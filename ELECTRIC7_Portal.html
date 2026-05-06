@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ELECTRIC 7 — Maintenance PM Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:       #0f1510;
+  --bg2:      #141c17;
+  --surface:  #1a2420;
+  --surface2: #1f2d27;
+  --border:   rgba(80,130,95,0.18);
+  --steel:    #4a7a5a;
+  --steel2:   #5d9970;
+  --accent:   #c0392b;
+  --gold:     #d4a032;
+  --ok:       #27ae60;
+  --warn:     #f39c12;
+  --text:     #d4e8db;
+  --text2:    #8fb89a;
+  --text3:    #4a6a54;
+  --mono:     'Share Tech Mono', monospace;
+  --sans:     'Barlow', sans-serif;
+  --rajdhani: 'Rajdhani', sans-serif;
+  --glow:     0 0 30px rgba(39,174,96,0.12);
+}
+*, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* ── ANIMATED GRID BG ──────────────────────────── */
+body::before {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background-image:
+    linear-gradient(rgba(39,174,96,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(39,174,96,0.03) 1px, transparent 1px);
+  background-size: 48px 48px;
+  animation: gridShift 40s linear infinite;
+  pointer-events: none;
+}
+@keyframes gridShift { from{background-position:0 0} to{background-position:48px 48px} }
+
+body::after {
+  content: '';
+  position: fixed; inset: 0; z-index: 0;
+  background:
+    radial-gradient(ellipse at 15% 20%, rgba(39,174,96,0.07) 0%, transparent 50%),
+    radial-gradient(ellipse at 85% 75%, rgba(74,122,90,0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(15,21,16,0.4) 0%, transparent 80%);
+  pointer-events: none;
+}
+
+/* ── TOPBAR ─────────────────────────────────────── */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  height: 52px;
+  background: rgba(10,14,11,0.92);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center;
+  padding: 0 32px; gap: 0;
+}
+.topbar::after {
+  content: '';
+  position: absolute; bottom: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--steel2), transparent);
+  opacity: 0.5;
+}
+.topbar-logo {
+  font-family: var(--rajdhani); font-size: 22px; font-weight: 700;
+  letter-spacing: 4px; color: #fff;
+  display: flex; align-items: center; gap: 10px;
+}
+.topbar-logo span { color: var(--ok); }
+.topbar-logo .pipe { color: var(--text3); font-weight: 300; margin: 0 4px; }
+.topbar-plant {
+  font-size: 12px; color: var(--text2); letter-spacing: 2px;
+  font-family: var(--mono); margin-left: 20px;
+  border-left: 1px solid var(--border); padding-left: 20px;
+}
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 16px; }
+.live-indicator { display: flex; align-items: center; gap: 7px; }
+.live-dot { width:7px; height:7px; border-radius:50%; background:var(--ok); animation:pulse 2s ease-in-out infinite; }
+@keyframes pulse { 0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(39,174,96,0.4)} 50%{opacity:0.6;box-shadow:0 0 0 5px rgba(39,174,96,0)} }
+.live-text { font-family:var(--mono); font-size:12px; color:var(--text2); }
+.topbar-time { font-family:var(--mono); font-size:13px; color:var(--steel2); }
+
+/* ── HERO SECTION ───────────────────────────────── */
+.hero {
+  position: relative; z-index: 1;
+  padding: 80px 48px 60px;
+  max-width: 1380px; margin: 0 auto;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  gap: 40px; flex-wrap: wrap;
+}
+.hero-left {}
+.hero-eyebrow {
+  font-family: var(--mono); font-size: 11px; color: var(--ok);
+  letter-spacing: 3px; text-transform: uppercase;
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 18px;
+}
+.hero-eyebrow::before { content:''; width:28px; height:1px; background:var(--ok); }
+
+.hero-title {
+  font-family: var(--rajdhani); font-weight: 700; line-height: 0.92;
+  letter-spacing: -1px; margin-bottom: 6px;
+}
+.hero-title .line1 { font-size: 80px; color: var(--text2); display: block; }
+.hero-title .line2 { font-size: 100px; color: #fff; display: block; }
+.hero-title .line3 {
+  font-size: 32px; color: var(--ok); display: block;
+  letter-spacing: 8px; font-weight: 600; margin-top: 6px;
+}
+
+.hero-sub {
+  margin-top: 22px; font-size: 15px; color: var(--text2);
+  max-width: 480px; line-height: 1.7; font-weight: 300;
+}
+
+.hero-right { display: flex; flex-direction: column; align-items: flex-end; gap: 16px; }
+.hero-stats { display: flex; gap: 2px; }
+.hstat {
+  padding: 18px 22px; text-align: center;
+  border: 1px solid var(--border);
+  background: rgba(26,36,32,0.8);
+  backdrop-filter: blur(8px);
+}
+.hstat:first-child { border-radius: 10px 0 0 10px; }
+.hstat:last-child  { border-radius: 0 10px 10px 0; }
+.hstat-num {
+  font-family: var(--rajdhani); font-size: 36px; font-weight: 700;
+  color: #fff; line-height: 1; display: block;
+}
+.hstat-num.green { color: var(--ok); }
+.hstat-num.gold  { color: var(--gold); }
+.hstat-num.red   { color: var(--accent); }
+.hstat-lbl { font-family: var(--mono); font-size: 10px; color: var(--text3); letter-spacing: 1.5px; text-transform: uppercase; margin-top: 4px; display: block; }
+
+/* ── DIVIDER ────────────────────────────────────── */
+.section-divider {
+  position: relative; z-index: 1;
+  max-width: 1380px; margin: 0 auto;
+  padding: 0 48px 0;
+  display: flex; align-items: center; gap: 16px;
+}
+.divider-line { flex: 1; height: 1px; background: var(--border); }
+.divider-label {
+  font-family: var(--mono); font-size: 11px; color: var(--text3);
+  letter-spacing: 3px; text-transform: uppercase; white-space: nowrap;
+}
+.divider-diamond { width:6px; height:6px; background:var(--ok); transform:rotate(45deg); flex-shrink:0; }
+
+/* ── MAIN CONTENT ───────────────────────────────── */
+.main-content {
+  position: relative; z-index: 1;
+  max-width: 1380px; margin: 0 auto;
+  padding: 32px 48px 80px;
+}
+
+/* ── CATEGORY SECTION ───────────────────────────── */
+.category-section { margin-bottom: 52px; }
+.cat-header {
+  display: flex; align-items: center; gap: 14px;
+  margin-bottom: 20px; padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap; gap: 12px;
+}
+.cat-icon {
+  width: 38px; height: 38px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; flex-shrink: 0;
+}
+.cat-title {
+  font-family: var(--rajdhani); font-size: 20px; font-weight: 700;
+  color: #fff; letter-spacing: 1.5px; text-transform: uppercase;
+}
+.cat-sub { font-family: var(--mono); font-size: 11px; color: var(--text3); letter-spacing: 1px; }
+.cat-count {
+  margin-left: auto; font-family: var(--mono); font-size: 12px;
+  color: var(--text3); padding: 3px 10px; border: 1px solid var(--border);
+  border-radius: 20px;
+}
+
+/* ── ASSET GRID ─────────────────────────────────── */
+.asset-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+/* ── ASSET CARD ─────────────────────────────────── */
+.asset-card {
+  position: relative; overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  text-decoration: none; color: inherit; display: block;
+  animation: fadeUp 0.5s ease both;
+}
+.asset-card::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--steel2), transparent);
+  opacity: 0; transition: opacity 0.2s;
+}
+.asset-card:hover { 
+  transform: translateY(-4px);
+  border-color: rgba(93,153,112,0.4);
+  background: var(--surface2);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(93,153,112,0.2), var(--glow);
+}
+.asset-card:hover::before { opacity: 1; }
+
+/* Status stripe on left */
+.asset-card::after {
+  content: '';
+  position: absolute; top: 16px; bottom: 16px; left: 0; width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--text3);
+  transition: background 0.2s;
+}
+.asset-card.status-ready::after    { background: var(--ok); }
+.asset-card.status-pending::after  { background: var(--warn); }
+.asset-card.status-draft::after    { background: var(--gold); }
+.asset-card.status-na::after       { background: var(--text3); }
+
+/* Card: coming soon state */
+.asset-card.coming-soon {
+  opacity: 0.55; cursor: default;
+  background: rgba(26,36,32,0.4);
+}
+.asset-card.coming-soon:hover {
+  transform: none; border-color: var(--border);
+  background: rgba(26,36,32,0.4); box-shadow: none;
+}
+.asset-card.coming-soon::before { display:none; }
+
+/* Card elements */
+.card-tag {
+  font-family: var(--mono); font-size: 10px; color: var(--text3);
+  letter-spacing: 1.5px; text-transform: uppercase;
+  margin-bottom: 8px; display: flex; align-items: center; gap: 6px;
+}
+.card-tag-dot { width:5px; height:5px; border-radius:50%; background:currentColor; }
+.card-name {
+  font-family: var(--rajdhani); font-size: 17px; font-weight: 700;
+  color: #fff; line-height: 1.2; margin-bottom: 5px;
+}
+.card-desc { font-size: 12px; color: var(--text2); line-height: 1.6; margin-bottom: 14px; }
+
+.card-footer {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-top: 12px; border-top: 1px solid var(--border);
+  flex-wrap: wrap; gap: 6px;
+}
+.card-freq {
+  font-family: var(--mono); font-size: 10px; color: var(--text3);
+  padding: 3px 8px; border: 1px solid var(--border); border-radius: 3px;
+  letter-spacing: 1px;
+}
+.card-status {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  padding: 3px 10px; border-radius: 3px; letter-spacing: 1px; text-transform: uppercase;
+}
+.cs-ready   { background: rgba(39,174,96,0.12);  color:var(--ok);   border:1px solid rgba(39,174,96,0.3); }
+.cs-pending { background: rgba(243,156,18,0.12); color:var(--warn); border:1px solid rgba(243,156,18,0.3); }
+.cs-draft   { background: rgba(212,160,50,0.12); color:var(--gold); border:1px solid rgba(212,160,50,0.3); }
+.cs-soon    { background: rgba(74,106,84,0.12);  color:var(--text3);border:1px solid var(--border); }
+
+.card-arrow {
+  position: absolute; top: 18px; right: 18px;
+  font-size: 16px; color: var(--text3);
+  transition: all 0.2s; opacity: 0;
+}
+.asset-card:not(.coming-soon):hover .card-arrow { opacity: 1; transform: translate(2px, -2px); }
+
+/* ── NOTICE BANNER ──────────────────────────────── */
+.notice-banner {
+  position: relative; z-index: 1;
+  max-width: 1380px; margin: 0 auto;
+  padding: 0 48px 24px;
+}
+.notice-inner {
+  background: rgba(39,174,96,0.06);
+  border: 1px solid rgba(39,174,96,0.2);
+  border-radius: 8px; padding: 14px 20px;
+  display: flex; align-items: center; gap: 12px; font-size: 13px;
+  color: var(--text2);
+}
+.notice-inner strong { color: var(--ok); }
+
+/* ── FOOTER ─────────────────────────────────────── */
+.footer {
+  position: relative; z-index: 1;
+  border-top: 1px solid var(--border);
+  padding: 28px 48px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;
+}
+.footer-left { font-family: var(--mono); font-size: 11px; color: var(--text3); letter-spacing: 1px; }
+.footer-right { font-family: var(--mono); font-size: 11px; color: var(--text3); letter-spacing: 1px; }
+
+/* ── SEARCH ─────────────────────────────────────── */
+.search-wrap {
+  position: relative; z-index: 1;
+  max-width: 1380px; margin: 0 auto;
+  padding: 0 48px 28px;
+}
+.search-box {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 8px; padding: 10px 16px;
+  max-width: 440px;
+}
+.search-box input {
+  background: transparent; border: none; outline: none;
+  color: var(--text); font-family: var(--sans); font-size: 14px;
+  flex: 1; width: 100%;
+}
+.search-box input::placeholder { color: var(--text3); }
+.search-icon { color: var(--text3); font-size: 15px; flex-shrink: 0; }
+
+/* ── ANIMATIONS ─────────────────────────────────── */
+@keyframes fadeUp { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+.asset-card:nth-child(1){animation-delay:.04s}
+.asset-card:nth-child(2){animation-delay:.08s}
+.asset-card:nth-child(3){animation-delay:.12s}
+.asset-card:nth-child(4){animation-delay:.16s}
+.asset-card:nth-child(5){animation-delay:.20s}
+.asset-card:nth-child(6){animation-delay:.24s}
+.asset-card:nth-child(7){animation-delay:.28s}
+.asset-card:nth-child(8){animation-delay:.32s}
+.asset-card:nth-child(9){animation-delay:.36s}
+
+/* ── RESPONSIVE ─────────────────────────────────── */
+@media(max-width:900px){
+  .hero { padding:48px 24px 40px; }
+  .hero-title .line1 { font-size:52px; }
+  .hero-title .line2 { font-size:68px; }
+  .hero-title .line3 { font-size:22px; }
+  .main-content { padding:24px 24px 60px; }
+  .section-divider { padding:0 24px; }
+  .search-wrap { padding:0 24px 20px; }
+  .notice-banner { padding:0 24px 20px; }
+  .footer { padding:20px 24px; }
+}
+@media(max-width:600px){
+  .topbar { padding:0 16px; }
+  .topbar-plant { display:none; }
+  .hero-stats { display:none; }
+  .asset-grid { grid-template-columns:1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="topbar-logo">
+    ELECTRIC <span>7</span>
+  </div>
+  <div class="topbar-plant">PLTU · MAINTENANCE DEPT.</div>
+  <div class="topbar-right">
+    <div class="live-indicator">
+      <div class="live-dot"></div>
+      <span class="live-text">PORTAL ACTIVE</span>
+    </div>
+    <span class="topbar-time" id="clock">--:--:--</span>
+  </div>
+</div>
+
+<!-- ══ HERO ══════════════════════════════════════════════ -->
+<section class="hero">
+  <div class="hero-left">
+    <div class="hero-eyebrow">Maintenance PM Portal</div>
+    <div class="hero-title">
+      <span class="line1">ELECTRIC</span>
+      <span class="line2">7</span>
+      <span class="line3">CHECK SHEET SYSTEM</span>
+    </div>
+    <p class="hero-sub">
+      Centralized portal for Preventive Maintenance check sheets — covering all electrical assets in the ELECTRIC 7 system. Select an asset below to open its digital check sheet and generate a PDF report.
+    </p>
+  </div>
+  <div class="hero-right">
+    <div class="hero-stats">
+      <div class="hstat">
+        <span class="hstat-num" id="total-assets">0</span>
+        <span class="hstat-lbl">Total Assets</span>
+      </div>
+      <div class="hstat">
+        <span class="hstat-num green" id="ready-count">0</span>
+        <span class="hstat-lbl">Ready</span>
+      </div>
+      <div class="hstat">
+        <span class="hstat-num gold" id="draft-count">0</span>
+        <span class="hstat-lbl">Draft</span>
+      </div>
+      <div class="hstat">
+        <span class="hstat-num" style="color:var(--text3)" id="soon-count">0</span>
+        <span class="hstat-lbl">Coming Soon</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══ NOTICE ════════════════════════════════════════════ -->
+<div class="notice-banner">
+  <div class="notice-inner">
+    💡 <span>Cards marked <strong>READY</strong> are linked to an active check sheet. Cards marked <strong>COMING SOON</strong> are placeholders — replace the <code style="background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-family:var(--mono)">href="#"</code> attribute with the actual file path when the check sheet is ready.</span>
+  </div>
+</div>
+
+<!-- ══ SEARCH ════════════════════════════════════════════ -->
+<div class="search-wrap">
+  <div class="search-box">
+    <span class="search-icon">🔍</span>
+    <input type="text" id="search-input" placeholder="Search asset name or tag…" oninput="filterCards()">
+  </div>
+</div>
+
+<!-- ══ MAIN CONTENT ══════════════════════════════════════ -->
+<div class="main-content">
+
+  <!-- ────────────────────────────────────────────────────
+       CATEGORY 1: DC SYSTEM & BATTERY CHARGER
+  ──────────────────────────────────────────────────────── -->
+  <div class="category-section" data-cat="dc-system">
+    <div class="cat-header">
+      <div class="cat-icon" style="background:rgba(39,174,96,0.12)">🔋</div>
+      <div>
+        <div class="cat-title">DC System & Battery Charger</div>
+        <div class="cat-sub">125VDC / 110VDC Distribution · Battery Charger Units · DCDB</div>
+      </div>
+      <div class="cat-count" id="cnt-dc">— items</div>
+    </div>
+    <div class="asset-grid">
+
+      <!-- BYC-125 A/B — READY (already made) -->
+      <a class="asset-card status-ready" href="PM_CheckSheet_BYC125.html" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-BYC-125 A/B</div>
+        <div class="card-name">Battery Charger Unit 125 A/B</div>
+        <div class="card-desc">2 Yearly PM — Rectifier, SCR/IGBT, transformer, cooling fan, float/equalize voltage check.</div>
+        <div class="card-footer">
+          <span class="card-freq">2 YEARLY</span>
+          <span class="card-status cs-ready">✓ READY</span>
+        </div>
+      </a>
+
+      <!-- BYC-125 C/D -->
+      <a class="asset-card status-pending coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-BYC-125 C/D</div>
+        <div class="card-name">Battery Charger Unit 125 C/D</div>
+        <div class="card-desc">2 Yearly PM — Rectifier, SCR/IGBT, transformer, cooling fan, float/equalize voltage check.</div>
+        <div class="card-footer">
+          <span class="card-freq">2 YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <!-- DCDB-125 -->
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-DCDB-125</div>
+        <div class="card-name">DC Distribution Board 125V</div>
+        <div class="card-desc">Yearly PM — Bus voltage, breaker condition, connection torque check, busbar temp IR scan.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <!-- Battery Bank -->
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-BAT-125</div>
+        <div class="card-name">Battery Bank 125VDC</div>
+        <div class="card-desc">Yearly PM — Cell voltage, specific gravity, electrolyte level, inter-cell connection, capacity test.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────
+       CATEGORY 2: TRANSFORMER
+  ──────────────────────────────────────────────────────── -->
+  <div class="section-divider"><div class="divider-line"></div><div class="divider-diamond"></div><div class="divider-label">Transformer</div><div class="divider-diamond"></div><div class="divider-line"></div></div>
+
+  <div class="category-section" style="margin-top:28px" data-cat="transformer">
+    <div class="cat-header">
+      <div class="cat-icon" style="background:rgba(212,160,50,0.12)">⚡</div>
+      <div>
+        <div class="cat-title">Transformer</div>
+        <div class="cat-sub">Unit Transformer · Station Service Transformer · Auxiliary Transformer</div>
+      </div>
+      <div class="cat-count" id="cnt-tx">— items</div>
+    </div>
+    <div class="asset-grid">
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-UT-001</div>
+        <div class="card-name">Unit Transformer</div>
+        <div class="card-desc">Yearly PM — Oil level, BDV, winding resistance, tap changer, bushing insulation, IR scan.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-SST-001</div>
+        <div class="card-name">Station Service Transformer</div>
+        <div class="card-desc">Yearly PM — Oil analysis, winding insulation, load tap changer, cooling system, IR thermography.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-AUX-TX</div>
+        <div class="card-name">Auxiliary Transformer</div>
+        <div class="card-desc">Yearly PM — Dry-type winding, terminal connections, cooling fan, insulation resistance (500VDC).</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────
+       CATEGORY 3: SWITCHGEAR & MV PANEL
+  ──────────────────────────────────────────────────────── -->
+  <div class="section-divider"><div class="divider-line"></div><div class="divider-diamond"></div><div class="divider-label">Switchgear & MV Panel</div><div class="divider-diamond"></div><div class="divider-line"></div></div>
+
+  <div class="category-section" style="margin-top:28px" data-cat="switchgear">
+    <div class="cat-header">
+      <div class="cat-icon" style="background:rgba(88,166,255,0.10)">🔌</div>
+      <div>
+        <div class="cat-title">Switchgear & MV Panel</div>
+        <div class="cat-sub">6kV / 11kV / 20kV Switchgear · LV Switchboard · MCC</div>
+      </div>
+      <div class="cat-count" id="cnt-sg">— items</div>
+    </div>
+    <div class="asset-grid">
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-SWG-6KV</div>
+        <div class="card-name">6kV Switchgear</div>
+        <div class="card-desc">Yearly PM — Vacuum breaker, bus bar insulation, PT/CT secondary, relay trip test, IR scan.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-MCC-001</div>
+        <div class="card-name">Motor Control Centre (MCC)</div>
+        <div class="card-desc">Yearly PM — MCCB, contactor, overload relay, bus bar condition, terminal torque, door gasket.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-LV-SWB</div>
+        <div class="card-name">LV Switchboard 380V</div>
+        <div class="card-desc">Yearly PM — ACB/MCCB condition, bus bar temp, feeder labeling, interlock mechanism check.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-PMCC-001</div>
+        <div class="card-name">Power MCC — Boiler</div>
+        <div class="card-desc">Yearly PM — Starter, VFD, thermal relay setting, busbar connection, overcurrent protection.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────
+       CATEGORY 4: MOTOR & DRIVE
+  ──────────────────────────────────────────────────────── -->
+  <div class="section-divider"><div class="divider-line"></div><div class="divider-diamond"></div><div class="divider-label">Motor & Drive</div><div class="divider-diamond"></div><div class="divider-line"></div></div>
+
+  <div class="category-section" style="margin-top:28px" data-cat="motor">
+    <div class="cat-header">
+      <div class="cat-icon" style="background:rgba(192,57,43,0.12)">⚙️</div>
+      <div>
+        <div class="cat-title">Motor & Variable Speed Drive</div>
+        <div class="cat-sub">HV Motor · LV Motor · VFD · Soft Starter</div>
+      </div>
+      <div class="cat-count" id="cnt-motor">— items</div>
+    </div>
+    <div class="asset-grid">
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-BFP-MTR</div>
+        <div class="card-name">Boiler Feed Pump Motor (HV)</div>
+        <div class="card-desc">Yearly PM — Winding insulation, bearing temperature, vibration, terminal connection, PI index.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-CWP-MTR</div>
+        <div class="card-name">Cooling Water Pump Motor</div>
+        <div class="card-desc">Yearly PM — Insulation resistance, bearing condition, coupling alignment, terminal tightness.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-VFD-001</div>
+        <div class="card-name">Variable Frequency Drive (VFD)</div>
+        <div class="card-desc">Yearly PM — DC bus voltage, IGBT temperature, cooling fan, filter, firmware parameter backup.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-ID-FAN-MTR</div>
+        <div class="card-name">ID Fan Motor</div>
+        <div class="card-desc">Yearly PM — Insulation resistance, winding temperature, vibration spectrum, bearing lubrication.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-PA-FAN-MTR</div>
+        <div class="card-name">PA Fan Motor</div>
+        <div class="card-desc">Yearly PM — Insulation resistance, current balance, bearing temperature, coupling check.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────
+       CATEGORY 5: PROTECTION RELAY & METERING
+  ──────────────────────────────────────────────────────── -->
+  <div class="section-divider"><div class="divider-line"></div><div class="divider-diamond"></div><div class="divider-label">Protection & Metering</div><div class="divider-diamond"></div><div class="divider-line"></div></div>
+
+  <div class="category-section" style="margin-top:28px" data-cat="protection">
+    <div class="cat-header">
+      <div class="cat-icon" style="background:rgba(142,68,173,0.12)">🛡️</div>
+      <div>
+        <div class="cat-title">Protection Relay & Metering</div>
+        <div class="cat-sub">Numerical Relay · Overcurrent · Differential · Energy Meter</div>
+      </div>
+      <div class="cat-count" id="cnt-prot">— items</div>
+    </div>
+    <div class="asset-grid">
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-REL-OC</div>
+        <div class="card-name">Overcurrent Relay (OCR)</div>
+        <div class="card-desc">2 Yearly PM — Setting verification, trip test, CT ratio check, timing test, event log review.</div>
+        <div class="card-footer">
+          <span class="card-freq">2 YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-REL-DIFF</div>
+        <div class="card-name">Differential Relay (87T)</div>
+        <div class="card-desc">2 Yearly PM — Bias characteristic test, CT check, interposing CT, restraint current, trip test.</div>
+        <div class="card-footer">
+          <span class="card-freq">2 YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-MET-KWHR</div>
+        <div class="card-name">Energy Meter (kWh)</div>
+        <div class="card-desc">Yearly PM — Meter accuracy, PT/CT secondary circuit, display reading, billing reconciliation.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────
+       CATEGORY 6: UPS & INVERTER
+  ──────────────────────────────────────────────────────── -->
+  <div class="section-divider"><div class="divider-line"></div><div class="divider-diamond"></div><div class="divider-label">UPS & Inverter</div><div class="divider-diamond"></div><div class="divider-line"></div></div>
+
+  <div class="category-section" style="margin-top:28px" data-cat="ups">
+    <div class="cat-header">
+      <div class="cat-icon" style="background:rgba(88,166,255,0.10)">🔄</div>
+      <div>
+        <div class="cat-title">UPS & Inverter</div>
+        <div class="cat-sub">Online UPS · Static Inverter · Bypass Switch</div>
+      </div>
+      <div class="cat-count" id="cnt-ups">— items</div>
+    </div>
+    <div class="asset-grid">
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-UPS-001</div>
+        <div class="card-name">Online UPS — Control System</div>
+        <div class="card-desc">Yearly PM — Input/output voltage, battery health, bypass test, runtime test, alarm check.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-INV-001</div>
+        <div class="card-name">Static Inverter</div>
+        <div class="card-desc">Yearly PM — DC input voltage, AC output voltage/frequency, thyristor temp, filter capacitor.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- ────────────────────────────────────────────────────
+       CATEGORY 7: GROUNDING & LIGHTNING PROTECTION
+  ──────────────────────────────────────────────────────── -->
+  <div class="section-divider"><div class="divider-line"></div><div class="divider-diamond"></div><div class="divider-label">Grounding & Lightning</div><div class="divider-diamond"></div><div class="divider-line"></div></div>
+
+  <div class="category-section" style="margin-top:28px" data-cat="grounding">
+    <div class="cat-header">
+      <div class="cat-icon" style="background:rgba(243,156,18,0.10)">⚡</div>
+      <div>
+        <div class="cat-title">Grounding & Lightning Protection</div>
+        <div class="cat-sub">Earthing System · Lightning Arrester · Surge Protection Device</div>
+      </div>
+      <div class="cat-count" id="cnt-gnd">— items</div>
+    </div>
+    <div class="asset-grid">
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-GND-SYSTEM</div>
+        <div class="card-name">Earthing / Grounding System</div>
+        <div class="card-desc">Yearly PM — Earth electrode resistance (≤1Ω), continuity check, visual inspection ground conductor.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-LA-ARRESTER</div>
+        <div class="card-name">Lightning Arrester</div>
+        <div class="card-desc">Yearly PM — Leakage current, resistive current, counter reading, visual insulator inspection.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+      <a class="asset-card coming-soon" href="#" target="_blank">
+        <span class="card-arrow">↗</span>
+        <div class="card-tag"><span class="card-tag-dot"></span>7EB-SPD-001</div>
+        <div class="card-name">Surge Protection Device (SPD)</div>
+        <div class="card-desc">Yearly PM — SPD indicator status, earth continuity, physical damage inspection, replacement check.</div>
+        <div class="card-footer">
+          <span class="card-freq">YEARLY</span>
+          <span class="card-status cs-soon">COMING SOON</span>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+</div><!-- /main-content -->
+
+<!-- ══ FOOTER ════════════════════════════════════════════ -->
+<footer class="footer">
+  <div class="footer-left">ELECTRIC 7 · PLTU MAINTENANCE PORTAL · DEPARTEMEN MAINTENANCE</div>
+  <div class="footer-right" id="footer-date">—</div>
+</footer>
+
+<!-- ════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════ -->
+<script>
+// ── CLOCK ─────────────────────────────────────────
+function tick() {
+  const now = new Date();
+  document.getElementById('clock').textContent = now.toLocaleTimeString('id-ID');
+  document.getElementById('footer-date').textContent =
+    now.toLocaleDateString('en-GB', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(tick, 1000); tick();
+
+// ── COUNT STATS ───────────────────────────────────
+function countStats() {
+  const all    = document.querySelectorAll('.asset-card');
+  const ready  = document.querySelectorAll('.asset-card.status-ready');
+  const draft  = document.querySelectorAll('.asset-card.status-draft');
+  const soon   = document.querySelectorAll('.asset-card.coming-soon');
+  document.getElementById('total-assets').textContent = all.length;
+  document.getElementById('ready-count').textContent  = ready.length;
+  document.getElementById('draft-count').textContent  = draft.length;
+  document.getElementById('soon-count').textContent   = soon.length;
+}
+
+// Count per category
+function countCategories() {
+  const map = {
+    'dc-system':   'cnt-dc',
+    'transformer': 'cnt-tx',
+    'switchgear':  'cnt-sg',
+    'motor':       'cnt-motor',
+    'protection':  'cnt-prot',
+    'ups':         'cnt-ups',
+    'grounding':   'cnt-gnd',
+  };
+  Object.entries(map).forEach(([cat, elId]) => {
+    const sec  = document.querySelector(`[data-cat="${cat}"]`);
+    const cntEl = document.getElementById(elId);
+    if (sec && cntEl) {
+      const n = sec.querySelectorAll('.asset-card').length;
+      cntEl.textContent = `${n} item${n!==1?'s':''}`;
+    }
+  });
+}
+
+// ── SEARCH FILTER ─────────────────────────────────
+function filterCards() {
+  const q = document.getElementById('search-input').value.toLowerCase().trim();
+  document.querySelectorAll('.asset-card').forEach(card => {
+    const text = card.textContent.toLowerCase();
+    card.style.display = (!q || text.includes(q)) ? '' : 'none';
+  });
+  // hide empty category headers
+  document.querySelectorAll('.category-section').forEach(sec => {
+    const visible = [...sec.querySelectorAll('.asset-card')].some(c => c.style.display !== 'none');
+    sec.style.display = visible ? '' : 'none';
+  });
+}
+
+// ── HOW TO ADD A NEW CARD (dev hint) ──────────────
+/* 
+  To add a new check sheet:
+  1. Find the correct category-section
+  2. Copy a card template:
+
+  <a class="asset-card status-ready" href="YOUR_FILE.html" target="_blank">
+    <span class="card-arrow">↗</span>
+    <div class="card-tag"><span class="card-tag-dot"></span>TAG-NUMBER</div>
+    <div class="card-name">Equipment Name</div>
+    <div class="card-desc">PM description…</div>
+    <div class="card-footer">
+      <span class="card-freq">YEARLY</span>
+      <span class="card-status cs-ready">✓ READY</span>
+    </div>
+  </a>
+
+  Status classes:
+  - status-ready  → cs-ready   (green, link active)
+  - status-pending → cs-pending (yellow, coming soon → add coming-soon class)
+  - status-draft  → cs-draft   (gold)
+  - (no class)    → cs-soon + coming-soon
+*/
+
+// ── INIT ──────────────────────────────────────────
+countStats();
+countCategories();
+</script>
+</body>
+</html>

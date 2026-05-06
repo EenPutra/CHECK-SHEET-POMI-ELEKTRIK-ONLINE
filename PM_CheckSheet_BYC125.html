@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>2 Yearly PM — 7EB-BYC-125 A/B Battery Charger</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #e8ece9;
+  --bg2: #dde3de;
+  --panel: rgba(255,255,255,0.78);
+  --panel-border: rgba(180,200,185,0.6);
+  --steel: #4a5e52;
+  --steel-light: #6b8474;
+  --accent: #c0392b;
+  --ok: #27ae60;
+  --warn: #f39c12;
+  --fail: #c0392b;
+  --na: #8e44ad;
+  --text: #1a2620;
+  --text2: #3d5248;
+  --text3: #7a9485;
+  --shadow: 0 4px 24px rgba(30,60,40,0.10);
+  --shadow2: 0 2px 8px rgba(30,60,40,0.08);
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Barlow', sans-serif;
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(ellipse at 20% 10%, rgba(180,210,190,0.45) 0%, transparent 55%),
+    radial-gradient(ellipse at 85% 80%, rgba(160,195,170,0.3) 0%, transparent 50%),
+    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none'%3E%3Cg fill='%234a5e52' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ── TOPBAR ─────────────────────────────────── */
+.topbar {
+  background: linear-gradient(90deg,#2c3e30 0%,#3d5248 60%,#2c3e30 100%);
+  color: #c8dcd0; padding: 0 32px;
+  display: flex; align-items: center; gap: 20px;
+  height: 52px; border-bottom: 2px solid #27ae6044;
+  position: sticky; top:0; z-index:100;
+}
+.topbar-logo { font-family:'Rajdhani',sans-serif; font-size:20px; font-weight:700; letter-spacing:3px; color:#a8d4b8; }
+.topbar-sep  { width:1px; height:28px; background:#4a6a54; }
+.topbar-sub  { font-size:13px; color:#7aaa8a; letter-spacing:1px; }
+.topbar-right{ margin-left:auto; display:flex; align-items:center; gap:12px; }
+.live-dot    { width:8px; height:8px; border-radius:50%; background:var(--ok); animation:blink 2s ease-in-out infinite; }
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0.3}}
+.topbar-time { font-family:'Share Tech Mono',monospace; font-size:13px; color:#7aaa8a; }
+
+/* ── WRAPPER ────────────────────────────────── */
+.wrapper { max-width:1300px; margin:0 auto; padding:32px 24px 80px; }
+
+.page-header { display:flex; align-items:flex-end; gap:24px; margin-bottom:28px; animation:fadeUp .5s ease both; flex-wrap:wrap; }
+.page-header-title { font-family:'Rajdhani',sans-serif; font-size:38px; font-weight:700; color:var(--steel); line-height:1; letter-spacing:1px; }
+.page-header-title span { color:var(--accent); }
+.page-header-sub { font-size:13px; color:var(--text3); letter-spacing:1.5px; text-transform:uppercase; margin-bottom:4px; }
+.badge { display:inline-block; padding:3px 10px; border-radius:3px; font-family:'Share Tech Mono',monospace; font-size:11px; letter-spacing:1px; background:#27ae6022; color:var(--ok); border:1px solid #27ae6044; }
+
+/* ── PANEL ──────────────────────────────────── */
+.panel {
+  background:var(--panel); border:1px solid var(--panel-border);
+  border-radius:12px; padding:24px 28px; margin-bottom:22px;
+  box-shadow:var(--shadow); backdrop-filter:blur(8px);
+  animation:fadeUp .5s ease both;
+}
+.section-label {
+  font-family:'Rajdhani',sans-serif; font-size:13px; font-weight:600;
+  letter-spacing:3px; text-transform:uppercase; color:var(--text3);
+  margin-bottom:18px; display:flex; align-items:center; gap:10px;
+}
+.section-label::after { content:''; flex:1; height:1px; background:var(--panel-border); }
+.section-label.red { color:var(--accent); }
+.section-label.red::after { background:rgba(192,57,43,0.2); }
+
+/* ── META GRID ──────────────────────────────── */
+.meta-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:8px; }
+.meta-grid-3 { display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+.meta-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+.meta-field { display:flex; flex-direction:column; gap:5px; }
+.meta-field label { font-size:12px; color:var(--text3); font-weight:500; letter-spacing:1px; text-transform:uppercase; }
+.meta-field input, .meta-field select, .meta-field textarea {
+  border:1.5px solid var(--panel-border); border-radius:6px;
+  padding:7px 11px; font-family:'Barlow',sans-serif; font-size:14px;
+  background:#f4f8f5; color:var(--text); transition:border-color .2s; width:100%;
+}
+.meta-field input[type=date], .meta-field input[type=time] { font-family:'Share Tech Mono',monospace; }
+.meta-field input:focus, .meta-field select:focus, .meta-field textarea:focus {
+  outline:none; border-color:var(--steel-light); background:#fff;
+}
+.meta-field textarea { resize:vertical; min-height:60px; }
+
+/* ── BUTTONS ────────────────────────────────── */
+.btn-row { display:flex; gap:12px; flex-wrap:wrap; margin-top:0; }
+.btn {
+  padding:9px 22px; border-radius:6px; border:none; cursor:pointer;
+  font-family:'Rajdhani',sans-serif; font-size:15px; font-weight:600;
+  letter-spacing:1px; transition:all .15s; display:inline-flex; align-items:center; gap:6px;
+}
+.btn-primary { background:var(--steel); color:#fff; }
+.btn-primary:hover { background:var(--steel-light); transform:translateY(-1px); box-shadow:var(--shadow2); }
+.btn-pdf { background:#c0392b; color:#fff; }
+.btn-pdf:hover { background:#a93226; transform:translateY(-1px); box-shadow:var(--shadow2); }
+.btn-outline { background:transparent; border:1.5px solid var(--panel-border); color:var(--steel); }
+.btn-outline:hover { background:var(--bg2); }
+.btn-sm { padding:5px 14px; font-size:13px; }
+
+/* ── MAIN CHECK TABLE ───────────────────────── */
+.check-table { width:100%; border-collapse:separate; border-spacing:0; font-size:14px; }
+.check-table th {
+  font-family:'Rajdhani',sans-serif; font-size:12px; font-weight:600;
+  letter-spacing:2px; text-transform:uppercase; color:var(--text3);
+  padding:10px 14px; text-align:left; border-bottom:2px solid var(--panel-border);
+  background:rgba(74,94,82,0.04);
+}
+.check-table th.center { text-align:center; }
+.check-table td { padding:8px 12px; border-bottom:1px solid rgba(180,200,185,0.3); vertical-align:middle; }
+.check-table tr:last-child td { border-bottom:none; }
+.check-table tr:hover td { background:rgba(74,94,82,0.03); }
+.check-table .sub-header td {
+  background:rgba(74,94,82,0.07); font-family:'Rajdhani',sans-serif;
+  font-size:13px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase;
+  color:var(--steel); padding:7px 14px;
+}
+.check-table .meas-row td { background:rgba(240,245,241,0.5); }
+.task-no { font-family:'Share Tech Mono',monospace; font-size:13px; color:var(--text3); min-width:32px; }
+.task-desc { color:var(--text); line-height:1.5; }
+.task-desc small { display:block; color:var(--text3); font-size:12px; margin-top:2px; font-style:italic; }
+
+/* Toggle Result Buttons */
+.result-cell { display:flex; gap:5px; justify-content:center; align-items:center; flex-wrap:nowrap; }
+.r-btn {
+  border:1.5px solid; border-radius:4px; cursor:pointer; background:transparent;
+  font-family:'Share Tech Mono',monospace; font-size:11px; font-weight:700;
+  padding:4px 10px; transition:all .15s; letter-spacing:.5px; white-space:nowrap;
+}
+.r-btn.ok-btn  { color:var(--ok);   border-color:rgba(39,174,96,0.4); }
+.r-btn.ng-btn  { color:var(--fail); border-color:rgba(192,57,43,0.4); }
+.r-btn.na-btn  { color:var(--na);   border-color:rgba(142,68,173,0.4); }
+.r-btn.ok-btn.active  { background:rgba(39,174,96,0.15);  border-color:var(--ok); }
+.r-btn.ng-btn.active  { background:rgba(192,57,43,0.15);  border-color:var(--fail); }
+.r-btn.na-btn.active  { background:rgba(142,68,173,0.15); border-color:var(--na); }
+
+/* Measurement input cells */
+.meas-input {
+  border:1.5px solid var(--panel-border); border-radius:5px;
+  padding:5px 8px; font-family:'Share Tech Mono',monospace; font-size:13px;
+  background:#f4f8f5; color:var(--text); transition:border-color .2s;
+  width:100%; min-width:90px;
+}
+.meas-input:focus { outline:none; border-color:var(--steel-light); background:#fff; }
+.meas-unit { font-size:11px; color:var(--text3); white-space:nowrap; display:block; margin-top:2px; font-family:'Share Tech Mono',monospace; }
+.meas-ref  { font-size:11px; color:var(--ok); font-family:'Share Tech Mono',monospace; }
+
+/* ── PHOTO UPLOAD ───────────────────────────── */
+.photo-section-grid { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+.photo-block { }
+.photo-block-title { font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:600; color:var(--steel); margin-bottom:10px; letter-spacing:1px; text-transform:uppercase; }
+.photo-drop {
+  border:2px dashed var(--panel-border); border-radius:8px;
+  aspect-ratio:4/3; display:flex; flex-direction:column; align-items:center;
+  justify-content:center; cursor:pointer; transition:all .2s;
+  background:rgba(74,94,82,0.03); position:relative; overflow:hidden;
+}
+.photo-drop:hover { border-color:var(--steel-light); background:rgba(74,94,82,0.07); }
+.photo-drop input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.photo-drop-icon { font-size:28px; margin-bottom:8px; }
+.photo-drop-hint { font-size:12px; color:var(--text3); text-align:center; }
+.photo-drop img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; border-radius:6px; }
+.photo-caption-wrap { margin-top:8px; }
+.photo-caption-wrap input {
+  width:100%; border:1.5px solid var(--panel-border); border-radius:6px;
+  padding:6px 10px; font-size:13px; background:#f4f8f5; color:var(--text);
+  font-family:'Barlow',sans-serif;
+}
+.photo-caption-wrap input:focus { outline:none; border-color:var(--steel-light); }
+.photo-del-btn {
+  position:absolute; top:6px; right:6px; background:rgba(192,57,43,0.85);
+  border:none; color:#fff; width:22px; height:22px; border-radius:50%;
+  cursor:pointer; font-size:14px; display:none; align-items:center; justify-content:center; z-index:5;
+}
+.photo-drop.has-photo .photo-del-btn { display:flex; }
+
+/* ── SIGNATURE ──────────────────────────────── */
+.sig-wrap { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.sig-block { }
+.sig-title { font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:600; color:var(--steel); margin-bottom:8px; letter-spacing:1px; text-transform:uppercase; }
+canvas.sig-canvas {
+  border:1.5px solid var(--panel-border); border-radius:8px;
+  background:#f4f8f5; width:100%; height:130px; display:block; cursor:crosshair; touch-action:none;
+}
+
+/* ── STATS ROW ──────────────────────────────── */
+.stat-row { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:20px; }
+.stat-chip {
+  padding:10px 20px; border-radius:8px; font-family:'Rajdhani',sans-serif;
+  font-weight:600; font-size:15px; display:flex; align-items:center; gap:8px; border:1.5px solid;
+}
+.stat-chip span { font-size:22px; font-weight:700; }
+.stat-chip.total { background:#f0f4f1; border-color:#b4c8bc; color:var(--steel); }
+.stat-chip.ok    { background:#e8f8ee; border-color:#27ae6030; color:var(--ok); }
+.stat-chip.ng    { background:#fdecea; border-color:#c0392b30; color:var(--fail); }
+.stat-chip.na    { background:#f3e8fd; border-color:#8e44ad30; color:var(--na); }
+
+/* ── NOTICE ─────────────────────────────────── */
+.notice { margin-top:14px; padding:11px 15px; border-radius:7px; font-size:13px; display:none; }
+.notice.ok  { background:#e8f8ee; border:1px solid #27ae6030; color:#1e8449; display:block; }
+.notice.err { background:#fdecea; border:1px solid #c0392b30; color:#922b21; display:block; }
+.notice.info { background:#e8f4fd; border:1px solid #3498db30; color:#1a5276; display:block; }
+
+/* ── ANIMATIONS ─────────────────────────────── */
+@keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+
+/* ── RESPONSIVE ─────────────────────────────── */
+@media(max-width:900px){
+  .meta-grid { grid-template-columns:repeat(2,1fr); }
+  .photo-section-grid { grid-template-columns:1fr; }
+  .sig-wrap { grid-template-columns:1fr; }
+}
+@media(max-width:600px){
+  .wrapper { padding:16px 12px 60px; }
+  .meta-grid { grid-template-columns:1fr 1fr; }
+  .check-table { font-size:12px; }
+}
+
+/* ── PRINT / PDF HIDE ───────────────────────── */
+@media print {
+  .topbar, .btn-row, .btn, .r-btn { display:none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ════════════════════════════════════════ -->
+<div class="topbar">
+  <span class="topbar-logo">PLTU</span>
+  <div class="topbar-sep"></div>
+  <span class="topbar-sub">2 YEARLY PREVENTIVE MAINTENANCE</span>
+  <div class="topbar-sep"></div>
+  <span class="topbar-sub">7EB-BYC-125 A/B · BATTERY CHARGER</span>
+  <div class="topbar-right">
+    <div class="live-dot"></div>
+    <span class="topbar-time" id="clock">--:--:--</span>
+    <div class="topbar-sep"></div>
+    <button class="btn btn-outline btn-sm" onclick="saveDraft()">💾 Save Draft</button>
+    <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 Download PDF</button>
+  </div>
+</div>
+
+<!-- ══ WRAPPER ═══════════════════════════════════════ -->
+<div class="wrapper">
+
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <div>
+      <div class="page-header-sub">Preventive Maintenance · 2 Yearly</div>
+      <div class="page-header-title">7EB-BYC-<span>125 A/B</span></div>
+    </div>
+    <div>
+      <span class="badge">BATTERY CHARGER UNIT</span>
+    </div>
+    <div style="margin-left:auto;">
+      <div class="stat-row" id="stat-row">
+        <div class="stat-chip total">Total <span id="cnt-total">0</span></div>
+        <div class="stat-chip ok">OK <span id="cnt-ok">0</span></div>
+        <div class="stat-chip ng">NG <span id="cnt-ng">0</span></div>
+        <div class="stat-chip na">N/A <span id="cnt-na">0</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SECTION 1: WORK ORDER INFO ══ -->
+  <div class="panel" style="animation-delay:.05s">
+    <div class="section-label">Work Order Information</div>
+    <div class="meta-grid">
+      <div class="meta-field">
+        <label>Work Order No.</label>
+        <input type="text" id="wo-no" placeholder="WO-2025-XXXX">
+      </div>
+      <div class="meta-field">
+        <label>Date of Execution</label>
+        <input type="date" id="wo-date">
+      </div>
+      <div class="meta-field">
+        <label>Time Start</label>
+        <input type="time" id="time-start">
+      </div>
+      <div class="meta-field">
+        <label>Time Finish</label>
+        <input type="time" id="time-end">
+      </div>
+    </div>
+    <div class="meta-grid" style="margin-top:12px">
+      <div class="meta-field">
+        <label>Checked By (Technician)</label>
+        <input type="text" id="checked-by" placeholder="Full name">
+      </div>
+      <div class="meta-field">
+        <label>NIK / Employee ID</label>
+        <input type="text" id="nik" placeholder="NIK-XXXXX">
+      </div>
+      <div class="meta-field">
+        <label>Reviewed By (Supervisor)</label>
+        <input type="text" id="reviewed-by" placeholder="Full name">
+      </div>
+      <div class="meta-field">
+        <label>Shift</label>
+        <select id="shift">
+          <option>Shift 1 (07:00–15:00)</option>
+          <option>Shift 2 (15:00–23:00)</option>
+          <option>Shift 3 (23:00–07:00)</option>
+          <option>Normal Hours (08:00–17:00)</option>
+        </select>
+      </div>
+    </div>
+    <div class="meta-grid-2" style="margin-top:12px">
+      <div class="meta-field">
+        <label>Equipment Tag</label>
+        <input type="text" id="equip-tag" value="7EB-BYC-125 A/B" placeholder="Equipment Tag Number">
+      </div>
+      <div class="meta-field">
+        <label>Unit / Plant Location</label>
+        <input type="text" id="location" placeholder="cth: Unit 8 — DC System Room">
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ SECTION A: CABINET CHECKS ══ -->
+  <div class="panel" style="animation-delay:.10s">
+    <div class="section-label">Section A — 7EB-BYC-125 Cabinet</div>
+    <div style="overflow-x:auto">
+    <table class="check-table" id="tbl-cabinet">
+      <thead>
+        <tr>
+          <th style="width:44px">No.</th>
+          <th>Task Description</th>
+          <th class="center" style="width:160px">7EB-BYC-125A</th>
+          <th class="center" style="width:160px">7EB-BYC-125B</th>
+          <th style="width:160px">Remarks</th>
+        </tr>
+      </thead>
+      <tbody>
+
+        <!-- Task 1 -->
+        <tr>
+          <td class="task-no">1</td>
+          <td class="task-desc">Check Top Cover/Plate for Corrosion Damage<br><small>Replace / Repair / Repaint if Required</small></td>
+          <td><div class="result-cell" id="r1a"></div></td>
+          <td><div class="result-cell" id="r1b"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+
+        <!-- Task 2 -->
+        <tr>
+          <td class="task-no">2</td>
+          <td class="task-desc">Check All Cable Entry Conduits are Connected Securely and Sealed Properly</td>
+          <td><div class="result-cell" id="r2a"></div></td>
+          <td><div class="result-cell" id="r2b"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+
+        <!-- Task 3 -->
+        <tr>
+          <td class="task-no">3</td>
+          <td class="task-desc">Check &amp; Clean / Replace the Air Filters<br><small>Shutdown Battery Charger for Cleaning if Required</small></td>
+          <td><div class="result-cell" id="r3a"></div></td>
+          <td><div class="result-cell" id="r3b"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+
+        <!-- Task 4 -->
+        <tr>
+          <td class="task-no">4</td>
+          <td class="task-desc">Check for Any Alarms / Errors Light ON and Reset with Reason &amp; Action</td>
+          <td><div class="result-cell" id="r4a"></div></td>
+          <td><div class="result-cell" id="r4b"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+
+        <!-- Task 5: Cooling Fans -->
+        <tr>
+          <td class="task-no">5</td>
+          <td class="task-desc">Check Cooling Fans to Satisfy Running at ≥90% Design Speed<br><small>Accepted: RPM &gt;1500, no abnormal noise</small></td>
+          <td><div class="result-cell" id="r5a"></div></td>
+          <td><div class="result-cell" id="r5b"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+
+        <!-- Sub: Cooling Fan RPM Measurements -->
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">
+            CAB1 — Cooling Fan 1 RPM
+            <span class="meas-ref">Ref: &gt;1500 RPM</span>
+          </td>
+          <td style="text-align:center">
+            <input class="meas-input" type="number" placeholder="e.g. 1680" id="fan1a-rpm">
+            <span class="meas-unit">RPM</span>
+          </td>
+          <td style="text-align:center">
+            <input class="meas-input" type="number" placeholder="e.g. 1680" id="fan1b-rpm">
+            <span class="meas-unit">RPM</span>
+          </td>
+          <td></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">
+            CAB1 — Cooling Fan 2 RPM
+            <span class="meas-ref">Ref: &gt;1500 RPM</span>
+          </td>
+          <td style="text-align:center">
+            <input class="meas-input" type="number" placeholder="e.g. 1700" id="fan2a-rpm">
+            <span class="meas-unit">RPM</span>
+          </td>
+          <td style="text-align:center">
+            <input class="meas-input" type="number" placeholder="e.g. 1700" id="fan2b-rpm">
+            <span class="meas-unit">RPM</span>
+          </td>
+          <td></td>
+        </tr>
+
+        <!-- Task 6: Temperature Transformers -->
+        <tr>
+          <td class="task-no">6</td>
+          <td class="task-desc">Check Temperature of Transformers &amp; Inductors<br><small>Use IR Thermal Imager / Thermometer</small></td>
+          <td><div class="result-cell" id="r6a"></div></td>
+          <td><div class="result-cell" id="r6b"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">Transformer Temperature <span class="meas-ref">Ref: &lt;80°C</span></td>
+          <td style="text-align:center">
+            <input class="meas-input" type="number" step="0.1" placeholder="°C" id="tx-temp-a">
+            <span class="meas-unit">°C</span>
+          </td>
+          <td style="text-align:center">
+            <input class="meas-input" type="number" step="0.1" placeholder="°C" id="tx-temp-b">
+            <span class="meas-unit">°C</span>
+          </td>
+          <td></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">Inductor Temperature <span class="meas-ref">Ref: &lt;80°C</span></td>
+          <td style="text-align:center">
+            <input class="meas-input" type="number" step="0.1" placeholder="°C" id="ind-temp-a">
+            <span class="meas-unit">°C</span>
+          </td>
+          <td style="text-align:center">
+            <input class="meas-input" type="number" step="0.1" placeholder="°C" id="ind-temp-b">
+            <span class="meas-unit">°C</span>
+          </td>
+          <td></td>
+        </tr>
+
+        <!-- Task 7: SCR Temperature -->
+        <tr>
+          <td class="task-no">7</td>
+          <td class="task-desc">Check Temperature of SCR's<br><small>Use IR Thermal Imager / Thermometer</small></td>
+          <td><div class="result-cell" id="r7a"></div></td>
+          <td><div class="result-cell" id="r7b"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">SCR Temperature <span class="meas-ref">Ref: &lt;100°C</span></td>
+          <td style="text-align:center">
+            <input class="meas-input" type="number" step="0.1" placeholder="°C" id="scr-temp-a">
+            <span class="meas-unit">°C</span>
+          </td>
+          <td style="text-align:center">
+            <input class="meas-input" type="number" step="0.1" placeholder="°C" id="scr-temp-b">
+            <span class="meas-unit">°C</span>
+          </td>
+          <td></td>
+        </tr>
+
+        <!-- Task 8: Float DC Voltage -->
+        <tr>
+          <td class="task-no">8</td>
+          <td class="task-desc">Check Float DC Output Voltage Characteristic<br><small>Satisfy 127VDC Nominal (126.0 ~ 127.5 VDC)</small></td>
+          <td><div class="result-cell" id="r8a"></div></td>
+          <td><div class="result-cell" id="r8b"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">Voltage In <span class="meas-ref">Ref: 380–415 VAC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V AC" id="vin-a"><span class="meas-unit">Volt AC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V AC" id="vin-b"><span class="meas-unit">Volt AC</span></td>
+          <td></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">Current In <span class="meas-ref">Ref: Nameplate</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="A AC" id="iin-a"><span class="meas-unit">Amp AC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="A AC" id="iin-b"><span class="meas-unit">Amp AC</span></td>
+          <td></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">Voltage Out <span class="meas-ref">Ref: 126.0–127.5 VDC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V DC" id="vout-a"><span class="meas-unit">Volt DC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V DC" id="vout-b"><span class="meas-unit">Volt DC</span></td>
+          <td></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">Current Out <span class="meas-ref">Ref: Nameplate</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="A DC" id="iout-a"><span class="meas-unit">Amp DC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="A DC" id="iout-b"><span class="meas-unit">Amp DC</span></td>
+          <td></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">Float Voltage <span class="meas-ref">Ref: 126.0–127.5 VDC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V DC" id="vfloat-a"><span class="meas-unit">Volt DC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V DC" id="vfloat-b"><span class="meas-unit">Volt DC</span></td>
+          <td></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">Equalize Voltage <span class="meas-ref">Ref: 130–135 VDC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V DC" id="veq-a"><span class="meas-unit">Volt DC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V DC" id="veq-b"><span class="meas-unit">Volt DC</span></td>
+          <td></td>
+        </tr>
+
+        <!-- Task 9: Voltage Mon Switch -->
+        <tr>
+          <td class="task-no">9</td>
+          <td class="task-desc">Operate and Record Voltage Mon. Switch (Volt AC)</td>
+          <td><div class="result-cell" id="r9a"></div></td>
+          <td><div class="result-cell" id="r9b"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">R–S Phase Voltage <span class="meas-ref">Ref: 380–415 VAC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V" id="vrs-a"><span class="meas-unit">Volt AC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V" id="vrs-b"><span class="meas-unit">Volt AC</span></td>
+          <td></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">S–T Phase Voltage <span class="meas-ref">Ref: 380–415 VAC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V" id="vst-a"><span class="meas-unit">Volt AC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V" id="vst-b"><span class="meas-unit">Volt AC</span></td>
+          <td></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">R–T Phase Voltage <span class="meas-ref">Ref: 380–415 VAC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V" id="vrt-a"><span class="meas-unit">Volt AC</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="V" id="vrt-b"><span class="meas-unit">Volt AC</span></td>
+          <td></td>
+        </tr>
+
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- ══ SECTION A (2 YEARLY ITEMS) ══ -->
+  <div class="panel" style="animation-delay:.15s">
+    <div class="section-label red">Section A — 2 Yearly Tasks (Deep Inspection)</div>
+    <div style="overflow-x:auto">
+    <table class="check-table">
+      <thead>
+        <tr>
+          <th style="width:44px">No.</th>
+          <th>Task Description</th>
+          <th class="center" style="width:160px">7EB-BYC-125A</th>
+          <th class="center" style="width:160px">7EB-BYC-125B</th>
+          <th style="width:160px">Remarks</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td class="task-no">10</td><td class="task-desc">Thoroughly Clean All Accumulated Dust / Dirt / Foreign Particles</td><td><div class="result-cell" id="r10a"></div></td><td><div class="result-cell" id="r10b"></div></td><td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td></tr>
+        <tr><td class="task-no">11</td><td class="task-desc">Check for Damage to Paint Finish, Be Touched Up to Avoid Corrosion</td><td><div class="result-cell" id="r11a"></div></td><td><div class="result-cell" id="r11b"></div></td><td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td></tr>
+        <tr><td class="task-no">13</td><td class="task-desc">Inspect All Wires &amp; Connections for Sign of Burnt, Loose, Frayed or Broken</td><td><div class="result-cell" id="r13a"></div></td><td><div class="result-cell" id="r13b"></div></td><td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td></tr>
+        <tr><td class="task-no">14</td><td class="task-desc">Inspect All Transformers, Inductors, SCR's/IGBT's &amp; Control Boards for Sign of Burnt</td><td><div class="result-cell" id="r14a"></div></td><td><div class="result-cell" id="r14b"></div></td><td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td></tr>
+        <!-- Task 15: Insulation -->
+        <tr>
+          <td class="task-no">15</td>
+          <td class="task-desc">Check All Transformer &amp; Inductors Winding Insulation<br><small>500VDC test — Satisfy ≥5 MΩ</small></td>
+          <td><div class="result-cell" id="r15a"></div></td>
+          <td><div class="result-cell" id="r15b"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">Transformer Insulation Resistance <span class="meas-ref">Ref: ≥5 MΩ</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="MΩ" id="tx-ins-a"><span class="meas-unit">MΩ</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="MΩ" id="tx-ins-b"><span class="meas-unit">MΩ</span></td>
+          <td></td>
+        </tr>
+        <tr class="meas-row">
+          <td></td>
+          <td class="task-desc" style="padding-left:24px">Inductor Insulation Resistance <span class="meas-ref">Ref: ≥5 MΩ</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="MΩ" id="ind-ins-a"><span class="meas-unit">MΩ</span></td>
+          <td style="text-align:center"><input class="meas-input" type="number" step="0.1" placeholder="MΩ" id="ind-ins-b"><span class="meas-unit">MΩ</span></td>
+          <td></td>
+        </tr>
+        <tr><td class="task-no">16</td><td class="task-desc">Test All SCR's/IGBTs Overheat Protection Sensor/Switch<br><small>Satisfy ±5% Deviation</small></td><td><div class="result-cell" id="r16a"></div></td><td><div class="result-cell" id="r16b"></div></td><td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td></tr>
+        <tr><td class="task-no">17</td><td class="task-desc">Inspect Snubber Networks (Across the Thyristor) for Loose Connection or Crack Joints</td><td><div class="result-cell" id="r17a"></div></td><td><div class="result-cell" id="r17b"></div></td><td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td></tr>
+        <tr><td class="task-no">18</td><td class="task-desc">Re-torque All High Current Connections and Secure Any Loose Connections</td><td><div class="result-cell" id="r18a"></div></td><td><div class="result-cell" id="r18b"></div></td><td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td></tr>
+        <tr><td class="task-no">19</td><td class="task-desc">Ensure All Cable Entry Conduits are Connected Securely and Sealed Properly</td><td><div class="result-cell" id="r19a"></div></td><td><div class="result-cell" id="r19b"></div></td><td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td></tr>
+        <tr><td class="task-no">20</td><td class="task-desc">Set Float DC Output Voltage to Satisfy 127VDC Nominal (126.0 ~ 127.5 VDC)</td><td><div class="result-cell" id="r20a"></div></td><td><div class="result-cell" id="r20b"></div></td><td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- ══ SECTION B: ROOM / CUBICLE ══ -->
+  <div class="panel" style="animation-delay:.20s">
+    <div class="section-label">Section B — 7EB-BYC-125 Room / Cubicle</div>
+    <div style="overflow-x:auto">
+    <table class="check-table">
+      <thead>
+        <tr>
+          <th style="width:44px">No.</th>
+          <th>Task Description</th>
+          <th class="center" style="width:160px">Result</th>
+          <th style="width:200px">Measured Value</th>
+          <th style="width:160px">Remarks</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="task-no">21</td>
+          <td class="task-desc">Ensure Air Conditioning Unit to Satisfy Room Temperature<br><small>Ref: ≤20°C</small></td>
+          <td><div class="result-cell" id="r21"></div></td>
+          <td><input class="meas-input" type="number" step="0.1" id="room-temp" placeholder="°C"><span class="meas-unit">°C</span></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="task-no">22</td>
+          <td class="task-desc">Measure the Relative Humidity<br><small>Ref: &lt;60% RH</small></td>
+          <td><div class="result-cell" id="r22"></div></td>
+          <td><input class="meas-input" type="number" step="0.1" id="humidity" placeholder="% RH"><span class="meas-unit">% RH</span></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="task-no">23</td>
+          <td class="task-desc">Measure the Audible Noise<br><small>Ref: ≤60 dB(A) at ≤1.5 meters</small></td>
+          <td><div class="result-cell" id="r23"></div></td>
+          <td><input class="meas-input" type="number" step="0.1" id="noise" placeholder="dB(A)"><span class="meas-unit">dB(A)</span></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="task-no">24</td>
+          <td class="task-desc">BYC Room/Cubicle: Set Air Conditioning Unit to Satisfy Room Temperature<br><small>Ref: ≤20°C</small></td>
+          <td><div class="result-cell" id="r24"></div></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="AC setpoint…"></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="task-no">25</td>
+          <td class="task-desc">BYC Room/Cubicle: Ensure Audible Noise ≤60 dB(A) at ≤1.5 Meters</td>
+          <td><div class="result-cell" id="r25"></div></td>
+          <td></td>
+          <td><input class="meas-input" style="font-family:'Barlow',sans-serif;font-size:13px" placeholder="Remark…"></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <!-- ══ SECTION C: EVIDENCE PICTURES ══ -->
+  <div class="panel" style="animation-delay:.25s">
+    <div class="section-label">Section C — Evidence Pictures</div>
+
+    <!-- Row 1: Room Cubicle -->
+    <div style="margin-bottom:22px">
+      <div class="section-label" style="font-size:12px; margin-bottom:12px">Task 26 — 7EB-BYC-125 Room Cubicle</div>
+      <div class="photo-section-grid">
+        <div class="photo-block">
+          <div class="photo-block-title">Room / Cubicle Overview</div>
+          <div class="photo-drop" id="pd-room1" data-idx="room1">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-room1')">
+            <button class="photo-del-btn" onclick="delPhoto('pd-room1',event)">×</button>
+            <div class="photo-drop-icon">📷</div>
+            <div class="photo-drop-hint">Click or drag to upload photo</div>
+          </div>
+          <div class="photo-caption-wrap"><input type="text" placeholder="Photo caption…" id="cap-room1"></div>
+        </div>
+        <div class="photo-block">
+          <div class="photo-block-title">Additional Room View</div>
+          <div class="photo-drop" id="pd-room2" data-idx="room2">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-room2')">
+            <button class="photo-del-btn" onclick="delPhoto('pd-room2',event)">×</button>
+            <div class="photo-drop-icon">📷</div>
+            <div class="photo-drop-hint">Click or drag to upload photo</div>
+          </div>
+          <div class="photo-caption-wrap"><input type="text" placeholder="Photo caption…" id="cap-room2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 2: Cabinet Condition -->
+    <div style="margin-bottom:22px">
+      <div class="section-label" style="font-size:12px; margin-bottom:12px">Task 27 — 7EB-BYC-125 Condition (Component, Cabinet, Transformer, Inductor)</div>
+      <div class="photo-section-grid">
+        <div class="photo-block">
+          <div class="photo-block-title">7EB-BYC-125A Condition</div>
+          <div class="photo-drop" id="pd-condA" data-idx="condA">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-condA')">
+            <button class="photo-del-btn" onclick="delPhoto('pd-condA',event)">×</button>
+            <div class="photo-drop-icon">📷</div>
+            <div class="photo-drop-hint">Click or drag to upload photo</div>
+          </div>
+          <div class="photo-caption-wrap"><input type="text" placeholder="Photo caption…" id="cap-condA"></div>
+        </div>
+        <div class="photo-block">
+          <div class="photo-block-title">7EB-BYC-125B Condition</div>
+          <div class="photo-drop" id="pd-condB" data-idx="condB">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-condB')">
+            <button class="photo-del-btn" onclick="delPhoto('pd-condB',event)">×</button>
+            <div class="photo-drop-icon">📷</div>
+            <div class="photo-drop-hint">Click or drag to upload photo</div>
+          </div>
+          <div class="photo-caption-wrap"><input type="text" placeholder="Photo caption…" id="cap-condB"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Thermal -->
+    <div>
+      <div class="section-label" style="font-size:12px; margin-bottom:12px">Task 28 — 7EB-BYC-125 Thermal Condition (IR Thermography)</div>
+      <div class="photo-section-grid">
+        <div class="photo-block">
+          <div class="photo-block-title">7EB-BYC-125A Thermal</div>
+          <div class="photo-drop" id="pd-thermA" data-idx="thermA">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-thermA')">
+            <button class="photo-del-btn" onclick="delPhoto('pd-thermA',event)">×</button>
+            <div class="photo-drop-icon">🌡️</div>
+            <div class="photo-drop-hint">Upload IR thermal image</div>
+          </div>
+          <div class="photo-caption-wrap"><input type="text" placeholder="Max temp, hotspot location…" id="cap-thermA"></div>
+        </div>
+        <div class="photo-block">
+          <div class="photo-block-title">7EB-BYC-125B Thermal</div>
+          <div class="photo-drop" id="pd-thermB" data-idx="thermB">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-thermB')">
+            <button class="photo-del-btn" onclick="delPhoto('pd-thermB',event)">×</button>
+            <div class="photo-drop-icon">🌡️</div>
+            <div class="photo-drop-hint">Upload IR thermal image</div>
+          </div>
+          <div class="photo-caption-wrap"><input type="text" placeholder="Max temp, hotspot location…" id="cap-thermB"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ══ FINDINGS & CONCLUSION ══ -->
+  <div class="panel" style="animation-delay:.30s">
+    <div class="section-label">Findings, Actions & Conclusion</div>
+    <div class="meta-grid-2" style="margin-bottom:14px">
+      <div class="meta-field">
+        <label>Overall Equipment Condition</label>
+        <select id="overall">
+          <option value="">-- Select --</option>
+          <option>✅ GOOD — Normal Operation</option>
+          <option>⚠️ FAIR — Requires Monitoring</option>
+          <option>🔧 POOR — Maintenance Required</option>
+          <option>🛑 CRITICAL — Must Shutdown</option>
+        </select>
+      </div>
+      <div class="meta-field">
+        <label>Next PM Due Date</label>
+        <input type="date" id="next-pm">
+      </div>
+    </div>
+    <div class="meta-grid-2">
+      <div class="meta-field">
+        <label>Findings / Observations</label>
+        <textarea id="findings" rows="4" placeholder="List all findings, abnormalities, or observations found during this PM…"></textarea>
+      </div>
+      <div class="meta-field">
+        <label>Corrective Actions / Recommendations</label>
+        <textarea id="recommendations" rows="4" placeholder="Actions taken and follow-up recommendations…"></textarea>
+      </div>
+    </div>
+    <div class="meta-field" style="margin-top:12px">
+      <label>Spare Parts / Materials Used</label>
+      <textarea id="spareparts" rows="2" placeholder="e.g. 1x Air Filter (P/N: XXX), 1x Cooling Fan Motor, etc."></textarea>
+    </div>
+  </div>
+
+  <!-- ══ SIGNATURES ══ -->
+  <div class="panel" style="animation-delay:.35s">
+    <div class="section-label">Authorization & Signatures</div>
+    <div class="sig-wrap">
+      <div class="sig-block">
+        <div class="sig-title">Checked By — Technician</div>
+        <div class="meta-field" style="margin-bottom:10px">
+          <label>Name</label>
+          <input type="text" id="sig-tech-name" placeholder="Full name">
+        </div>
+        <canvas class="sig-canvas" id="sig-tech" width="600" height="130"></canvas>
+        <div style="margin-top:8px; display:flex; gap:8px;">
+          <button class="btn btn-outline btn-sm" onclick="clearSig('sig-tech')">✕ Clear</button>
+        </div>
+      </div>
+      <div class="sig-block">
+        <div class="sig-title">Reviewed By — Supervisor</div>
+        <div class="meta-field" style="margin-bottom:10px">
+          <label>Name</label>
+          <input type="text" id="sig-super-name" placeholder="Full name">
+        </div>
+        <canvas class="sig-canvas" id="sig-super" width="600" height="130"></canvas>
+        <div style="margin-top:8px; display:flex; gap:8px;">
+          <button class="btn btn-outline btn-sm" onclick="clearSig('sig-super')">✕ Clear</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Row -->
+  <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:flex-end; padding-bottom:20px;">
+    <button class="btn btn-outline" onclick="saveDraft()">💾 Save Draft</button>
+    <button class="btn btn-primary" onclick="resetForm()">🔄 Reset Form</button>
+    <button class="btn btn-pdf" onclick="generatePDF()">📄 Download PDF Report</button>
+  </div>
+
+  <div id="pdf-notice" class="notice" style="margin-top:0;display:none"></div>
+
+</div><!-- /wrapper -->
+
+<!-- ════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════ -->
+<script>
+// ── CLOCK ─────────────────────────────────────────
+function tick() {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('id-ID');
+}
+setInterval(tick, 1000); tick();
+
+// ── RESULT TOGGLE BUTTONS ─────────────────────────
+const resultIds = [
+  'r1a','r1b','r2a','r2b','r3a','r3b','r4a','r4b','r5a','r5b',
+  'r6a','r6b','r7a','r7b','r8a','r8b','r9a','r9b',
+  'r10a','r10b','r11a','r11b','r13a','r13b','r14a','r14b',
+  'r15a','r15b','r16a','r16b','r17a','r17b','r18a','r18b',
+  'r19a','r19b','r20a','r20b',
+  'r21','r22','r23','r24','r25'
+];
+
+function buildToggles() {
+  resultIds.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = `
+      <button class="r-btn ok-btn" data-id="${id}" data-type="ok" onclick="setResult('${id}','ok',this)">OK</button>
+      <button class="r-btn ng-btn" data-id="${id}" data-type="ng" onclick="setResult('${id}','ng',this)">NG</button>
+      <button class="r-btn na-btn" data-id="${id}" data-type="na" onclick="setResult('${id}','na',this)">N/A</button>
+    `;
+  });
+}
+
+const resultState = {};
+
+function setResult(id, type, btn) {
+  const cell = document.getElementById(id);
+  const btns = cell.querySelectorAll('.r-btn');
+  const wasActive = btn.classList.contains('active');
+  btns.forEach(b => b.classList.remove('active'));
+  if (!wasActive) {
+    btn.classList.add('active');
+    resultState[id] = type;
+  } else {
+    delete resultState[id];
+  }
+  updateStats();
+}
+
+function updateStats() {
+  const vals = Object.values(resultState);
+  const ok = vals.filter(v => v === 'ok').length;
+  const ng = vals.filter(v => v === 'ng').length;
+  const na = vals.filter(v => v === 'na').length;
+  const total = ok + ng + na;
+  document.getElementById('cnt-total').textContent = total;
+  document.getElementById('cnt-ok').textContent = ok;
+  document.getElementById('cnt-ng').textContent = ng;
+  document.getElementById('cnt-na').textContent = na;
+}
+
+// ── PHOTO UPLOAD ──────────────────────────────────
+const photoStore = {};
+
+function loadPhoto(input, slotId) {
+  if (!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const slot = document.getElementById(slotId);
+    photoStore[slotId] = e.target.result;
+    let img = slot.querySelector('img');
+    if (!img) { img = document.createElement('img'); slot.appendChild(img); }
+    img.src = e.target.result;
+    slot.classList.add('has-photo');
+    const hint = slot.querySelector('.photo-drop-icon');
+    const hintTxt = slot.querySelector('.photo-drop-hint');
+    if (hint) hint.style.display = 'none';
+    if (hintTxt) hintTxt.style.display = 'none';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+function delPhoto(slotId, e) {
+  e.stopPropagation();
+  const slot = document.getElementById(slotId);
+  const img = slot.querySelector('img');
+  if (img) img.remove();
+  slot.classList.remove('has-photo');
+  const hint = slot.querySelector('.photo-drop-icon');
+  const hintTxt = slot.querySelector('.photo-drop-hint');
+  if (hint) hint.style.display = '';
+  if (hintTxt) hintTxt.style.display = '';
+  delete photoStore[slotId];
+}
+
+// ── SIGNATURE ─────────────────────────────────────
+function initSig(id) {
+  const canvas = document.getElementById(id);
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
+  function pos(e) {
+    const r = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / r.width;
+    const scaleY = canvas.height / r.height;
+    if (e.touches) return { x:(e.touches[0].clientX-r.left)*scaleX, y:(e.touches[0].clientY-r.top)*scaleY };
+    return { x:(e.clientX-r.left)*scaleX, y:(e.clientY-r.top)*scaleY };
+  }
+  canvas.addEventListener('mousedown', e => { drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); });
+  canvas.addEventListener('mousemove', e => { if(!drawing)return; const p=pos(e); ctx.strokeStyle='#2c3e30'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.lineTo(p.x,p.y); ctx.stroke(); });
+  canvas.addEventListener('mouseup', () => drawing=false);
+  canvas.addEventListener('mouseleave', () => drawing=false);
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing=true; const p=pos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }, {passive:false});
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); if(!drawing)return; const p=pos(e); ctx.strokeStyle='#2c3e30'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.lineTo(p.x,p.y); ctx.stroke(); }, {passive:false});
+  canvas.addEventListener('touchend', () => drawing=false);
+}
+function clearSig(id) {
+  const c = document.getElementById(id);
+  c.getContext('2d').clearRect(0,0,c.width,c.height);
+}
+
+// ── DRAFT SAVE / LOAD ─────────────────────────────
+function saveDraft() {
+  const data = {};
+  document.querySelectorAll('input[type=text],input[type=date],input[type=time],input[type=number],select,textarea').forEach((el,i) => {
+    data['f'+i] = el.value;
+  });
+  data._resultState = resultState;
+  try {
+    localStorage.setItem('byc125_draft', JSON.stringify(data));
+    showNotice('✅ Draft saved to browser storage.', 'ok');
+  } catch(e) { showNotice('❌ Could not save: ' + e.message, 'err'); }
+}
+function loadDraft() {
+  const raw = localStorage.getItem('byc125_draft');
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    document.querySelectorAll('input[type=text],input[type=date],input[type=time],input[type=number],select,textarea').forEach((el,i) => {
+      if (data['f'+i] !== undefined) el.value = data['f'+i];
+    });
+    if (data._resultState) {
+      Object.entries(data._resultState).forEach(([id, type]) => {
+        const cell = document.getElementById(id);
+        if (!cell) return;
+        const btn = cell.querySelector(`.${type}-btn`);
+        if (btn) btn.classList.add('active');
+        resultState[id] = type;
+      });
+    }
+    updateStats();
+  } catch(e) {}
+}
+function resetForm() {
+  if (!confirm('Reset all form data? This cannot be undone.')) return;
+  document.querySelectorAll('input,select,textarea').forEach(el => { if(el.type!=='file') el.value=''; });
+  Object.keys(resultState).forEach(k => delete resultState[k]);
+  document.querySelectorAll('.r-btn').forEach(b => b.classList.remove('active'));
+  clearSig('sig-tech'); clearSig('sig-super');
+  Object.keys(photoStore).forEach(k => { delPhoto(k, {stopPropagation:()=>{}}); });
+  updateStats();
+}
+
+// ── NOTICE ────────────────────────────────────────
+function showNotice(msg, type) {
+  const n = document.getElementById('pdf-notice');
+  n.textContent = msg; n.className = `notice ${type}`;
+  n.style.display = 'block';
+  setTimeout(() => n.style.display='none', 4000);
+}
+
+// ── HELPERS ───────────────────────────────────────
+function v(id) { const el=document.getElementById(id); return el?el.value.trim():''; }
+function trunc(s,n) { return s && s.length>n ? s.slice(0,n)+'…' : (s||''); }
+function getResult(id) {
+  const cell = document.getElementById(id);
+  if (!cell) return '—';
+  const active = cell.querySelector('.r-btn.active');
+  if (!active) return '—';
+  if (active.classList.contains('ok-btn')) return 'OK';
+  if (active.classList.contains('ng-btn')) return 'NG';
+  return 'N/A';
+}
+function getMeasVal(id) { const el=document.getElementById(id); return el?el.value||'—':'—'; }
+
+// ── PDF GENERATION ────────────────────────────────
+async function generatePDF() {
+  showNotice('⏳ Generating PDF, please wait…', 'info');
+  await new Promise(r => setTimeout(r, 200));
+
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const pW=210, pH=297, M=14;
+  let y = M;
+
+  // Color palette
+  const STEEL = [74,94,82];
+  const ACCENT = [192,57,43];
+  const OK_C = [39,174,96];
+  const NG_C = [192,57,43];
+  const NA_C = [142,68,173];
+  const LIGHT = [240,245,241];
+  const DARK = [44,62,48];
+
+  function newPage() {
+    pdf.addPage();
+    y = M;
+    // mini header
+    pdf.setFillColor(...DARK);
+    pdf.rect(0,0,pW,10,'F');
+    pdf.setTextColor(168,212,184);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8);
+    pdf.text('7EB-BYC-125 A/B — 2 YEARLY PM CHECK SHEET', M, 7);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7);
+    pdf.setTextColor(120,170,140);
+    pdf.text(`WO: ${v('wo-no') || '—'}  |  Date: ${v('wo-date') || '—'}`, pW-M, 7, {align:'right'});
+    y = 14;
+  }
+  function checkY(need) { if (y+need > pH-M) newPage(); }
+
+  // ── COVER HEADER ──────────────────────────────
+  pdf.setFillColor(...DARK);
+  pdf.rect(0,0,pW,42,'F');
+  pdf.setFillColor(...ACCENT);
+  pdf.rect(0,40,pW,2,'F');
+
+  pdf.setTextColor(240,245,241);
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(18);
+  pdf.text('2 YEARLY PM CHECK SHEET', M, 14);
+  pdf.setFontSize(13);
+  pdf.setTextColor(168,212,184);
+  pdf.text('7EB-BYC-125 A/B — Battery Charger Unit', M, 23);
+  pdf.setFontSize(9);
+  pdf.setTextColor(120,170,140);
+  pdf.text(`Generated: ${new Date().toLocaleString('en-GB')}`, M, 33);
+  pdf.text(`Ref: PLTU Maintenance Dept.`, pW-M, 33, {align:'right'});
+  y = 48;
+
+  // ── WORK ORDER BOX ────────────────────────────
+  pdf.setFillColor(244,248,245);
+  pdf.setDrawColor(180,200,185);
+  pdf.setLineWidth(0.3);
+  pdf.roundedRect(M, y, pW-M*2, 34, 2, 2, 'FD');
+  
+  const row1y = y+8, row2y = y+18, row3y = y+28;
+  function infoBlock(label, val, x, yy, w) {
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(7);
+    pdf.setTextColor(120,160,135);
+    pdf.text(label.toUpperCase(), x, yy);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(10);
+    pdf.setTextColor(...DARK);
+    pdf.text(trunc(val,28)||'—', x, yy+6);
+  }
+  const col = [M+3, 62, 115, 163];
+  infoBlock('Work Order', v('wo-no'), col[0], row1y);
+  infoBlock('Date', v('wo-date'), col[1], row1y);
+  infoBlock('Shift', v('shift').split(' ')[0]+' '+(v('shift').split(' ')[1]||''), col[2], row1y);
+  infoBlock('Time', `${v('time-start')||'--:--'} – ${v('time-end')||'--:--'}`, col[3], row1y);
+  infoBlock('Checked By', v('checked-by'), col[0], row2y);
+  infoBlock('NIK', v('nik'), col[1], row2y);
+  infoBlock('Reviewed By', v('reviewed-by'), col[2], row2y);
+  infoBlock('Location', v('location'), col[3], row2y);
+  y += 38;
+
+  // ── STATS ──────────────────────────────────────
+  checkY(16);
+  const sc = parseInt(document.getElementById('cnt-ok').textContent);
+  const fc = parseInt(document.getElementById('cnt-ng').textContent);
+  const nc = parseInt(document.getElementById('cnt-na').textContent);
+  const tc = sc+fc+nc;
+
+  const chips = [
+    [M, 'TOTAL', String(tc), STEEL],
+    [M+42, 'OK', String(sc), OK_C],
+    [M+84, 'NG', String(fc), NG_C],
+    [M+126, 'N/A', String(nc), NA_C],
+  ];
+  chips.forEach(([x, lbl, val, clr]) => {
+    pdf.setFillColor(clr[0],clr[1],clr[2],0.1);
+    pdf.setDrawColor(...clr); pdf.setLineWidth(0.4);
+    pdf.roundedRect(x, y, 36, 14, 2, 2, 'FD');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(7);
+    pdf.setTextColor(...clr);
+    pdf.text(lbl, x+3, y+5.5);
+    pdf.setFontSize(13);
+    pdf.text(val, x+3, y+12);
+  });
+  y += 20;
+
+  // ── SECTION HEADER HELPER ──────────────────────
+  function sectionHeader(title) {
+    checkY(14);
+    pdf.setFillColor(...STEEL);
+    pdf.rect(M, y, pW-M*2, 8, 'F');
+    pdf.setTextColor(240,245,241);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9);
+    pdf.text('▶  ' + title, M+3, y+5.5);
+    y += 11;
+  }
+
+  // ── TABLE HELPER ──────────────────────────────
+  function drawCheckTable(rows, hasAB=true) {
+    const head = hasAB
+      ? [['No.','Task Description','BYC-125A','BYC-125B','Remarks']]
+      : [['No.','Task Description','Result','Value','Remarks']];
+    const colW = hasAB ? [10,95,20,20,37] : [10,95,20,25,32];
+    const body = rows.map(r => {
+      if (r.type === 'meas') {
+        return [{ content: '', colSpan:1 }, r.label, r.valA||'—', r.valB||'—', ''];
+      }
+      return [r.no||'', r.task, r.resA||'—', r.resB||'—', r.remark||''];
+    });
+
+    pdf.autoTable({
+      startY: y,
+      head: head,
+      body: body,
+      theme: 'grid',
+      styles: {
+        font: 'helvetica', fontSize: 8, cellPadding: 3,
+        textColor: [26,38,32], lineColor: [200,215,205], lineWidth: 0.2,
+      },
+      headStyles: {
+        fillColor: [240,245,241], textColor: [90,120,100],
+        fontStyle:'bold', fontSize:7.5, halign:'center',
+      },
+      columnStyles: {
+        0: { halign:'center', cellWidth: colW[0] },
+        2: { halign:'center', cellWidth: colW[2] },
+        3: { halign:'center', cellWidth: colW[3] },
+      },
+      didParseCell: function(data) {
+        const val = data.cell.text[0];
+        if (val === 'OK')  { data.cell.styles.textColor = [...OK_C]; data.cell.styles.fontStyle='bold'; }
+        if (val === 'NG')  { data.cell.styles.textColor = [...NG_C]; data.cell.styles.fontStyle='bold'; }
+        if (val === 'N/A') { data.cell.styles.textColor = [...NA_C]; data.cell.styles.fontStyle='bold'; }
+      },
+      margin: { left: M, right: M },
+    });
+    y = pdf.lastAutoTable.finalY + 4;
+  }
+
+  // ── SECTION A: CABINET ────────────────────────
+  sectionHeader('Section A — 7EB-BYC-125 Cabinet');
+  drawCheckTable([
+    {no:'1', task:'Check Top Cover/Plate for Corrosion Damage', resA:getResult('r1a'), resB:getResult('r1b')},
+    {no:'2', task:'Check All Cable Entry Conduits Connected & Sealed', resA:getResult('r2a'), resB:getResult('r2b')},
+    {no:'3', task:'Check & Clean/Replace Air Filters', resA:getResult('r3a'), resB:getResult('r3b')},
+    {no:'4', task:'Check for Alarms/Errors Light and Reset', resA:getResult('r4a'), resB:getResult('r4b')},
+    {no:'5', task:'Check Cooling Fans ≥90% Design Speed (>1500 RPM)', resA:getResult('r5a'), resB:getResult('r5b')},
+    {type:'meas', label:'  Fan 1 RPM (Ref: >1500)', valA:getMeasVal('fan1a-rpm'), valB:getMeasVal('fan1b-rpm')},
+    {type:'meas', label:'  Fan 2 RPM (Ref: >1500)', valA:getMeasVal('fan2a-rpm'), valB:getMeasVal('fan2b-rpm')},
+    {no:'6', task:'Check Temperature of Transformers & Inductors (IR)', resA:getResult('r6a'), resB:getResult('r6b')},
+    {type:'meas', label:'  Transformer Temp °C (Ref:<80°C)', valA:getMeasVal('tx-temp-a'), valB:getMeasVal('tx-temp-b')},
+    {type:'meas', label:'  Inductor Temp °C (Ref:<80°C)', valA:getMeasVal('ind-temp-a'), valB:getMeasVal('ind-temp-b')},
+    {no:'7', task:"Check Temperature of SCR's (IR)", resA:getResult('r7a'), resB:getResult('r7b')},
+    {type:'meas', label:'  SCR Temp °C (Ref:<100°C)', valA:getMeasVal('scr-temp-a'), valB:getMeasVal('scr-temp-b')},
+    {no:'8', task:'Check Float DC Output Voltage (126.0~127.5VDC)', resA:getResult('r8a'), resB:getResult('r8b')},
+    {type:'meas', label:'  Voltage In (VAC)', valA:getMeasVal('vin-a'), valB:getMeasVal('vin-b')},
+    {type:'meas', label:'  Current In (AAC)', valA:getMeasVal('iin-a'), valB:getMeasVal('iin-b')},
+    {type:'meas', label:'  Voltage Out (VDC)', valA:getMeasVal('vout-a'), valB:getMeasVal('vout-b')},
+    {type:'meas', label:'  Current Out (ADC)', valA:getMeasVal('iout-a'), valB:getMeasVal('iout-b')},
+    {type:'meas', label:'  Float Voltage (VDC)', valA:getMeasVal('vfloat-a'), valB:getMeasVal('vfloat-b')},
+    {type:'meas', label:'  Equalize Voltage (VDC)', valA:getMeasVal('veq-a'), valB:getMeasVal('veq-b')},
+    {no:'9', task:'Operate & Record Voltage Mon. Switch (VAC)', resA:getResult('r9a'), resB:getResult('r9b')},
+    {type:'meas', label:'  R-S Phase Voltage (VAC)', valA:getMeasVal('vrs-a'), valB:getMeasVal('vrs-b')},
+    {type:'meas', label:'  S-T Phase Voltage (VAC)', valA:getMeasVal('vst-a'), valB:getMeasVal('vst-b')},
+    {type:'meas', label:'  R-T Phase Voltage (VAC)', valA:getMeasVal('vrt-a'), valB:getMeasVal('vrt-b')},
+  ]);
+
+  // ── SECTION A 2-YEARLY ────────────────────────
+  checkY(14);
+  sectionHeader('Section A — 2 Yearly Tasks (Deep Inspection)');
+  drawCheckTable([
+    {no:'10', task:'Thoroughly Clean All Accumulated Dust/Dirt', resA:getResult('r10a'), resB:getResult('r10b')},
+    {no:'11', task:'Check Paint Finish Damage & Touch-up Spray Paint', resA:getResult('r11a'), resB:getResult('r11b')},
+    {no:'13', task:'Inspect All Wires & Connections for Burnt/Loose/Frayed', resA:getResult('r13a'), resB:getResult('r13b')},
+    {no:'14', task:"Inspect Transformers, Inductors, SCR's/IGBT's for Burnt", resA:getResult('r14a'), resB:getResult('r14b')},
+    {no:'15', task:'Check Winding Insulation 500VDC (≥5MΩ)', resA:getResult('r15a'), resB:getResult('r15b')},
+    {type:'meas', label:'  Transformer Insulation (MΩ)', valA:getMeasVal('tx-ins-a'), valB:getMeasVal('tx-ins-b')},
+    {type:'meas', label:'  Inductor Insulation (MΩ)', valA:getMeasVal('ind-ins-a'), valB:getMeasVal('ind-ins-b')},
+    {no:'16', task:"Test SCR's/IGBTs Overheat Protection Sensor (±5%)", resA:getResult('r16a'), resB:getResult('r16b')},
+    {no:'17', task:'Inspect Snubber Networks for Loose/Crack Joints', resA:getResult('r17a'), resB:getResult('r17b')},
+    {no:'18', task:'Re-torque All High Current Connections', resA:getResult('r18a'), resB:getResult('r18b')},
+    {no:'19', task:'Ensure Cable Entry Conduits Connected & Sealed', resA:getResult('r19a'), resB:getResult('r19b')},
+    {no:'20', task:'Set Float DC Output Voltage to 127VDC Nominal', resA:getResult('r20a'), resB:getResult('r20b')},
+  ]);
+
+  // ── SECTION B: ROOM ────────────────────────────
+  checkY(14);
+  sectionHeader('Section B — Room / Cubicle Conditions');
+  drawCheckTable([
+    {no:'21', task:`Room Temperature ≤20°C`, resA:getResult('r21'), resB:getMeasVal('room-temp')+'°C'},
+    {no:'22', task:`Relative Humidity <60% RH`, resA:getResult('r22'), resB:getMeasVal('humidity')+'%'},
+    {no:'23', task:`Audible Noise ≤60 dB(A) at ≤1.5m`, resA:getResult('r23'), resB:getMeasVal('noise')+' dB'},
+    {no:'24', task:`Set AC Unit to ≤20°C`, resA:getResult('r24'), resB:''},
+    {no:'25', task:`Ensure Audible Noise ≤60 dB(A)`, resA:getResult('r25'), resB:''},
+  ]);
+
+  // ── PHOTOS ────────────────────────────────────
+  const photoSlots = [
+    {id:'pd-room1',  title:'Task 26 — Room/Cubicle Overview', capId:'cap-room1'},
+    {id:'pd-room2',  title:'Task 26 — Room/Cubicle Additional', capId:'cap-room2'},
+    {id:'pd-condA',  title:'Task 27 — 7EB-BYC-125A Condition', capId:'cap-condA'},
+    {id:'pd-condB',  title:'Task 27 — 7EB-BYC-125B Condition', capId:'cap-condB'},
+    {id:'pd-thermA', title:'Task 28 — 7EB-BYC-125A Thermal (IR)', capId:'cap-thermA'},
+    {id:'pd-thermB', title:'Task 28 — 7EB-BYC-125B Thermal (IR)', capId:'cap-thermB'},
+  ].filter(p => photoStore[p.id]);
+
+  if (photoSlots.length > 0) {
+    checkY(14);
+    sectionHeader('Section C — Evidence Pictures');
+
+    for (let i=0; i<photoSlots.length; i+=2) {
+      const pair = photoSlots.slice(i, i+2);
+      const imgH = 55;
+      checkY(imgH + 14);
+
+      pair.forEach((p, pi) => {
+        const xOff = M + pi*(pW-M*2)/2 + (pi>0?2:0);
+        const w = (pW-M*2)/2 - 2;
+        // Title
+        pdf.setFont('helvetica','bold'); pdf.setFontSize(8);
+        pdf.setTextColor(...STEEL);
+        pdf.text(p.title, xOff, y+5);
+        // Image
+        try {
+          pdf.addImage(photoStore[p.id], 'JPEG', xOff, y+7, w, imgH, undefined, 'MEDIUM');
+        } catch(e) {}
+        // Caption
+        const cap = document.getElementById(p.capId)?.value || '';
+        if (cap) {
+          pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5);
+          pdf.setTextColor(120,160,135);
+          pdf.text(trunc(cap,55), xOff, y+7+imgH+4);
+        }
+      });
+      y += imgH + 18;
+    }
+  }
+
+  // ── FINDINGS & CONCLUSION ─────────────────────
+  checkY(50);
+  sectionHeader('Findings, Actions & Conclusion');
+  pdf.autoTable({
+    startY: y,
+    body: [
+      ['Overall Condition', v('overall')||'—'],
+      ['Next PM Due', v('next-pm')||'—'],
+      ['Findings / Observations', v('findings')||'—'],
+      ['Corrective Actions', v('recommendations')||'—'],
+      ['Spare Parts / Materials', v('spareparts')||'—'],
+    ],
+    theme:'grid',
+    styles:{ font:'helvetica', fontSize:9, cellPadding:4, textColor:[26,38,32], lineColor:[200,215,205], lineWidth:0.2 },
+    columnStyles:{ 0:{ cellWidth:48, fontStyle:'bold', fillColor:[244,248,245], textColor:[74,94,82] } },
+    margin:{ left:M, right:M },
+  });
+  y = pdf.lastAutoTable.finalY + 6;
+
+  // ── SIGNATURES ────────────────────────────────
+  checkY(50);
+  sectionHeader('Authorization & Signatures');
+  const sigW = (pW-M*2)/2-4;
+  const sigH = 28;
+  const sig_y = y;
+
+  ['sig-tech','sig-super'].forEach((id,i) => {
+    const xOff = M + i*(sigW+8);
+    const lbl = i===0 ? 'Checked By — Technician' : 'Reviewed By — Supervisor';
+    const name = i===0 ? (v('sig-tech-name')||v('checked-by')||'') : (v('sig-super-name')||v('reviewed-by')||'');
+    pdf.setFillColor(244,248,245);
+    pdf.setDrawColor(180,200,185); pdf.setLineWidth(0.3);
+    pdf.roundedRect(xOff, sig_y, sigW, sigH+20, 2, 2, 'FD');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(...STEEL);
+    pdf.text(lbl, xOff+3, sig_y+6);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...DARK);
+    pdf.text(name, xOff+3, sig_y+13);
+    const c = document.getElementById(id);
+    const isEmpty = !c.getContext('2d').getImageData(0,0,c.width,c.height).data.some(v=>v!==0);
+    if (!isEmpty) {
+      try { pdf.addImage(c.toDataURL('image/png'), 'PNG', xOff+3, sig_y+15, sigW-6, sigH-6); } catch(e){}
+    }
+    pdf.setDrawColor(180,200,185); pdf.line(xOff+3, sig_y+sigH+12, xOff+sigW-3, sig_y+sigH+12);
+    pdf.setFont('helvetica','italic'); pdf.setFontSize(7); pdf.setTextColor(120,160,135);
+    pdf.text('Signature', xOff+3, sig_y+sigH+17);
+  });
+  y = sig_y + sigH + 30;
+
+  // ── FOOTER ON LAST PAGE ───────────────────────
+  const pageCount = pdf.internal.getNumberOfPages();
+  for (let pg=1; pg<=pageCount; pg++) {
+    pdf.setPage(pg);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(150);
+    pdf.text(`Page ${pg} / ${pageCount}`, pW-M, pH-8, {align:'right'});
+    pdf.text('PLTU — Maintenance Dept. | 7EB-BYC-125 A/B 2 Yearly PM', M, pH-8);
+  }
+
+  // ── SAVE ──────────────────────────────────────
+  const fname = `PM_BYC125_${v('wo-no')||'NoWO'}_${(v('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
+  pdf.save(fname);
+  showNotice(`✅ PDF saved: ${fname}`, 'ok');
+}
+
+// ── INIT ──────────────────────────────────────────
+buildToggles();
+initSig('sig-tech');
+initSig('sig-super');
+loadDraft();
+updateStats();
+</script>
+</body>
+</html>
