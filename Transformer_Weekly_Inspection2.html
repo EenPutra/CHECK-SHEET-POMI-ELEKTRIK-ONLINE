@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer Weekly Inspection — Unit 7/8</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e8ece9;--bg2:#dde3de;--panel:rgba(255,255,255,0.80);--pb:rgba(180,200,185,0.55);--steel:#4a5e52;--sl:#6b8474;--red:#c0392b;--ok:#27ae60;--warn:#f39c12;--na:#8e44ad;--text:#1a2620;--t2:#3d5248;--t3:#7a9485;--sh:0 4px 24px rgba(30,60,40,0.10);--mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;background-image:radial-gradient(ellipse at 18% 12%,rgba(180,210,190,.4) 0%,transparent 55%),radial-gradient(ellipse at 82% 80%,rgba(160,195,170,.28) 0%,transparent 50%),url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%234a5e52' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");}
+.topbar{background:linear-gradient(90deg,#2c3e30,#3d5248 60%,#2c3e30);color:#c8dcd0;padding:0 28px;display:flex;align-items:center;gap:16px;height:52px;border-bottom:2px solid #27ae6033;position:sticky;top:0;z-index:100}
+.tl{font-family:var(--raj);font-size:20px;font-weight:700;letter-spacing:3px;color:#a8d4b8}
+.tsep{width:1px;height:26px;background:#4a6a54}.tsub{font-size:12px;color:#7aaa8a;letter-spacing:1px}.tr{margin-left:auto;display:flex;align-items:center;gap:10px}
+.ldot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.tclock{font-family:var(--mono);font-size:12px;color:#7aaa8a}
+.wrap{max-width:1340px;margin:0 auto;padding:28px 20px 80px}
+.ph{display:flex;align-items:flex-end;gap:20px;margin-bottom:24px;flex-wrap:wrap}
+.ph-title{font-family:var(--raj);font-size:36px;font-weight:700;color:var(--steel);line-height:1;letter-spacing:1px}
+.ph-title span{color:var(--red)}.ph-sub{font-size:12px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px}
+.badge{display:inline-block;padding:3px 10px;border-radius:3px;font-family:var(--mono);font-size:11px;letter-spacing:1px;background:#27ae6018;color:var(--ok);border:1px solid #27ae6035}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
+.sc{padding:8px 16px;border-radius:7px;font-family:var(--raj);font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px;border:1.5px solid}
+.sc span{font-size:18px;font-weight:700}.sc.t{background:#f0f4f1;border-color:#b4c8bc;color:var(--steel)}.sc.ok{background:#e8f8ee;border-color:#27ae6028;color:var(--ok)}.sc.ng{background:#fdecea;border-color:#c0392b28;color:var(--red)}
+.panel{background:var(--panel);border:1px solid var(--pb);border-radius:12px;padding:20px 24px;margin-bottom:18px;box-shadow:var(--sh);backdrop-filter:blur(8px);animation:fadeUp .45s ease both}
+.panel.top{border-radius:0 0 12px 12px;border-top:none}
+.slbl{font-family:var(--raj);font-size:12px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.slbl::after{content:'';flex:1;height:1px;background:var(--pb)}
+.tabbar{background:var(--panel);border:1px solid var(--pb);border-top:none;padding:0 24px;overflow-x:auto;display:flex;white-space:nowrap}
+.tbtn{padding:10px 18px;border:none;background:transparent;cursor:pointer;font-family:var(--raj);font-size:13px;font-weight:600;color:var(--t3);letter-spacing:1px;border-bottom:3px solid transparent;margin-bottom:-1px;transition:all .18s;display:inline-block}
+.tbtn:hover{color:var(--steel)}.tbtn.on{color:var(--steel);border-bottom-color:var(--steel)}
+.tpane{display:none}.tpane.on{display:block}
+.mg4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px}
+.mg2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf label{font-size:11px;color:var(--t3);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.mf input,.mf select,.mf textarea{border:1.5px solid var(--pb);border-radius:6px;padding:7px 10px;font-family:var(--sans);font-size:13px;background:#f4f8f5;color:var(--text);transition:border-color .18s;width:100%}
+.mf input[type=date]{font-family:var(--mono)}.mf input:focus,.mf select:focus,.mf textarea:focus{outline:none;border-color:var(--sl);background:#fff}.mf textarea{resize:vertical;min-height:56px}
+.btn{padding:8px 20px;border-radius:6px;border:none;cursor:pointer;font-family:var(--raj);font-size:14px;font-weight:600;letter-spacing:1px;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.bp{background:var(--steel);color:#fff}.bp:hover{background:var(--sl);transform:translateY(-1px)}
+.br{background:#c0392b;color:#fff}.br:hover{background:#a93226;transform:translateY(-1px)}
+.bo{background:transparent;border:1.5px solid var(--pb);color:var(--steel)}.bo:hover{background:var(--bg2)}.bsm{padding:5px 12px;font-size:12px}
+.ct{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+.ct th{font-family:var(--raj);font-size:10.5px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:8px 10px;text-align:left;border-bottom:2px solid var(--pb);background:rgba(74,94,82,.04)}
+.ct th.ctr{text-align:center}.ct td{padding:6px 9px;border-bottom:1px solid rgba(180,200,185,.28);vertical-align:middle}
+.ct tr:last-child td{border-bottom:none}.ct tr:hover td{background:rgba(74,94,82,.025)}
+.shdr td{background:rgba(74,94,82,.08)!important;font-family:var(--raj);font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--steel);padding:6px 10px!important}
+.mr td{background:rgba(244,248,245,.65)}
+.tno{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap}
+.tdesc{color:var(--text);line-height:1.45}.crit{display:block;font-family:var(--mono);font-size:10px;color:var(--ok);margin-top:1px}
+.nac{font-family:var(--mono);font-size:11px;color:var(--na);font-weight:700;text-align:center;display:block}
+.rc{display:flex;gap:3px;justify-content:center;align-items:center}
+.rb{border:1.5px solid;border-radius:4px;cursor:pointer;background:transparent;font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 7px;transition:all .12s;letter-spacing:.5px;white-space:nowrap}
+.rb.ok{color:var(--ok);border-color:rgba(39,174,96,.35)}.rb.ng{color:var(--red);border-color:rgba(192,57,43,.35)}
+.rb.ok.a{background:rgba(39,174,96,.14);border-color:var(--ok)}.rb.ng.a{background:rgba(192,57,43,.14);border-color:var(--red)}
+.lc{display:flex;gap:3px}
+.lb{border:1.5px solid var(--pb);border-radius:3px;cursor:pointer;background:transparent;font-family:var(--mono);font-size:10px;padding:2px 6px;transition:all .12s;color:var(--t3);white-space:nowrap}
+.lb.leak.a{background:rgba(192,57,43,.14);border-color:var(--red);color:var(--red);font-weight:700}
+.lb.noleak.a{background:rgba(39,174,96,.14);border-color:var(--ok);color:var(--ok);font-weight:700}
+.lb.clean.a{background:rgba(39,174,96,.14);border-color:var(--ok);color:var(--ok);font-weight:700}
+.lb.dirty.a{background:rgba(243,156,18,.14);border-color:var(--warn);color:var(--warn);font-weight:700}
+.lb.noise.a{background:rgba(243,156,18,.14);border-color:var(--warn);color:var(--warn);font-weight:700}
+.lb.normal.a{background:rgba(39,174,96,.14);border-color:var(--ok);color:var(--ok);font-weight:700}
+.mi{border:1.5px solid var(--pb);border-radius:5px;padding:4px 6px;font-family:var(--mono);font-size:11.5px;background:#f4f8f5;color:var(--text);transition:border-color .18s;width:100%;min-width:62px}
+.mi:focus{outline:none;border-color:var(--sl);background:#fff}.mu{font-size:9.5px;color:var(--t3);white-space:nowrap;font-family:var(--mono);display:block;margin-top:1px}
+.giswrap{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.gisttl{font-family:var(--raj);font-size:13px;font-weight:700;color:var(--steel);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
+.gt{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px}
+.gt th{font-family:var(--mono);font-size:9.5px;color:var(--t3);padding:6px 8px;text-align:center;border-bottom:2px solid var(--pb);background:rgba(74,94,82,.04)}
+.gt td{padding:4px 7px;border-bottom:1px solid rgba(180,200,185,.22);text-align:center;vertical-align:middle}
+.gt .tgl{font-family:var(--mono);font-size:10.5px;color:var(--steel);text-align:left;padding-left:8px}
+.pg2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pd{border:2px dashed var(--pb);border-radius:8px;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;background:rgba(74,94,82,.025);position:relative;overflow:hidden}
+.pd:hover{border-color:var(--sl);background:rgba(74,94,82,.06)}.pd input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.pd img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:6px}
+.pd .delbtn{position:absolute;top:5px;right:5px;background:rgba(192,57,43,.85);border:none;color:#fff;width:21px;height:21px;border-radius:50%;cursor:pointer;font-size:13px;display:none;align-items:center;justify-content:center;z-index:5}
+.pd.hp .delbtn{display:flex}.phi{font-size:24px;margin-bottom:5px;pointer-events:none}.pht{font-size:10.5px;color:var(--t3);text-align:center;pointer-events:none}
+.pcap{margin-top:6px}.pcap input{width:100%;border:1.5px solid var(--pb);border-radius:5px;padding:5px 8px;font-size:12px;background:#f4f8f5;color:var(--text)}
+.pbtl{font-family:var(--raj);font-size:12px;font-weight:600;color:var(--steel);margin-bottom:7px;letter-spacing:1px;text-transform:uppercase}
+.sw2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.sttl{font-family:var(--raj);font-size:12px;font-weight:600;color:var(--steel);margin-bottom:7px;letter-spacing:1px;text-transform:uppercase}
+canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;width:100%;height:110px;display:block;cursor:crosshair;touch-action:none}
+.notice{padding:9px 14px;border-radius:6px;font-size:12.5px;display:none;margin-top:10px}
+.notice.ok{background:#e8f8ee;border:1px solid #27ae6028;color:#1e8449;display:block}
+.notice.err{background:#fdecea;border:1px solid #c0392b28;color:#922b21;display:block}
+.notice.info{background:#e8f4fd;border:1px solid #3498db28;color:#1a5276;display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:880px){.mg4{grid-template-columns:repeat(2,1fr)}.giswrap{grid-template-columns:1fr}.sw2{grid-template-columns:1fr}.pg2{grid-template-columns:1fr}}
+.psl-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;border:1.5px solid #d0ddd5;background:#f8fbf9;cursor:pointer;transition:all .15s;user-select:none}
+.psl-item:hover{border-color:#6b8474;background:#edf4ef}
+.psl-item.psl-on{border-color:#27ae60;background:#e8f8ee}
+.psl-icon{font-size:18px;flex-shrink:0;width:26px;text-align:center}
+.psl-info{flex:1;display:flex;flex-direction:column;gap:1px}
+.psl-name{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:#1a2620;letter-spacing:.5px}
+.psl-desc{font-size:10.5px;color:#7a9485;font-family:'Share Tech Mono',monospace}
+.psl-chk{width:22px;height:22px;border-radius:5px;border:2px solid #b4c8bc;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#27ae60;flex-shrink:0;background:#fff;transition:all .15s}
+.psl-item.psl-on .psl-chk{background:#27ae60;border-color:#27ae60;color:#fff}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="tl">PLTU</span><div class="tsep"></div>
+  <span class="tsub">TRANSFORMER WEEKLY INSPECTION</span><div class="tsep"></div>
+  <span class="tsub">UNIT 7/8 · AT+DGA · USST · COMMON SST · GIS</span>
+  <div class="tr">
+    <div class="ldot"></div><span class="tclock" id="clock">--:--:--</span><div class="tsep"></div>
+    <button class="btn bo bsm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn br bsm" onclick="openPdfModal()">📄 PDF ▾</button>
+  </div>
+</div>
+<div class="wrap">
+  <div class="ph">
+    <div><div class="ph-sub">Weekly / Three-Monthly Maintenance</div><div class="ph-title">TRANSFORMER <span>INSPECTION</span></div></div>
+    <span class="badge">UNIT 7/8 — ALL TYPES</span>
+    <div class="stats">
+      <div class="sc t">Items <span id="cnt-t">0</span></div>
+      <div class="sc ok">OK <span id="cnt-ok">0</span></div>
+      <div class="sc ng">NG <span id="cnt-ng">0</span></div>
+    </div>
+  </div>
+
+  <div class="panel" style="border-radius:12px 12px 0 0;margin-bottom:0">
+    <div class="slbl">Work Order &amp; Inspector Information</div>
+    <div class="mg4">
+      <div class="mf"><label>Work Order No.</label><input type="text" id="wo-no" placeholder="WO-2025-XXXX"></div>
+      <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
+      <div class="mf"><label>Unit</label><select id="unit-sel"><option>7</option><option>8</option><option>7/8</option></select></div>
+      <div class="mf"><label>Inspection Type</label><select id="itype"><option>Weekly Inspection</option><option>Three Monthly PM</option><option>Monthly</option></select></div>
+      <div class="mf"><label>Checked By</label><input type="text" id="checked-by" placeholder="Full name"></div>
+      <div class="mf"><label>NIK</label><input type="text" id="nik" placeholder="NIK-XXXXX"></div>
+      <div class="mf"><label>Reviewed By</label><input type="text" id="reviewed-by" placeholder="Supervisor name"></div>
+      <div class="mf"><label>Shift</label><select id="shift"><option>Shift 1 (07:00–15:00)</option><option>Shift 2 (15:00–23:00)</option><option>Shift 3 (23:00–07:00)</option><option>Normal Hours</option></select></div>
+    </div>
+  </div>
+
+  <div class="tabbar">
+    <button class="tbtn on" onclick="sw('s1',this)">Sheet 1 — AT+DGA</button>
+    <button class="tbtn" onclick="sw('s2',this)">Sheet 2 — AT</button>
+    <button class="tbtn" onclick="sw('s3',this)">USST</button>
+    <button class="tbtn" onclick="sw('s4',this)">SST SWRO/SCRUB</button>
+    <button class="tbtn" onclick="sw('s5',this)">SST CHCB/WH</button>
+    <button class="tbtn" onclick="sw('gis',this)">GIS SF₆</button>
+    <button class="tbtn" onclick="sw('photo',this)">📷 Photos</button>
+    <button class="tbtn" onclick="sw('sign',this)">✍️ Sign-off</button>
+  </div>
+
+  <div class="tpane on panel top" id="p-s1">
+    <div class="slbl">7EX-XFMR-AT + DGA — Unit 7/8 Weekly Maintenance</div>
+    <p style="font-size:11px;color:var(--t3);margin-bottom:12px">EZ-XFMR-GSU · EY-XFMR-SU · EX-XFMR-UAT · EX-XFMR-EXC · EM-XFMR-A1 · EM-XFMR-B1 · EM-XFMR-C1</p>
+    <div style="overflow-x:auto"><table class="ct"><thead><tr>
+      <th style="width:30px">No.</th><th>Inspection Item</th>
+      <th class="ctr" style="min-width:82px">EZ-GSU</th><th class="ctr" style="min-width:82px">EY-SU</th>
+      <th class="ctr" style="min-width:82px">EX-UAT</th><th class="ctr" style="min-width:82px">EX-EXC</th>
+      <th class="ctr" style="min-width:82px">EM-A1</th><th class="ctr" style="min-width:82px">EM-B1</th>
+      <th class="ctr" style="min-width:82px">EM-C1</th>
+    </tr></thead><tbody id="tb-s1"></tbody></table></div>
+  </div>
+
+  <div class="tpane panel top" id="p-s2">
+    <div class="slbl">7EX-XFMR-AT — Unit 7/8 Weekly (Without DGA)</div>
+    <p style="font-size:11px;color:var(--t3);margin-bottom:12px">EZ-XFMR-GSU · EY-XFMR-SU · EX-XFMR-UAT · EX-XFMR-EXC · EM-XFMR-A1 · EM-XFMR-B1 · EM-XFMR-C1</p>
+    <div style="overflow-x:auto"><table class="ct"><thead><tr>
+      <th style="width:30px">No.</th><th>Inspection Item</th>
+      <th class="ctr" style="min-width:82px">EZ-GSU</th><th class="ctr" style="min-width:82px">EY-SU</th>
+      <th class="ctr" style="min-width:82px">EX-UAT</th><th class="ctr" style="min-width:82px">EX-EXC</th>
+      <th class="ctr" style="min-width:82px">EM-A1</th><th class="ctr" style="min-width:82px">EM-B1</th>
+      <th class="ctr" style="min-width:82px">EM-C1</th>
+    </tr></thead><tbody id="tb-s2"></tbody></table></div>
+  </div>
+
+  <div class="tpane panel top" id="p-s3">
+    <div class="slbl">U78 USST — Three Monthly PM (PI-10-20-450)</div>
+    <p style="font-size:11px;color:var(--t3);margin-bottom:12px">EM-A2 · EM-B2 · EM-A3 · EM-B3 · EM-A6 · EM-B6 · EN-B11 · EN-C11</p>
+    <div style="overflow-x:auto"><table class="ct"><thead><tr>
+      <th style="width:30px">No.</th><th>Inspection Item</th>
+      <th class="ctr" style="min-width:68px">EM-A2</th><th class="ctr" style="min-width:68px">EM-B2</th>
+      <th class="ctr" style="min-width:68px">EM-A3</th><th class="ctr" style="min-width:68px">EM-B3</th>
+      <th class="ctr" style="min-width:68px">EM-A6</th><th class="ctr" style="min-width:68px">EM-B6</th>
+      <th class="ctr" style="min-width:68px">EN-B11</th><th class="ctr" style="min-width:68px">EN-C11</th>
+    </tr></thead><tbody id="tb-s3"></tbody></table></div>
+    <div class="mf" style="margin-top:14px"><label>Remark</label><textarea id="rmk-s3" rows="2" placeholder="General remarks…"></textarea></div>
+  </div>
+
+  <div class="tpane panel top" id="p-s4">
+    <div class="slbl">Common SST — SWRO / Scrubber / Admin — Three Monthly PM</div>
+    <p style="font-size:11px;color:var(--t3);margin-bottom:12px">7EM-A4(SWRO) · 8EM-B4(SWRO) · 7EN-B1A1(SCRUB) · 8EN-B1A1(SCRUB) · 7EM-A5(ADMIN) · 8EM-A5(ADMIN) · 7EM-B5(ASH)</p>
+    <div style="overflow-x:auto"><table class="ct"><thead><tr>
+      <th style="width:30px">No.</th><th>Inspection Item</th>
+      <th class="ctr" style="min-width:72px">7EM-A4<br><small style="font-weight:300;letter-spacing:0;text-transform:none">(SWRO)</small></th>
+      <th class="ctr" style="min-width:72px">8EM-B4<br><small>(SWRO)</small></th>
+      <th class="ctr" style="min-width:72px">7EN-B1A1<br><small>(SCRUB)</small></th>
+      <th class="ctr" style="min-width:72px">8EN-B1A1<br><small>(SCRUB)</small></th>
+      <th class="ctr" style="min-width:72px">7EM-A5<br><small>(ADMIN)</small></th>
+      <th class="ctr" style="min-width:72px">8EM-A5<br><small>(ADMIN)</small></th>
+      <th class="ctr" style="min-width:72px">7EM-B5<br><small>(ASH)</small></th>
+    </tr></thead><tbody id="tb-s4"></tbody></table></div>
+    <div class="mf" style="margin-top:14px"><label>Remark</label><textarea id="rmk-s4" rows="2" placeholder="General remarks…"></textarea></div>
+  </div>
+
+  <div class="tpane panel top" id="p-s5">
+    <div class="slbl">Common SST — CHCB / Warehouse / CUCB — Three Monthly PM</div>
+    <p style="font-size:11px;color:var(--t3);margin-bottom:12px">CCH-100A(CHCB) · CCH-100B(CHCB) · 7EM-B4(WH) · 8EM-B4(WH) · CCH-200(CUCB) · 7EM-B5(ASH)</p>
+    <div style="overflow-x:auto"><table class="ct"><thead><tr>
+      <th style="width:30px">No.</th><th>Inspection Item</th>
+      <th class="ctr" style="min-width:76px">CCH-100A<br><small>(CHCB)</small></th>
+      <th class="ctr" style="min-width:76px">CCH-100B<br><small>(CHCB)</small></th>
+      <th class="ctr" style="min-width:76px">7EM-B4<br><small>(WH)</small></th>
+      <th class="ctr" style="min-width:76px">8EM-B4<br><small>(WH)</small></th>
+      <th class="ctr" style="min-width:76px">CCH-200<br><small>(CUCB)</small></th>
+      <th class="ctr" style="min-width:76px">7EM-B5<br><small>(ASH)</small></th>
+    </tr></thead><tbody id="tb-s5"></tbody></table></div>
+    <div class="mf" style="margin-top:14px"><label>Remark</label><textarea id="rmk-s5" rows="2" placeholder="General remarks…"></textarea></div>
+  </div>
+
+  <div class="tpane panel top" id="p-gis">
+    <div class="slbl">GIS SF₆ Gas Pressure Monitoring</div>
+    <div style="padding:8px 14px;background:#e8f8ee;border:1px solid #27ae6030;border-radius:6px;font-family:var(--mono);font-size:11px;color:var(--t3);margin-bottom:16px;display:inline-block">
+      <strong style="color:var(--ok)">Setting:</strong> Alarm ≥ 0.45 MPa &nbsp;·&nbsp; Trip ≤ 0.40 MPa
+    </div>
+    <div class="giswrap">
+      <div><div class="gisttl">SF₆ GIS — 150 kV</div>
+        <table class="gt"><thead><tr><th>No.</th><th class="tgl">Phase A</th><th>MPa</th><th class="tgl">Phase B</th><th>MPa</th><th class="tgl">Phase C</th><th>MPa</th></tr></thead>
+        <tbody id="tb-g150"></tbody></table></div>
+      <div><div class="gisttl">SF₆ GIS — 500 kV</div>
+        <table class="gt"><thead><tr><th>No.</th><th class="tgl">Phase A</th><th>MPa</th><th class="tgl">Phase B</th><th>MPa</th><th class="tgl">Phase C</th><th>MPa</th></tr></thead>
+        <tbody id="tb-g500"></tbody></table></div>
+    </div>
+    <div class="mf" style="margin-top:14px"><label>GIS Remarks</label><textarea id="gis-rmk" rows="2" placeholder="SF₆ anomalies or observations…"></textarea></div>
+  </div>
+
+  <div class="tpane panel top" id="p-photo">
+    <div class="slbl">Evidence Photos</div>
+    <div class="pg2" id="photo-wrap"></div>
+  </div>
+
+  <div class="tpane panel top" id="p-sign">
+    <div class="slbl">Findings &amp; Conclusion</div>
+    <div class="mg2" style="margin-bottom:12px">
+      <div class="mf"><label>Overall Condition</label>
+        <select id="overall"><option>✅ GOOD — Normal Operation</option><option>⚠️ FAIR — Requires Monitoring</option><option>🔧 POOR — Maintenance Required</option><option>🛑 CRITICAL — Must Shutdown</option></select>
+      </div>
+      <div class="mf"><label>Next Inspection Due</label><input type="date" id="next-insp"></div>
+    </div>
+    <div class="mg2" style="margin-bottom:16px">
+      <div class="mf"><label>Findings / Observations</label><textarea id="findings" rows="4" placeholder="List all findings…"></textarea></div>
+      <div class="mf"><label>Corrective Actions</label><textarea id="recommendations" rows="4" placeholder="Actions taken and follow-up…"></textarea></div>
+    </div>
+    <div class="slbl" style="margin-top:6px">Authorization &amp; Signatures</div>
+    <div class="sw2">
+      <div><div class="sttl">Checked By — Technician</div>
+        <div class="mf" style="margin-bottom:8px"><label>Name</label><input type="text" id="sig-tech-name" placeholder="Full name"></div>
+        <canvas class="sigc" id="sig-tech" width="600" height="110"></canvas>
+        <button class="btn bo bsm" style="margin-top:6px" onclick="clrSig('sig-tech')">✕ Clear</button>
+      </div>
+      <div><div class="sttl">Reviewed By — Supervisor</div>
+        <div class="mf" style="margin-bottom:8px"><label>Name</label><input type="text" id="sig-super-name" placeholder="Full name"></div>
+        <canvas class="sigc" id="sig-super" width="600" height="110"></canvas>
+        <button class="btn bo bsm" style="margin-top:6px" onclick="clrSig('sig-super')">✕ Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-top:14px">
+    <button class="btn bo" onclick="saveDraft()">💾 Save Draft</button>
+    <button class="btn bp" onclick="resetForm()">🔄 Reset</button>
+    <button class="btn br" onclick="generatePDF()">📄 Download PDF Report</button>
+  </div>
+  <div id="notice" class="notice"></div>
+</div>
+
+<script>
+// CLOCK
+setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('id-ID'),1000);
+document.getElementById('clock').textContent=new Date().toLocaleTimeString('id-ID');
+
+// TABS
+function sw(n,b){document.querySelectorAll('.tpane').forEach(p=>p.classList.remove('on'));document.querySelectorAll('.tbtn').forEach(x=>x.classList.remove('on'));document.getElementById('p-'+n).classList.add('on');b.classList.add('on');}
+
+// STATE
+const ST={};
+function upStats(){const vs=Object.values(ST).filter(v=>v);const okS=new Set(['OK','No Leak','Clean','Normal']);const ngS=new Set(['NG','Leak','Dirty','Noise']);document.getElementById('cnt-t').textContent=vs.length;document.getElementById('cnt-ok').textContent=vs.filter(v=>okS.has(v)).length;document.getElementById('cnt-ng').textContent=vs.filter(v=>ngS.has(v)).length;}
+
+// CELL TYPES
+function meas(id,u){return `<input class="mi" type="number" step="any" id="${id}" placeholder="—"><span class="mu">${u}</span>`;}
+function tog(id){return `<div class="rc"><button class="rb ok" data-id="${id}" data-v="OK" onclick="setT('${id}','OK',this)">OK</button><button class="rb ng" data-id="${id}" data-v="NG" onclick="setT('${id}','NG',this)">NG</button></div>`;}
+function lc(id,t){const p={leak:['Leak','leak','No Leak','noleak'],clean:['Clean','clean','Dirty','dirty'],noise:['Noise','noise','Normal','normal']}[t];return `<div class="lc"><button class="lb ${p[1]}" data-id="${id}" onclick="setLC('${id}','${p[0]}',this,'${p[1]}')">${p[0]}</button><button class="lb ${p[3]}" data-id="${id}" onclick="setLC('${id}','${p[2]}',this,'${p[3]}')">${p[2]}</button></div>`;}
+function na(){return `<span class="nac">N/A</span>`;}
+function setT(id,v,b){const w=b.classList.contains('a');b.closest('.rc').querySelectorAll('.rb').forEach(x=>x.classList.remove('a'));if(!w){b.classList.add('a');ST[id]=v;}else delete ST[id];upStats();}
+function setLC(id,v,b,c){const w=b.classList.contains('a');b.closest('.lc').querySelectorAll('.lb').forEach(x=>x.classList.remove('a'));if(!w){b.classList.add('a');ST[id]=v;}else delete ST[id];upStats();}
+
+// ROW BUILDERS
+function shdr(tb,txt){const tr=tb.insertRow();tr.className='shdr';const td=tr.insertCell();td.colSpan=99;td.textContent=txt;}
+function row(tb,no,desc,crit,cells,mr=false){
+  const tr=tb.insertRow();if(mr)tr.className='mr';
+  tr.innerHTML=`<td class="tno">${no}</td><td class="tdesc">${desc}${crit?`<span class="crit">▸ ${crit}</span>`:''}</td>`;
+  cells.forEach(([t,id,u])=>{const td=tr.insertCell();td.style.textAlign='center';
+    if(t==='na')td.innerHTML=na();else if(t==='ok')td.innerHTML=tog(id);
+    else if(t==='leak')td.innerHTML=lc(id,'leak');else if(t==='clean')td.innerHTML=lc(id,'clean');
+    else if(t==='noise')td.innerHTML=lc(id,'noise');else if(t==='meas')td.innerHTML=meas(id,u||'');
+  });
+}
+
+// SHEET 1+2 BUILDER
+function mkAT(tbId,pfx,dga){
+  const tb=document.getElementById(tbId);
+  const C=['gsu','su','uat','exc','a1','b1','c1'];
+  shdr(tb,'A.  Transformer Temperature and Load');
+  row(tb,'A.1','Ambient Temperature','Record °C',C.map(c=>['meas',pfx+'_a1_'+c,'°C']),true);
+  row(tb,'A.2','Oil Temperature','SST/EXC ≤85°C · UAT/SUT/GSUT ≤95°C alarm',C.map(c=>['meas',pfx+'_a2_'+c,'°C']),true);
+  row(tb,'A.3','Winding Temperature','80°C→Fan stage1 · 85°C→Fan stage2',C.map(c=>['meas',pfx+'_a3_'+c,'°C']),true);
+  row(tb,'A.4','Voltage','Record kV',C.map(c=>['meas',pfx+'_a4_'+c,'kV']),true);
+  row(tb,'A.5','Apparent Power','GSUT≤873.6 · UAT/SUT≤112 · SST≤36 · EXC≤7.875 MVA',C.map(c=>['meas',pfx+'_a5_'+c,'MVA']),true);
+  shdr(tb,'B.  Oil Level Gauge & Dissolve Gas Analysis');
+  row(tb,'B.1','Main Tank Oil Level','In range per Temp vs Level table',C.map(c=>['ok',pfx+'_b1_'+c]));
+  row(tb,'B.2','OLTC Oil Level (if equipped)','',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['ok',pfx+'_b2_'+c]));
+  row(tb,'B.3','Dissolve Gas Analysis — DGA (ppm)','Alarm=500 ppm · High=1000 ppm',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_b3_'+c,'ppm']),true);
+  if(dga){
+    shdr(tb,'DGA General Inspection (TP1, 3, 6, 7, 8)');
+    row(tb,'','Visual inspection & retighten test points (TP1,3,6,7,8)','',C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_dga1_'+c]));
+    row(tb,'','DGA Feedback Current — Alarm 1 (500 ppm)','Ref: 12.0 mA',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_dga2_'+c,'mA']),true);
+    row(tb,'','DGA Feedback Current — Alarm 2 (1000 ppm)','Ref: 20.0 mA',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_dga3_'+c,'mA']),true);
+    row(tb,'','DGA Reading (actual)','Record ppm / mA',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_dga4_'+c,'mA']),true);
+  }
+  shdr(tb,'C.  Silicagel Breather');
+  row(tb,'C.1','Silicagel color check (25% blue + 75% white)','≥70% pink from bottom → replace',C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_c1_'+c]));
+  row(tb,'C.2','Sealing oil level in oil cup','Oil level = mark',C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_c2_'+c]));
+  row(tb,'C.3','Contamination of absorbent & sealing oil','Absorbent dirty / Sealing oil milky',C.map(c=>c==='exc'?['na','','']:['clean',pfx+'_c3_'+c]));
+  shdr(tb,'D.  Oil Leaks — Valves, Gauges, Gaskets, Welds');
+  row(tb,'D','Check all connections for oil leaks','No leak',C.map(c=>['leak',pfx+'_d_'+c]));
+  shdr(tb,'E.  Cooling Equipment');
+  row(tb,'E.1','Leakage on radiators','No leak',C.map(c=>['leak',pfx+'_e1_'+c]));
+  row(tb,'E.2','Dust / rust on radiator surface','No rust',C.map(c=>['clean',pfx+'_e2_'+c]));
+  row(tb,'E.3','Abnormal noise on cooling fans','No abnormal noise',C.map(c=>['noise',pfx+'_e3_'+c]));
+  shdr(tb,'F.  Bushing (Porcelain Type)');
+  row(tb,'F.1','Bushing oil level & leaks (if equipped)','Oil level > 50%',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['ok',pfx+'_f1_'+c]));
+  row(tb,'F.2','Porcelain contamination','Clean, No contamination',C.map(c=>c==='exc'?['na','','']:['clean',pfx+'_f2_'+c]));
+  shdr(tb,'G.  Pressure Relief Device');
+  row(tb,'G.1','Oil leakage on Pressure Relief Device','No leak',C.map(c=>['leak',pfx+'_g1_'+c]));
+  shdr(tb,'H.  On Load Tap Changer (OLTC)');
+  row(tb,'H.1','Tap changing operation counter','< 80,000 ops',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['meas',pfx+'_h1_'+c,'ops']),true);
+  shdr(tb,'I.  Oil Purifier');
+  row(tb,'I.1','Oil purifier leaks','No leak',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['leak',pfx+'_i1_'+c]));
+  row(tb,'I.2','Filter Differential Pressure','Diff Press < 0.4 MPa',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['meas',pfx+'_i2_'+c,'MPa']),true);
+  row(tb,'I.3','Oil flow sight — carbon contamination','No carbon contamination',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['clean',pfx+'_i3_'+c]));
+  shdr(tb,'J.  Cooler Control Cubicle');
+  row(tb,'J.1','Rust on cubicle','No rust',C.map(c=>['clean',pfx+'_j1_'+c]));
+  row(tb,'J.2','Loose connections inside cubicle','No looseness',C.map(c=>['ok',pfx+'_j2_'+c]));
+  row(tb,'J.3','Wire color / discoloration / overheating','No discoloration',C.map(c=>['ok',pfx+'_j3_'+c]));
+  shdr(tb,'K.  N₂ Pressure');
+  row(tb,'K.1','N₂ Bottle Pressure','>10 psi (Low Alarm)',C.map(c=>c==='exc'?['meas',pfx+'_k1_'+c,'psi']:['na','','']),true);
+  row(tb,'K.2','XFMR Tank Pressure','<+9 psi (Avg +2 psi)',C.map(c=>c==='exc'?['meas',pfx+'_k2_'+c,'psi']:['na','','']),true);
+  shdr(tb,'SF₆ Gas Pressure');
+  row(tb,'','SF₆ Gas Pressure','Alarm: 0.45 MPa · Trip: 0.40 MPa',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['meas',pfx+'_sf_'+c,'MPa']),true);
+}
+
+// SHEET 3 USST
+function mkUST(){
+  const tb=document.getElementById('tb-s3');
+  const C=['a2','b2','a3','b3','a6','b6','b11','c11'];
+  shdr(tb,'A.  Transformer Temperature and Load');
+  row(tb,'A.1','Ambient Temperature (°C)','',C.map(c=>['meas','s3_a1_'+c,'°C']),true);
+  row(tb,'A.2L','Winding Temp — Left Winding','<220°C (Class AA)',C.map(c=>['meas','s3_a2l_'+c,'°C']),true);
+  row(tb,'A.2C','Winding Temp — Center Winding','',C.map(c=>['meas','s3_a2c_'+c,'°C']),true);
+  row(tb,'A.2R','Winding Temp — Right Winding','',C.map(c=>['meas','s3_a2r_'+c,'°C']),true);
+  row(tb,'A.3','Primary / HV Voltage (kV)','A2,B2,A3,B3,A6,B6 = 13.8 kV · B11,C11 = 6.9 kV',C.map(c=>['meas','s3_a3_'+c,'kV']),true);
+  row(tb,'A.4','Primary / HV Current (A)','A2–B6 ≤62.8 A · B11,C11 ≤209 A',C.map(c=>['meas','s3_a4_'+c,'A']),true);
+  row(tb,'A.5','Apparent Power (kVA)','A2–B6 ≤1500 · B11,C11 ≤2500 kVA',C.map(c=>['meas','s3_a5_'+c,'kVA']),true);
+  shdr(tb,'B.  Transformer Electrical Components');
+  row(tb,'B.1','Check components for damage','',C.map(c=>['ok','s3_b1_'+c]));
+  row(tb,'B.2','Operate cooling fans — check noise (12 pcs: 6F+6R)','No abnormal noise',C.map(c=>['noise','s3_b2_'+c]));
+  row(tb,'B.3','Clean enclosure & components from dust','',C.map(c=>['ok','s3_b3_'+c]));
+}
+
+// SHEET 4 SST SWRO/SCRUB/ADMIN
+function mkSST4(){
+  const tb=document.getElementById('tb-s4');
+  const C=['a4','b4s','b1a1_7','b1a1_8','a5_7','a5_8','b5'];
+  shdr(tb,'A.  Transformer Temperature and Load');
+  row(tb,'A.1','Ambient Temperature (°C)','',C.map(c=>['meas','s4_a1_'+c,'°C']),true);
+  row(tb,'A.2L','Winding Temp — Left','<220°C (Class AA)',C.map(c=>['meas','s4_a2l_'+c,'°C']),true);
+  row(tb,'A.2C','Winding Temp — Center','',C.map(c=>['meas','s4_a2c_'+c,'°C']),true);
+  row(tb,'A.2R','Winding Temp — Right','',C.map(c=>['meas','s4_a2r_'+c,'°C']),true);
+  row(tb,'A.3','Primary / HV Voltage (kV)','A4,A5,B5 = 13.8 kV · B1A1 = 6.9 kV',C.map(c=>['meas','s4_a3_'+c,'kV']),true);
+  row(tb,'A.4','Primary / HV Current (A)','A4 ≤83.7 · A5,B5 ≤41.8 · B1A1 ≤64.8 A',C.map(c=>['meas','s4_a4_'+c,'A']),true);
+  row(tb,'A.5','Apparent Power (kVA)','A4 ≤2000 · A5,B5 ≤1000 · B1A1 ≤750 kVA',C.map(c=>['meas','s4_a5_'+c,'kVA']),true);
+  shdr(tb,'B.  Transformer Electrical Components');
+  row(tb,'B.1','Check components for damage','',C.map(c=>['ok','s4_b1_'+c]));
+  row(tb,'B.2','Operate cooling fans — check noise','No abnormal noise',C.map(c=>['noise','s4_b2_'+c]));
+  row(tb,'B.3','Clean enclosure & components from dust','',C.map(c=>['ok','s4_b3_'+c]));
+}
+
+// SHEET 5 SST CHCB/WH/CUCB
+function mkSST5(){
+  const tb=document.getElementById('tb-s5');
+  const C=['100a','100b','b4_7','b4_8','200','b5'];
+  shdr(tb,'A.  Transformer Temperature and Load');
+  row(tb,'A.1','Ambient Temperature (°C)','',C.map(c=>['meas','s5_a1_'+c,'°C']),true);
+  row(tb,'A.2L','Winding Temp — Left','<220°C (Class AA)',C.map(c=>['meas','s5_a2l_'+c,'°C']),true);
+  row(tb,'A.2C','Winding Temp — Center','',C.map(c=>['meas','s5_a2c_'+c,'°C']),true);
+  row(tb,'A.2R','Winding Temp — Right','',C.map(c=>['meas','s5_a2r_'+c,'°C']),true);
+  row(tb,'A.3','Primary / HV Voltage (kV)','B4 = 13.8 kV · 100A/B,200 = 6.9 kV',C.map(c=>['meas','s5_a3_'+c,'kV']),true);
+  row(tb,'A.4','Primary / HV Current (A)','B4 ≤41.8 · 100A/B ≤125 · 200 ≤83.7 A',C.map(c=>['meas','s5_a4_'+c,'A']),true);
+  row(tb,'A.5','Apparent Power (kVA)','B4,200 ≤1000 · 100A/B ≤1500 kVA',C.map(c=>['meas','s5_a5_'+c,'kVA']),true);
+  shdr(tb,'B.  Transformer Electrical Components');
+  row(tb,'B.1','Check components for damage','',C.map(c=>['ok','s5_b1_'+c]));
+  row(tb,'B.2','Operate cooling fans — check noise','No abnormal noise',C.map(c=>['noise','s5_b2_'+c]));
+  row(tb,'B.3','Clean enclosure & components from dust','',C.map(c=>['ok','s5_b3_'+c]));
+}
+
+// GIS
+const GTAGS=[['GD1A1','GD1B1','GD1C1'],['GD1A2','GD1B2','GD1C2'],['GD2A1','GD2B1','GD2C1'],['GD2A2','GD2B2','GD2C2'],['GD3A1','GD3B1','GD3C1'],['GD3A2','GD3B2','GD3C2'],['GD4A1','GD4B1','GD4C1'],['GD4A2','GD4B2','GD4C2'],['GD5A1','GD5B1','GD5C1'],['GD5A2','GD5B2','GD5C2'],['GD6A1','GD6B1','GD6C1'],['GD6A2','GD6B2','GD6C2'],['GD7A1','GD7B1','GD7C1'],['GD7A2','GD7B2','GD7C2'],['GD8A1','GD8B1','GD8C1'],['GD8A2','GD8B2','GD8C2'],['GD9A1','GD9B1','GD9C1'],['GD9A2','GD9B2','GD9C2'],['GD10A1','GD10B1','GD10C1'],['GD10A2','GD10B2','GD10C2'],['GD11A1','GD11B1','GD11C1'],['GD11A2','GD11B2','GD11C2'],['GD12A1','GD12B1','GD12C1'],['GD12A2','GD12B2','GD12C2']];
+function mkGIS(tbId,pfx){
+  const tb=document.getElementById(tbId);
+  GTAGS.forEach((tags,i)=>{
+    const tr=tb.insertRow();
+    let h=`<td style="text-align:center;font-family:var(--mono);font-size:10.5px;color:var(--t3)">${i+1}</td>`;
+    tags.forEach(tag=>{h+=`<td class="tgl">${tag}</td><td><input class="mi" type="number" step="0.001" id="${pfx}_${tag}" placeholder="0.000" style="min-width:58px;width:58px;text-align:center"><span class="mu">MPa</span></td>`;});
+    tr.innerHTML=h;
+  });
+}
+
+// PHOTOS
+const PS={};
+const PSLOTS=[{id:'ph1',title:'Transformer Room Overview'},{id:'ph2',title:'EZ-XFMR-GSU Condition'},{id:'ph3',title:'EY-XFMR-SU Condition'},{id:'ph4',title:'EX-XFMR-UAT Condition'},{id:'ph5',title:'Thermal Scan — GSU/SU (IR)'},{id:'ph6',title:'Thermal Scan — UAT/Others (IR)'}];
+function mkPhotos(){document.getElementById('photo-wrap').innerHTML=PSLOTS.map(p=>`<div><div class="pbtl">${p.title}</div><div class="pd" id="${p.id}"><input type="file" accept="image/*" onchange="lpx(this,'${p.id}')"><button class="delbtn" onclick="dpx('${p.id}',event)">×</button><div class="phi">📷</div><div class="pht">Click to upload</div></div><div class="pcap"><input type="text" id="${p.id}-cap" placeholder="Caption…"></div></div>`).join('');}
+function lpx(inp,id){if(!inp.files[0])return;const r=new FileReader();r.onload=e=>{PS[id]=e.target.result;const s=document.getElementById(id);let img=s.querySelector('img');if(!img){img=document.createElement('img');s.appendChild(img);}img.src=e.target.result;s.classList.add('hp');s.querySelector('.phi').style.display='none';s.querySelector('.pht').style.display='none';};r.readAsDataURL(inp.files[0]);}
+function dpx(id,e){e.stopPropagation();const s=document.getElementById(id);const img=s.querySelector('img');if(img)img.remove();s.classList.remove('hp');s.querySelector('.phi').style.display='';s.querySelector('.pht').style.display='';delete PS[id];}
+
+// SIGNATURE
+function initSig(id){const c=document.getElementById(id);const ctx=c.getContext('2d');let dr=false;function p(e){const r=c.getBoundingClientRect();const sx=c.width/r.width;const sy=c.height/r.height;if(e.touches)return{x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};}c.addEventListener('mousedown',e=>{dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);});c.addEventListener('mousemove',e=>{if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();});c.addEventListener('mouseup',()=>dr=false);c.addEventListener('mouseleave',()=>dr=false);c.addEventListener('touchstart',e=>{e.preventDefault();dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);},{passive:false});c.addEventListener('touchmove',e=>{e.preventDefault();if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();},{passive:false});c.addEventListener('touchend',()=>dr=false);}
+function clrSig(id){const c=document.getElementById(id);c.getContext('2d').clearRect(0,0,c.width,c.height);}
+
+// DRAFT
+function saveDraft(){const d={};document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>d['f'+i]=el.value);d._st=ST;try{localStorage.setItem('tx_wk_v3',JSON.stringify(d));note('💾 Draft saved.','ok');}catch(e){note('❌ '+e.message,'err');}}
+function loadDraft(){try{const raw=localStorage.getItem('tx_wk_v3');if(!raw)return;const d=JSON.parse(raw);document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>{if(d['f'+i]!==undefined)el.value=d['f'+i];});if(d._st){Object.assign(ST,d._st);Object.entries(ST).forEach(([id,val])=>{document.querySelectorAll(`[data-id="${id}"]`).forEach(b=>{if(b.dataset.v===val||b.textContent===val)b.classList.add('a');});});}upStats();}catch(e){}}
+function resetForm(){if(!confirm('Reset all data?'))return;document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file')el.value='';});Object.keys(ST).forEach(k=>delete ST[k]);document.querySelectorAll('.rb,.lb').forEach(b=>b.classList.remove('a'));clrSig('sig-tech');clrSig('sig-super');PSLOTS.forEach(p=>dpx(p.id,{stopPropagation:()=>{}}));upStats();}
+
+// NOTICE
+function note(msg,t){const n=document.getElementById('notice');n.textContent=msg;n.className='notice '+t;setTimeout(()=>n.className='notice',3500);}
+const vv=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
+const trunc=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'');
+
+// PDF
+async function generatePDF(selSet){
+  if(!selSet)selSet=new Set(PDF_SHEETS.map(s=>s.key));
+  note('⏳ Generating PDF…','info');await new Promise(r=>setTimeout(r,200));
+  const{jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=297,H=210,M=11;let y=M;let firstPage=true;
+  const DARK=[44,62,48],STL=[74,94,82],RED=[192,57,43],OK=[39,174,96],NA=[142,68,173],LT=[240,245,241];
+  function nPage(){pdf.addPage();y=M;pgHdr();}
+  function ck(n){if(y+n>H-M)nPage();}
+  function pgHdr(){pdf.setFillColor(...DARK);pdf.rect(0,0,W,9,'F');pdf.setTextColor(168,212,184);pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.text('TRANSFORMER INSPECTION — UNIT '+vv('unit-sel'),M,6.5);pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(100,150,120);pdf.text(`WO: ${vv('wo-no')||'—'}  Date: ${vv('wo-date')||'—'}  By: ${vv('checked-by')||'—'}`,W-M,6.5,{align:'right'});y=13;}
+  function ensurePage(){if(!firstPage){nPage();}else{firstPage=false;pgHdr();}}
+
+  // Cover
+  if(selSet.has('cover')){
+    firstPage=false;
+    pdf.setFillColor(...DARK);pdf.rect(0,0,W,44,'F');pdf.setFillColor(...RED);pdf.rect(0,42,W,2,'F');
+    pdf.setTextColor(...LT);pdf.setFont('helvetica','bold');pdf.setFontSize(20);pdf.text('TRANSFORMER WEEKLY INSPECTION',M,15);
+    pdf.setFontSize(12);pdf.setTextColor(168,212,184);pdf.text('UNIT '+vv('unit-sel')+' — XFMR-AT · USST · COMMON SST · GIS SF₆',M,25);
+    pdf.setFontSize(8);pdf.setTextColor(100,150,120);pdf.text('Generated: '+new Date().toLocaleString('en-GB'),M,35);pdf.text('PLTU Maintenance Dept.',W-M,35,{align:'right'});
+    const sheetNames=PDF_SHEETS.filter(s=>selSet.has(s.key)&&s.key!=='cover').map(s=>s.label).join(' · ');
+    if(sheetNames){pdf.setFontSize(6.5);pdf.text('Included: '+trunc(sheetNames,130),M,40);}
+    y=50;
+    pdf.setFillColor(244,248,245);pdf.setDrawColor(180,200,185);pdf.setLineWidth(0.25);pdf.roundedRect(M,y,W-M*2,28,2,2,'FD');
+    function ib(l,v,x,yy){pdf.setFont('helvetica','bold');pdf.setFontSize(6.5);pdf.setTextColor(120,160,135);pdf.text(l.toUpperCase(),x,yy);pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);pdf.setTextColor(...DARK);pdf.text(trunc(v||'—',28),x,yy+5.5);}
+    const cx=[M+3,62,115,165,215];
+    ib('WO',vv('wo-no'),cx[0],y+7);ib('Date',vv('wo-date'),cx[1],y+7);ib('Unit',vv('unit-sel'),cx[2],y+7);ib('Type',vv('itype'),cx[3],y+7);
+    ib('Checked By',vv('checked-by'),cx[0],y+19);ib('NIK',vv('nik'),cx[1],y+19);ib('Reviewed By',vv('reviewed-by'),cx[2],y+19);ib('Shift',vv('shift').split(' ')[0],cx[3],y+19);
+    y+=34;
+    const to=parseInt(document.getElementById('cnt-t').textContent)||0;
+    const oc=parseInt(document.getElementById('cnt-ok').textContent)||0;
+    const nc=parseInt(document.getElementById('cnt-ng').textContent)||0;
+    [[M,'TOTAL',String(to),STL],[M+36,'OK/NORMAL',String(oc),OK],[M+72,'NG/ISSUE',String(nc),RED]].forEach(([x,l,v,cl])=>{
+      pdf.setFillColor(...cl,.06);pdf.setDrawColor(...cl);pdf.setLineWidth(0.35);pdf.roundedRect(x,y,30,11,2,2,'FD');
+      pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...cl);pdf.text(l,x+2,y+4.5);pdf.setFontSize(11);pdf.text(v,x+2,y+10);
+    });y+=17;
+  }
+
+  function drawTbl(title,tbId,hdrs,cws){
+    ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.text('▶  '+title,M+3,y+5);y+=10;
+    const body=[];
+    document.getElementById(tbId).querySelectorAll('tr').forEach(tr=>{
+      if(tr.classList.contains('shdr')){body.push([{content:tr.querySelector('td').textContent,colSpan:99,styles:{fillColor:[240,245,241],fontStyle:'bold',fontSize:7,textColor:[74,94,82]}}]);return;}
+      const tds=[...tr.querySelectorAll('td')];if(tds.length<2)return;
+      const no=tds[0].textContent.trim();const desc=tds[1].textContent.replace(/▸.*/,'').trim();
+      const crit=tds[1].querySelector('.crit')?.textContent.replace('▸ ','').trim()||'';
+      const vals=tds.slice(2).map(td=>{if(td.querySelector('.nac'))return'N/A';const a=td.querySelector('.rb.a,.lb.a');if(a)return a.textContent;const inp=td.querySelector('input[type=number]');return inp&&inp.value?inp.value:'—';});
+      body.push([no,crit?`${desc}\n▸ ${crit}`:desc,...vals]);
+    });
+    pdf.autoTable({startY:y,head:[['No.','Inspection Item',...hdrs]],body,theme:'grid',
+      styles:{font:'helvetica',fontSize:6.8,cellPadding:2,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.16},
+      headStyles:{fillColor:[240,245,241],textColor:[80,110,90],fontStyle:'bold',fontSize:6.5,halign:'center'},
+      columnStyles:{0:{cellWidth:8,halign:'center'},1:{cellWidth:cws[0]||70},...hdrs.reduce((o,_,i)=>({...o,[i+2]:{cellWidth:cws[i+1]||22,halign:'center'}}),{})},
+      didParseCell:d=>{const v=d.cell.text[0];if(['OK','No Leak','Clean','Normal'].includes(v)){d.cell.styles.textColor=[...OK];d.cell.styles.fontStyle='bold';}if(['NG','Leak','Dirty','Noise'].includes(v)){d.cell.styles.textColor=[...RED];d.cell.styles.fontStyle='bold';}if(v==='N/A')d.cell.styles.textColor=[...NA];},
+      margin:{left:M,right:M}});y=pdf.lastAutoTable.finalY+5;
+  }
+
+  if(selSet.has('s1')){ensurePage();drawTbl('Sheet 1: 7EX-XFMR-AT + DGA','tb-s1',['EZ-GSU','EY-SU','EX-UAT','EX-EXC','EM-A1','EM-B1','EM-C1'],[72,22,22,22,22,22,22,22]);}
+  if(selSet.has('s2')){ensurePage();drawTbl('Sheet 2: 7EX-XFMR-AT (Without DGA)','tb-s2',['EZ-GSU','EY-SU','EX-UAT','EX-EXC','EM-A1','EM-B1','EM-C1'],[72,22,22,22,22,22,22,22]);}
+  if(selSet.has('s3')){ensurePage();drawTbl('Sheet 3: U78 USST — Three Monthly PM','tb-s3',['EM-A2','EM-B2','EM-A3','EM-B3','EM-A6','EM-B6','EN-B11','EN-C11'],[65,20,20,20,20,20,20,20,20]);}
+  if(selSet.has('s4')){ensurePage();drawTbl('Sheet 4: Common SST — SWRO/Scrubber/Admin','tb-s4',['7EM-A4','8EM-B4','7EN-B1A1','8EN-B1A1','7EM-A5','8EM-A5','7EM-B5'],[68,24,24,24,24,24,24,24]);}
+  if(selSet.has('s5')){ensurePage();drawTbl('Sheet 5: Common SST — CHCB/Warehouse/CUCB','tb-s5',['CCH-100A','CCH-100B','7EM-B4','8EM-B4','CCH-200','7EM-B5'],[78,28,28,28,28,28,28]);}
+
+  // GIS
+  if(selSet.has('gis')){
+    ensurePage();
+    ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.text('▶  GIS SF₆ Gas Pressure Monitoring',M+3,y+5);y+=10;
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(...OK);pdf.text('Setting: Alarm ≥ 0.45 MPa  ·  Trip ≤ 0.40 MPa',M,y+5);y+=9;
+    const gb=GTAGS.map((tags,i)=>{const v150=tags.map(t=>{const e=document.getElementById('g150_'+t);return e?e.value||'—':'—';});const v500=tags.map(t=>{const e=document.getElementById('g500_'+t);return e?e.value||'—':'—';});return[i+1,tags[0],v150[0],tags[1],v150[1],tags[2],v150[2],'',i+1,tags[0],v500[0],tags[1],v500[1],tags[2],v500[2]];});
+    pdf.autoTable({startY:y,head:[['No','150kV-A','MPa','150kV-B','MPa','150kV-C','MPa','','No','500kV-A','MPa','500kV-B','MPa','500kV-C','MPa']],body:gb,theme:'grid',styles:{font:'helvetica',fontSize:7,cellPadding:2,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.16},headStyles:{fillColor:[240,245,241],textColor:[80,110,90],fontStyle:'bold',fontSize:6.5},columnStyles:{0:{cellWidth:8,halign:'center'},7:{cellWidth:4,fillColor:[230,237,232]}},margin:{left:M,right:M}});y=pdf.lastAutoTable.finalY+6;
+  }
+
+  // Photos
+  if(selSet.has('photos')){
+    const hp=PSLOTS.filter(p=>PS[p.id]);
+    if(hp.length){
+      ensurePage();
+      ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.text('▶  Evidence Photos',M+3,y+5);y+=11;
+      const cw=(W-M*2)/3-3;
+      for(let i=0;i<hp.length;i+=3){const g=hp.slice(i,i+3);const ih=50;ck(ih+14);g.forEach((p,pi)=>{const xo=M+pi*(cw+3);pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.setTextColor(...STL);pdf.text(trunc(p.title,32),xo,y+5);try{pdf.addImage(PS[p.id],'JPEG',xo,y+7,cw,ih,undefined,'MEDIUM');}catch(e){}const cap=document.getElementById(p.id+'-cap')?.value||'';if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(6.5);pdf.setTextColor(120,155,135);pdf.text(trunc(cap,40),xo,y+7+ih+4);}});y+=ih+18;}
+    }
+  }
+
+  // Findings & Signatures
+  if(selSet.has('findings')){
+    ensurePage();
+    ck(48);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.text('▶  Findings & Conclusion',M+3,y+5);y+=10;
+    pdf.autoTable({startY:y,body:[['Overall',vv('overall')||'—'],['Next Inspection',vv('next-insp')||'—'],['Findings',vv('findings')||'—'],['Corrective Actions',vv('recommendations')||'—']],theme:'grid',styles:{font:'helvetica',fontSize:8.5,cellPadding:3.5,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.18},columnStyles:{0:{cellWidth:46,fontStyle:'bold',fillColor:[244,248,245],textColor:[74,94,82]}},margin:{left:M,right:M}});y=pdf.lastAutoTable.finalY+7;
+    ck(42);const sw=(W-M*2)/2-5;
+    ['sig-tech','sig-super'].forEach((id,i)=>{const xo=M+i*(sw+10);const lbl=i===0?'Checked By — Technician':'Reviewed By — Supervisor';const nm=i===0?(vv('sig-tech-name')||vv('checked-by')):(vv('sig-super-name')||vv('reviewed-by'));pdf.setFillColor(244,248,245);pdf.setDrawColor(180,200,185);pdf.setLineWidth(0.25);pdf.roundedRect(xo,y,sw,36,2,2,'FD');pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...STL);pdf.text(lbl,xo+3,y+5.5);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(...DARK);pdf.text(nm||'',xo+3,y+12);const c=document.getElementById(id);if(c){const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data.some(v=>v);if(d)try{pdf.addImage(c.toDataURL('image/png'),'PNG',xo+3,y+14,sw-6,18);}catch(e){}}pdf.setDrawColor(180,200,185);pdf.line(xo+3,y+33,xo+sw-3,y+33);pdf.setFont('helvetica','italic');pdf.setFontSize(6.5);pdf.setTextColor(120,155,135);pdf.text('Signature',xo+3,y+36);});
+  }
+
+  const pages=pdf.internal.getNumberOfPages();
+  for(let pg=1;pg<=pages;pg++){pdf.setPage(pg);pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(150);pdf.text(`Page ${pg}/${pages}`,W-M,H-5,{align:'right'});pdf.text('PLTU — Transformer Weekly Inspection',M,H-5);}
+
+  const fn=`TX_Inspection_U${vv('unit-sel')}_${(vv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
+  pdf.save(fn);note('✅ PDF saved: '+fn,'ok');
+}
+
+// PDF MODAL
+const PDF_SHEETS=[
+  {key:'cover',  label:'Cover & Header',      icon:'📋', desc:'Cover page + WO info + stats'},
+  {key:'s1',     label:'Sheet 1 — AT+DGA',    icon:'⚡', desc:'EZ-GSU · EY-SU · EX-UAT · EX-EXC · EM-A1/B1/C1'},
+  {key:'s2',     label:'Sheet 2 — AT (No DGA)',icon:'🔌', desc:'Same transformers, without DGA items'},
+  {key:'s3',     label:'Sheet 3 — USST',      icon:'🏭', desc:'U78 USST Three Monthly PM'},
+  {key:'s4',     label:'Sheet 4 — SST SWRO',  icon:'💧', desc:'Common SST SWRO/Scrubber/Admin'},
+  {key:'s5',     label:'Sheet 5 — SST CHCB',  icon:'🏗️', desc:'Common SST CHCB/Warehouse/CUCB'},
+  {key:'gis',    label:'GIS SF₆',             icon:'🔵', desc:'150 kV & 500 kV gas pressure monitoring'},
+  {key:'photos', label:'Evidence Photos',      icon:'📷', desc:'Uploaded inspection photos'},
+  {key:'findings',label:'Findings & Sign-off', icon:'✍️', desc:'Conclusion, actions & signatures'},
+];
+let _pdfSel=new Set(PDF_SHEETS.map(s=>s.key));// all selected by default
+
+function openPdfModal(){
+  _pdfSel=new Set(PDF_SHEETS.map(s=>s.key));
+  renderPdfModal();
+  document.getElementById('pdf-modal-overlay').style.display='flex';
+}
+function closePdfModal(){document.getElementById('pdf-modal-overlay').style.display='none';}
+
+function renderPdfModal(){
+  const list=document.getElementById('pdf-sheet-list');
+  list.innerHTML=PDF_SHEETS.map(s=>`
+    <div class="psl-item ${_pdfSel.has(s.key)?'psl-on':''}" id="pslrow-${s.key}" onclick="toggleSheet('${s.key}')">
+      <span class="psl-icon">${s.icon}</span>
+      <span class="psl-info"><span class="psl-name">${s.label}</span><span class="psl-desc">${s.desc}</span></span>
+      <span class="psl-chk" id="pslchk-${s.key}">${_pdfSel.has(s.key)?'✓':''}</span>
+    </div>`).join('');
+  updatePdfBadge();
+}
+function toggleSheet(key){
+  if(_pdfSel.has(key))_pdfSel.delete(key);else _pdfSel.add(key);
+  const row=document.getElementById('pslrow-'+key);
+  const chk=document.getElementById('pslchk-'+key);
+  if(row)row.className='psl-item'+(_pdfSel.has(key)?' psl-on':'');
+  if(chk)chk.textContent=_pdfSel.has(key)?'✓':'';
+  updatePdfBadge();
+}
+function updatePdfBadge(){
+  const el=document.getElementById('pdf-count-badge');
+  if(el)el.textContent=_pdfSel.size+' sheet'+(_pdfSel.size!==1?'s':'');
+}
+function pdfSelectAll(){_pdfSel=new Set(PDF_SHEETS.map(s=>s.key));renderPdfModal();}
+function pdfClearAll(){_pdfSel=new Set();renderPdfModal();}
+
+function generatePDFSelected(){
+  if(_pdfSel.size===0){note('⚠️ Pilih minimal 1 sheet!','err');return;}
+  closePdfModal();
+  generatePDF(_pdfSel);
+}
+
+// INIT
+mkAT('tb-s1','s1',true);mkAT('tb-s2','s2',false);mkUST();mkSST4();mkSST5();
+mkGIS('tb-g150','g150');mkGIS('tb-g500','g500');
+mkPhotos();initSig('sig-tech');initSig('sig-super');loadDraft();upStats();
+</script>
+<!-- PDF Sheet Selector Modal -->
+<div id="pdf-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(20,35,25,0.65);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:#f0f5f1;border:1.5px solid #b4c8bc;border-radius:14px;padding:0;width:480px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden">
+    <div style="background:linear-gradient(90deg,#2c3e30,#3d5248);padding:16px 22px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:700;color:#a8d4b8;letter-spacing:2px">PILIH SHEET PDF</div>
+        <div style="font-size:11px;color:#6aaa8a;margin-top:2px">Centang sheet yang ingin dimasukkan dalam PDF</div>
+      </div>
+      <button onclick="closePdfModal()" style="background:none;border:none;color:#7aaa8a;font-size:20px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px">✕</button>
+    </div>
+    <div style="padding:14px 18px 6px">
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <button onclick="pdfSelectAll()" class="btn bo bsm" style="font-size:11px;padding:4px 12px">✅ Pilih Semua</button>
+        <button onclick="pdfClearAll()" class="btn bo bsm" style="font-size:11px;padding:4px 12px">☐ Kosongkan</button>
+        <span id="pdf-count-badge" style="margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:12px;color:#4a5e52;background:#dde3de;padding:3px 10px;border-radius:20px;font-weight:700">9 sheets</span>
+      </div>
+      <div id="pdf-sheet-list" style="display:flex;flex-direction:column;gap:5px;max-height:360px;overflow-y:auto;padding-right:4px"></div>
+    </div>
+    <div style="padding:14px 18px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #dde3de;margin-top:10px">
+      <button onclick="closePdfModal()" class="btn bo">Batal</button>
+      <button onclick="generatePDFSelected()" class="btn br" style="min-width:140px">📄 Download PDF</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
