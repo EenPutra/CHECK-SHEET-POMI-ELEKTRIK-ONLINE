@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>7EP-MCC — MCC Switchboard 4 Yearly PM</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1e3a5f;--navy2:#0f2744;--blue:#2563eb;--sky:#7dd3fc;--sky2:#bfdbfe;
+  --bg:#f8fbff;--bg2:#f0f7ff;--surf:#fff;--bdr:#bfdbfe;--bdr2:#dbeafe;
+  --ok:#16a34a;--ng:#dc2626;--idle:#e5e7eb;
+  --txt:#0f172a;--txt2:#1e3a5f;--txt3:#3b82f6;--txt4:#64748b;
+  --mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:100vh}
+
+.topbar{position:sticky;top:0;z-index:100;background:var(--navy2);height:52px;
+  display:flex;align-items:center;padding:0 20px;gap:12px;border-bottom:2px solid var(--blue)}
+.tb-logo{font-family:var(--raj);font-size:20px;font-weight:700;letter-spacing:3px;color:#fff}
+.tb-logo em{color:var(--sky);font-style:normal}
+.tb-sep{width:1px;height:26px;background:rgba(255,255,255,0.15);flex-shrink:0}
+.tb-sub{font-size:11px;color:var(--sky);font-family:var(--mono);letter-spacing:1px;white-space:nowrap}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--sky);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.tb-time{font-family:var(--mono);font-size:12px;color:var(--sky);white-space:nowrap}
+.btn{padding:6px 14px;border-radius:5px;border:none;cursor:pointer;font-family:var(--raj);font-size:13px;font-weight:600;letter-spacing:1px;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.btn-pdf{background:var(--blue);color:#fff}.btn-pdf:hover{background:#1d4ed8;transform:translateY(-1px)}
+.btn-ol{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)}.btn-ol:hover{background:rgba(255,255,255,0.2)}
+.btn-sm{padding:4px 10px;font-size:12px}
+
+.hero{background:var(--navy);padding:24px 20px 20px}
+.hero-eyebrow{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--sky)}
+.hero-title{font-family:var(--raj);font-size:clamp(24px,5vw,48px);font-weight:700;line-height:1;color:#fff;letter-spacing:1px}
+.hero-title em{color:var(--sky);font-style:normal}
+.hero-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-top:8px;font-weight:300}
+.hero-stats{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.hstat{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px 16px;text-align:center;min-width:72px}
+.hstat-n{font-family:var(--raj);font-size:26px;font-weight:700;color:#fff;line-height:1;display:block}
+.hstat-n.ok{color:#4ade80}.hstat-n.ng{color:#f87171}.hstat-n.ph{color:var(--sky)}
+.hstat-l{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;display:block}
+
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 80px}
+.panel{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 6px rgba(30,58,95,0.06)}
+
+.sec-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--navy);cursor:pointer;user-select:none}
+.sec-icon{width:28px;height:28px;border-radius:6px;background:rgba(37,99,235,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.sec-title{font-family:var(--raj);font-size:15px;font-weight:700;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.sec-sub{font-family:var(--mono);font-size:10px;color:var(--sky);margin-left:4px}
+.sec-cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.4);padding:2px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:10px}
+.sec-arrow{color:rgba(255,255,255,0.4);font-size:14px;transition:transform .2s;margin-left:6px}
+.sec-hdr.open .sec-arrow{transform:rotate(180deg)}
+
+.wo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;padding:16px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf label{font-size:10px;color:var(--txt4);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.mf input,.mf select,.mf textarea{border:1.5px solid var(--bdr);border-radius:5px;padding:7px 10px;font-family:var(--sans);font-size:13px;background:var(--bg2);color:var(--txt);transition:border-color .18s;width:100%}
+.mf input:focus,.mf select:focus,.mf textarea:focus{outline:none;border-color:var(--blue);background:#fff}
+.mf input[type=date]{font-family:var(--mono)}
+.mf textarea{resize:vertical;min-height:70px}
+
+/* CAUTION BANNER */
+.caution{background:rgba(220,38,38,0.08);border:1.5px solid rgba(220,38,38,0.3);border-radius:6px;padding:10px 14px;margin:12px 16px;display:flex;align-items:flex-start;gap:10px;font-size:12.5px;color:#b91c1c}
+.caution-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl-wrap::-webkit-scrollbar{height:4px}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--sky2);border-radius:2px}
+.ct{width:100%;border-collapse:collapse;font-size:12px}
+.ct th{background:var(--navy);color:var(--sky2);padding:7px 10px;text-align:center;font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.08)}
+.ct th.tl{text-align:left}.ct th:last-child{border-right:none}
+.ct td{padding:7px 10px;border-bottom:1px solid var(--bdr2);background:var(--surf);vertical-align:middle;border-right:1px solid var(--bdr2)}
+.ct td:last-child{border-right:none}
+.ct tr:last-child td{border-bottom:none}
+.ct tr:hover td{background:var(--bg2)}
+.ct td.no{font-family:var(--mono);font-size:11px;color:var(--txt4);width:32px;text-align:center}
+.ct td.lbl{text-align:left;color:var(--txt);font-size:12px;min-width:300px;line-height:1.5}
+.ct td.ref{font-family:var(--mono);font-size:10px;color:var(--txt3);min-width:120px;text-align:center}
+.ct td.res{min-width:100px;text-align:center}
+.ct td.rmk{min-width:140px}
+
+/* TOGGLE */
+.tog{display:inline-flex;gap:3px;justify-content:center}
+.rb{font-size:10px;padding:4px 9px;border-radius:4px;cursor:pointer;font-weight:700;letter-spacing:.5px;border:none;transition:all .15s;font-family:var(--mono)}
+.rb.ok-idle{background:var(--idle);color:#9ca3af}
+.rb.ng-idle{background:var(--idle);color:#9ca3af}
+.rb.ok-act{background:var(--ok);color:#fff;box-shadow:0 0 0 2px rgba(22,163,74,0.3)}
+.rb.ng-act{background:var(--ng);color:#fff;box-shadow:0 0 0 2px rgba(220,38,38,0.3)}
+.rb:hover{opacity:.85;transform:translateY(-1px)}
+
+/* PHOTO SECTION */
+.photo-wrap{padding:16px;background:var(--bg2);border-top:2px dashed var(--bdr)}
+.photo-sec-lbl{font-family:var(--raj);font-size:12px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.photo-grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.photo-grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.photo-block{display:flex;flex-direction:column;gap:6px}
+.photo-blk-ttl{font-family:var(--raj);font-size:11.5px;font-weight:700;color:var(--sky2);letter-spacing:1px;text-transform:uppercase;padding:5px 10px;background:var(--navy);border-radius:5px;text-align:center}
+.photo-drop{border:2px dashed var(--bdr);border-radius:8px;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;background:#fff;position:relative;overflow:hidden}
+.photo-drop:hover{border-color:var(--blue);background:var(--bg2)}
+.photo-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.photo-drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:6px}
+.photo-drop .del-btn{position:absolute;top:5px;right:5px;background:rgba(220,38,38,.85);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:13px;display:none;align-items:center;justify-content:center;z-index:5}
+.photo-drop.has-photo .del-btn{display:flex}
+.ph-icon{font-size:22px;margin-bottom:5px;pointer-events:none}
+.ph-hint{font-size:10px;color:var(--txt4);text-align:center;pointer-events:none;font-family:var(--mono);padding:0 8px}
+.photo-cap{width:100%;border:1.5px solid var(--bdr);border-radius:5px;padding:5px 8px;font-size:12px;background:#fff;color:var(--txt);font-family:var(--sans)}
+.photo-cap:focus{outline:none;border-color:var(--blue)}
+
+.findings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
+.notice{padding:10px 16px;border-radius:6px;font-size:13px;display:none;margin:12px 0 0}
+.notice.ok{background:#dcfce7;border:1px solid #86efac;color:#15803d;display:block}
+.notice.err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;display:block}
+.notice.info{background:#dbeafe;border:1px solid #93c5fd;color:#1e40af;display:block}
+.footer{background:var(--navy2);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:20px}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px}
+
+@media(max-width:768px){
+  .tb-sub,.tb-sep{display:none}
+  .photo-grid-2,.photo-grid-3{grid-template-columns:repeat(2,1fr)}
+  .findings-grid{grid-template-columns:1fr}
+}
+@media(max-width:480px){
+  .photo-grid-2,.photo-grid-3{grid-template-columns:1fr}
+  .wo-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="live-dot"></div>
+  <span class="tb-logo">MCC-<em>B61</em></span>
+  <div class="tb-sep"></div>
+  <span class="tb-sub">7EP-MCC-XXX · 4 YEARLY SHUTDOWN MAINTENANCE</span>
+  <div class="tb-right">
+    <span class="tb-time" id="clock">--:--:--</span>
+    <button class="btn btn-ol btn-sm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 PDF</button>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">4 Yearly — Motor Control Center Switchboard Shutdown Maintenance</div>
+  <div class="hero-title">7EP-<em>MCC</em></div>
+  <div class="hero-sub">Motor Control Center · QCP & Work Completion Report</div>
+  <div class="hero-stats">
+    <div class="hstat"><span class="hstat-n" id="h-total">0</span><span class="hstat-l">Total</span></div>
+    <div class="hstat"><span class="hstat-n ok" id="h-ok">0</span><span class="hstat-l">OK</span></div>
+    <div class="hstat"><span class="hstat-n ng" id="h-ng">0</span><span class="hstat-l">NG</span></div>
+    <div class="hstat"><span class="hstat-n ph" id="h-photos">0</span><span class="hstat-l">Photos</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- WORK ORDER -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-icon">📋</div>
+    <div><div class="sec-title">Work Order Information</div></div>
+    <span class="sec-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid">
+      <div class="mf"><label>Plant Tag No.</label><input type="text" id="tag-no" placeholder="7EP-MCC-XXX"></div>
+      <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
+      <div class="mf"><label>Tag Description</label><input type="text" id="tag-desc" placeholder="Motor Control Center XXX"></div>
+      <div class="mf"><label>Done By</label><input type="text" id="done-by" placeholder="Technician name"></div>
+      <div class="mf"><label>Acknowledge By</label><input type="text" id="ack-by" placeholder="Supervisor name"></div>
+      <div class="mf"><label>Acknowledge Date</label><input type="date" id="ack-date"></div>
+      <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
+      <div class="mf"><label>Signature</label><input type="text" id="signature" placeholder="Initial / signature"></div>
+    </div>
+  </div>
+</div>
+
+<!-- CAUTION + CHECK ITEMS -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-icon">✅</div>
+    <div><div class="sec-title">Check Items</div></div>
+    <span class="sec-cnt">12 items</span>
+    <span class="sec-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <!-- Caution Banner -->
+    <div class="caution">
+      <div class="caution-icon">⚠️</div>
+      <div><strong>CAUTION:</strong> This maintenance work must be done with MCC de-energized (both primary and control power supply)</div>
+    </div>
+    <div class="tbl-wrap">
+    <table class="ct" id="check-table">
+      <thead>
+        <tr>
+          <th class="tl" style="width:32px">No.</th>
+          <th class="tl" style="min-width:340px">Check Items / Point</th>
+          <th style="min-width:140px">Criteria</th>
+          <th style="min-width:110px">Result</th>
+          <th style="min-width:150px">Remark</th>
+        </tr>
+      </thead>
+      <tbody id="tbody-check"></tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- FOTO KEGIATAN -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-icon">📸</div>
+    <div>
+      <div class="sec-title">Foto Kegiatan</div>
+      <span class="sec-sub">Activity Documentation</span>
+    </div>
+    <span class="sec-cnt" id="cnt-activity">0 / 4 uploaded</span>
+    <span class="sec-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="photo-wrap" style="border-top:none">
+      <div class="photo-sec-lbl" style="margin-bottom:14px">
+        <span style="font-size:16px">📸</span> Dokumentasi Kegiatan Maintenance
+      </div>
+      <div class="photo-grid-2" id="activity-grid">
+        <!-- Built by JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FOTO AFTER CLEANING -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-icon">🧹</div>
+    <div>
+      <div class="sec-title">Foto After Cleaning</div>
+      <span class="sec-sub">Post-Cleaning Evidence</span>
+    </div>
+    <span class="sec-cnt" id="cnt-cleaning">0 / 4 uploaded</span>
+    <span class="sec-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="photo-wrap" style="border-top:none">
+      <div class="photo-sec-lbl" style="margin-bottom:14px">
+        <span style="font-size:16px">🧹</span> Kondisi Setelah Cleaning
+      </div>
+      <div class="photo-grid-2" id="cleaning-grid">
+        <!-- Built by JS -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- COMMENTS & CONCLUSION -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-icon">📝</div>
+    <div><div class="sec-title">Comments & Conclusion</div></div>
+    <span class="sec-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="findings-grid">
+      <div class="mf"><label>Comments / Findings</label>
+        <textarea id="comments" rows="4" placeholder="Record all findings, observations, defects found…"></textarea>
+      </div>
+      <div class="mf"><label>Corrective Actions / Recommendations</label>
+        <textarea id="actions" rows="4" placeholder="Actions taken and follow-up recommendations…"></textarea>
+      </div>
+    </div>
+    <div class="wo-grid" style="padding-top:0">
+      <div class="mf"><label>Overall Condition</label>
+        <select id="overall">
+          <option>✅ GOOD — Normal Operation</option>
+          <option>⚠️ FAIR — Requires Monitoring</option>
+          <option>🔧 POOR — Maintenance Required</option>
+          <option>🛑 CRITICAL — Must Shutdown</option>
+        </select>
+      </div>
+      <div class="mf"><label>Next PM Due</label><input type="date" id="next-pm"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ACTION ROW -->
+<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
+  <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
+  <button class="btn" style="background:var(--navy);color:#fff" onclick="saveDraft()">💾 Save Draft</button>
+  <button class="btn btn-pdf" onclick="generatePDF()">📄 Download PDF</button>
+</div>
+<div id="notice" class="notice"></div>
+
+</div><!-- /wrap -->
+
+<footer class="footer">
+  <div class="footer-l">7EP-MCC · MOTOR CONTROL CENTER · 4 YEARLY SHUTDOWN MAINTENANCE</div>
+  <div class="footer-r" id="fdate">—</div>
+</footer>
+
+<script>
+// ── CLOCK ──────────────────────────────────────────
+function tick(){
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('id-ID');
+  document.getElementById('fdate').textContent=n.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(tick,1000);tick();
+
+// ── TOGGLE SECTION ─────────────────────────────────
+function toggleSec(hdr){
+  hdr.classList.toggle('open');
+  hdr.nextElementSibling.style.display=hdr.classList.contains('open')?'':'none';
+}
+
+// ── STATE ──────────────────────────────────────────
+const ST={};
+function setBtn(id,val,btn){
+  btn.closest('.tog').querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
+  if(ST[id]===val){delete ST[id];}
+  else{btn.className='rb '+(val==='OK'?'ok-act':'ng-act');ST[id]=val;}
+  updateStats();
+}
+function mkTog(id){
+  return `<div class="tog"><button class="rb ok-idle" data-v="OK" onclick="setBtn('${id}','OK',this)">✓ OK</button><button class="rb ng-idle" data-v="NG" onclick="setBtn('${id}','NG',this)">✗ NG</button></div>`;
+}
+
+// ── CHECK ITEMS ────────────────────────────────────
+const ITEMS=[
+  {no:'1',  desc:'Visually inspect the equipment panel for any obvious signs of damage', crit:'No sign of damage'},
+  {no:'2',  desc:'Visually inspect compartment for ingress of dust and foreign material', crit:'No dust and foreign material'},
+  {no:'3',  desc:'Remove accumulation dust and dirt, use brush, soft cloth or vacuum cleaner', crit:'No dust or dirty'},
+  {no:'4',  desc:'Wipe clean all main bus insulator and vertical bus barriers', crit:'No dust or dirty'},
+  {no:'5',  desc:'Inspect main and vertical bus joints and main bus supports and tighten if necessary', crit:'No sign of damage and tightness'},
+  {no:'6',  desc:'Inspect all internal wiring of the unit for deterioration of insulation', crit:'No deterioration in the insulation'},
+  {no:'7',  desc:'Check all starter contacts. Replace if found to be in a severely worn condition i.e. when the silver coating is worn out and the contact tip support is exposed', crit:'No sign of damage'},
+  {no:'8',  desc:'Operate each magnetic device by hand to see that all moving parts operate freely', crit:'Moving parts operate freely'},
+  {no:'9',  desc:'Check unit door interlocks for correct operation', crit:'OK'},
+  {no:'10', desc:'Verify that all required grounding connections are providing a good contact to ground', crit:'Good contact to ground'},
+  {no:'11', desc:'Check all indicating lights and replace as required', crit:'No sign of damage'},
+  {no:'12', desc:'Check that the circuit breaker of the heater panels are switched to the ON condition', crit:'ON'},
+];
+
+function buildCheckTable(){
+  const tb=document.getElementById('tbody-check');
+  ITEMS.forEach(item=>{
+    const id='item_'+item.no;
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td class="no">${item.no}</td>
+      <td class="lbl">${item.desc}</td>
+      <td class="ref">${item.crit}</td>
+      <td class="res">${mkTog(id)}</td>
+      <td class="rmk"><input style="width:100%;border:1.5px solid var(--bdr);border-radius:3px;padding:4px 7px;font-size:11.5px;background:var(--bg2);color:var(--txt);font-family:var(--sans)" placeholder="Remark…" id="rmk_${item.no}"></td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+
+// ── PHOTO SYSTEM ───────────────────────────────────
+const photoStore={};
+
+const ACTIVITY_SLOTS=[
+  {id:'act_1', title:'Kegiatan 1', hint:'Proses inspection / measurement'},
+  {id:'act_2', title:'Kegiatan 2', hint:'Proses cleaning / maintenance'},
+  {id:'act_3', title:'Kegiatan 3', hint:'Proses tightening / adjustment'},
+  {id:'act_4', title:'Kegiatan 4', hint:'Proses testing / commissioning'},
+];
+
+const CLEANING_SLOTS=[
+  {id:'clean_1', title:'Panel Overview', hint:'Tampak depan panel setelah cleaning'},
+  {id:'clean_2', title:'Bus Bar Area', hint:'Area bus bar setelah dibersihkan'},
+  {id:'clean_3', title:'Internal Wiring', hint:'Internal wiring setelah cleaning'},
+  {id:'clean_4', title:'Compartment Bottom', hint:'Bagian bawah kompartemen'},
+];
+
+function buildPhotoGrid(slots, gridId){
+  const grid=document.getElementById(gridId);
+  slots.forEach(slot=>{
+    const div=document.createElement('div');
+    div.className='photo-block';
+    div.innerHTML=`
+      <div class="photo-blk-ttl">${slot.title}</div>
+      <div class="photo-drop" id="${slot.id}">
+        <input type="file" accept="image/*" onchange="loadPhoto(this,'${slot.id}')">
+        <button class="del-btn" onclick="delPhoto('${slot.id}',event)">×</button>
+        <div class="ph-icon">📷</div>
+        <div class="ph-hint">${slot.hint}</div>
+      </div>
+      <input class="photo-cap" type="text" id="cap_${slot.id}" placeholder="Caption…">
+    `;
+    grid.appendChild(div);
+  });
+}
+
+function loadPhoto(input,slotId){
+  if(!input.files[0])return;
+  const r=new FileReader();
+  r.onload=e=>{
+    photoStore[slotId]=e.target.result;
+    const slot=document.getElementById(slotId);
+    let img=slot.querySelector('img');
+    if(!img){img=document.createElement('img');slot.appendChild(img);}
+    img.src=e.target.result;
+    slot.classList.add('has-photo');
+    slot.querySelector('.ph-icon').style.display='none';
+    slot.querySelector('.ph-hint').style.display='none';
+    updateStats();
+  };
+  r.readAsDataURL(input.files[0]);
+}
+function delPhoto(slotId,e){
+  e.stopPropagation();
+  const slot=document.getElementById(slotId);
+  const img=slot.querySelector('img');if(img)img.remove();
+  slot.classList.remove('has-photo');
+  slot.querySelector('.ph-icon').style.display='';
+  slot.querySelector('.ph-hint').style.display='';
+  delete photoStore[slotId];
+  updateStats();
+}
+
+// ── STATS ──────────────────────────────────────────
+function updateStats(){
+  const vals=Object.values(ST);
+  const ok=vals.filter(v=>v==='OK').length;
+  const ng=vals.filter(v=>v==='NG').length;
+  const total=ITEMS.length;
+  const actPhotos=ACTIVITY_SLOTS.filter(s=>photoStore[s.id]).length;
+  const clnPhotos=CLEANING_SLOTS.filter(s=>photoStore[s.id]).length;
+  const totalPhotos=actPhotos+clnPhotos;
+  document.getElementById('h-total').textContent=total;
+  document.getElementById('h-ok').textContent=ok;
+  document.getElementById('h-ng').textContent=ng;
+  document.getElementById('h-photos').textContent=totalPhotos;
+  document.getElementById('cnt-activity').textContent=`${actPhotos} / 4 uploaded`;
+  document.getElementById('cnt-cleaning').textContent=`${clnPhotos} / 4 uploaded`;
+}
+
+// ── DRAFT ──────────────────────────────────────────
+function saveDraft(){
+  const d={};
+  document.querySelectorAll('input[type=text],input[type=date],select,textarea').forEach((el,i)=>d['f'+i]=el.value);
+  d._st=ST;
+  try{localStorage.setItem('mccb61_draft',JSON.stringify(d));showNote('💾 Draft tersimpan.','ok');}
+  catch(e){showNote('❌ '+e.message,'err');}
+}
+function loadDraft(){
+  try{
+    const raw=localStorage.getItem('mccb61_draft');if(!raw)return;
+    const d=JSON.parse(raw);
+    document.querySelectorAll('input[type=text],input[type=date],select,textarea').forEach((el,i)=>{if(d['f'+i]!==undefined)el.value=d['f'+i];});
+    if(d._st){
+      Object.entries(d._st).forEach(([id,val])=>{
+        ST[id]=val;
+        const tog=document.querySelector(`.tog .rb[data-v="${val}"][onclick*="'${id}'"]`);
+        if(tog)tog.className='rb '+(val==='OK'?'ok-act':'ng-act');
+      });
+    }
+    updateStats();
+  }catch(e){}
+}
+function resetForm(){
+  if(!confirm('Reset semua data?'))return;
+  document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file')el.value='';});
+  Object.keys(ST).forEach(k=>delete ST[k]);
+  document.querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
+  [...ACTIVITY_SLOTS,...CLEANING_SLOTS].forEach(s=>delPhoto(s.id,{stopPropagation:()=>{}}));
+  updateStats();
+}
+function showNote(msg,t){
+  const n=document.getElementById('notice');n.textContent=msg;n.className='notice '+t;
+  setTimeout(()=>n.className='notice',4000);
+}
+const v=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
+const gT=id=>ST[id]||'—';
+const tr2=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'—');
+
+// ── PDF ────────────────────────────────────────────
+async function generatePDF(){
+  showNote('⏳ Membuat PDF…','info');
+  await new Promise(r=>setTimeout(r,200));
+  const{jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297,M=10;let y=M;
+  const NAVY=[30,58,95],BLUE=[37,99,235],SKY=[125,211,252],LT=[240,247,255],
+        OK=[22,163,74],NG=[220,38,38],RED=[185,28,28];
+
+  function ckY(n){if(y+n>H-M)nPage();}
+  function nPage(){pdf.addPage();y=M;miniHdr();}
+  function miniHdr(){
+    pdf.setFillColor(...NAVY);pdf.rect(0,0,W,8,'F');
+    pdf.setTextColor(...SKY);pdf.setFont('helvetica','bold');pdf.setFontSize(7);
+    pdf.text('7EP-MCC — 4 YEARLY SHUTDOWN MAINTENANCE',M,5.5);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);
+    pdf.text(`Date: ${v('wo-date')||'—'}  By: ${v('done-by')||'—'}`,W-M,5.5,{align:'right'});
+    y=12;
+  }
+  function secHdr(title){
+    ckY(12);
+    pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,7,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
+    pdf.text('▶  '+title,M+3,y+5);y+=10;
+  }
+
+  // Cover
+  pdf.setFillColor(...NAVY);pdf.rect(0,0,W,42,'F');
+  pdf.setFillColor(...BLUE);pdf.rect(0,40,W,2,'F');
+  pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8);
+  pdf.text('QCP & WORK COMPLETION REPORT',M,12);
+  pdf.setFontSize(20);  pdf.text('7EP-MCC',M,24);
+  pdf.setFontSize(10);pdf.setTextColor(...SKY);
+  pdf.text('4 Yearly Motor Control Center Switchboard Shutdown Maintenance',M,33);
+  pdf.setFontSize(10);pdf.setTextColor(...SKY);
+  pdf.text('4 Yearly Motor Control Center Switchboard Shutdown Maintenance',M,33);
+  pdf.setFontSize(7.5);pdf.setFont('helvetica','normal');
+  pdf.text(new Date().toLocaleString('en-GB'),W-M,33,{align:'right'});
+  y=48;
+
+  // Info box
+  pdf.setFillColor(...LT);pdf.setDrawColor(125,211,252);pdf.setLineWidth(0.25);
+  pdf.roundedRect(M,y,W-M*2,30,2,2,'FD');
+  function ib(l,val,x,yy){
+    pdf.setFont('helvetica','bold');pdf.setFontSize(5.5);pdf.setTextColor(100,116,139);pdf.text(l.toUpperCase(),x,yy);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(...NAVY);pdf.text(tr2(val||'—',28),x,yy+5);
+  }
+  ib('Plant Tag No.',v('tag-no'),M+3,y+7);ib('Date',v('wo-date'),85,y+7);ib('WO No.',v('wo-no'),140,y+7);
+  ib('Tag Description',v('tag-desc'),M+3,y+19);ib('Done By',v('done-by'),85,y+19);
+  ib('Ack By',v('ack-by'),140,y+19);ib('Ack Date',v('ack-date'),M+3,y+28);
+  y+=36;
+
+  // Stats
+  const okN=Object.values(ST).filter(x=>x==='OK').length;
+  const ngN=Object.values(ST).filter(x=>x==='NG').length;
+  [[M,'TOTAL','12',NAVY],[M+42,'OK',String(okN),OK],[M+84,'NG',String(ngN),NG]].forEach(([x,l,val,cl])=>{
+    pdf.setFillColor(...cl,.08);pdf.setDrawColor(...cl);pdf.setLineWidth(0.3);
+    pdf.roundedRect(x,y,34,10,1.5,1.5,'FD');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(5.5);pdf.setTextColor(...cl);pdf.text(l,x+2,y+3.5);
+    pdf.setFontSize(11);pdf.text(val,x+2,y+9);
+  });y+=16;
+
+  // Caution
+  ckY(12);
+  pdf.setFillColor(254,226,226);pdf.setDrawColor(...RED);pdf.setLineWidth(0.3);
+  pdf.roundedRect(M,y,W-M*2,8,1.5,1.5,'FD');
+  pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...RED);
+  pdf.text('⚠  CAUTION: MCC must be de-energized (both primary and control power supply)',M+3,y+5.5);
+  y+=12;
+
+  // Check items
+  secHdr('Check Items / Point');
+  const checkRows=ITEMS.map(item=>[
+    item.no,
+    tr2(item.desc,65),
+    tr2(item.crit,22),
+    gT('item_'+item.no),
+    tr2(v('rmk_'+item.no),20)||'—'
+  ]);
+  pdf.autoTable({startY:y,head:[['No.','Check Item / Point','Criteria','Result','Remark']],body:checkRows,
+    theme:'grid',styles:{font:'helvetica',fontSize:7,cellPadding:2.5,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+    headStyles:{fillColor:NAVY,textColor:[125,211,252],fontStyle:'bold',fontSize:6.5,halign:'center'},
+    columnStyles:{0:{halign:'center',cellWidth:10},1:{cellWidth:72},2:{cellWidth:30,halign:'center'},3:{halign:'center',cellWidth:18},4:{cellWidth:30}},
+    didParseCell:d=>{const val=d.cell.text[0];
+      if(val==='OK'){d.cell.styles.textColor=[...OK];d.cell.styles.fontStyle='bold';}
+      if(val==='NG'){d.cell.styles.textColor=[...NG];d.cell.styles.fontStyle='bold';}
+    },margin:{left:M,right:M}});
+  y=pdf.lastAutoTable.finalY+6;
+
+  // Activity Photos
+  const hasAct=ACTIVITY_SLOTS.filter(s=>photoStore[s.id]);
+  if(hasAct.length){
+    ckY(14);secHdr('Foto Kegiatan — Activity Documentation');
+    const imgW=(W-M*2)/2-3;const imgH=50;
+    for(let i=0;i<hasAct.length;i+=2){
+      const batch=hasAct.slice(i,i+2);
+      ckY(imgH+16);
+      batch.forEach((slot,pi)=>{
+        const xo=M+pi*(imgW+3);
+        pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(slot.title,xo,y+5);
+        try{pdf.addImage(photoStore[slot.id],'JPEG',xo,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
+        const cap=v('cap_'+slot.id);
+        if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(6.5);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),xo,y+7+imgH+4);}
+      });
+      y+=imgH+18;
+    }
+  }
+
+  // Cleaning Photos
+  const hasCln=CLEANING_SLOTS.filter(s=>photoStore[s.id]);
+  if(hasCln.length){
+    ckY(14);secHdr('Foto After Cleaning — Post-Cleaning Evidence');
+    const imgW=(W-M*2)/2-3;const imgH=50;
+    for(let i=0;i<hasCln.length;i+=2){
+      const batch=hasCln.slice(i,i+2);
+      ckY(imgH+16);
+      batch.forEach((slot,pi)=>{
+        const xo=M+pi*(imgW+3);
+        pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(slot.title,xo,y+5);
+        try{pdf.addImage(photoStore[slot.id],'JPEG',xo,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
+        const cap=v('cap_'+slot.id);
+        if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(6.5);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),xo,y+7+imgH+4);}
+      });
+      y+=imgH+18;
+    }
+  }
+
+  // Findings
+  ckY(14);secHdr('Comments & Conclusion');
+  pdf.autoTable({startY:y,body:[
+    ['Overall',v('overall')],
+    ['Next PM Due',v('next-pm')||'—'],
+    ['Comments / Findings',v('comments')||'—'],
+    ['Corrective Actions',v('actions')||'—'],
+  ],theme:'grid',styles:{font:'helvetica',fontSize:8,cellPadding:3,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+  columnStyles:{0:{cellWidth:46,fontStyle:'bold',fillColor:LT,textColor:NAVY}},margin:{left:M,right:M}});
+
+  // Page numbers
+  const pages=pdf.internal.getNumberOfPages();
+  for(let pg=1;pg<=pages;pg++){
+    pdf.setPage(pg);pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(150);
+    pdf.text(`Page ${pg}/${pages}`,W-M,H-5,{align:'right'});
+    pdf.text('7EP-MCC — 4 Yearly MCC Shutdown Maintenance',M,H-5);
+  }
+
+  const fn=`MCC_PM_${(v('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
+  pdf.save(fn);showNote('✅ PDF tersimpan: '+fn,'ok');
+}
+
+// ── INIT ───────────────────────────────────────────
+buildCheckTable();
+buildPhotoGrid(ACTIVITY_SLOTS,'activity-grid');
+buildPhotoGrid(CLEANING_SLOTS,'cleaning-grid');
+loadDraft();
+updateStats();
+</script>
+</body>
+</html>
