@@ -1,0 +1,1103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dry Transformer 2 Yearly PM Check Sheet</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1e3a5f;--navy2:#0f2744;--blue:#2563eb;--sky:#7dd3fc;--sky2:#bfdbfe;
+  --bg:#f8fbff;--bg2:#f0f7ff;--surf:#fff;--bdr:#bfdbfe;--bdr2:#dbeafe;
+  --ok:#16a34a;--ng:#dc2626;--idle:#e5e7eb;
+  --txt:#0f172a;--txt2:#1e3a5f;--txt3:#3b82f6;--txt4:#64748b;
+  --mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:100vh}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:100;background:var(--navy2);height:52px;
+  display:flex;align-items:center;padding:0 20px;gap:12px;border-bottom:2px solid var(--blue)}
+.tb-logo{font-family:var(--raj);font-size:20px;font-weight:700;letter-spacing:3px;color:#fff}
+.tb-logo em{color:var(--sky);font-style:normal}
+.tb-sep{width:1px;height:26px;background:rgba(255,255,255,0.15);flex-shrink:0}
+.tb-sub{font-size:11px;color:var(--sky);font-family:var(--mono);letter-spacing:1px;white-space:nowrap}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--sky);animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.tb-time{font-family:var(--mono);font-size:12px;color:var(--sky);white-space:nowrap}
+.btn{padding:6px 14px;border-radius:5px;border:none;cursor:pointer;font-family:var(--raj);font-size:13px;font-weight:600;letter-spacing:1px;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.btn-pdf{background:var(--blue);color:#fff}.btn-pdf:hover{background:#1d4ed8;transform:translateY(-1px)}
+.btn-outline{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)}
+.btn-outline:hover{background:rgba(255,255,255,0.2)}
+.btn-sm{padding:4px 10px;font-size:12px}
+
+/* HERO */
+.hero{background:var(--navy);padding:24px 20px 20px}
+.hero-eyebrow{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--sky)}
+.hero-title{font-family:var(--raj);font-size:clamp(28px,6vw,52px);font-weight:700;line-height:1;color:#fff;letter-spacing:1px}
+.hero-title em{color:var(--sky);font-style:normal}
+.hero-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-top:8px;font-weight:300}
+.hero-stats{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.hstat{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px 16px;text-align:center;min-width:72px}
+.hstat-n{font-family:var(--raj);font-size:26px;font-weight:700;color:#fff;line-height:1;display:block}
+.hstat-n.ok{color:#4ade80}.hstat-n.ng{color:#f87171}
+.hstat-l{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;display:block}
+
+/* WRAP */
+.wrap{max-width:1200px;margin:0 auto;padding:20px 16px 80px}
+.panel{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 6px rgba(30,58,95,0.06)}
+
+/* SECTION HEADER */
+.sec-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--navy);cursor:pointer;user-select:none}
+.sec-hdr-icon{width:28px;height:28px;border-radius:6px;background:rgba(37,99,235,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.sec-hdr-title{font-family:var(--raj);font-size:15px;font-weight:700;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.sec-hdr-cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.4);padding:2px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:10px}
+.sec-hdr-arrow{color:rgba(255,255,255,0.4);font-size:14px;transition:transform .2s;margin-left:6px}
+.sec-hdr.open .sec-hdr-arrow{transform:rotate(180deg)}
+
+/* FORMS */
+.wo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;padding:16px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf label{font-size:10px;color:var(--txt4);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.mf input,.mf select,.mf textarea{border:1.5px solid var(--bdr);border-radius:5px;padding:7px 10px;font-family:var(--sans);font-size:13px;background:var(--bg2);color:var(--txt);transition:border-color .18s;width:100%}
+.mf input:focus,.mf select:focus,.mf textarea:focus{outline:none;border-color:var(--blue);background:#fff}
+.mf input[type=date]{font-family:var(--mono)}
+.mf textarea{resize:vertical;min-height:80px}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.ct{width:100%;border-collapse:collapse;font-size:12px}
+.ct th{background:var(--navy);color:var(--sky2);padding:7px 8px;text-align:center;font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.08)}
+.ct th.tl{text-align:left}.ct th:last-child{border-right:none}
+.ct td{padding:6px 8px;border-bottom:1px solid var(--bdr2);background:var(--surf);vertical-align:middle;border-right:1px solid var(--bdr2)}
+.ct td:last-child{border-right:none}
+.ct tr:last-child td{border-bottom:none}
+.ct tr:hover td{background:var(--bg2)}
+.ct td.no{font-family:var(--mono);font-size:11px;color:var(--txt4);min-width:28px;text-align:center}
+.ct td.lbl{text-align:left;color:var(--txt);font-size:11.5px;min-width:200px}
+.ct td.ref{font-family:var(--mono);font-size:9.5px;color:var(--txt3);text-align:center;min-width:100px}
+.mi{width:52px;font-size:11px;padding:3px 4px;border-radius:3px;font-family:var(--mono);text-align:center;border:1.5px solid var(--bdr);background:var(--bg2);color:var(--txt)}
+.mi:focus{outline:none;border-color:var(--blue);background:#fff}
+
+/* TOGGLE BUTTONS */
+.tog{display:inline-flex;gap:3px;justify-content:center}
+.rb{font-size:10px;padding:4px 8px;border-radius:4px;cursor:pointer;font-weight:700;letter-spacing:.5px;border:none;transition:all .15s;font-family:var(--mono)}
+.rb.ok-idle{background:var(--idle);color:#9ca3af}
+.rb.ng-idle{background:var(--idle);color:#9ca3af}
+.rb.ok-act{background:var(--ok);color:#fff;box-shadow:0 0 0 2px rgba(22,163,74,0.3)}
+.rb.ng-act{background:var(--ng);color:#fff;box-shadow:0 0 0 2px rgba(220,38,38,0.3)}
+.rb:hover{opacity:.85;transform:translateY(-1px)}
+
+/* PHOTO SECTION */
+.photo-section{padding:14px 16px;background:var(--bg2);border-top:2px dashed var(--bdr)}
+.photo-section-label{font-family:var(--raj);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.photo-section-label::before{content:'📷';font-size:13px}
+.photo-grid{display:grid;gap:12px}
+.photo-grid.cols-1{grid-template-columns:1fr}
+.photo-grid.cols-2{grid-template-columns:repeat(2,1fr)}
+.photo-grid.cols-3{grid-template-columns:repeat(3,1fr)}
+.photo-block{display:flex;flex-direction:column;gap:6px}
+.photo-block-title{font-family:var(--raj);font-size:11px;font-weight:600;color:var(--navy2);letter-spacing:1px;text-transform:uppercase}
+.photo-drop{border:2px dashed var(--bdr);border-radius:8px;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;background:#fff;position:relative;overflow:hidden}
+.photo-drop:hover{border-color:var(--blue);background:var(--bg2)}
+.photo-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.photo-drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:6px}
+.photo-drop .del-btn{position:absolute;top:5px;right:5px;background:rgba(220,38,38,.85);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:13px;display:none;align-items:center;justify-content:center;z-index:5}
+.photo-drop.has-photo .del-btn{display:flex}
+.photo-icon{font-size:24px;margin-bottom:5px;pointer-events:none}
+.photo-hint{font-size:10px;color:var(--txt4);text-align:center;pointer-events:none;font-family:var(--mono)}
+.photo-cap{width:100%;border:1.5px solid var(--bdr);border-radius:5px;padding:5px 8px;font-size:12px;background:#fff;color:var(--txt);font-family:var(--sans)}
+.photo-cap:focus{outline:none;border-color:var(--blue)}
+
+/* NOTICE */
+.notice{padding:10px 16px;border-radius:6px;font-size:13px;display:none;margin:12px 0 0}
+.notice.ok{background:#dcfce7;border:1px solid #86efac;color:#15803d;display:block}
+.notice.err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;display:block}
+.notice.info{background:#dbeafe;border:1px solid #93c5fd;color:#1e40af;display:block}
+
+/* FOOTER */
+.footer{background:var(--navy2);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:20px}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px}
+
+/* FINDINGS */
+.findings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
+
+@media(max-width:640px){
+  .tb-sub,.tb-sep{display:none}
+  .findings-grid{grid-template-columns:1fr}
+  .photo-grid.cols-2,.photo-grid.cols-3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="live-dot"></div>
+  <span class="tb-logo">DRY <em>XFMR</em></span>
+  <div class="tb-sep"></div>
+  <span class="tb-sub">2 YEARLY PREVENTIVE MAINTENANCE</span>
+  <div class="tb-right">
+    <span class="tb-time" id="clock">--:--:--</span>
+    <button class="btn btn-outline btn-sm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 PDF</button>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">2 Yearly Preventive Maintenance</div>
+  <div class="hero-title">DRY <em>TRANSFORMER</em></div>
+  <div class="hero-sub">USS Dry Transformer 1500/2000 KVA · 13800/416Y/240V · AA/FA Cooling</div>
+  <div class="hero-stats">
+    <div class="hstat"><span class="hstat-n" id="h-total">0</span><span class="hstat-l">Total</span></div>
+    <div class="hstat"><span class="hstat-n ok" id="h-ok">0</span><span class="hstat-l">OK</span></div>
+    <div class="hstat"><span class="hstat-n ng" id="h-ng">0</span><span class="hstat-l">NG</span></div>
+    <div class="hstat"><span class="hstat-n" style="color:var(--sky)" id="h-photos">0</span><span class="hstat-l">Photos</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- WORK ORDER -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📋</div>
+    <div><div class="sec-hdr-title">Work Order Information</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid">
+      <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
+      <div class="mf"><label>Plant Tag No.</label><input type="text" id="tag-no" placeholder="Tag number"></div>
+      <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
+      <div class="mf"><label>Tag Description</label><input type="text" id="tag-desc" placeholder="Location / description"></div>
+      <div class="mf"><label>Done By</label><input type="text" id="done-by" placeholder="Technician name"></div>
+      <div class="mf"><label>Acknowledge By</label><input type="text" id="ack-by" placeholder="Supervisor name"></div>
+      <div class="mf"><label>Date Acknowledge</label><input type="date" id="ack-date"></div>
+      <div class="mf"><label>Signature / Initial</label><input type="text" id="signature" placeholder="Signature or initial"></div>
+    </div>
+    <div class="wo-grid" style="padding-top:0;border-top:1px solid var(--bdr2)">
+      <div class="mf"><label>XFMR Type</label><input type="text" id="xfmr-type" value="Dry XFMR"></div>
+      <div class="mf"><label>Voltage</label><input type="text" id="voltage" value="13800 / 416 Y / 240 V"></div>
+      <div class="mf"><label>Capacity</label><input type="text" id="capacity" value="1500 / 2000 KVA"></div>
+      <div class="mf"><label>Cooling Type</label><input type="text" id="cooling" value="AA/FA"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ITEMS 1-5 ═══ -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🧹</div>
+    <div><div class="sec-hdr-title">Items 1–5 — De-energized Inspection</div></div>
+    <span class="sec-hdr-cnt">5 items</span>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct">
+      <thead><tr>
+        <th class="tl" style="width:28px">No.</th>
+        <th class="tl" style="min-width:260px">Check Item / Point</th>
+        <th style="min-width:160px">Criteria</th>
+        <th style="min-width:110px">Result</th>
+        <th style="min-width:140px">Remark</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="no">1</td>
+          <td class="lbl">With transformer de-energized, cleaning XFMR and all accessories by vacuum cleaner</td>
+          <td class="ref">Clean all surfaces</td>
+          <td><div class="tog" id="tog-1"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="no">2</td>
+          <td class="lbl">Check all bolts connection for tightness<br><small style="color:var(--txt4);font-size:10px">¼-20: 4-6 | 5/16-18: 6-12 | 3/8-16: 15-20 | ½-13: 25-30 lbft</small></td>
+          <td class="ref">Per torque table</td>
+          <td><div class="tog" id="tog-2"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="no">3</td>
+          <td class="lbl">Check insulation winding for sign of deterioration or overheating</td>
+          <td class="ref">No deterioration<br>No overheating</td>
+          <td><div class="tog" id="tog-3"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="no">4</td>
+          <td class="lbl">Inspect all parts for any sign of corrosion or damage</td>
+          <td class="ref">No corrosion<br>No damage</td>
+          <td><div class="tog" id="tog-4"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="no">5</td>
+          <td class="lbl">Check the fans and ensure that can be operated properly</td>
+          <td class="ref">All fans OK</td>
+          <td><div class="tog" id="tog-5"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ITEM 6 — MEGGER ═══ -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🔬</div>
+    <div><div class="sec-hdr-title">Item 6 — Insulation Resistance & PI Test</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct">
+      <thead><tr>
+        <th class="tl" style="min-width:200px">Test Point</th>
+        <th>Criteria</th>
+        <th>1 min (MΩ)</th>
+        <th>10 min (MΩ)</th>
+        <th>PI Value</th>
+        <th style="min-width:110px">Result</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="lbl">H1-H2 (HV)</td>
+          <td class="ref">PI ≥ 1.5</td>
+          <td><input class="mi" type="number" step="0.01" id="hv-h1h2-1m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="hv-h1h2-10m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="pi-h1h2" placeholder="—"></td>
+          <td><div class="tog" id="tog-6hv1"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">H1-H3 (HV)</td>
+          <td class="ref">PI ≥ 1.5</td>
+          <td><input class="mi" type="number" step="0.01" id="hv-h1h3-1m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="hv-h1h3-10m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="pi-h1h3" placeholder="—"></td>
+          <td><div class="tog" id="tog-6hv2"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">H2-H3 (HV)</td>
+          <td class="ref">PI ≥ 1.5</td>
+          <td><input class="mi" type="number" step="0.01" id="hv-h2h3-1m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="hv-h2h3-10m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="pi-h2h3" placeholder="—"></td>
+          <td><div class="tog" id="tog-6hv3"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">X1-X2 (LV)</td>
+          <td class="ref">PI ≥ 1.5</td>
+          <td><input class="mi" type="number" step="0.01" id="lv-x1x2-1m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="lv-x1x2-10m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="pi-x1x2" placeholder="—"></td>
+          <td><div class="tog" id="tog-6lv1"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">X1-X3 (LV)</td>
+          <td class="ref">PI ≥ 1.5</td>
+          <td><input class="mi" type="number" step="0.01" id="lv-x1x3-1m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="lv-x1x3-10m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="pi-x1x3" placeholder="—"></td>
+          <td><div class="tog" id="tog-6lv2"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">X2-X3 (LV)</td>
+          <td class="ref">PI ≥ 1.5</td>
+          <td><input class="mi" type="number" step="0.01" id="lv-x2x3-1m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="lv-x2x3-10m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="pi-x2x3" placeholder="—"></td>
+          <td><div class="tog" id="tog-6lv3"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">HV (jumper together) – Ground</td>
+          <td class="ref">PI ≥ 1.5</td>
+          <td><input class="mi" type="number" step="0.01" id="hv-gnd-1m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="hv-gnd-10m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="pi-hv-gnd" placeholder="—"></td>
+          <td><div class="tog" id="tog-6gnd1"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">LV (jumper together) – Ground</td>
+          <td class="ref">PI ≥ 1.5</td>
+          <td><input class="mi" type="number" step="0.01" id="lv-gnd-1m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="lv-gnd-10m" placeholder="—"></td>
+          <td><input class="mi" type="number" step="0.01" id="pi-lv-gnd" placeholder="—"></td>
+          <td><div class="tog" id="tog-6gnd2"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl" colspan="5">Winding Temperature During Megger Test</td>
+          <td><input class="mi" type="number" id="winding-temp" placeholder="°C"></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <!-- WINDING RESISTANCE -->
+    <div style="padding:12px 16px;border-top:1px solid var(--bdr2)">
+      <div style="font-family:var(--raj);font-size:12px;font-weight:700;color:var(--navy);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">Winding Resistance (Ω)</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px">
+        <div class="mf"><label>H1-H2</label><input class="mi" style="width:100%" type="text" id="wr-h1h2" placeholder="Ω"></div>
+        <div class="mf"><label>H1-H3</label><input class="mi" style="width:100%" type="text" id="wr-h1h3" placeholder="Ω"></div>
+        <div class="mf"><label>H2-H3</label><input class="mi" style="width:100%" type="text" id="wr-h2h3" placeholder="Ω"></div>
+        <div class="mf"><label>X1-X2</label><input class="mi" style="width:100%" type="text" id="wr-x1x2" placeholder="Ω"></div>
+        <div class="mf"><label>X1-X3</label><input class="mi" style="width:100%" type="text" id="wr-x1x3" placeholder="Ω"></div>
+        <div class="mf"><label>X2-X3</label><input class="mi" style="width:100%" type="text" id="wr-x2x3" placeholder="Ω"></div>
+      </div>
+    </div>
+    <!-- PHOTOS ITEM 6 -->
+    <div class="photo-section">
+      <div class="photo-section-label">Evidence Photos — Item 6</div>
+      <div class="photo-grid cols-2">
+        <div class="photo-block">
+          <div class="photo-block-title">HV Megger Test Result</div>
+          <div class="photo-drop" id="pd-megger-hv">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-megger-hv')">
+            <button class="del-btn" onclick="delPhoto('pd-megger-hv',event)">×</button>
+            <div class="photo-icon">📷</div>
+            <div class="photo-hint">Tap to upload</div>
+          </div>
+          <input class="photo-cap" type="text" id="cap-megger-hv" placeholder="Caption…">
+        </div>
+        <div class="photo-block">
+          <div class="photo-block-title">LV Megger Test Result</div>
+          <div class="photo-drop" id="pd-megger-lv">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-megger-lv')">
+            <button class="del-btn" onclick="delPhoto('pd-megger-lv',event)">×</button>
+            <div class="photo-icon">📷</div>
+            <div class="photo-hint">Tap to upload</div>
+          </div>
+          <input class="photo-cap" type="text" id="cap-megger-lv" placeholder="Caption…">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ITEM 7 ═══ -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🔩</div>
+    <div><div class="sec-hdr-title">Item 7 — Reconnection & Bolt Tightness</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct">
+      <thead><tr>
+        <th class="tl" style="min-width:260px">Check Item</th>
+        <th>Criteria</th>
+        <th style="min-width:110px">Result</th>
+        <th style="min-width:140px">Remark</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="lbl">Reconnect HV side — check all bolts for tightness</td>
+          <td class="ref">Torque: 16 lbft</td>
+          <td><div class="tog" id="tog-7hv"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="lbl">Reconnect LV side — check all bolts for tightness</td>
+          <td class="ref">Torque: 30 lbft</td>
+          <td><div class="tog" id="tog-7lv"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ITEM 8 ═══ -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🌡️</div>
+    <div><div class="sec-hdr-title">Item 8 — Temperature Sensor TC Type K Calibration</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct">
+      <thead><tr>
+        <th class="tl" style="min-width:200px">Sensor Point</th>
+        <th>Reference (°C)</th>
+        <th>Actual Reading (°C)</th>
+        <th>Deviation</th>
+        <th style="min-width:110px">Result</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="lbl">TC Sensor — Phase R (Primary)</td>
+          <td class="ref">—</td>
+          <td><input class="mi" type="number" step="0.1" id="tc-r-pri" placeholder="°C"></td>
+          <td><input class="mi" type="number" step="0.1" id="tc-r-dev" placeholder="—"></td>
+          <td><div class="tog" id="tog-8r"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">TC Sensor — Phase S (Primary)</td>
+          <td class="ref">—</td>
+          <td><input class="mi" type="number" step="0.1" id="tc-s-pri" placeholder="°C"></td>
+          <td><input class="mi" type="number" step="0.1" id="tc-s-dev" placeholder="—"></td>
+          <td><div class="tog" id="tog-8s"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">TC Sensor — Phase T (Primary)</td>
+          <td class="ref">—</td>
+          <td><input class="mi" type="number" step="0.1" id="tc-t-pri" placeholder="°C"></td>
+          <td><input class="mi" type="number" step="0.1" id="tc-t-dev" placeholder="—"></td>
+          <td><div class="tog" id="tog-8t"></div></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ITEM 9 — ETM ═══ -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">💡</div>
+    <div><div class="sec-hdr-title">Item 9 — ETM Energize & Indicating Lamps</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct">
+      <thead><tr>
+        <th class="tl" style="min-width:200px">Check Point</th>
+        <th>Criteria</th>
+        <th style="min-width:110px">Result</th>
+        <th style="min-width:140px">Remark</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="lbl">All indicating lamps functional</td>
+          <td class="ref">All lamps OK</td>
+          <td><div class="tog" id="tog-9lamp"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="lbl">Display temperature reading (record)</td>
+          <td class="ref">Record value</td>
+          <td><input class="mi" style="width:80px" type="number" step="0.1" id="etm-disp-temp" placeholder="°C"></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="lbl">Test alarm function</td>
+          <td class="ref">Alarm activated</td>
+          <td><div class="tog" id="tog-9alarm"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="lbl">No blown fuses</td>
+          <td class="ref">All fuses intact</td>
+          <td><div class="tog" id="tog-9fuse"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="lbl">No looseness on connection</td>
+          <td class="ref">All connections tight</td>
+          <td><div class="tog" id="tog-9conn"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="lbl">No corrosion or damage on ETM</td>
+          <td class="ref">No corrosion/damage</td>
+          <td><div class="tog" id="tog-9corr"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <!-- PHOTOS ITEM 9 -->
+    <div class="photo-section">
+      <div class="photo-section-label">Evidence Photos — Item 9</div>
+      <div class="photo-grid cols-2">
+        <div class="photo-block">
+          <div class="photo-block-title">ETM Display & Temperature Reading</div>
+          <div class="photo-drop" id="pd-etm-disp">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-etm-disp')">
+            <button class="del-btn" onclick="delPhoto('pd-etm-disp',event)">×</button>
+            <div class="photo-icon">📷</div>
+            <div class="photo-hint">Tap to upload</div>
+          </div>
+          <input class="photo-cap" type="text" id="cap-etm-disp" placeholder="Caption…">
+        </div>
+        <div class="photo-block">
+          <div class="photo-block-title">Indicating Lamps Condition</div>
+          <div class="photo-drop" id="pd-etm-lamp">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-etm-lamp')">
+            <button class="del-btn" onclick="delPhoto('pd-etm-lamp',event)">×</button>
+            <div class="photo-icon">📷</div>
+            <div class="photo-hint">Tap to upload</div>
+          </div>
+          <input class="photo-cap" type="text" id="cap-etm-lamp" placeholder="Caption…">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ITEM 10 — ETM SETTINGS ═══ -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">⚙️</div>
+    <div><div class="sec-hdr-title">Item 10 — ETM Temperature Settings</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct">
+      <thead><tr>
+        <th class="tl">Setting Parameter</th>
+        <th>Standard Value</th>
+        <th>Actual Reading</th>
+        <th style="min-width:110px">Result</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="lbl">FAN Setting</td>
+          <td class="ref">140°C</td>
+          <td><input class="mi" type="number" id="etm-fan" placeholder="140"></td>
+          <td><div class="tog" id="tog-fan"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">ALARM Setting</td>
+          <td class="ref">150°C</td>
+          <td><input class="mi" type="number" id="etm-alarm" placeholder="150"></td>
+          <td><div class="tog" id="tog-alarm"></div></td>
+        </tr>
+        <tr>
+          <td class="lbl">TRIP Setting</td>
+          <td class="ref">200°C</td>
+          <td><input class="mi" type="number" id="etm-trip" placeholder="200"></td>
+          <td><div class="tog" id="tog-trip"></div></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <!-- PHOTO ETM SETTINGS -->
+    <div class="photo-section">
+      <div class="photo-section-label">Evidence Photo — Item 10</div>
+      <div class="photo-grid cols-1" style="max-width:360px">
+        <div class="photo-block">
+          <div class="photo-block-title">ETM Setting Display (FAN / ALARM / TRIP)</div>
+          <div class="photo-drop" id="pd-etm-set">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-etm-set')">
+            <button class="del-btn" onclick="delPhoto('pd-etm-set',event)">×</button>
+            <div class="photo-icon">📷</div>
+            <div class="photo-hint">Tap to upload</div>
+          </div>
+          <input class="photo-cap" type="text" id="cap-etm-set" placeholder="Caption…">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ITEM 11 ═══ -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">💨</div>
+    <div><div class="sec-hdr-title">Item 11 — Fan Operation Test</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct">
+      <thead><tr>
+        <th class="tl" style="min-width:200px">Fan</th>
+        <th>Test Duration</th>
+        <th style="min-width:110px">Result</th>
+        <th style="min-width:140px">Remark</th>
+      </tr></thead>
+      <tbody>
+        <tr>
+          <td class="lbl">Fan 1 — Manual operation test</td>
+          <td class="ref">1 min → 10 min</td>
+          <td><div class="tog" id="tog-11f1"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="lbl">Fan 2 — Manual operation test</td>
+          <td class="ref">1 min → 10 min</td>
+          <td><div class="tog" id="tog-11f2"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="lbl">Fan 3 — Manual operation test</td>
+          <td class="ref">1 min → 10 min</td>
+          <td><div class="tog" id="tog-11f3"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+        <tr>
+          <td class="lbl">Heater — check operation</td>
+          <td class="ref">Heater OK</td>
+          <td><div class="tog" id="tog-11htr"></div></td>
+          <td><input class="remark-inp" placeholder="Remark…"></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ITEM 12 — MAX TEMP + PHOTOS ═══ -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🌡️</div>
+    <div><div class="sec-hdr-title">Item 12 — Max. Temperature Record</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div style="padding:14px 16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;border-bottom:1px solid var(--bdr2)">
+      <div class="mf">
+        <label>Max. Temp Before Cleaning</label>
+        <input type="text" id="temp-before" placeholder="°C" style="font-family:var(--mono)">
+      </div>
+      <div class="mf">
+        <label>Max. Temp After Cleaning</label>
+        <input type="text" id="temp-after" placeholder="°C" style="font-family:var(--mono)">
+      </div>
+      <div class="mf">
+        <label>Result</label>
+        <div style="display:flex;align-items:center;height:38px"><div class="tog" id="tog-12temp"></div></div>
+      </div>
+    </div>
+    <!-- PHOTOS ITEM 12 -->
+    <div class="photo-section">
+      <div class="photo-section-label">Evidence Photos — Item 12 (Before & After Cleaning)</div>
+      <div class="photo-grid cols-2">
+        <div class="photo-block">
+          <div class="photo-block-title">Before Cleaning — IR Thermal / Visual</div>
+          <div class="photo-drop" id="pd-before">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-before')">
+            <button class="del-btn" onclick="delPhoto('pd-before',event)">×</button>
+            <div class="photo-icon">📷</div>
+            <div class="photo-hint">Tap to upload</div>
+          </div>
+          <input class="photo-cap" type="text" id="cap-before" placeholder="Max temp, hotspot location…">
+        </div>
+        <div class="photo-block">
+          <div class="photo-block-title">After Cleaning — IR Thermal / Visual</div>
+          <div class="photo-drop" id="pd-after">
+            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-after')">
+            <button class="del-btn" onclick="delPhoto('pd-after',event)">×</button>
+            <div class="photo-icon">📷</div>
+            <div class="photo-hint">Tap to upload</div>
+          </div>
+          <input class="photo-cap" type="text" id="cap-after" placeholder="Max temp after cleaning…">
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- FINDINGS -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📝</div>
+    <div><div class="sec-hdr-title">Comments & Findings</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="findings-grid">
+      <div class="mf"><label>Comments / Findings</label>
+        <textarea id="comments" placeholder="Record any findings, observations, or notes…"></textarea>
+      </div>
+      <div class="mf"><label>Corrective Actions / Recommendations</label>
+        <textarea id="actions" placeholder="Actions taken and follow-up recommendations…"></textarea>
+      </div>
+    </div>
+    <div class="wo-grid" style="padding-top:0">
+      <div class="mf"><label>Overall Condition</label>
+        <select id="overall">
+          <option>✅ GOOD — Normal Operation</option>
+          <option>⚠️ FAIR — Requires Monitoring</option>
+          <option>🔧 POOR — Maintenance Required</option>
+          <option>🛑 CRITICAL — Must Shutdown</option>
+        </select>
+      </div>
+      <div class="mf"><label>Next PM Due</label><input type="date" id="next-pm"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ACTION ROW -->
+<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
+  <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
+  <button class="btn" style="background:var(--navy);color:#fff" onclick="saveDraft()">💾 Save Draft</button>
+  <button class="btn btn-pdf" onclick="generatePDF()">📄 Download PDF</button>
+</div>
+<div id="notice" class="notice"></div>
+
+</div><!-- /wrap -->
+
+<footer class="footer">
+  <div class="footer-l">DRY TRANSFORMER · 2 YEARLY PM · 1500/2000 KVA · 13800/416Y/240V</div>
+  <div class="footer-r" id="fdate">—</div>
+</footer>
+
+<script>
+// ── CLOCK ──────────────────────────────────────────
+function tick(){
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('id-ID');
+  document.getElementById('fdate').textContent=n.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(tick,1000);tick();
+
+// ── TOGGLE SECTION ─────────────────────────────────
+function toggleSec(hdr){
+  hdr.classList.toggle('open');
+  hdr.nextElementSibling.style.display=hdr.classList.contains('open')?'':'none';
+}
+
+// ── STATE ──────────────────────────────────────────
+const ST={};
+function setBtn(id,val,btn){
+  btn.closest('.tog').querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
+  if(ST[id]===val){delete ST[id];}
+  else{btn.className='rb '+(val==='OK'?'ok-act':'ng-act');ST[id]=val;}
+  updateStats();
+}
+function mkTog(id){
+  return `<div class="tog"><button class="rb ok-idle" data-v="OK" onclick="setBtn('${id}','OK',this)">✓ OK</button><button class="rb ng-idle" data-v="NG" onclick="setBtn('${id}','NG',this)">✗ NG</button></div>`;
+}
+
+// ── ALL TOGGLE IDS ─────────────────────────────────
+const TOG_IDS=[
+  'tog-1','tog-2','tog-3','tog-4','tog-5',
+  'tog-6hv1','tog-6hv2','tog-6hv3','tog-6lv1','tog-6lv2','tog-6lv3','tog-6gnd1','tog-6gnd2',
+  'tog-7hv','tog-7lv',
+  'tog-8r','tog-8s','tog-8t',
+  'tog-9lamp','tog-9alarm','tog-9fuse','tog-9conn','tog-9corr',
+  'tog-fan','tog-alarm','tog-trip',
+  'tog-11f1','tog-11f2','tog-11f3','tog-11htr',
+  'tog-12temp'
+];
+
+function buildToggles(){
+  TOG_IDS.forEach(id=>{
+    const el=document.getElementById(id);
+    if(el)el.innerHTML=mkTog(id).replace(/^<div[^>]*>/,'').replace(/<\/div>$/,'');
+  });
+}
+
+// ── REMARK INPUTS ──────────────────────────────────
+function styleRemarks(){
+  document.querySelectorAll('.remark-inp').forEach(el=>{
+    el.style.cssText='width:100%;border:1.5px solid var(--bdr);border-radius:3px;padding:4px 6px;font-size:11px;font-family:var(--sans);background:var(--bg2);color:var(--txt)';
+  });
+}
+
+// ── STATS ──────────────────────────────────────────
+const PHOTO_IDS=['pd-megger-hv','pd-megger-lv','pd-etm-disp','pd-etm-lamp','pd-etm-set','pd-before','pd-after'];
+const photoStore={};
+
+function updateStats(){
+  const vals=Object.values(ST);
+  const ok=vals.filter(v=>v==='OK').length;
+  const ng=vals.filter(v=>v==='NG').length;
+  const total=TOG_IDS.length;
+  const photos=PHOTO_IDS.filter(id=>photoStore[id]).length;
+  document.getElementById('h-total').textContent=total;
+  document.getElementById('h-ok').textContent=ok;
+  document.getElementById('h-ng').textContent=ng;
+  document.getElementById('h-photos').textContent=photos;
+}
+
+// ── PHOTO UPLOAD ───────────────────────────────────
+function loadPhoto(input,slotId){
+  if(!input.files[0])return;
+  const r=new FileReader();
+  r.onload=e=>{
+    photoStore[slotId]=e.target.result;
+    const slot=document.getElementById(slotId);
+    let img=slot.querySelector('img');
+    if(!img){img=document.createElement('img');slot.appendChild(img);}
+    img.src=e.target.result;
+    slot.classList.add('has-photo');
+    slot.querySelector('.photo-icon').style.display='none';
+    slot.querySelector('.photo-hint').style.display='none';
+    updateStats();
+  };
+  r.readAsDataURL(input.files[0]);
+}
+function delPhoto(slotId,e){
+  e.stopPropagation();
+  const slot=document.getElementById(slotId);
+  const img=slot.querySelector('img');
+  if(img)img.remove();
+  slot.classList.remove('has-photo');
+  slot.querySelector('.photo-icon').style.display='';
+  slot.querySelector('.photo-hint').style.display='';
+  delete photoStore[slotId];
+  updateStats();
+}
+
+// ── DRAFT ──────────────────────────────────────────
+function saveDraft(){
+  const d={};
+  document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>d['f'+i]=el.value);
+  d._st=ST;
+  try{
+    localStorage.setItem('dry_trafo_v2',JSON.stringify(d));
+    showNote('💾 Draft tersimpan.','ok');
+  }catch(e){showNote('❌ '+e.message,'err');}
+}
+function loadDraft(){
+  try{
+    const raw=localStorage.getItem('dry_trafo_v2');
+    if(!raw)return;
+    const d=JSON.parse(raw);
+    document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>{if(d['f'+i]!==undefined)el.value=d['f'+i];});
+    if(d._st){
+      Object.entries(d._st).forEach(([id,val])=>{
+        ST[id]=val;
+        const tog=document.querySelector(`#${id} .rb[data-v="${val}"]`);
+        if(tog)tog.className='rb '+(val==='OK'?'ok-act':'ng-act');
+      });
+    }
+    updateStats();
+  }catch(e){}
+}
+function resetForm(){
+  if(!confirm('Reset semua data?'))return;
+  document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file')el.value='';});
+  Object.keys(ST).forEach(k=>delete ST[k]);
+  document.querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
+  PHOTO_IDS.forEach(id=>delPhoto(id,{stopPropagation:()=>{}}));
+  updateStats();
+}
+function showNote(msg,t){
+  const n=document.getElementById('notice');
+  n.textContent=msg;n.className='notice '+t;
+  setTimeout(()=>n.className='notice',4000);
+}
+const v=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
+const gT=id=>ST[id]||'—';
+const tr2=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'—');
+
+// ── PDF ────────────────────────────────────────────
+async function generatePDF(){
+  showNote('⏳ Membuat PDF…','info');
+  await new Promise(r=>setTimeout(r,200));
+  const{jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297,M=10;let y=M;
+  const NAVY=[30,58,95],BLUE=[37,99,235],SKY=[125,211,252],LT=[240,247,255],
+        OK=[22,163,74],NG=[220,38,38],GRAY=[100,116,139];
+
+  function ckY(n){if(y+n>H-M)nPage();}
+  function nPage(){pdf.addPage();y=M;miniHdr();}
+  function miniHdr(){
+    pdf.setFillColor(...NAVY);pdf.rect(0,0,W,8,'F');
+    pdf.setTextColor(...SKY);pdf.setFont('helvetica','bold');pdf.setFontSize(7);
+    pdf.text('DRY TRANSFORMER — 2 YEARLY PM',M,5.5);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);
+    pdf.text(`WO: ${v('wo-no')||'—'}  Date: ${v('wo-date')||'—'}  By: ${v('done-by')||'—'}`,W-M,5.5,{align:'right'});
+    y=12;
+  }
+  function secHdr(title){
+    ckY(12);
+    pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,7,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
+    pdf.text('▶  '+title,M+3,y+5);y+=10;
+  }
+  function autoTbl(head,body){
+    pdf.autoTable({startY:y,head:[head],body,theme:'grid',
+      styles:{font:'helvetica',fontSize:7,cellPadding:2,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+      headStyles:{fillColor:NAVY,textColor:[125,211,252],fontStyle:'bold',fontSize:6.5,halign:'center'},
+      didParseCell:d=>{const val=d.cell.text[0];if(val==='OK'||val==='✓ OK'){d.cell.styles.textColor=[...OK];d.cell.styles.fontStyle='bold';}if(val==='NG'||val==='✗ NG'){d.cell.styles.textColor=[...NG];d.cell.styles.fontStyle='bold';}},
+      margin:{left:M,right:M}});
+    y=pdf.lastAutoTable.finalY+5;
+  }
+
+  // Cover
+  pdf.setFillColor(...NAVY);pdf.rect(0,0,W,40,'F');
+  pdf.setFillColor(...BLUE);pdf.rect(0,38,W,2,'F');
+  pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(18);
+  pdf.text('DRY TRANSFORMER',M,16);
+  pdf.setFontSize(11);pdf.setTextColor(...SKY);
+  pdf.text('2 Yearly Preventive Maintenance Check Sheet',M,26);
+  pdf.setFontSize(8);pdf.setTextColor(...SKY);pdf.setFont('helvetica','normal');
+  pdf.text('1500/2000 KVA · 13800/416Y/240V · AA/FA · USS Dry XFMR',M,33);
+  pdf.text(new Date().toLocaleString('en-GB'),W-M,33,{align:'right'});
+  y=48;
+
+  // Info
+  pdf.setFillColor(...LT);pdf.setDrawColor(125,211,252);pdf.setLineWidth(0.25);
+  pdf.roundedRect(M,y,W-M*2,26,2,2,'FD');
+  function ib(l,val,x,yy){
+    pdf.setFont('helvetica','bold');pdf.setFontSize(5.5);pdf.setTextColor(...GRAY);pdf.text(l.toUpperCase(),x,yy);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(30,58,95);pdf.text((val||'—').slice(0,30),x,yy+4.5);
+  }
+  ib('WO No.',v('wo-no'),M+3,y+5);ib('Date',v('wo-date'),65,y+5);ib('Tag No.',v('tag-no'),115,y+5);
+  ib('Done By',v('done-by'),M+3,y+17);ib('Ack By',v('ack-by'),65,y+17);ib('Ack Date',v('ack-date'),115,y+17);
+  y+=32;
+
+  // Stats
+  const okN=Object.values(ST).filter(x=>x==='OK').length;
+  const ngN=Object.values(ST).filter(x=>x==='NG').length;
+  [[M,'TOTAL',String(TOG_IDS.length),NAVY],[M+45,'OK',String(okN),OK],[M+90,'NG',String(ngN),NG]].forEach(([x,l,val,cl])=>{
+    pdf.setFillColor(...cl,.08);pdf.setDrawColor(...cl);pdf.setLineWidth(0.3);
+    pdf.roundedRect(x,y,35,10,1.5,1.5,'FD');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(5.5);pdf.setTextColor(...cl);pdf.text(l,x+2,y+3.5);
+    pdf.setFontSize(11);pdf.text(val,x+2,y+9);
+  });
+  y+=16;
+
+  // Items 1-5
+  secHdr('Items 1–5 — De-energized Inspection');
+  autoTbl(['No.','Item','Criteria','Result'],[
+    ['1','Cleaning by vacuum cleaner','Clean all surfaces',gT('tog-1')],
+    ['2','Check all bolts for tightness','Per torque table',gT('tog-2')],
+    ['3','Check insulation winding','No deterioration / No overheating',gT('tog-3')],
+    ['4','Inspect for corrosion or damage','No corrosion / No damage',gT('tog-4')],
+    ['5','Check fans operation','All fans OK',gT('tog-5')],
+  ]);
+
+  // Item 6 - Megger
+  ckY(14);secHdr('Item 6 — Insulation Resistance & PI Test');
+  autoTbl(['Test Point','PI Criteria','1 min (MΩ)','10 min (MΩ)','PI','Result'],[
+    ['H1-H2 (HV)','≥1.5',v('hv-h1h2-1m'),v('hv-h1h2-10m'),v('pi-h1h2'),gT('tog-6hv1')],
+    ['H1-H3 (HV)','≥1.5',v('hv-h1h3-1m'),v('hv-h1h3-10m'),v('pi-h1h3'),gT('tog-6hv2')],
+    ['H2-H3 (HV)','≥1.5',v('hv-h2h3-1m'),v('hv-h2h3-10m'),v('pi-h2h3'),gT('tog-6hv3')],
+    ['X1-X2 (LV)','≥1.5',v('lv-x1x2-1m'),v('lv-x1x2-10m'),v('pi-x1x2'),gT('tog-6lv1')],
+    ['X1-X3 (LV)','≥1.5',v('lv-x1x3-1m'),v('lv-x1x3-10m'),v('pi-x1x3'),gT('tog-6lv2')],
+    ['X2-X3 (LV)','≥1.5',v('lv-x2x3-1m'),v('lv-x2x3-10m'),v('pi-x2x3'),gT('tog-6lv3')],
+    ['HV–Ground','≥1.5',v('hv-gnd-1m'),v('hv-gnd-10m'),v('pi-hv-gnd'),gT('tog-6gnd1')],
+    ['LV–Ground','≥1.5',v('lv-gnd-1m'),v('lv-gnd-10m'),v('pi-lv-gnd'),gT('tog-6gnd2')],
+  ]);
+  ckY(14);secHdr('Winding Resistance');
+  autoTbl(['H1-H2','H1-H3','H2-H3','X1-X2','X1-X3','X2-X3'],[
+    [v('wr-h1h2'),v('wr-h1h3'),v('wr-h2h3'),v('wr-x1x2'),v('wr-x1x3'),v('wr-x2x3')]
+  ]);
+
+  // Photos Item 6
+  const photos6=[{id:'pd-megger-hv',cap:'cap-megger-hv',title:'HV Megger Test'},{id:'pd-megger-lv',cap:'cap-megger-lv',title:'LV Megger Test'}];
+  const hasP6=photos6.filter(p=>photoStore[p.id]);
+  if(hasP6.length){
+    ckY(14);secHdr('Evidence Photos — Item 6');
+    const imgW=(W-M*2)/2-3;const imgH=45;ckY(imgH+14);
+    hasP6.forEach((p,i)=>{const x=M+i*(imgW+3);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
+      try{pdf.addImage(photoStore[p.id],'JPEG',x,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
+      const cap=v(p.cap);if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
+    });y+=imgH+18;
+  }
+
+  // Items 7-8
+  ckY(14);secHdr('Item 7 — Reconnection & Bolt Tightness');
+  autoTbl(['Check Item','Criteria','Result'],[
+    ['Reconnect HV side','Torque: 16 lbft',gT('tog-7hv')],
+    ['Reconnect LV side','Torque: 30 lbft',gT('tog-7lv')],
+  ]);
+  ckY(14);secHdr('Item 8 — TC Type K Sensor Calibration');
+  autoTbl(['Sensor','Actual (°C)','Deviation','Result'],[
+    ['Phase R',v('tc-r-pri'),v('tc-r-dev'),gT('tog-8r')],
+    ['Phase S',v('tc-s-pri'),v('tc-s-dev'),gT('tog-8s')],
+    ['Phase T',v('tc-t-pri'),v('tc-t-dev'),gT('tog-8t')],
+  ]);
+
+  // Item 9
+  ckY(14);secHdr('Item 9 — ETM Energize & Indicating Lamps');
+  autoTbl(['Check Point','Criteria','Result'],[
+    ['All indicating lamps','All lamps OK',gT('tog-9lamp')],
+    ['Display temp reading',v('etm-disp-temp')+'°C','—'],
+    ['Test alarm function','Alarm activated',gT('tog-9alarm')],
+    ['No blown fuses','All fuses intact',gT('tog-9fuse')],
+    ['No looseness on connection','All tight',gT('tog-9conn')],
+    ['No corrosion or damage on ETM','No corrosion',gT('tog-9corr')],
+  ]);
+  const photos9=[{id:'pd-etm-disp',cap:'cap-etm-disp',title:'ETM Display'},{id:'pd-etm-lamp',cap:'cap-etm-lamp',title:'Indicating Lamps'}];
+  const hasP9=photos9.filter(p=>photoStore[p.id]);
+  if(hasP9.length){
+    ckY(14);secHdr('Evidence Photos — Item 9');
+    const imgW=(W-M*2)/2-3;const imgH=45;ckY(imgH+14);
+    hasP9.forEach((p,i)=>{const x=M+i*(imgW+3);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
+      try{pdf.addImage(photoStore[p.id],'JPEG',x,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
+      const cap=v(p.cap);if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
+    });y+=imgH+18;
+  }
+
+  // Item 10
+  ckY(14);secHdr('Item 10 — ETM Temperature Settings');
+  autoTbl(['Setting','Standard','Actual','Result'],[
+    ['FAN','140°C',v('etm-fan')+'°C',gT('tog-fan')],
+    ['ALARM','150°C',v('etm-alarm')+'°C',gT('tog-alarm')],
+    ['TRIP','200°C',v('etm-trip')+'°C',gT('tog-trip')],
+  ]);
+  if(photoStore['pd-etm-set']){
+    const imgW=70;const imgH=52;ckY(imgH+16);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text('ETM Setting Display',M,y+5);
+    try{pdf.addImage(photoStore['pd-etm-set'],'JPEG',M,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
+    const cap=v('cap-etm-set');if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),M,y+7+imgH+4);}
+    y+=imgH+18;
+  }
+
+  // Item 11-12
+  ckY(14);secHdr('Item 11 — Fan Operation Test');
+  autoTbl(['Fan','Test Duration','Result'],[
+    ['Fan 1','1 min → 10 min',gT('tog-11f1')],
+    ['Fan 2','1 min → 10 min',gT('tog-11f2')],
+    ['Fan 3','1 min → 10 min',gT('tog-11f3')],
+    ['Heater','Operation check',gT('tog-11htr')],
+  ]);
+  ckY(14);secHdr('Item 12 — Max. Temperature Record');
+  autoTbl(['Parameter','Value','Result'],[
+    ['Max. Temp Before Cleaning',v('temp-before'),gT('tog-12temp')],
+    ['Max. Temp After Cleaning',v('temp-after'),'—'],
+  ]);
+  const photos12=[{id:'pd-before',cap:'cap-before',title:'Before Cleaning'},{id:'pd-after',cap:'cap-after',title:'After Cleaning'}];
+  const hasP12=photos12.filter(p=>photoStore[p.id]);
+  if(hasP12.length){
+    ckY(14);secHdr('Evidence Photos — Item 12 (Before & After Cleaning)');
+    const imgW=(W-M*2)/2-3;const imgH=55;ckY(imgH+14);
+    hasP12.forEach((p,i)=>{const x=M+i*(imgW+3);
+      pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
+      try{pdf.addImage(photoStore[p.id],'JPEG',x,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
+      const cap=v(p.cap);if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
+    });y+=imgH+18;
+  }
+
+  // Findings
+  ckY(14);secHdr('Comments & Findings');
+  pdf.autoTable({startY:y,body:[
+    ['Overall Condition',v('overall')],['Next PM Due',v('next-pm')||'—'],
+    ['Comments / Findings',v('comments')||'—'],['Corrective Actions',v('actions')||'—'],
+  ],theme:'grid',styles:{font:'helvetica',fontSize:8,cellPadding:3,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+  columnStyles:{0:{cellWidth:50,fontStyle:'bold',fillColor:LT,textColor:NAVY}},margin:{left:M,right:M}});
+
+  // Page numbers
+  const pages=pdf.internal.getNumberOfPages();
+  for(let pg=1;pg<=pages;pg++){
+    pdf.setPage(pg);pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(150);
+    pdf.text(`Page ${pg}/${pages}`,W-M,H-5,{align:'right'});
+    pdf.text('Dry Transformer 2 Yearly PM',M,H-5);
+  }
+  const fn=`DRY_TRAFO_PM_${(v('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
+  pdf.save(fn);
+  showNote('✅ PDF tersimpan: '+fn,'ok');
+}
+
+// ── INIT ───────────────────────────────────────────
+buildToggles();
+styleRemarks();
+loadDraft();
+updateStats();
+</script>
+</body>
+</html>
