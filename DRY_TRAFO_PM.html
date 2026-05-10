@@ -889,77 +889,86 @@ const v=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
 const gT=id=>ST[id]||'—';
 const tr2=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'—');
 
-// ── PDF ────────────────────────────────────────────
 async function generatePDF(){
-  showNote('⏳ Membuat PDF…','info');
-  await new Promise(r=>setTimeout(r,200));
-  const{jsPDF}=window.jspdf;
-  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
-  const W=210,H=297,M=10;let y=M;
-  const NAVY=[30,58,95],BLUE=[37,99,235],SKY=[125,211,252],LT=[240,247,255],
-        OK=[22,163,74],NG=[220,38,38],GRAY=[100,116,139];
-
-  function ckY(n){if(y+n>H-M)nPage();}
-  function nPage(){pdf.addPage();y=M;miniHdr();}
-  function miniHdr(){
-    pdf.setFillColor(...NAVY);pdf.rect(0,0,W,8,'F');
-    pdf.setTextColor(...SKY);pdf.setFont('helvetica','bold');pdf.setFontSize(7);
-    pdf.text('DRY TRANSFORMER — 2 YEARLY PM',M,5.5);
-    pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);
-    pdf.text(`WO: ${v('wo-no')||'—'}  Date: ${v('wo-date')||'—'}  By: ${v('done-by')||'—'}`,W-M,5.5,{align:'right'});
+  showNote('Membuat PDF...','info');
+  await new Promise(function(r){setTimeout(r,300);});
+  try{
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  var W=210,H=297,M=10,CW=W-M*2;
+  var NAVY=[30,58,95],BLUE=[37,99,235],SKY=[125,211,252],LT=[240,247,255],OK=[22,163,74],NG=[220,38,38],GR=[100,116,139];
+  var y=M;
+  function ckY(n){if(y+n>H-14)nPage();}
+  function nPage(){pgFt();doc.addPage();y=M;pgHd();}
+  function pgHd(){
+    doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]);doc.rect(0,0,W,8,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(SKY[0],SKY[1],SKY[2]);
+    doc.text('DRY TRANSFORMER  -  2 YEARLY PM',M,5.5);
+    doc.setFont('helvetica','normal');doc.setFontSize(6.5);
+    doc.text('WO: '+(gv('wo-no')||'-')+'  Date: '+(gv('wo-date')||'-')+'  By: '+(gv('done-by')||'-'),W-M,5.5,{align:'right'});
     y=12;
   }
-  function secHdr(title){
+  function pgFt(){
+    var pg=doc.internal.getCurrentPageInfo().pageNumber;
+    doc.setDrawColor(190,205,225);doc.setLineWidth(0.3);doc.line(M,H-10,W-M,H-10);
+    doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.setTextColor(150,150,150);
+    doc.text('Dry Transformer  |  2 Yearly PM',M,H-6);
+    doc.text('Page '+pg,W-M,H-6,{align:'right'});
+  }
+  function secBar(title){
     ckY(12);
-    pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,7,'F');
-    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
-    pdf.text('▶  '+title,M+3,y+5);y+=10;
+    doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]);doc.rect(M,y,CW,7,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(8.5);doc.setTextColor(255,255,255);
+    doc.text('  '+title,M+2,y+5);y+=10;
   }
   function autoTbl(head,body){
-    pdf.autoTable({startY:y,head:[head],body,theme:'grid',
-      styles:{font:'helvetica',fontSize:7,cellPadding:2,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
-      headStyles:{fillColor:NAVY,textColor:[125,211,252],fontStyle:'bold',fontSize:6.5,halign:'center'},
-      didParseCell:d=>{const val=d.cell.text[0];if(val==='OK'||val==='✓ OK'){d.cell.styles.textColor=[...OK];d.cell.styles.fontStyle='bold';}if(val==='NG'||val==='✗ NG'){d.cell.styles.textColor=[...NG];d.cell.styles.fontStyle='bold';}},
-      margin:{left:M,right:M}});
-    y=pdf.lastAutoTable.finalY+5;
+    doc.autoTable({startY:y,head:[head],body:body,theme:'grid',
+      styles:{font:'helvetica',fontSize:7,cellPadding:2,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18,overflow:'linebreak'},
+      headStyles:{fillColor:[NAVY[0],NAVY[1],NAVY[2]],textColor:[SKY[0],SKY[1],SKY[2]],fontStyle:'bold',fontSize:6.5,halign:'center'},
+      didParseCell:function(d){var val=d.cell.text[0];
+        if(val==='OK'){d.cell.styles.textColor=[OK[0],OK[1],OK[2]];d.cell.styles.fontStyle='bold';}
+        if(val==='NG'){d.cell.styles.textColor=[NG[0],NG[1],NG[2]];d.cell.styles.fontStyle='bold';}
+      },margin:{left:M,right:M}});
+    y=doc.lastAutoTable.finalY+5;
   }
+  function tr2(s,n){if(!s)return'';return s.length>n?s.slice(0,n)+'...':s;}
 
-  // Cover
-  pdf.setFillColor(...NAVY);pdf.rect(0,0,W,40,'F');
-  pdf.setFillColor(...BLUE);pdf.rect(0,38,W,2,'F');
-  pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(18);
-  pdf.text('DRY TRANSFORMER',M,16);
-  pdf.setFontSize(11);pdf.setTextColor(...SKY);
-  pdf.text('2 Yearly Preventive Maintenance Check Sheet',M,26);
-  pdf.setFontSize(8);pdf.setTextColor(...SKY);pdf.setFont('helvetica','normal');
-  pdf.text('1500/2000 KVA · 13800/416Y/240V · AA/FA · USS Dry XFMR',M,33);
-  pdf.text(new Date().toLocaleString('en-GB'),W-M,33,{align:'right'});
+  // COVER
+  doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]);doc.rect(0,0,W,42,'F');
+  doc.setFillColor(BLUE[0],BLUE[1],BLUE[2]);doc.rect(0,40,W,2,'F');
+  doc.setFont('helvetica','bold');doc.setFontSize(18);doc.setTextColor(255,255,255);
+  doc.text('DRY TRANSFORMER',M,16);
+  doc.setFontSize(11);doc.setTextColor(SKY[0],SKY[1],SKY[2]);
+  doc.text('2 Yearly Preventive Maintenance Check Sheet',M,26);
+  doc.setFontSize(8);doc.setTextColor(SKY[0],SKY[1],SKY[2]);doc.setFont('helvetica','normal');
+  doc.text('1500/2000 KVA  |  13800/416Y/240V  |  AA/FA  |  USS Dry XFMR',M,33);
+  doc.text(new Date().toLocaleString('en-GB'),W-M,33,{align:'right'});
   y=48;
 
-  // Info
-  pdf.setFillColor(...LT);pdf.setDrawColor(125,211,252);pdf.setLineWidth(0.25);
-  pdf.roundedRect(M,y,W-M*2,26,2,2,'FD');
+  // INFO
+  doc.setFillColor(LT[0],LT[1],LT[2]);doc.setDrawColor(125,211,252);doc.setLineWidth(0.25);
+  doc.roundedRect(M,y,CW,26,2,2,'FD');
   function ib(l,val,x,yy){
-    pdf.setFont('helvetica','bold');pdf.setFontSize(5.5);pdf.setTextColor(...GRAY);pdf.text(l.toUpperCase(),x,yy);
-    pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(30,58,95);pdf.text((val||'—').slice(0,30),x,yy+4.5);
+    doc.setFont('helvetica','bold');doc.setFontSize(5.5);doc.setTextColor(GR[0],GR[1],GR[2]);doc.text(l.toUpperCase(),x,yy);
+    doc.setFont('helvetica','normal');doc.setFontSize(8.5);doc.setTextColor(NAVY[0],NAVY[1],NAVY[2]);doc.text((val||'-').slice(0,30),x,yy+4.5);
   }
-  ib('WO No.',v('wo-no'),M+3,y+5);ib('Date',v('wo-date'),65,y+5);ib('Tag No.',v('tag-no'),115,y+5);
-  ib('Done By',v('done-by'),M+3,y+17);ib('Ack By',v('ack-by'),65,y+17);ib('Ack Date',v('ack-date'),115,y+17);
+  ib('WO No.',gv('wo-no'),M+3,y+5);ib('Date',gv('wo-date'),65,y+5);ib('Tag No.',gv('tag-no'),115,y+5);
+  ib('Done By',gv('done-by'),M+3,y+17);ib('Ack By',gv('ack-by'),65,y+17);ib('Ack Date',gv('ack-date'),115,y+17);
   y+=32;
 
-  // Stats
-  const okN=Object.values(ST).filter(x=>x==='OK').length;
-  const ngN=Object.values(ST).filter(x=>x==='NG').length;
-  [[M,'TOTAL',String(TOG_IDS.length),NAVY],[M+45,'OK',String(okN),OK],[M+90,'NG',String(ngN),NG]].forEach(([x,l,val,cl])=>{
-    pdf.setFillColor(...cl,.08);pdf.setDrawColor(...cl);pdf.setLineWidth(0.3);
-    pdf.roundedRect(x,y,35,10,1.5,1.5,'FD');
-    pdf.setFont('helvetica','bold');pdf.setFontSize(5.5);pdf.setTextColor(...cl);pdf.text(l,x+2,y+3.5);
-    pdf.setFontSize(11);pdf.text(val,x+2,y+9);
+  // STATS
+  var okN=Object.values(ST).filter(function(x){return x==='OK';}).length;
+  var ngN=Object.values(ST).filter(function(x){return x==='NG';}).length;
+  [[M,'TOTAL',String(TOG_IDS.length),NAVY],[M+45,'OK',String(okN),OK],[M+90,'NG',String(ngN),NG]].forEach(function(chip){
+    var x=chip[0],lbl=chip[1],val=chip[2],cl=chip[3];
+    doc.setDrawColor(cl[0],cl[1],cl[2]);doc.setLineWidth(0.4);doc.roundedRect(x,y,35,10,1.5,1.5,'S');
+    doc.setFont('helvetica','bold');doc.setFontSize(5.5);doc.setTextColor(cl[0],cl[1],cl[2]);doc.text(lbl,x+2,y+3.5);
+    doc.setFontSize(11);doc.text(val,x+2,y+9);
   });
   y+=16;
 
-  // Items 1-5
-  secHdr('Items 1–5 — De-energized Inspection');
+  // ITEMS 1-5
+  secBar('Items 1-5  -  De-energized Inspection');
   autoTbl(['No.','Item','Criteria','Result'],[
     ['1','Cleaning by vacuum cleaner','Clean all surfaces',gT('tog-1')],
     ['2','Check all bolts for tightness','Per torque table',gT('tog-2')],
@@ -968,129 +977,143 @@ async function generatePDF(){
     ['5','Check fans operation','All fans OK',gT('tog-5')],
   ]);
 
-  // Item 6 - Megger
-  ckY(14);secHdr('Item 6 — Insulation Resistance & PI Test');
-  autoTbl(['Test Point','PI Criteria','1 min (MΩ)','10 min (MΩ)','PI','Result'],[
-    ['H1-H2 (HV)','≥1.5',v('hv-h1h2-1m'),v('hv-h1h2-10m'),v('pi-h1h2'),gT('tog-6hv1')],
-    ['H1-H3 (HV)','≥1.5',v('hv-h1h3-1m'),v('hv-h1h3-10m'),v('pi-h1h3'),gT('tog-6hv2')],
-    ['H2-H3 (HV)','≥1.5',v('hv-h2h3-1m'),v('hv-h2h3-10m'),v('pi-h2h3'),gT('tog-6hv3')],
-    ['X1-X2 (LV)','≥1.5',v('lv-x1x2-1m'),v('lv-x1x2-10m'),v('pi-x1x2'),gT('tog-6lv1')],
-    ['X1-X3 (LV)','≥1.5',v('lv-x1x3-1m'),v('lv-x1x3-10m'),v('pi-x1x3'),gT('tog-6lv2')],
-    ['X2-X3 (LV)','≥1.5',v('lv-x2x3-1m'),v('lv-x2x3-10m'),v('pi-x2x3'),gT('tog-6lv3')],
-    ['HV–Ground','≥1.5',v('hv-gnd-1m'),v('hv-gnd-10m'),v('pi-hv-gnd'),gT('tog-6gnd1')],
-    ['LV–Ground','≥1.5',v('lv-gnd-1m'),v('lv-gnd-10m'),v('pi-lv-gnd'),gT('tog-6gnd2')],
+  // ITEM 6
+  ckY(14);secBar('Item 6  -  Insulation Resistance & PI Test');
+  autoTbl(['Test Point','PI Criteria','1 min (MOhm)','10 min (MOhm)','PI','Result'],[
+    ['H1-H2 (HV)','>=1.5',gv('hv-h1h2-1m'),gv('hv-h1h2-10m'),gv('pi-h1h2'),gT('tog-6hv1')],
+    ['H1-H3 (HV)','>=1.5',gv('hv-h1h3-1m'),gv('hv-h1h3-10m'),gv('pi-h1h3'),gT('tog-6hv2')],
+    ['H2-H3 (HV)','>=1.5',gv('hv-h2h3-1m'),gv('hv-h2h3-10m'),gv('pi-h2h3'),gT('tog-6hv3')],
+    ['X1-X2 (LV)','>=1.5',gv('lv-x1x2-1m'),gv('lv-x1x2-10m'),gv('pi-x1x2'),gT('tog-6lv1')],
+    ['X1-X3 (LV)','>=1.5',gv('lv-x1x3-1m'),gv('lv-x1x3-10m'),gv('pi-x1x3'),gT('tog-6lv2')],
+    ['X2-X3 (LV)','>=1.5',gv('lv-x2x3-1m'),gv('lv-x2x3-10m'),gv('pi-x2x3'),gT('tog-6lv3')],
+    ['HV-Ground','>=1.5',gv('hv-gnd-1m'),gv('hv-gnd-10m'),gv('pi-hv-gnd'),gT('tog-6gnd1')],
+    ['LV-Ground','>=1.5',gv('lv-gnd-1m'),gv('lv-gnd-10m'),gv('pi-lv-gnd'),gT('tog-6gnd2')],
   ]);
-  ckY(14);secHdr('Winding Resistance');
+  ckY(14);secBar('Winding Resistance');
   autoTbl(['H1-H2','H1-H3','H2-H3','X1-X2','X1-X3','X2-X3'],[
-    [v('wr-h1h2'),v('wr-h1h3'),v('wr-h2h3'),v('wr-x1x2'),v('wr-x1x3'),v('wr-x2x3')]
+    [gv('wr-h1h2'),gv('wr-h1h3'),gv('wr-h2h3'),gv('wr-x1x2'),gv('wr-x1x3'),gv('wr-x2x3')]
   ]);
 
-  // Photos Item 6
-  const photos6=[{id:'pd-megger-hv',cap:'cap-megger-hv',title:'HV Megger Test'},{id:'pd-megger-lv',cap:'cap-megger-lv',title:'LV Megger Test'}];
-  const hasP6=photos6.filter(p=>photoStore[p.id]);
-  if(hasP6.length){
-    ckY(14);secHdr('Evidence Photos — Item 6');
-    const imgW=(W-M*2)/2-3;const imgH=45;ckY(imgH+14);
-    hasP6.forEach((p,i)=>{const x=M+i*(imgW+3);
-      pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
-      try{pdf.addImage(photoStore[p.id],'JPEG',x,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
-      const cap=v(p.cap);if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
-    });y+=imgH+18;
+  // PHOTOS helper
+  function renderPhotos(title,slots){
+    var hasPh=slots.filter(function(p){return photoStore[p.id];});
+    if(!hasPh.length)return;
+    ckY(14);secBar(title);
+    var colW=(CW-4)/2;var maxH=55;
+    for(var i=0;i<hasPh.length;i+=2){
+      var pair=hasPh.slice(i,i+2);
+      var rowH=maxH;
+      pair.forEach(function(p){var pd=photoStore[p.id];if(pd&&pd.w&&pd.h){var rr=pd.h/pd.w;var ch=colW*rr;if(ch<rowH)rowH=ch;}});
+      rowH=Math.min(rowH,maxH);
+      ckY(rowH+18);
+      pair.forEach(function(p,pi){
+        var pd=photoStore[p.id];if(!pd)return;
+        var xo=M+pi*(colW+4);
+        doc.setFillColor(NAVY[0],NAVY[1],NAVY[2]);doc.rect(xo,y,colW,6,'F');
+        doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(255,255,255);
+        doc.text(p.title,xo+2,y+4.2);
+        var dw=colW,dh=rowH;
+        if(pd.w&&pd.h){var ratio=pd.h/pd.w;dh=colW*ratio;if(dh>maxH){dh=maxH;dw=dh/ratio;}else{dw=colW;}}
+        var xi=xo+(colW-dw)/2;
+        doc.setDrawColor(190,205,225);doc.setLineWidth(0.3);doc.rect(xo,y+7,colW,rowH+1,'S');
+        try{doc.addImage(pd.src,'JPEG',xi,y+8,dw,dh,'','FAST');}catch(ex){}
+        var cap=gv(p.capId);
+        if(cap){doc.setFont('helvetica','italic');doc.setFontSize(7);doc.setTextColor(GR[0],GR[1],GR[2]);doc.text(tr2(cap,40),xo+2,y+7+rowH+4.5);}
+      });
+      y+=rowH+18;
+    }
   }
 
-  // Items 7-8
-  ckY(14);secHdr('Item 7 — Reconnection & Bolt Tightness');
+  renderPhotos('Evidence Photos  -  Item 6',[
+    {id:'pd-megger-hv',title:'HV Megger Test',capId:'cap-megger-hv'},
+    {id:'pd-megger-lv',title:'LV Megger Test',capId:'cap-megger-lv'}
+  ]);
+
+  // ITEMS 7-8
+  ckY(14);secBar('Item 7  -  Reconnection & Bolt Tightness');
   autoTbl(['Check Item','Criteria','Result'],[
     ['Reconnect HV side','Torque: 16 lbft',gT('tog-7hv')],
     ['Reconnect LV side','Torque: 30 lbft',gT('tog-7lv')],
   ]);
-  ckY(14);secHdr('Item 8 — TC Type K Sensor Calibration');
-  autoTbl(['Sensor','Actual (°C)','Deviation','Result'],[
-    ['Phase R',v('tc-r-pri'),v('tc-r-dev'),gT('tog-8r')],
-    ['Phase S',v('tc-s-pri'),v('tc-s-dev'),gT('tog-8s')],
-    ['Phase T',v('tc-t-pri'),v('tc-t-dev'),gT('tog-8t')],
+  ckY(14);secBar('Item 8  -  TC Type K Sensor Calibration');
+  autoTbl(['Sensor','Actual (C)','Deviation','Result'],[
+    ['Phase R',gv('tc-r-pri'),gv('tc-r-dev'),gT('tog-8r')],
+    ['Phase S',gv('tc-s-pri'),gv('tc-s-dev'),gT('tog-8s')],
+    ['Phase T',gv('tc-t-pri'),gv('tc-t-dev'),gT('tog-8t')],
   ]);
 
-  // Item 9
-  ckY(14);secHdr('Item 9 — ETM Energize & Indicating Lamps');
+  // ITEM 9
+  ckY(14);secBar('Item 9  -  ETM Energize & Indicating Lamps');
   autoTbl(['Check Point','Criteria','Result'],[
     ['All indicating lamps','All lamps OK',gT('tog-9lamp')],
-    ['Display temp reading',v('etm-disp-temp')+'°C','—'],
+    ['Display temp reading',gv('etm-disp-temp')+' C','-'],
     ['Test alarm function','Alarm activated',gT('tog-9alarm')],
     ['No blown fuses','All fuses intact',gT('tog-9fuse')],
     ['No looseness on connection','All tight',gT('tog-9conn')],
     ['No corrosion or damage on ETM','No corrosion',gT('tog-9corr')],
   ]);
-  const photos9=[{id:'pd-etm-disp',cap:'cap-etm-disp',title:'ETM Display'},{id:'pd-etm-lamp',cap:'cap-etm-lamp',title:'Indicating Lamps'}];
-  const hasP9=photos9.filter(p=>photoStore[p.id]);
-  if(hasP9.length){
-    ckY(14);secHdr('Evidence Photos — Item 9');
-    const imgW=(W-M*2)/2-3;const imgH=45;ckY(imgH+14);
-    hasP9.forEach((p,i)=>{const x=M+i*(imgW+3);
-      pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
-      try{pdf.addImage(photoStore[p.id],'JPEG',x,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
-      const cap=v(p.cap);if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
-    });y+=imgH+18;
-  }
+  renderPhotos('Evidence Photos  -  Item 9',[
+    {id:'pd-etm-disp',title:'ETM Display',capId:'cap-etm-disp'},
+    {id:'pd-etm-lamp',title:'Indicating Lamps',capId:'cap-etm-lamp'}
+  ]);
 
-  // Item 10
-  ckY(14);secHdr('Item 10 — ETM Temperature Settings');
+  // ITEM 10
+  ckY(14);secBar('Item 10  -  ETM Temperature Settings');
   autoTbl(['Setting','Standard','Actual','Result'],[
-    ['FAN','140°C',v('etm-fan')+'°C',gT('tog-fan')],
-    ['ALARM','150°C',v('etm-alarm')+'°C',gT('tog-alarm')],
-    ['TRIP','200°C',v('etm-trip')+'°C',gT('tog-trip')],
+    ['FAN','140 C',gv('etm-fan')+' C',gT('tog-fan')],
+    ['ALARM','150 C',gv('etm-alarm')+' C',gT('tog-alarm')],
+    ['TRIP','200 C',gv('etm-trip')+' C',gT('tog-trip')],
   ]);
   if(photoStore['pd-etm-set']){
-    const imgW=70;const imgH=52;ckY(imgH+16);
-    pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text('ETM Setting Display',M,y+5);
-    try{pdf.addImage(photoStore['pd-etm-set'],'JPEG',M,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
-    const cap=v('cap-etm-set');if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),M,y+7+imgH+4);}
-    y+=imgH+18;
+    var pd=photoStore['pd-etm-set'];
+    var dw=70,dh=52;
+    if(pd.w&&pd.h){var ratio=pd.h/pd.w;dh=70*ratio;if(dh>70){dh=70;dw=dh/ratio;}}
+    ckY(dh+16);
+    doc.setFont('helvetica','bold');doc.setFontSize(7.5);doc.setTextColor(NAVY[0],NAVY[1],NAVY[2]);doc.text('ETM Setting Display',M,y+5);
+    doc.setDrawColor(190,205,225);doc.setLineWidth(0.3);doc.rect(M,y+7,dw+2,dh+2,'S');
+    try{doc.addImage(pd.src,'JPEG',M+1,y+8,dw,dh,'','FAST');}catch(ex){}
+    var cap=gv('cap-etm-set');
+    if(cap){doc.setFont('helvetica','italic');doc.setFontSize(7);doc.setTextColor(GR[0],GR[1],GR[2]);doc.text(tr2(cap,40),M,y+8+dh+4);}
+    y+=dh+18;
   }
 
-  // Item 11-12
-  ckY(14);secHdr('Item 11 — Fan Operation Test');
+  // ITEMS 11-12
+  ckY(14);secBar('Item 11  -  Fan Operation Test');
   autoTbl(['Fan','Test Duration','Result'],[
-    ['Fan 1','1 min → 10 min',gT('tog-11f1')],
-    ['Fan 2','1 min → 10 min',gT('tog-11f2')],
-    ['Fan 3','1 min → 10 min',gT('tog-11f3')],
+    ['Fan 1','1 min to 10 min',gT('tog-11f1')],
+    ['Fan 2','1 min to 10 min',gT('tog-11f2')],
+    ['Fan 3','1 min to 10 min',gT('tog-11f3')],
     ['Heater','Operation check',gT('tog-11htr')],
   ]);
-  ckY(14);secHdr('Item 12 — Max. Temperature Record');
+  ckY(14);secBar('Item 12  -  Max. Temperature Record');
   autoTbl(['Parameter','Value','Result'],[
-    ['Max. Temp Before Cleaning',v('temp-before'),gT('tog-12temp')],
-    ['Max. Temp After Cleaning',v('temp-after'),'—'],
+    ['Max. Temp Before Cleaning',gv('temp-before'),gT('tog-12temp')],
+    ['Max. Temp After Cleaning',gv('temp-after'),'-'],
   ]);
-  const photos12=[{id:'pd-before',cap:'cap-before',title:'Before Cleaning'},{id:'pd-after',cap:'cap-after',title:'After Cleaning'}];
-  const hasP12=photos12.filter(p=>photoStore[p.id]);
-  if(hasP12.length){
-    ckY(14);secHdr('Evidence Photos — Item 12 (Before & After Cleaning)');
-    const imgW=(W-M*2)/2-3;const imgH=55;ckY(imgH+14);
-    hasP12.forEach((p,i)=>{const x=M+i*(imgW+3);
-      pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
-      try{pdf.addImage(photoStore[p.id],'JPEG',x,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
-      const cap=v(p.cap);if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
-    });y+=imgH+18;
-  }
+  renderPhotos('Evidence Photos  -  Item 12 (Before & After Cleaning)',[
+    {id:'pd-before',title:'Before Cleaning',capId:'cap-before'},
+    {id:'pd-after',title:'After Cleaning',capId:'cap-after'}
+  ]);
 
-  // Findings
-  ckY(14);secHdr('Comments & Findings');
-  pdf.autoTable({startY:y,body:[
-    ['Overall Condition',v('overall')],['Next PM Due',v('next-pm')||'—'],
-    ['Comments / Findings',v('comments')||'—'],['Corrective Actions',v('actions')||'—'],
-  ],theme:'grid',styles:{font:'helvetica',fontSize:8,cellPadding:3,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
-  columnStyles:{0:{cellWidth:50,fontStyle:'bold',fillColor:LT,textColor:NAVY}},margin:{left:M,right:M}});
+  // FINDINGS
+  ckY(14);secBar('Comments & Findings');
+  doc.autoTable({startY:y,body:[
+    ['Overall Condition',gv('overall')||'-'],['Next PM Due',gv('next-pm')||'-'],
+    ['Comments / Findings',gv('comments')||'-'],['Corrective Actions',gv('actions')||'-'],
+  ],theme:'grid',styles:{font:'helvetica',fontSize:8,cellPadding:3,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18,overflow:'linebreak'},
+  columnStyles:{0:{cellWidth:50,fontStyle:'bold',fillColor:[LT[0],LT[1],LT[2]],textColor:[NAVY[0],NAVY[1],NAVY[2]]}},margin:{left:M,right:M}});
 
-  // Page numbers
-  const pages=pdf.internal.getNumberOfPages();
-  for(let pg=1;pg<=pages;pg++){
-    pdf.setPage(pg);pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(150);
-    pdf.text(`Page ${pg}/${pages}`,W-M,H-5,{align:'right'});
-    pdf.text('Dry Transformer 2 Yearly PM',M,H-5);
+  // PAGE NUMBERS
+  pgFt();
+  var pages=doc.internal.getNumberOfPages();
+  for(var pg=1;pg<=pages;pg++){
+    doc.setPage(pg);doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.setTextColor(150,150,150);
+    doc.text('Page '+pg+' / '+pages,W-M,H-6,{align:'right'});
   }
-  const fn=`DRY_TRAFO_PM_${(v('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
-  pdf.save(fn);
-  showNote('✅ PDF tersimpan: '+fn,'ok');
+  var fn='DRY_TRAFO_PM_'+((gv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,''))+'.pdf';
+  doc.save(fn);
+  showNote('PDF tersimpan: '+fn,'ok');
+  }catch(err){console.error('PDF Error:',err);showNote('Error PDF: '+err.message,'err');}
 }
 
 // ── INIT ───────────────────────────────────────────
