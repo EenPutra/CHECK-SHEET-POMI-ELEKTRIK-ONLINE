@@ -121,7 +121,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   transition:border-color .15s}
 .mi:focus{outline:none;border-color:var(--blue);background:#fff}
 
-/* OK/NG BUTTONS — Variasi 1 Solid Fill */
+/* OK/NG BUTTONS */
 .tog{display:inline-flex;gap:3px;justify-content:center}
 .rb{font-size:10px;padding:4px 8px;border-radius:4px;cursor:pointer;font-weight:700;
   letter-spacing:.5px;border:none;transition:all .15s;font-family:var(--mono)}
@@ -411,7 +411,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <!-- Panel Cleaning -->
     <div class="panel-clean">
       <div style="font-family:var(--raj);font-size:13px;font-weight:700;color:var(--navy);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px">
-        F.2 — Panel Cleaning from Dust & Contamination
+        F.2 — Panel Cleaning from Dust &amp; Contamination
       </div>
       <div style="font-size:11px;color:var(--txt4);margin-bottom:10px">Bersihkan semua panel lokal dari debu dan kontaminasi</div>
       <div class="pc-grid">
@@ -448,7 +448,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">📝</div>
-    <div><div class="sec-hdr-title">Findings & Conclusion</div></div>
+    <div><div class="sec-hdr-title">Findings &amp; Conclusion</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -535,11 +535,9 @@ function mkInp(id){
 
 // ── UPDATE STATS ───────────────────────────────────
 function updateStats(){
-  // Count toggle states
   const vals=Object.values(ST);
   const ok=vals.filter(v=>v==='OK').length;
   const ng=vals.filter(v=>v==='NG').length;
-  // Count all toggle containers
   const total=document.querySelectorAll('.tog').length;
   const pending=total-ok-ng;
   document.getElementById('h-total').textContent=total;
@@ -563,13 +561,13 @@ function buildA(){
   row('3','AC Input Current T/R','&lt; 275 A',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">A</span>');
   row('4','DC Output Voltage T/R','&lt; 60 kV',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">kV</span>');
   row('5','DC Output Current T/R','&lt; 1200 mA',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">mA</span>');
-  row('6','DC Output Current Limit','&lt; 1200 mA',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">mA</span>');
+  row('6','DC Output Current Limit (Is)<br><small>Current Set Point / Limit</small>','&lt; 1200 mA',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">mA</span>');
+  row('6b','DC Voltage Limit (Vs)<br><small>Voltage Set Point / Limit</small>','&lt; 60 kV',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">kV</span>');
   row('7','Oil Level T/R','&gt; Oil fill mark',id=>mkOilSel(id));
   row('8','Oil Temperature','&lt; 90°C',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">°C</span>');
   row('9','Oil Leakage<br><small>Drain Valve, Oil Sight Glass, Bushings, Thermostat, Radiator, Welds</small>','No Leak',id=>mkTog(id));
   row('10','Contamination','Clean',id=>mkTog(id));
 
-  // Item 11 & 12 — text input per kolom, satu tabel sama
   function rowTxt(no,desc,crit){
     const tr=document.createElement('tr');
     let h=`<td class="no">${no}</td><td class="lbl">${desc}</td><td class="ref">${crit}</td>`;
@@ -613,7 +611,6 @@ function buildF(){
     h+=`<td>${mkInp('htr_'+c)}<span style="font-size:9px;color:var(--txt4);display:block">A</span></td>`;
   });
   tr.innerHTML=h; tb.appendChild(tr);
-  // Panel clean toggles
   ['pc-800a','pc-800b','pc-800c','pc-800d','pc-800e','pc-800f'].forEach(id=>{
     document.getElementById(id).innerHTML=mkTog(id);
   });
@@ -745,7 +742,7 @@ async function generatePDF(){
     y=pdf.lastAutoTable.finalY+5;
   }
 
-  // Section A
+  // Section A — now includes Vs Limit row (6b)
   const colsA=['817A','827A','837A','847A','815A','825A','835A','845A','817B','827B','837B','847B','815B','825B','835B','845B'];
   const rowsA=[
     ['1','Ambient Temp.','<40°C',...colsA.map(c=>getInpVal('1_'+c)+'°C')],
@@ -753,7 +750,8 @@ async function generatePDF(){
     ['3','AC Input Current','<275A',...colsA.map(c=>getInpVal('3_'+c)+'A')],
     ['4','DC Output Voltage','<60kV',...colsA.map(c=>getInpVal('4_'+c)+'kV')],
     ['5','DC Output Current','<1200mA',...colsA.map(c=>getInpVal('5_'+c)+'mA')],
-    ['6','DC Current Limit','<1200mA',...colsA.map(c=>getInpVal('6_'+c)+'mA')],
+    ['6','DC Current Limit (Is)','<1200mA',...colsA.map(c=>getInpVal('6_'+c)+'mA')],
+    ['6b','DC Voltage Limit (Vs)','<60kV',...colsA.map(c=>getInpVal('6b_'+c)+'kV')],
     ['7','Oil Level','>Fill mark',...colsA.map(c=>getSelVal('7_'+c))],
     ['8','Oil Temperature','<90°C',...colsA.map(c=>getInpVal('8_'+c)+'°C')],
     ['9','Oil Leakage','No Leak',...colsA.map(c=>getTogVal('9_'+c))],
