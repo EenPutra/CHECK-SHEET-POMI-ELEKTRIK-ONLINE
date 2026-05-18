@@ -67,6 +67,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .mi{border:1.5px solid var(--pb);border-radius:5px;padding:4px 6px;font-family:var(--mono);font-size:11.5px;background:#f4f8f5;color:var(--text);transition:border-color .18s;width:100%;min-width:62px}
 .mi:focus{outline:none;border-color:var(--sl);background:#fff}.mu{font-size:9.5px;color:var(--t3);white-space:nowrap;font-family:var(--mono);display:block;margin-top:1px}
 .m3{display:grid;grid-template-columns:repeat(3,minmax(48px,1fr));gap:4px;align-items:start}.m3c{display:flex;flex-direction:column;align-items:center;gap:1px}.m3lbl{font-family:var(--mono);font-size:9px;color:var(--t3);font-weight:700;line-height:1}.m3 .mi{min-width:0;width:100%;padding:4px 3px;text-align:center}.m3 .mu{font-size:8.5px;margin-top:0}
+/* pct input group — no labels */
+.pct-grp{display:flex;flex-direction:column;gap:3px;align-items:center}
+.pct-inp{border:1.5px solid var(--pb);border-radius:4px;padding:3px 4px;font-family:var(--mono);font-size:11px;background:#f4f8f5;color:var(--text);width:50px;text-align:center;transition:border-color .18s}
+.pct-inp:focus{outline:none;border-color:var(--sl);background:#fff}
+.pct-u{font-size:8.5px;color:var(--t3);font-family:var(--mono)}
 .giswrap{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .gisttl{font-family:var(--raj);font-size:13px;font-weight:700;color:var(--steel);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
 .gt{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px}
@@ -165,7 +170,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;wi
     <p style="font-size:11px;color:var(--t3);margin-bottom:12px">EZ-XFMR-GSU · EY-XFMR-SU · EX-XFMR-UAT · EX-XFMR-EXC · EM-XFMR-A1 · EM-XFMR-B1 · EM-XFMR-C1</p>
     <div style="overflow-x:auto"><table class="ct"><thead><tr>
       <th style="width:30px">No.</th><th>Inspection Item</th>
-      <th class="ctr" style="min-width:82px">EZ-GSU</th><th class="ctr" style="min-width:82px">EY-SU</th>
+      <th class="ctr" style="min-width:110px">EZ-GSU</th><th class="ctr" style="min-width:90px">EY-SU</th>
       <th class="ctr" style="min-width:82px">EX-UAT</th><th class="ctr" style="min-width:82px">EX-EXC</th>
       <th class="ctr" style="min-width:82px">EM-A1</th><th class="ctr" style="min-width:82px">EM-B1</th>
       <th class="ctr" style="min-width:82px">EM-C1</th>
@@ -293,6 +298,19 @@ function na(){return `<span class="nac">N/A</span>`;}
 function setT(id,v,b){const w=b.classList.contains('a');b.closest('.rc').querySelectorAll('.rb').forEach(x=>x.classList.remove('a'));if(!w){b.classList.add('a');ST[id]=v;}else delete ST[id];upStats();}
 function setLC(id,v,b,c){const w=b.classList.contains('a');b.closest('.lc').querySelectorAll('.lb').forEach(x=>x.classList.remove('a'));if(!w){b.classList.add('a');ST[id]=v;}else delete ST[id];upStats();}
 
+// PCT input group: n inputs stacked, no labels
+function pctGrp(baseId, n){
+  let html='<div class="pct-grp">';
+  for(let i=1;i<=n;i++){
+    html+=`<div style="display:flex;align-items:center;gap:2px">
+      <input class="pct-inp" type="number" min="0" max="100" step="1" id="${baseId}_${i}" placeholder="—">
+      <span class="pct-u">%</span>
+    </div>`;
+  }
+  html+='</div>';
+  return html;
+}
+
 // ROW BUILDERS
 function shdr(tb,txt){const tr=tb.insertRow();tr.className='shdr';const td=tr.insertCell();td.colSpan=99;td.textContent=txt;}
 function row(tb,no,desc,crit,cells,mr=false){
@@ -302,11 +320,14 @@ function row(tb,no,desc,crit,cells,mr=false){
     if(t==='na')td.innerHTML=na();else if(t==='ok')td.innerHTML=tog(id);
     else if(t==='leak')td.innerHTML=lc(id,'leak');else if(t==='clean')td.innerHTML=lc(id,'clean');
     else if(t==='noise')td.innerHTML=lc(id,'noise');else if(t==='meas')td.innerHTML=meas(id,u||'');else if(t==='meas3')td.innerHTML=meas3(id,u||'');
+    else if(t==='pct1')td.innerHTML=pctGrp(id,1);
+    else if(t==='pct2')td.innerHTML=pctGrp(id,2);
+    else if(t==='pct3')td.innerHTML=pctGrp(id,3);
   });
 }
 
-// SHEET 1+2 BUILDER
-function mkAT(tbId,pfx,dga){
+// SHEET 1 builder (with DGA, original silicagel)
+function mkAT_s1(tbId,pfx){
   const tb=document.getElementById(tbId);
   const C=['gsu','su','uat','exc','a1','b1','c1'];
   shdr(tb,'A.  Transformer Temperature and Load');
@@ -319,17 +340,90 @@ function mkAT(tbId,pfx,dga){
   row(tb,'B.1','Main Tank Oil Level','In range per Temp vs Level table',C.map(c=>['ok',pfx+'_b1_'+c]));
   row(tb,'B.2','OLTC Oil Level (if equipped)','',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['ok',pfx+'_b2_'+c]));
   row(tb,'B.3','Dissolve Gas Analysis — DGA (ppm)','Alarm=500 ppm · High=1000 ppm',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_b3_'+c,'ppm']),true);
-  if(dga){
-    shdr(tb,'DGA General Inspection (TP1, 3, 6, 7, 8)');
-    row(tb,'','Visual inspection & retighten test points (TP1,3,6,7,8)','',C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_dga1_'+c]));
-    row(tb,'','DGA Feedback Current — Alarm 1 (500 ppm)','Ref: 12.0 mA',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_dga2_'+c,'mA']),true);
-    row(tb,'','DGA Feedback Current — Alarm 2 (1000 ppm)','Ref: 20.0 mA',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_dga3_'+c,'mA']),true);
-    row(tb,'','DGA Reading (actual)','Record ppm / mA',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_dga4_'+c,'mA']),true);
-  }
+  shdr(tb,'DGA General Inspection (TP1, 3, 6, 7, 8)');
+  row(tb,'','Visual inspection & retighten test points (TP1,3,6,7,8)','',C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_dga1_'+c]));
+  row(tb,'','DGA Feedback Current — Alarm 1 (500 ppm)','Ref: 12.0 mA',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_dga2_'+c,'mA']),true);
+  row(tb,'','DGA Feedback Current — Alarm 2 (1000 ppm)','Ref: 20.0 mA',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_dga3_'+c,'mA']),true);
+  row(tb,'','DGA Reading (actual)','Record ppm / mA',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_dga4_'+c,'mA']),true);
   shdr(tb,'C.  Silicagel Breather');
   row(tb,'C.1','Silicagel color check (25% blue + 75% white)','≥70% pink from bottom → replace',C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_c1_'+c]));
   row(tb,'C.2','Sealing oil level in oil cup','Oil level = mark',C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_c2_'+c]));
   row(tb,'C.3','Contamination of absorbent & sealing oil','Absorbent dirty / Sealing oil milky',C.map(c=>c==='exc'?['na','','']:['clean',pfx+'_c3_'+c]));
+  shdr(tb,'D.  Oil Leaks — Valves, Gauges, Gaskets, Welds');
+  row(tb,'D','Check all connections for oil leaks','No leak',C.map(c=>['leak',pfx+'_d_'+c]));
+  shdr(tb,'E.  Cooling Equipment');
+  row(tb,'E.1','Leakage on radiators','No leak',C.map(c=>['leak',pfx+'_e1_'+c]));
+  row(tb,'E.2','Dust / rust on radiator surface','No rust',C.map(c=>['clean',pfx+'_e2_'+c]));
+  row(tb,'E.3','Abnormal noise on cooling fans','No abnormal noise',C.map(c=>['noise',pfx+'_e3_'+c]));
+  shdr(tb,'F.  Bushing (Porcelain Type)');
+  row(tb,'F.1','Bushing oil level & leaks (if equipped)','Oil level > 50%',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['ok',pfx+'_f1_'+c]));
+  row(tb,'F.2','Porcelain contamination','Clean, No contamination',C.map(c=>c==='exc'?['na','','']:['clean',pfx+'_f2_'+c]));
+  shdr(tb,'G.  Pressure Relief Device');
+  row(tb,'G.1','Oil leakage on Pressure Relief Device','No leak',C.map(c=>['leak',pfx+'_g1_'+c]));
+  shdr(tb,'H.  On Load Tap Changer (OLTC)');
+  row(tb,'H.1','Tap changing operation counter','< 80,000 ops',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['meas',pfx+'_h1_'+c,'ops']),true);
+  shdr(tb,'I.  Oil Purifier');
+  row(tb,'I.1','Oil purifier leaks','No leak',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['leak',pfx+'_i1_'+c]));
+  row(tb,'I.2','Filter Differential Pressure','Diff Press < 0.4 MPa',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['meas',pfx+'_i2_'+c,'MPa']),true);
+  row(tb,'I.3','Oil flow sight — carbon contamination','No carbon contamination',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['clean',pfx+'_i3_'+c]));
+  shdr(tb,'J.  Cooler Control Cubicle');
+  row(tb,'J.1','Rust on cubicle','No rust',C.map(c=>['clean',pfx+'_j1_'+c]));
+  row(tb,'J.2','Loose connections inside cubicle','No looseness',C.map(c=>['ok',pfx+'_j2_'+c]));
+  row(tb,'J.3','Wire color / discoloration / overheating','No discoloration',C.map(c=>['ok',pfx+'_j3_'+c]));
+  shdr(tb,'K.  N₂ Pressure');
+  row(tb,'K.1','N₂ Bottle Pressure','>10 psi (Low Alarm)',C.map(c=>c==='exc'?['meas',pfx+'_k1_'+c,'psi']:['na','','']),true);
+  row(tb,'K.2','XFMR Tank Pressure','<+9 psi (Avg +2 psi)',C.map(c=>c==='exc'?['meas',pfx+'_k2_'+c,'psi']:['na','','']),true);
+  shdr(tb,'SF₆ Gas Pressure');
+  row(tb,'','SF₆ Gas Pressure','Alarm: 0.45 MPa · Trip: 0.40 MPa',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['meas',pfx+'_sf_'+c,'MPa']),true);
+}
+
+// SHEET 2 builder (without DGA, NEW silicagel with % inputs)
+function mkAT_s2(tbId,pfx){
+  const tb=document.getElementById(tbId);
+  const C=['gsu','su','uat','exc','a1','b1','c1'];
+
+  // GSU=3 pct inputs, SU=2 pct inputs, UAT/A1/B1/C1=1, EXC=N/A
+  function silGrp(c,baseId){
+    if(c==='exc') return ['na','',''];
+    if(c==='gsu') return ['pct3',baseId,''];
+    if(c==='su')  return ['pct2',baseId,''];
+    return ['pct1',baseId,''];
+  }
+
+  shdr(tb,'A.  Transformer Temperature and Load');
+  row(tb,'A.1','Ambient Temperature','Record °C',C.map(c=>['meas',pfx+'_a1_'+c,'°C']),true);
+  row(tb,'A.2','Oil Temperature','SST/EXC ≤85°C · UAT/SUT/GSUT ≤95°C alarm',C.map(c=>['meas',pfx+'_a2_'+c,'°C']),true);
+  row(tb,'A.3','Winding Temperature','80°C→Fan stage1 · 85°C→Fan stage2',C.map(c=>['meas',pfx+'_a3_'+c,'°C']),true);
+  row(tb,'A.4','Voltage','Record kV',C.map(c=>c==='uat'?['meas3',pfx+'_a4_'+c,'kV']:['meas',pfx+'_a4_'+c,'kV']),true);
+  row(tb,'A.5','Apparent Power','GSUT≤873.6 · UAT/SUT≤112 · SST≤36 · EXC≤7.875 MVA',C.map(c=>c==='uat'?['meas3',pfx+'_a5_'+c,'MVA']:['meas',pfx+'_a5_'+c,'MVA']),true);
+  shdr(tb,'B.  Oil Level Gauge');
+  row(tb,'B.1','Main Tank Oil Level','In range per Temp vs Level table',C.map(c=>['ok',pfx+'_b1_'+c]));
+  row(tb,'B.2','OLTC Oil Level (if equipped)','',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['ok',pfx+'_b2_'+c]));
+
+  // ── SILICAGEL BREATHER — updated section ──
+  shdr(tb,'C.  Silicagel Breather');
+
+  // C.1a — % pink from bottom (≥70% replace)
+  row(tb,'C.1a',
+    'Check color change of silicagel (25% blue + 75% white)<br><small style="color:var(--t3);font-size:10px">▸ ≥ 70% silica pink from bottom → replace it</small>',
+    '',
+    C.map(c=>silGrp(c, pfx+'_c1a_'+c)),
+    true
+  );
+
+  // C.1b — % pink from upper portion
+  row(tb,'C.1b',
+    'If upper portions of silicagel was pink<br><small style="color:var(--t3);font-size:10px">▸ Check &amp; retighten the silicagel inlet cap and joint to the conservator</small>',
+    '',
+    C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_c2_'+c])
+  );
+
+  // C.2 — sealing oil level
+  row(tb,'C.2','Check the level of sealing oil in oil cup','Oil level = oil level mark at oil pot',C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_c2_'+c]));
+
+  // C.3 — contamination (Clean/Dirty)
+  row(tb,'C.3','Check contamination of absorbent and sealing oil','Absorbent dirty / Sealing oil milky',C.map(c=>c==='exc'?['na','','']:['clean',pfx+'_c3_'+c]));
+
   shdr(tb,'D.  Oil Leaks — Valves, Gauges, Gaskets, Welds');
   row(tb,'D','Check all connections for oil leaks','No leak',C.map(c=>['leak',pfx+'_d_'+c]));
   shdr(tb,'E.  Cooling Equipment');
@@ -436,14 +530,24 @@ function initSig(id){const c=document.getElementById(id);const ctx=c.getContext(
 function clrSig(id){const c=document.getElementById(id);c.getContext('2d').clearRect(0,0,c.width,c.height);}
 
 // DRAFT
-function saveDraft(){const d={};document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>d['f'+i]=el.value);d._st=ST;try{localStorage.setItem('tx_wk_v3',JSON.stringify(d));note('💾 Draft saved.','ok');}catch(e){note('❌ '+e.message,'err');}}
-function loadDraft(){try{const raw=localStorage.getItem('tx_wk_v3');if(!raw)return;const d=JSON.parse(raw);document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>{if(d['f'+i]!==undefined)el.value=d['f'+i];});if(d._st){Object.assign(ST,d._st);Object.entries(ST).forEach(([id,val])=>{document.querySelectorAll(`[data-id="${id}"]`).forEach(b=>{if(b.dataset.v===val||b.textContent===val)b.classList.add('a');});});}upStats();}catch(e){}}
+function saveDraft(){const d={};document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>d['f'+i]=el.value);d._st=ST;try{localStorage.setItem('tx_wk_v4',JSON.stringify(d));note('💾 Draft saved.','ok');}catch(e){note('❌ '+e.message,'err');}}
+function loadDraft(){try{const raw=localStorage.getItem('tx_wk_v4');if(!raw)return;const d=JSON.parse(raw);document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>{if(d['f'+i]!==undefined)el.value=d['f'+i];});if(d._st){Object.assign(ST,d._st);Object.entries(ST).forEach(([id,val])=>{document.querySelectorAll(`[data-id="${id}"]`).forEach(b=>{if(b.dataset.v===val||b.textContent===val)b.classList.add('a');});});}upStats();}catch(e){}}
 function resetForm(){if(!confirm('Reset all data?'))return;document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file')el.value='';});Object.keys(ST).forEach(k=>delete ST[k]);document.querySelectorAll('.rb,.lb').forEach(b=>b.classList.remove('a'));clrSig('sig-tech');clrSig('sig-super');PSLOTS.forEach(p=>dpx(p.id,{stopPropagation:()=>{}}));upStats();}
 
 // NOTICE
 function note(msg,t){const n=document.getElementById('notice');n.textContent=msg;n.className='notice '+t;setTimeout(()=>n.className='notice',3500);}
 const vv=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
 const trunc=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'');
+
+// helper: get pct inputs value from group
+function getPct(baseId, n){
+  const vals=[];
+  for(let i=1;i<=n;i++){
+    const el=document.getElementById(baseId+'_'+i);
+    vals.push(el&&el.value?el.value+'%':'—');
+  }
+  return vals.join(' / ');
+}
 
 // PDF
 async function generatePDF(selSet){
@@ -491,7 +595,15 @@ async function generatePDF(selSet){
       const tds=[...tr.querySelectorAll('td')];if(tds.length<2)return;
       const no=tds[0].textContent.trim();const desc=tds[1].textContent.replace(/▸.*/,'').trim();
       const crit=tds[1].querySelector('.crit')?.textContent.replace('▸ ','').trim()||'';
-      const vals=tds.slice(2).map(td=>{if(td.querySelector('.nac'))return'N/A';const a=td.querySelector('.rb.a,.lb.a');if(a)return a.textContent;const inp=td.querySelector('input[type=number]');return inp&&inp.value?inp.value:'—';});
+      const vals=tds.slice(2).map(td=>{
+        if(td.querySelector('.nac'))return'N/A';
+        const a=td.querySelector('.rb.a,.lb.a');if(a)return a.textContent;
+        // collect pct inputs
+        const pctInps=td.querySelectorAll('.pct-inp');
+        if(pctInps.length>0)return[...pctInps].map(i=>i.value?i.value+'%':'—').join('/');
+        const inp=td.querySelector('input[type=number]');
+        return inp&&inp.value?inp.value:'—';
+      });
       body.push([no,crit?`${desc}\n▸ ${crit}`:desc,...vals]);
     });
     pdf.autoTable({startY:y,head:[['No.','Inspection Item',...hdrs]],body,theme:'grid',
@@ -546,61 +658,39 @@ async function generatePDF(selSet){
 
 // PDF MODAL
 const PDF_SHEETS=[
-  {key:'cover',  label:'Cover & Header',      icon:'📋', desc:'Cover page + WO info + stats'},
-  {key:'s1',     label:'Sheet 1 — AT+DGA',    icon:'⚡', desc:'EZ-GSU · EY-SU · EX-UAT · EX-EXC · EM-A1/B1/C1'},
+  {key:'cover',  label:'Cover & Header',       icon:'📋', desc:'Cover page + WO info + stats'},
+  {key:'s1',     label:'Sheet 1 — AT+DGA',     icon:'⚡', desc:'EZ-GSU · EY-SU · EX-UAT · EX-EXC · EM-A1/B1/C1'},
   {key:'s2',     label:'Sheet 2 — AT (No DGA)',icon:'🔌', desc:'Same transformers, without DGA items'},
-  {key:'s3',     label:'Sheet 3 — USST',      icon:'🏭', desc:'U78 USST Three Monthly PM'},
-  {key:'s4',     label:'Sheet 4 — SST SWRO',  icon:'💧', desc:'Common SST SWRO/Scrubber/Admin'},
-  {key:'s5',     label:'Sheet 5 — SST CHCB',  icon:'🏗️', desc:'Common SST CHCB/Warehouse/CUCB'},
-  {key:'gis',    label:'GIS SF₆',             icon:'🔵', desc:'150 kV & 500 kV gas pressure monitoring'},
-  {key:'photos', label:'Evidence Photos',      icon:'📷', desc:'Uploaded inspection photos'},
-  {key:'findings',label:'Findings & Sign-off', icon:'✍️', desc:'Conclusion, actions & signatures'},
+  {key:'s3',     label:'Sheet 3 — USST',       icon:'🏭', desc:'U78 USST Three Monthly PM'},
+  {key:'s4',     label:'Sheet 4 — SST SWRO',   icon:'💧', desc:'Common SST SWRO/Scrubber/Admin'},
+  {key:'s5',     label:'Sheet 5 — SST CHCB',   icon:'🏗️', desc:'Common SST CHCB/Warehouse/CUCB'},
+  {key:'gis',    label:'GIS SF₆',              icon:'🔵', desc:'150 kV & 500 kV gas pressure monitoring'},
+  {key:'photos', label:'Evidence Photos',       icon:'📷', desc:'Uploaded inspection photos'},
+  {key:'findings',label:'Findings & Sign-off',  icon:'✍️', desc:'Conclusion, actions & signatures'},
 ];
-let _pdfSel=new Set(PDF_SHEETS.map(s=>s.key));// all selected by default
+let _pdfSel=new Set(PDF_SHEETS.map(s=>s.key));
 
-function openPdfModal(){
-  _pdfSel=new Set(PDF_SHEETS.map(s=>s.key));
-  renderPdfModal();
-  document.getElementById('pdf-modal-overlay').style.display='flex';
-}
+function openPdfModal(){_pdfSel=new Set(PDF_SHEETS.map(s=>s.key));renderPdfModal();document.getElementById('pdf-modal-overlay').style.display='flex';}
 function closePdfModal(){document.getElementById('pdf-modal-overlay').style.display='none';}
-
 function renderPdfModal(){
   const list=document.getElementById('pdf-sheet-list');
-  list.innerHTML=PDF_SHEETS.map(s=>`
-    <div class="psl-item ${_pdfSel.has(s.key)?'psl-on':''}" id="pslrow-${s.key}" onclick="toggleSheet('${s.key}')">
-      <span class="psl-icon">${s.icon}</span>
-      <span class="psl-info"><span class="psl-name">${s.label}</span><span class="psl-desc">${s.desc}</span></span>
-      <span class="psl-chk" id="pslchk-${s.key}">${_pdfSel.has(s.key)?'✓':''}</span>
-    </div>`).join('');
+  list.innerHTML=PDF_SHEETS.map(s=>`<div class="psl-item ${_pdfSel.has(s.key)?'psl-on':''}" id="pslrow-${s.key}" onclick="toggleSheet('${s.key}')"><span class="psl-icon">${s.icon}</span><span class="psl-info"><span class="psl-name">${s.label}</span><span class="psl-desc">${s.desc}</span></span><span class="psl-chk" id="pslchk-${s.key}">${_pdfSel.has(s.key)?'✓':''}</span></div>`).join('');
   updatePdfBadge();
 }
-function toggleSheet(key){
-  if(_pdfSel.has(key))_pdfSel.delete(key);else _pdfSel.add(key);
-  const row=document.getElementById('pslrow-'+key);
-  const chk=document.getElementById('pslchk-'+key);
-  if(row)row.className='psl-item'+(_pdfSel.has(key)?' psl-on':'');
-  if(chk)chk.textContent=_pdfSel.has(key)?'✓':'';
-  updatePdfBadge();
-}
-function updatePdfBadge(){
-  const el=document.getElementById('pdf-count-badge');
-  if(el)el.textContent=_pdfSel.size+' sheet'+(_pdfSel.size!==1?'s':'');
-}
+function toggleSheet(key){if(_pdfSel.has(key))_pdfSel.delete(key);else _pdfSel.add(key);const row=document.getElementById('pslrow-'+key);const chk=document.getElementById('pslchk-'+key);if(row)row.className='psl-item'+(_pdfSel.has(key)?' psl-on':'');if(chk)chk.textContent=_pdfSel.has(key)?'✓':'';updatePdfBadge();}
+function updatePdfBadge(){const el=document.getElementById('pdf-count-badge');if(el)el.textContent=_pdfSel.size+' sheet'+(_pdfSel.size!==1?'s':'');}
 function pdfSelectAll(){_pdfSel=new Set(PDF_SHEETS.map(s=>s.key));renderPdfModal();}
 function pdfClearAll(){_pdfSel=new Set();renderPdfModal();}
-
-function generatePDFSelected(){
-  if(_pdfSel.size===0){note('⚠️ Pilih minimal 1 sheet!','err');return;}
-  closePdfModal();
-  generatePDF(_pdfSel);
-}
+function generatePDFSelected(){if(_pdfSel.size===0){note('⚠️ Pilih minimal 1 sheet!','err');return;}closePdfModal();generatePDF(_pdfSel);}
 
 // INIT
-mkAT('tb-s1','s1',true);mkAT('tb-s2','s2',false);mkUST();mkSST4();mkSST5();
+mkAT_s1('tb-s1','s1');
+mkAT_s2('tb-s2','s2');
+mkUST();mkSST4();mkSST5();
 mkGIS('tb-g150','g150');mkGIS('tb-g500','g500');
 mkPhotos();initSig('sig-tech');initSig('sig-super');loadDraft();upStats();
 </script>
+
 <!-- PDF Sheet Selector Modal -->
 <div id="pdf-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(20,35,25,0.65);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
   <div style="background:#f0f5f1;border:1.5px solid #b4c8bc;border-radius:14px;padding:0;width:480px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden">
