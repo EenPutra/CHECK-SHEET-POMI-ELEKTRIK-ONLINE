@@ -6,6 +6,10 @@
 <title>Dry Transformer 2 Yearly PM Check Sheet</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -147,6 +151,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-outline btn-sm" onclick="saveDraft()">💾 Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 PDF</button>
+    <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
 </div>
 
@@ -1107,6 +1112,18 @@ buildToggles();
 styleRemarks();
 loadDraft();
 updateStats();
+
+async function submitToDb(){
+  const data=DB.collectCheckSheetData('dry-trafo','DRY-XFMR-USST','Dry Transformer USST','2 YEARLY');
+  if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
+  if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+  try{
+    const id=await DB.save(data);
+    DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
+  }catch(e){
+    DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+  }
+}
 </script>
 </body>
 </html>

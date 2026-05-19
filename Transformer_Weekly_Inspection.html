@@ -6,6 +6,10 @@
 <title>Transformer Weekly Inspection — Unit 7/8</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#e8ece9;--bg2:#dde3de;--panel:rgba(255,255,255,0.80);--pb:rgba(180,200,185,0.55);--steel:#4a5e52;--sl:#6b8474;--red:#c0392b;--ok:#27ae60;--warn:#f39c12;--na:#8e44ad;--text:#1a2620;--t2:#3d5248;--t3:#7a9485;--sh:0 4px 24px rgba(30,60,40,0.10);--mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;}
@@ -115,6 +119,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;wi
     <div class="ldot"></div><span class="tclock" id="clock">--:--:--</span><div class="tsep"></div>
     <button class="btn bo bsm" onclick="saveDraft()">💾 Draft</button>
     <button class="btn br bsm" onclick="openPdfModal()">📄 PDF ▾</button>
+    <button class="btn bsm" style="background:#27ae60;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
 </div>
 <div class="wrap">
@@ -690,6 +695,18 @@ mkAT_s2('tb-s2','s2');
 mkUST();mkSST4();mkSST5();
 mkGIS('tb-g150','g150');mkGIS('tb-g500','g500');
 mkPhotos();initSig('sig-tech');initSig('sig-super');loadDraft();upStats();
+
+async function submitToDb(){
+  const data=DB.collectCheckSheetData('transformer','7EX-XFMR','Transformer Weekly Inspection','WEEKLY');
+  if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
+  if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+  try{
+    const id=await DB.save(data);
+    DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
+  }catch(e){
+    DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+  }
+}
 </script>
 
 <!-- PDF Sheet Selector Modal -->

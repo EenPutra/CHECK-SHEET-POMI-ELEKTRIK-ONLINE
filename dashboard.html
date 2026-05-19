@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dashboard — ELECTRIC 7 POMI</title>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
+<style>
+:root {
+  --bg:#0f1510;--bg2:#141c17;--surf:#1a2420;--surf2:#1f2d27;
+  --bdr:rgba(80,130,95,0.18);--steel:#4a7a5a;--steel2:#5d9970;
+  --acc:#c0392b;--gold:#d4a032;--ok:#27ae60;--warn:#f39c12;
+  --txt:#d4e8db;--txt2:#8fb89a;--txt3:#4a6a54;
+  --mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
+  --glow:0 0 30px rgba(39,174,96,0.12);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;
+  background-image:linear-gradient(rgba(39,174,96,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(39,174,96,0.03) 1px,transparent 1px);
+  background-size:48px 48px;pointer-events:none}
+
+.topbar{position:sticky;top:0;z-index:100;height:52px;background:rgba(10,14,11,0.95);
+  backdrop-filter:blur(16px);border-bottom:1px solid var(--bdr);
+  display:flex;align-items:center;padding:0 32px;gap:0}
+.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--steel2),transparent);opacity:0.5}
+.tb-logo{font-family:var(--raj);font-size:22px;font-weight:700;letter-spacing:4px;color:#fff;display:flex;align-items:center;gap:10px}
+.tb-logo span{color:var(--ok)}
+.tb-nav{display:flex;align-items:center;gap:6px;margin-left:24px}
+.tb-nav a{font-family:var(--mono);font-size:12px;color:var(--txt3);text-decoration:none;
+  padding:6px 14px;border-radius:4px;letter-spacing:1px;transition:all 0.15s}
+.tb-nav a:hover{color:var(--txt2);background:rgba(93,153,112,0.1)}
+.tb-nav a.active{color:var(--ok);background:rgba(39,174,96,0.12);border:1px solid rgba(39,174,96,0.25)}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:16px}
+.tb-time{font-family:var(--mono);font-size:13px;color:var(--steel2)}
+
+.main{position:relative;z-index:1;max-width:1380px;margin:0 auto;padding:32px 48px 80px}
+
+.page-title{font-family:var(--raj);font-size:42px;font-weight:700;color:#fff;margin-bottom:6px}
+.page-sub{font-size:14px;color:var(--txt2);margin-bottom:32px}
+
+/* STAT CARDS */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:32px}
+.stat-card{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:20px;
+  position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.stat-card.c-total::before{background:var(--steel2)}
+.stat-card.c-ok::before{background:var(--ok)}
+.stat-card.c-ng::before{background:var(--acc)}
+.stat-card.c-rate::before{background:var(--gold)}
+.sc-label{font-family:var(--mono);font-size:10px;color:var(--txt3);letter-spacing:2px;text-transform:uppercase}
+.sc-num{font-family:var(--raj);font-size:42px;font-weight:700;color:#fff;line-height:1;margin-top:8px}
+.sc-num.ok{color:var(--ok)}.sc-num.ng{color:var(--acc)}.sc-num.gold{color:var(--gold)}
+
+/* CHARTS ROW */
+.charts-row{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:32px}
+.chart-panel{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;padding:20px}
+.chart-title{font-family:var(--raj);font-size:16px;font-weight:700;color:#fff;margin-bottom:16px;
+  letter-spacing:1px;display:flex;align-items:center;gap:8px}
+.chart-title::before{content:'';width:3px;height:16px;background:var(--ok);border-radius:2px}
+
+/* FILTERS */
+.filter-bar{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.filter-bar select,.filter-bar input{background:var(--surf);border:1px solid var(--bdr);
+  border-radius:6px;padding:8px 14px;color:var(--txt);font-family:var(--sans);font-size:13px;
+  outline:none;transition:border-color 0.15s}
+.filter-bar select:focus,.filter-bar input:focus{border-color:var(--steel2)}
+.filter-bar select option{background:var(--surf);color:var(--txt)}
+
+.btn{padding:8px 18px;border-radius:6px;border:none;cursor:pointer;
+  font-family:var(--raj);font-size:14px;font-weight:600;letter-spacing:1px;
+  transition:all 0.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-ok{background:var(--ok);color:#fff}
+.btn-ok:hover{background:#219a52;transform:translateY(-1px)}
+.btn-outline{background:transparent;border:1px solid var(--bdr);color:var(--txt2)}
+.btn-outline:hover{border-color:var(--steel2);color:#fff}
+.btn-excel{background:#1d6f42;color:#fff}
+.btn-excel:hover{background:#17593a;transform:translateY(-1px)}
+
+/* TABLE */
+.table-panel{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;overflow:hidden}
+.table-hdr{padding:16px 20px;display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--bdr);flex-wrap:wrap;gap:10px}
+.table-hdr-title{font-family:var(--raj);font-size:18px;font-weight:700;color:#fff;letter-spacing:1px}
+.table-hdr-count{font-family:var(--mono);font-size:12px;color:var(--txt3)}
+.tbl-wrap{overflow-x:auto}
+table.dtbl{width:100%;border-collapse:collapse;font-size:13px;min-width:900px}
+table.dtbl th{background:rgba(74,122,90,0.08);color:var(--txt2);padding:10px 14px;text-align:left;
+  font-family:var(--mono);font-size:10px;letter-spacing:1.5px;text-transform:uppercase;
+  border-bottom:1px solid var(--bdr);white-space:nowrap}
+table.dtbl td{padding:10px 14px;border-bottom:1px solid rgba(80,130,95,0.1);vertical-align:middle}
+table.dtbl tr:hover td{background:rgba(93,153,112,0.06)}
+table.dtbl tr:last-child td{border-bottom:none}
+.tag{font-family:var(--mono);font-size:10px;padding:3px 8px;border-radius:3px;letter-spacing:0.5px;font-weight:700}
+.tag-ok{background:rgba(39,174,96,0.12);color:var(--ok);border:1px solid rgba(39,174,96,0.3)}
+.tag-ng{background:rgba(192,57,43,0.12);color:var(--acc);border:1px solid rgba(192,57,43,0.3)}
+.link-btn{color:var(--steel2);text-decoration:none;font-family:var(--mono);font-size:11px;
+  padding:4px 10px;border:1px solid var(--bdr);border-radius:4px;transition:all 0.15s}
+.link-btn:hover{color:var(--ok);border-color:var(--ok)}
+
+.empty-state{text-align:center;padding:60px 20px;color:var(--txt3)}
+.empty-state .icon{font-size:48px;margin-bottom:16px;opacity:0.5}
+.empty-state .msg{font-size:16px;margin-bottom:8px;color:var(--txt2)}
+.empty-state .hint{font-size:13px}
+
+.loading{text-align:center;padding:40px;color:var(--txt3);font-family:var(--mono);font-size:13px}
+
+/* DETAIL MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.7);
+  backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px}
+.modal-overlay.show{display:flex}
+.modal{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;max-width:700px;
+  width:100%;max-height:85vh;overflow-y:auto;padding:28px}
+.modal-close{float:right;background:none;border:none;color:var(--txt3);font-size:22px;cursor:pointer;
+  padding:4px 8px;border-radius:4px;transition:color 0.15s}
+.modal-close:hover{color:#fff}
+.modal-title{font-family:var(--raj);font-size:24px;font-weight:700;color:#fff;margin-bottom:4px}
+.modal-sub{font-family:var(--mono);font-size:12px;color:var(--txt3);margin-bottom:20px}
+.detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+.detail-item{padding:10px 14px;background:rgba(74,122,90,0.06);border-radius:6px}
+.detail-label{font-family:var(--mono);font-size:10px;color:var(--txt3);letter-spacing:1px;text-transform:uppercase}
+.detail-value{font-size:14px;color:#fff;margin-top:4px}
+.detail-section{margin-top:18px}
+.detail-section-title{font-family:var(--raj);font-size:14px;font-weight:700;color:var(--txt2);
+  letter-spacing:1px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bdr)}
+.detail-items-table{width:100%;border-collapse:collapse;font-size:12px}
+.detail-items-table th{text-align:left;padding:6px 8px;color:var(--txt3);font-family:var(--mono);font-size:10px;
+  letter-spacing:1px;border-bottom:1px solid var(--bdr)}
+.detail-items-table td{padding:6px 8px;border-bottom:1px solid rgba(80,130,95,0.08)}
+
+@media(max-width:900px){
+  .main{padding:20px}
+  .charts-row{grid-template-columns:1fr}
+  .detail-grid{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .topbar{padding:0 16px}
+  .tb-nav{display:none}
+  .stat-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="tb-logo">ELECTRIC <span>7</span></div>
+  <div class="tb-nav">
+    <a href="index.html">PORTAL</a>
+    <a href="dashboard.html" class="active">DASHBOARD</a>
+  </div>
+  <div class="tb-right">
+    <span class="tb-time" id="clock">--:--:--</span>
+  </div>
+</div>
+
+<div class="main">
+  <div class="page-title">Dashboard</div>
+  <div class="page-sub">Ringkasan data check sheet Preventive Maintenance — ELECTRIC 7 POMI</div>
+
+  <!-- STAT CARDS -->
+  <div class="stat-grid">
+    <div class="stat-card c-total">
+      <div class="sc-label">Total Submissions</div>
+      <div class="sc-num" id="s-total">-</div>
+    </div>
+    <div class="stat-card c-ok">
+      <div class="sc-label">Total OK Items</div>
+      <div class="sc-num ok" id="s-ok">-</div>
+    </div>
+    <div class="stat-card c-ng">
+      <div class="sc-label">Total NG Items</div>
+      <div class="sc-num ng" id="s-ng">-</div>
+    </div>
+    <div class="stat-card c-rate">
+      <div class="sc-label">OK Rate</div>
+      <div class="sc-num gold" id="s-rate">-</div>
+    </div>
+  </div>
+
+  <!-- CHARTS -->
+  <div class="charts-row">
+    <div class="chart-panel">
+      <div class="chart-title">Trend Bulanan</div>
+      <canvas id="chartTrend" height="220"></canvas>
+    </div>
+    <div class="chart-panel">
+      <div class="chart-title">OK vs NG per Aset</div>
+      <canvas id="chartAsset" height="220"></canvas>
+    </div>
+  </div>
+
+  <!-- FILTERS + TABLE -->
+  <div class="table-panel">
+    <div class="table-hdr">
+      <div>
+        <div class="table-hdr-title">Riwayat Check Sheet</div>
+        <div class="table-hdr-count" id="tbl-count">Memuat data...</div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-excel" onclick="exportExcel()">Export Excel</button>
+        <button class="btn btn-outline" onclick="loadData()">Refresh</button>
+      </div>
+    </div>
+
+    <div class="filter-bar" style="padding:14px 20px 0">
+      <select id="f-asset" onchange="applyFilters()">
+        <option value="">Semua Aset</option>
+      </select>
+      <select id="f-status" onchange="applyFilters()">
+        <option value="">Semua Status</option>
+        <option value="OK">OK</option>
+        <option value="NG">NG</option>
+      </select>
+      <input type="date" id="f-from" onchange="applyFilters()" title="Dari tanggal">
+      <input type="date" id="f-to" onchange="applyFilters()" title="Sampai tanggal">
+      <button class="btn btn-outline" onclick="clearFilters()" style="font-size:12px;padding:6px 12px">Reset</button>
+    </div>
+
+    <div class="tbl-wrap" style="padding:14px 20px 20px">
+      <div class="loading" id="tbl-loading">Memuat data dari database...</div>
+      <table class="dtbl" id="data-table" style="display:none">
+        <thead>
+          <tr>
+            <th>No</th>
+            <th>Tanggal</th>
+            <th>Asset Tag</th>
+            <th>Asset Name</th>
+            <th>WO Number</th>
+            <th>Checked By</th>
+            <th>OK</th>
+            <th>NG</th>
+            <th>Status</th>
+            <th>Detail</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-body"></tbody>
+      </table>
+      <div class="empty-state" id="empty-state" style="display:none">
+        <div class="icon">&#128203;</div>
+        <div class="msg">Belum ada data check sheet</div>
+        <div class="hint">Data akan muncul setelah check sheet di-submit dari halaman check sheet masing-masing aset.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">&times;</button>
+    <div class="modal-title" id="m-title">-</div>
+    <div class="modal-sub" id="m-sub">-</div>
+    <div class="detail-grid" id="m-grid"></div>
+    <div class="detail-section" id="m-items-section" style="display:none">
+      <div class="detail-section-title">Inspection Items</div>
+      <table class="detail-items-table">
+        <thead><tr><th>No</th><th>Item</th><th>Result</th></tr></thead>
+        <tbody id="m-items"></tbody>
+      </table>
+    </div>
+    <div class="detail-section" id="m-meas-section" style="display:none">
+      <div class="detail-section-title">Measurements</div>
+      <table class="detail-items-table">
+        <thead><tr><th>Item</th><th>Value</th><th>Unit</th></tr></thead>
+        <tbody id="m-meas"></tbody>
+      </table>
+    </div>
+    <div class="detail-section" id="m-findings-section" style="display:none">
+      <div class="detail-section-title">Findings & Recommendations</div>
+      <div id="m-findings" style="font-size:13px;color:var(--txt2);white-space:pre-wrap;padding:10px;background:rgba(74,122,90,0.06);border-radius:6px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+let allData = [];
+let filteredData = [];
+
+function tick() {
+  const n = new Date();
+  document.getElementById('clock').textContent = n.toLocaleTimeString('id-ID');
+}
+setInterval(tick, 1000); tick();
+
+async function loadData() {
+  document.getElementById('tbl-loading').style.display = 'block';
+  document.getElementById('data-table').style.display = 'none';
+  document.getElementById('empty-state').style.display = 'none';
+
+  try {
+    allData = await DB.getAll();
+    const stats = await DB.getStats();
+    renderStats(stats);
+    renderCharts(stats);
+    populateAssetFilter();
+    applyFilters();
+  } catch (e) {
+    console.error('Load error:', e);
+    document.getElementById('tbl-loading').textContent = 'Gagal memuat data. Pastikan Firebase sudah dikonfigurasi.';
+  }
+}
+
+function renderStats(stats) {
+  document.getElementById('s-total').textContent = stats.total;
+  document.getElementById('s-ok').textContent = stats.totalOk;
+  document.getElementById('s-ng').textContent = stats.totalNg;
+  const rate = (stats.totalOk + stats.totalNg) > 0
+    ? ((stats.totalOk / (stats.totalOk + stats.totalNg)) * 100).toFixed(1) + '%'
+    : '-';
+  document.getElementById('s-rate').textContent = rate;
+}
+
+let chartTrend, chartAsset;
+function renderCharts(stats) {
+  const months = Object.keys(stats.byMonth).sort();
+  const trendData = months.map(m => stats.byMonth[m]);
+
+  if (chartTrend) chartTrend.destroy();
+  chartTrend = new Chart(document.getElementById('chartTrend'), {
+    type: 'bar',
+    data: {
+      labels: months,
+      datasets: [
+        { label: 'Submissions', data: trendData.map(d => d.submissions), backgroundColor: 'rgba(93,153,112,0.6)', borderRadius: 4 },
+        { label: 'NG Items', data: trendData.map(d => d.ng), backgroundColor: 'rgba(192,57,43,0.6)', borderRadius: 4 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#8fb89a', font: { size: 11 } } } },
+      scales: {
+        x: { ticks: { color: '#4a6a54' }, grid: { color: 'rgba(80,130,95,0.1)' } },
+        y: { ticks: { color: '#4a6a54' }, grid: { color: 'rgba(80,130,95,0.1)' }, beginAtZero: true }
+      }
+    }
+  });
+
+  const assets = Object.keys(stats.byAsset);
+  if (chartAsset) chartAsset.destroy();
+  chartAsset = new Chart(document.getElementById('chartAsset'), {
+    type: 'doughnut',
+    data: {
+      labels: assets.length > 0 ? assets : ['No Data'],
+      datasets: [{
+        data: assets.length > 0 ? assets.map(a => stats.byAsset[a].total) : [1],
+        backgroundColor: assets.length > 0
+          ? ['#27ae60','#2563eb','#d4a032','#c0392b','#8e44ad','#16a085','#e67e22','#3498db']
+          : ['#1a2420'],
+        borderWidth: 0
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'bottom', labels: { color: '#8fb89a', font: { size: 10 }, padding: 8 } } }
+    }
+  });
+}
+
+function populateAssetFilter() {
+  const sel = document.getElementById('f-asset');
+  const tags = [...new Set(allData.map(d => d.assetTag).filter(Boolean))];
+  sel.innerHTML = '<option value="">Semua Aset</option>';
+  tags.forEach(t => { sel.innerHTML += `<option value="${t}">${t}</option>`; });
+}
+
+function applyFilters() {
+  const asset = document.getElementById('f-asset').value;
+  const status = document.getElementById('f-status').value;
+  const from = document.getElementById('f-from').value;
+  const to = document.getElementById('f-to').value;
+
+  filteredData = allData.filter(d => {
+    if (asset && d.assetTag !== asset) return false;
+    if (status && d.overallStatus !== status) return false;
+    if (from && d.executionDate && d.executionDate < from) return false;
+    if (to && d.executionDate && d.executionDate > to) return false;
+    return true;
+  });
+
+  renderTable(filteredData);
+}
+
+function clearFilters() {
+  document.getElementById('f-asset').value = '';
+  document.getElementById('f-status').value = '';
+  document.getElementById('f-from').value = '';
+  document.getElementById('f-to').value = '';
+  applyFilters();
+}
+
+function renderTable(data) {
+  const tbody = document.getElementById('tbl-body');
+  const loading = document.getElementById('tbl-loading');
+  const table = document.getElementById('data-table');
+  const empty = document.getElementById('empty-state');
+
+  loading.style.display = 'none';
+
+  if (data.length === 0) {
+    table.style.display = 'none';
+    empty.style.display = 'block';
+    document.getElementById('tbl-count').textContent = '0 records';
+    return;
+  }
+
+  table.style.display = 'table';
+  empty.style.display = 'none';
+  document.getElementById('tbl-count').textContent = `${data.length} record${data.length !== 1 ? 's' : ''}`;
+
+  tbody.innerHTML = data.map((d, i) => `
+    <tr>
+      <td style="font-family:var(--mono);color:var(--txt3)">${i + 1}</td>
+      <td style="font-family:var(--mono);font-size:12px">${d.executionDate || '-'}</td>
+      <td style="font-family:var(--mono);font-size:11px;color:var(--steel2)">${esc(d.assetTag || '-')}</td>
+      <td>${esc(d.assetName || '-')}</td>
+      <td style="font-family:var(--mono);font-size:12px">${esc(d.woNumber || '-')}</td>
+      <td>${esc(d.checkedBy || '-')}</td>
+      <td style="text-align:center;color:var(--ok);font-weight:700">${d.countOk || 0}</td>
+      <td style="text-align:center;color:var(--acc);font-weight:700">${d.countNg || 0}</td>
+      <td><span class="tag ${d.overallStatus === 'OK' ? 'tag-ok' : 'tag-ng'}">${d.overallStatus || '-'}</span></td>
+      <td><a href="#" class="link-btn" onclick="showDetail('${d.id}');return false">Lihat</a></td>
+    </tr>
+  `).join('');
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+async function showDetail(id) {
+  const d = allData.find(x => x.id === id);
+  if (!d) return;
+
+  document.getElementById('m-title').textContent = d.assetName || d.assetTag || '-';
+  document.getElementById('m-sub').textContent = `${d.assetTag || ''} | ${d.frequency || ''} | WO: ${d.woNumber || '-'}`;
+
+  document.getElementById('m-grid').innerHTML = [
+    ['Tanggal', d.executionDate || '-'],
+    ['Waktu', `${d.timeStart || '-'} - ${d.timeEnd || '-'}`],
+    ['Checked By', d.checkedBy || '-'],
+    ['NIK', d.nik || '-'],
+    ['Reviewed By', d.reviewedBy || '-'],
+    ['Shift', d.shift || '-'],
+    ['OK Count', d.countOk || 0],
+    ['NG Count', d.countNg || 0],
+  ].map(([l, v]) => `<div class="detail-item"><div class="detail-label">${l}</div><div class="detail-value">${esc(String(v))}</div></div>`).join('');
+
+  const itemsSection = document.getElementById('m-items-section');
+  const itemsTbody = document.getElementById('m-items');
+  if (d.items && d.items.length > 0) {
+    itemsSection.style.display = 'block';
+    itemsTbody.innerHTML = d.items.map((it, i) => `
+      <tr>
+        <td style="color:var(--txt3);font-family:var(--mono)">${i + 1}</td>
+        <td>${esc(it.label)}</td>
+        <td><span class="tag ${it.result === 'OK' ? 'tag-ok' : it.result === 'NG' ? 'tag-ng' : ''}">${it.result}</span></td>
+      </tr>
+    `).join('');
+  } else {
+    itemsSection.style.display = 'none';
+  }
+
+  const measSection = document.getElementById('m-meas-section');
+  const measTbody = document.getElementById('m-meas');
+  if (d.measurements && d.measurements.length > 0) {
+    measSection.style.display = 'block';
+    measTbody.innerHTML = d.measurements.map(m => `
+      <tr><td>${esc(m.label)}</td><td style="font-family:var(--mono)">${esc(m.value)}</td><td style="color:var(--txt3)">${esc(m.unit)}</td></tr>
+    `).join('');
+  } else {
+    measSection.style.display = 'none';
+  }
+
+  const findingsSection = document.getElementById('m-findings-section');
+  const findingsDiv = document.getElementById('m-findings');
+  if (d.findings || d.recommendations) {
+    findingsSection.style.display = 'block';
+    findingsDiv.textContent = `Findings:\n${d.findings || '-'}\n\nRecommendations:\n${d.recommendations || '-'}`;
+  } else {
+    findingsSection.style.display = 'none';
+  }
+
+  document.getElementById('modal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modal').classList.remove('show');
+}
+
+function exportExcel() {
+  const data = (filteredData.length > 0 ? filteredData : allData).map((d, i) => ({
+    'No': i + 1,
+    'Tanggal': d.executionDate || '',
+    'Asset Tag': d.assetTag || '',
+    'Asset Name': d.assetName || '',
+    'Frequency': d.frequency || '',
+    'WO Number': d.woNumber || '',
+    'Checked By': d.checkedBy || '',
+    'NIK': d.nik || '',
+    'Reviewed By': d.reviewedBy || '',
+    'Shift': d.shift || '',
+    'Time Start': d.timeStart || '',
+    'Time End': d.timeEnd || '',
+    'OK Count': d.countOk || 0,
+    'NG Count': d.countNg || 0,
+    'N/A Count': d.countNa || 0,
+    'Overall Status': d.overallStatus || '',
+    'Findings': d.findings || '',
+    'Recommendations': d.recommendations || ''
+  }));
+
+  if (data.length === 0) {
+    alert('Tidak ada data untuk di-export.');
+    return;
+  }
+
+  const ws = XLSX.utils.json_to_sheet(data);
+  const colWidths = Object.keys(data[0]).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+  ws['!cols'] = colWidths;
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Check Sheets');
+
+  const allItems = [];
+  (filteredData.length > 0 ? filteredData : allData).forEach(d => {
+    if (d.items) {
+      d.items.forEach((it, idx) => {
+        allItems.push({
+          'Asset Tag': d.assetTag || '',
+          'WO Number': d.woNumber || '',
+          'Tanggal': d.executionDate || '',
+          'Item No': idx + 1,
+          'Item': it.label || '',
+          'Result': it.result || ''
+        });
+      });
+    }
+  });
+  if (allItems.length > 0) {
+    const ws2 = XLSX.utils.json_to_sheet(allItems);
+    ws2['!cols'] = Object.keys(allItems[0]).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+    XLSX.utils.book_append_sheet(wb, ws2, 'Detail Items');
+  }
+
+  const allMeas = [];
+  (filteredData.length > 0 ? filteredData : allData).forEach(d => {
+    if (d.measurements) {
+      d.measurements.forEach(m => {
+        allMeas.push({
+          'Asset Tag': d.assetTag || '',
+          'WO Number': d.woNumber || '',
+          'Tanggal': d.executionDate || '',
+          'Item': m.label || '',
+          'Value': m.value || '',
+          'Unit': m.unit || ''
+        });
+      });
+    }
+  });
+  if (allMeas.length > 0) {
+    const ws3 = XLSX.utils.json_to_sheet(allMeas);
+    ws3['!cols'] = Object.keys(allMeas[0]).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+    XLSX.utils.book_append_sheet(wb, ws3, 'Measurements');
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  XLSX.writeFile(wb, `CheckSheet_POMI_Electric7_${today}.xlsx`);
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+loadData();
+</script>
+</body>
+</html>

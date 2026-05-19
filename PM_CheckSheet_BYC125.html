@@ -6,6 +6,10 @@
 <title>2 Yearly PM — 7EB-BYC-125 A/B Battery Charger</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#e8ece9;--bg2:#dde3de;--panel:rgba(255,255,255,0.78);--panel-border:rgba(180,200,185,0.6);--steel:#4a5e52;--steel-light:#6b8474;--accent:#c0392b;--ok:#27ae60;--warn:#f39c12;--fail:#c0392b;--na:#8e44ad;--text:#1a2620;--text2:#3d5248;--text3:#7a9485;--shadow:0 4px 24px rgba(30,60,40,0.10);--shadow2:0 2px 8px rgba(30,60,40,0.08)}
@@ -110,6 +114,7 @@ canvas.sig-canvas{border:1.5px solid var(--panel-border);border-radius:8px;backg
     <div class="topbar-sep"></div>
     <button class="btn btn-outline btn-sm" onclick="saveDraft()">Save Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">Download PDF</button>
+    <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="submitToDb()">Submit to DB</button>
   </div>
 </div>
 
@@ -771,6 +776,18 @@ buildTableA();buildTableA2();buildTableB();
 buildToggles();
 initSig('sig-tech');initSig('sig-super');
 loadDraft();updateStats();
+
+async function submitToDb(){
+  const data=DB.collectCheckSheetData('byc125','7EB-BYC-125 A/B','Battery Charger Unit 125 A/B','2 YEARLY');
+  if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
+  if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+  try{
+    const id=await DB.save(data);
+    DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
+  }catch(e){
+    DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+  }
+}
 </script>
 </body>
 </html>
