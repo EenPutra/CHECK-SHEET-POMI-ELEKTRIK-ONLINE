@@ -695,18 +695,183 @@ mkAT_s1('tb-s1','s1');
 mkAT_s2('tb-s2','s2');
 mkUST();mkSST4();mkSST5();
 mkGIS('tb-g150','g150');mkGIS('tb-g500','g500');
-mkPhotos();initSig('sig-tech');initSig('sig-super');loadDraft();upStats();
+mkPhotos();initSig('sig-tech');initSig('sig-super');loadDraft();upStats();loadLastSubmission();
+
+function collectSheetData(tbId, columns, pfx) {
+  const tb = document.getElementById(tbId);
+  if (!tb) return [];
+  const rows = [];
+  let currentSection = '';
+  tb.querySelectorAll('tr').forEach(tr => {
+    if (tr.classList.contains('shdr')) { currentSection = tr.textContent.trim(); return; }
+    const noCell = tr.querySelector('.tno');
+    const descCell = tr.querySelector('.tdesc');
+    if (!descCell) return;
+    const no = noCell ? noCell.textContent.trim() : '';
+    const desc = descCell.childNodes[0] ? descCell.childNodes[0].textContent.trim() : descCell.textContent.trim();
+    const critEl = descCell.querySelector('.crit');
+    const crit = critEl ? critEl.textContent.replace('▸','').trim() : '';
+    const values = {};
+    columns.forEach((col, ci) => {
+      const tds = tr.querySelectorAll('td');
+      const td = tds[ci + 2];
+      if (!td) return;
+      const mi = td.querySelector('.mi');
+      const pctInps = td.querySelectorAll('.pct-inp');
+      const activeBtn = td.querySelector('.rb.a, .lb.a');
+      const naEl = td.querySelector('.nac');
+      if (mi && mi.value) values[col] = mi.value;
+      else if (pctInps.length > 0) {
+        const pv = [...pctInps].map(p => p.value ? p.value + '%' : '—').join('/');
+        if (pv.replace(/[—/]/g, '')) values[col] = pv;
+      }
+      else if (activeBtn) values[col] = activeBtn.textContent.trim() || activeBtn.dataset.v || '';
+      else if (naEl) values[col] = 'N/A';
+    });
+    rows.push({ section: currentSection, no, desc, crit, values });
+  });
+  return rows;
+}
+
+function collectGISData(tbId, pfx) {
+  const tb = document.getElementById(tbId);
+  if (!tb) return [];
+  const rows = [];
+  tb.querySelectorAll('tr').forEach((tr, i) => {
+    const tds = tr.querySelectorAll('td');
+    const vals = {};
+    for (let j = 0; j < tds.length; j += 2) {
+      if (j + 1 < tds.length) {
+        const tag = tds[j].textContent.trim();
+        const inp = tds[j + 1].querySelector('.mi');
+        if (inp && inp.value) vals[tag] = inp.value;
+      }
+    }
+    if (Object.keys(vals).length > 0) rows.push({ no: i + 1, values: vals });
+  });
+  return rows;
+}
 
 async function submitToDb(){
-  const data=DB.collectCheckSheetData('transformer','7EX-XFMR','Transformer Weekly Inspection','WEEKLY');
-  if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
-  if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
-  try{
-    const id=await DB.save(data);
-    DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
-  }catch(e){
-    DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+  const data = {
+    assetTag: '7EX-XFMR',
+    assetName: 'Transformer Weekly Inspection',
+    frequency: 'WEEKLY',
+    woNumber: vv('wo-no'),
+    executionDate: vv('wo-date'),
+    timeStart: '',
+    timeEnd: '',
+    checkedBy: vv('checked-by'),
+    nik: vv('nik'),
+    reviewedBy: vv('reviewed-by'),
+    shift: vv('shift'),
+    unit: vv('unit-sel'),
+    inspectionType: vv('itype'),
+    countOk: parseInt(document.getElementById('cnt-ok').textContent) || 0,
+    countNg: parseInt(document.getElementById('cnt-ng').textContent) || 0,
+    countNa: 0,
+    overallStatus: (parseInt(document.getElementById('cnt-ng').textContent) || 0) > 0 ? 'NG' : 'OK',
+    sheets: {}
+  };
+
+  const s1cols = ['EZ-GSU','EY-SU','EX-UAT','EX-EXC','EM-A1','EM-B1','EM-C1'];
+  const s2cols = s1cols;
+  const s3cols = ['EM-A2','EM-B2','EM-A3','EM-B3','EM-A6','EM-B6','EN-B11','EN-C11'];
+  const s4cols = ['7EM-A4(SWRO)','8EM-B4(SWRO)','7EN-B1A1(SCRUB)','8EN-B1A1(SCRUB)','7EM-A5(ADMIN)','8EM-A5(ADMIN)','7EM-B5(ASH)'];
+  const s5cols = ['EM-100A','EM-100B','7EM-B4','8EM-B4','EM-200','EM-B5'];
+
+  data.sheets.s1 = { title: 'AT+DGA', columns: s1cols, rows: collectSheetData('tb-s1', s1cols, 's1') };
+  data.sheets.s2 = { title: 'AT (Without DGA)', columns: s2cols, rows: collectSheetData('tb-s2', s2cols, 's2') };
+  data.sheets.s3 = { title: 'USST', columns: s3cols, rows: collectSheetData('tb-s3', s3cols, 's3'), remark: vv('rmk-s3') };
+  data.sheets.s4 = { title: 'Common SST', columns: s4cols, rows: collectSheetData('tb-s4', s4cols, 's4'), remark: vv('rmk-s4') };
+  data.sheets.s5 = { title: 'SST CHCB/WH', columns: s5cols, rows: collectSheetData('tb-s5', s5cols, 's5') };
+  data.sheets.gis = { title: 'GIS SF₆', rows: collectGISData('tb-gis', 'gis') };
+
+  data.items = [];
+  data.measurements = [];
+
+  if (!data.executionDate) { DB.showSubmitResult(false, 'Isi tanggal eksekusi terlebih dahulu.'); return; }
+  if (!data.checkedBy) { DB.showSubmitResult(false, 'Isi nama teknisi terlebih dahulu.'); return; }
+  try {
+    const id = await DB.save(data);
+    DB.showSubmitResult(true, 'Data berhasil disimpan ke database! ID: ' + id);
+  } catch(e) {
+    DB.showSubmitResult(false, 'Gagal menyimpan: ' + e.message);
   }
+}
+
+async function loadLastSubmission() {
+  try {
+    const snap = await db.collection('checksheets')
+      .where('assetTag', '==', '7EX-XFMR')
+      .orderBy('createdAt', 'desc').limit(1).get();
+    if (snap.empty) return;
+    const d = snap.docs[0].data();
+    if (d.woNumber) document.getElementById('wo-no').value = d.woNumber;
+    if (d.executionDate) document.getElementById('wo-date').value = d.executionDate;
+    if (d.checkedBy) document.getElementById('checked-by').value = d.checkedBy;
+    if (d.nik) document.getElementById('nik').value = d.nik;
+    if (d.reviewedBy) document.getElementById('reviewed-by').value = d.reviewedBy;
+    if (d.shift) document.getElementById('shift').value = d.shift;
+    if (d.unit) document.getElementById('unit-sel').value = d.unit;
+    if (d.inspectionType) document.getElementById('itype').value = d.inspectionType;
+
+    if (!d.sheets) return;
+    Object.entries(d.sheets).forEach(([key, sheet]) => {
+      if (key === 'gis' && sheet.rows) {
+        sheet.rows.forEach(r => {
+          Object.entries(r.values || {}).forEach(([tag, val]) => {
+            const el = document.getElementById('gis_' + tag);
+            if (el) el.value = val;
+          });
+        });
+        return;
+      }
+      if (!sheet.rows || !sheet.columns) return;
+      const tb = document.getElementById('tb-' + key);
+      if (!tb) return;
+      const colMap = {};
+      sheet.columns.forEach((c, i) => colMap[c] = i);
+
+      let rowIdx = 0;
+      tb.querySelectorAll('tr').forEach(tr => {
+        if (tr.classList.contains('shdr')) return;
+        const descCell = tr.querySelector('.tdesc');
+        if (!descCell) return;
+        const savedRow = sheet.rows[rowIdx];
+        rowIdx++;
+        if (!savedRow || !savedRow.values) return;
+
+        const tds = tr.querySelectorAll('td');
+        sheet.columns.forEach((col, ci) => {
+          const val = savedRow.values[col];
+          if (!val || val === 'N/A') return;
+          const td = tds[ci + 2];
+          if (!td) return;
+          const mi = td.querySelector('.mi');
+          const pctInps = td.querySelectorAll('.pct-inp');
+          const btns = td.querySelectorAll('.rb, .lb');
+          if (mi) { mi.value = val; }
+          else if (pctInps.length > 0) {
+            const parts = val.split('/');
+            pctInps.forEach((p, pi) => { if (parts[pi]) p.value = parts[pi].replace('%','').trim(); });
+          } else if (btns.length > 0) {
+            btns.forEach(b => {
+              if ((b.textContent.trim() === val || b.dataset.v === val)) {
+                b.classList.add('a');
+                const id = b.dataset.id;
+                if (id) ST[id] = val;
+              }
+            });
+          }
+        });
+      });
+    });
+    if (d.sheets.s3 && d.sheets.s3.remark) document.getElementById('rmk-s3').value = d.sheets.s3.remark;
+    if (d.sheets.s4 && d.sheets.s4.remark) document.getElementById('rmk-s4').value = d.sheets.s4.remark;
+    upStats();
+    note('📂 Data terakhir dimuat dari database.', 'ok');
+  } catch(e) { console.log('Auto-load skip:', e.message); }
 }
 </script>
 

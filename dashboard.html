@@ -423,7 +423,51 @@ async function showDetail(id) {
       <div style="padding:8px 16px;border-radius:6px;border:1px solid rgba(142,68,173,0.3);background:rgba(142,68,173,0.08);font-family:var(--raj);font-weight:600;font-size:13px;color:#8e44ad">N/A <span style="font-size:18px;font-weight:700;margin-left:6px">${naCount}</span></div>
     </div>`;
 
-  if (d.items && d.items.length > 0) {
+  if (d.sheets) {
+    Object.entries(d.sheets).forEach(([key, sheet]) => {
+      if (!sheet.rows || sheet.rows.length === 0) return;
+      html += `<div class="detail-section-title">${esc(sheet.title || key)}</div>`;
+      if (sheet.columns) {
+        html += `<div style="overflow-x:auto;margin-bottom:18px"><table class="detail-items-table" style="min-width:600px">
+          <thead><tr><th style="width:36px;text-align:center">No</th><th>Inspection Item</th>`;
+        sheet.columns.forEach(c => { html += `<th style="text-align:center;min-width:65px;font-size:9px">${esc(c)}</th>`; });
+        html += `</tr></thead><tbody>`;
+        let curSec = '';
+        sheet.rows.forEach(r => {
+          if (r.section && r.section !== curSec) {
+            curSec = r.section;
+            html += `<tr><td colspan="${sheet.columns.length + 2}" style="font-weight:700;color:var(--ok);font-size:11px;padding:8px 6px;background:rgba(39,174,96,0.06)">${esc(curSec)}</td></tr>`;
+          }
+          html += `<tr><td style="text-align:center;font-family:var(--mono);color:var(--txt3);font-size:11px">${esc(r.no || '')}</td>`;
+          html += `<td style="font-size:12px">${esc(r.desc || '')}${r.crit ? '<span style="display:block;font-size:10px;color:var(--txt3)">▸ ' + esc(r.crit) + '</span>' : ''}</td>`;
+          sheet.columns.forEach(c => {
+            const v = (r.values && r.values[c]) || '—';
+            const isOk = v === 'OK' || v === 'No Leak' || v === 'Clean' || v === 'Normal';
+            const isNg = v === 'NG' || v === 'Leak' || v === 'Dirty' || v === 'Noise';
+            const cls = isOk ? 'color:var(--ok);font-weight:700' : isNg ? 'color:var(--acc);font-weight:700' : v === 'N/A' ? 'color:var(--txt3)' : 'color:#fff';
+            html += `<td style="text-align:center;font-family:var(--mono);font-size:11px;${cls}">${esc(v)}</td>`;
+          });
+          html += `</tr>`;
+        });
+        html += `</tbody></table></div>`;
+        if (sheet.remark) html += `<div style="font-size:12px;color:var(--txt2);padding:8px 12px;background:rgba(74,122,90,0.06);border-radius:6px;margin-bottom:14px"><span style="color:var(--txt3);font-family:var(--mono);font-size:10px">REMARK:</span> ${esc(sheet.remark)}</div>`;
+      } else {
+        html += `<div style="overflow-x:auto;margin-bottom:18px"><table class="detail-items-table">
+          <thead><tr><th style="width:36px;text-align:center">No</th>`;
+        const allTags = new Set();
+        sheet.rows.forEach(r => Object.keys(r.values || {}).forEach(k => allTags.add(k)));
+        const tags = [...allTags];
+        tags.forEach(t => { html += `<th style="text-align:center;font-size:9px;min-width:55px">${esc(t)}</th>`; });
+        html += `</tr></thead><tbody>`;
+        sheet.rows.forEach(r => {
+          html += `<tr><td style="text-align:center;font-family:var(--mono);color:var(--txt3)">${r.no || ''}</td>`;
+          tags.forEach(t => { html += `<td style="text-align:center;font-family:var(--mono);color:#fff;font-size:11px">${esc((r.values && r.values[t]) || '—')}</td>`; });
+          html += `</tr>`;
+        });
+        html += `</tbody></table></div>`;
+      }
+    });
+  } else if (d.items && d.items.length > 0) {
     html += `
     <div class="detail-section-title">Inspection Items</div>
     <table class="detail-items-table" style="margin-bottom:18px">
@@ -436,7 +480,7 @@ async function showDetail(id) {
     html += `</tbody></table>`;
   }
 
-  if (d.measurements && d.measurements.length > 0) {
+  if (!d.sheets && d.measurements && d.measurements.length > 0) {
     html += `
     <div class="detail-section-title">Measurements</div>
     <table class="detail-items-table" style="margin-bottom:18px">
@@ -511,22 +555,50 @@ function exportExcel() {
     ws2Data.push(['SUMMARY', '', 'Total OK', d.countOk || 0, 'Total NG', d.countNg || 0, 'Total N/A', d.countNa || 0]);
     ws2Data.push([]);
 
-    if (d.items && d.items.length > 0) {
-      ws2Data.push(['INSPECTION ITEMS']);
-      ws2Data.push(['No', 'Task Description', 'Result']);
-      d.items.forEach((it, i) => {
-        ws2Data.push([i + 1, it.label || '', it.result || '']);
+    if (d.sheets) {
+      Object.entries(d.sheets).forEach(([key, sheet]) => {
+        if (!sheet.rows || sheet.rows.length === 0) return;
+        ws2Data.push([sheet.title || key]);
+        if (sheet.columns) {
+          ws2Data.push(['No', 'Inspection Item', ...sheet.columns]);
+          let curSec = '';
+          sheet.rows.forEach(r => {
+            if (r.section && r.section !== curSec) {
+              curSec = r.section;
+              ws2Data.push([curSec]);
+            }
+            const vals = sheet.columns.map(c => (r.values && r.values[c]) || '—');
+            ws2Data.push([r.no || '', r.desc || '', ...vals]);
+          });
+        } else {
+          const allTags = new Set();
+          sheet.rows.forEach(r => Object.keys(r.values || {}).forEach(k => allTags.add(k)));
+          const tags = [...allTags];
+          ws2Data.push(['No', ...tags]);
+          sheet.rows.forEach(r => {
+            ws2Data.push([r.no || '', ...tags.map(t => (r.values && r.values[t]) || '—')]);
+          });
+        }
+        if (sheet.remark) ws2Data.push(['Remark: ' + sheet.remark]);
+        ws2Data.push([]);
       });
-      ws2Data.push([]);
-    }
-
-    if (d.measurements && d.measurements.length > 0) {
-      ws2Data.push(['MEASUREMENTS']);
-      ws2Data.push(['Parameter', 'Value', 'Unit']);
-      d.measurements.forEach(m => {
-        ws2Data.push([m.label || '', m.value || '', m.unit || '']);
-      });
-      ws2Data.push([]);
+    } else {
+      if (d.items && d.items.length > 0) {
+        ws2Data.push(['INSPECTION ITEMS']);
+        ws2Data.push(['No', 'Task Description', 'Result']);
+        d.items.forEach((it, i) => {
+          ws2Data.push([i + 1, it.label || '', it.result || '']);
+        });
+        ws2Data.push([]);
+      }
+      if (d.measurements && d.measurements.length > 0) {
+        ws2Data.push(['MEASUREMENTS']);
+        ws2Data.push(['Parameter', 'Value', 'Unit']);
+        d.measurements.forEach(m => {
+          ws2Data.push([m.label || '', m.value || '', m.unit || '']);
+        });
+        ws2Data.push([]);
+      }
     }
 
     if (d.findings || d.recommendations) {
