@@ -25,6 +25,21 @@ const DB = {
     return doc.exists ? { id: doc.id, ...doc.data() } : null;
   },
 
+  async deleteById(id) {
+    await db.collection(this.COLLECTION).doc(id).delete();
+    return true;
+  },
+
+  async deleteMultiple(ids) {
+    const batch = db.batch();
+    ids.forEach(id => {
+      const ref = db.collection(this.COLLECTION).doc(id);
+      batch.delete(ref);
+    });
+    await batch.commit();
+    return true;
+  },
+
   async getStats() {
     const snap = await db.collection(this.COLLECTION).get();
     const docs = snap.docs.map(d => d.data());

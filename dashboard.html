@@ -104,6 +104,28 @@ table.dtbl tr:last-child td{border-bottom:none}
 .link-btn{color:var(--steel2);text-decoration:none;font-family:var(--mono);font-size:11px;
   padding:4px 10px;border:1px solid var(--bdr);border-radius:4px;transition:all 0.15s}
 .link-btn:hover{color:var(--ok);border-color:var(--ok)}
+.btn-del{background:rgba(192,57,43,0.12);color:var(--acc);border:1px solid rgba(192,57,43,0.3)}
+.btn-del:hover{background:rgba(192,57,43,0.25);transform:translateY(-1px)}
+.chk-del{width:16px;height:16px;accent-color:var(--acc);cursor:pointer}
+.del-bar{display:none;align-items:center;gap:12px;padding:10px 20px;background:rgba(192,57,43,0.08);
+  border-top:1px solid rgba(192,57,43,0.2)}
+.del-bar.show{display:flex}
+.del-count{font-family:var(--mono);font-size:13px;color:var(--acc)}
+.confirm-overlay{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,0.75);
+  backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:20px}
+.confirm-overlay.show{display:flex}
+.confirm-box{background:var(--surf);border:1px solid rgba(192,57,43,0.3);border-radius:12px;
+  padding:28px;max-width:420px;width:100%;text-align:center}
+.confirm-box .ico{font-size:40px;margin-bottom:12px}
+.confirm-box .ttl{font-family:var(--raj);font-size:20px;font-weight:700;color:#fff;margin-bottom:8px}
+.confirm-box .desc{font-size:14px;color:var(--txt2);margin-bottom:20px}
+.confirm-box .actions{display:flex;gap:10px;justify-content:center}
+.btn-danger{background:var(--acc);color:#fff;border:none;padding:10px 24px;border-radius:6px;cursor:pointer;
+  font-family:var(--raj);font-size:14px;font-weight:600;letter-spacing:1px;transition:all 0.15s}
+.btn-danger:hover{background:#a93226;transform:translateY(-1px)}
+.btn-cancel{background:transparent;border:1px solid var(--bdr);color:var(--txt2);padding:10px 24px;
+  border-radius:6px;cursor:pointer;font-family:var(--raj);font-size:14px;font-weight:600;letter-spacing:1px;transition:all 0.15s}
+.btn-cancel:hover{border-color:var(--steel2);color:#fff}
 
 .empty-state{text-align:center;padding:60px 20px;color:var(--txt3)}
 .empty-state .icon{font-size:48px;margin-bottom:16px;opacity:0.5}
@@ -204,6 +226,12 @@ table.dtbl tr:last-child td{border-bottom:none}
       </div>
     </div>
 
+    <div class="del-bar" id="del-bar">
+      <span class="del-count" id="del-count">0 dipilih</span>
+      <button class="btn btn-del" onclick="confirmDelete()">🗑 Hapus yang dipilih</button>
+      <button class="btn btn-cancel" onclick="clearSelection()" style="padding:6px 14px;font-size:12px">Batal</button>
+    </div>
+
     <div class="filter-bar" style="padding:14px 20px 0">
       <select id="f-asset" onchange="applyFilters()">
         <option value="">Semua Aset</option>
@@ -223,6 +251,7 @@ table.dtbl tr:last-child td{border-bottom:none}
       <table class="dtbl" id="data-table" style="display:none">
         <thead>
           <tr>
+            <th style="width:36px;text-align:center"><input type="checkbox" class="chk-del" id="chk-all" onchange="toggleAll(this.checked)"></th>
             <th>No</th>
             <th>Tanggal</th>
             <th>Asset Tag</th>
@@ -242,6 +271,19 @@ table.dtbl tr:last-child td{border-bottom:none}
         <div class="msg">Belum ada data check sheet</div>
         <div class="hint">Data akan muncul setelah check sheet di-submit dari halaman check sheet masing-masing aset.</div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRMATION -->
+<div class="confirm-overlay" id="confirm-del" onclick="if(event.target===this)cancelDelete()">
+  <div class="confirm-box">
+    <div class="ico">⚠️</div>
+    <div class="ttl">Hapus Data Check Sheet?</div>
+    <div class="desc" id="confirm-msg">Anda akan menghapus <strong>0</strong> data yang dipilih. Tindakan ini tidak dapat dibatalkan.</div>
+    <div class="actions">
+      <button class="btn-cancel" onclick="cancelDelete()">Batal</button>
+      <button class="btn-danger" onclick="executeDelete()">Ya, Hapus</button>
     </div>
   </div>
 </div>
@@ -368,6 +410,7 @@ function renderTable(data) {
 
   tbody.innerHTML = data.map((d, i) => `
     <tr>
+      <td style="text-align:center"><input type="checkbox" class="chk-del row-chk" data-id="${d.id}" onchange="updateDelBar()"></td>
       <td style="font-family:var(--mono);color:var(--txt3)">${i + 1}</td>
       <td style="font-family:var(--mono);font-size:12px">${d.executionDate || '-'}</td>
       <td style="font-family:var(--mono);font-size:11px;color:var(--steel2)">${esc(d.assetTag || '-')}</td>
@@ -380,6 +423,8 @@ function renderTable(data) {
       <td><a href="#" class="link-btn" onclick="showDetail('${d.id}');return false">Lihat</a></td>
     </tr>
   `).join('');
+  document.getElementById('chk-all').checked = false;
+  updateDelBar();
 }
 
 function esc(s) {
@@ -667,7 +712,70 @@ function exportExcel() {
   XLSX.writeFile(wb, `CheckSheet_POMI_Electric7_${today}.xlsx`);
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); cancelDelete(); } });
+
+/* ── DELETE FUNCTIONS ── */
+function getSelectedIds() {
+  return [...document.querySelectorAll('.row-chk:checked')].map(c => c.dataset.id);
+}
+
+function toggleAll(checked) {
+  document.querySelectorAll('.row-chk').forEach(c => { c.checked = checked; });
+  updateDelBar();
+}
+
+function updateDelBar() {
+  const sel = getSelectedIds();
+  const bar = document.getElementById('del-bar');
+  if (sel.length > 0) {
+    bar.classList.add('show');
+    document.getElementById('del-count').textContent = sel.length + ' dipilih';
+  } else {
+    bar.classList.remove('show');
+  }
+}
+
+function clearSelection() {
+  document.querySelectorAll('.row-chk').forEach(c => { c.checked = false; });
+  document.getElementById('chk-all').checked = false;
+  updateDelBar();
+}
+
+function confirmDelete() {
+  const ids = getSelectedIds();
+  if (ids.length === 0) return;
+  document.getElementById('confirm-msg').innerHTML =
+    'Anda akan menghapus <strong>' + ids.length + '</strong> data yang dipilih. Tindakan ini tidak dapat dibatalkan.';
+  document.getElementById('confirm-del').classList.add('show');
+}
+
+function cancelDelete() {
+  document.getElementById('confirm-del').classList.remove('show');
+}
+
+async function executeDelete() {
+  const ids = getSelectedIds();
+  if (ids.length === 0) return;
+  cancelDelete();
+
+  const btn = document.querySelector('.btn-del');
+  const origText = btn.innerHTML;
+  btn.innerHTML = '⏳ Menghapus...';
+  btn.disabled = true;
+
+  try {
+    await DB.deleteMultiple(ids);
+    DB.showSubmitResult(true, ids.length + ' data berhasil dihapus.');
+    clearSelection();
+    await loadData();
+  } catch (e) {
+    console.error('Delete error:', e);
+    DB.showSubmitResult(false, 'Gagal menghapus: ' + e.message);
+  } finally {
+    btn.innerHTML = origText;
+    btn.disabled = false;
+  }
+}
 
 loadData();
 </script>
