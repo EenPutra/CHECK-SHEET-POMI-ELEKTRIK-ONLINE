@@ -414,36 +414,176 @@ table.dtbl tr:last-child td{border-bottom:none}
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 
-/* DETAIL MODAL */
+/* DETAIL MODAL — print/PDF report style */
 .modal-overlay{
   display:none;position:fixed;inset:0;z-index:200;
   background:rgba(15,23,42,0.55);backdrop-filter:blur(6px);
-  align-items:center;justify-content:center;padding:20px;
+  align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto;
 }
 .modal-overlay.show{display:flex;animation:modalFade 0.18s ease}
 @keyframes modalFade{from{opacity:0}to{opacity:1}}
 .modal{
-  background:var(--surf);border:1px solid var(--bdr);border-radius:18px;
-  max-width:820px;width:100%;max-height:88vh;overflow-y:auto;padding:28px 30px;
-  box-shadow:0 30px 60px -15px rgba(15,23,42,0.3);
+  background:#fff;border:none;border-radius:4px;
+  max-width:960px;width:100%;margin:20px auto;padding:0;
+  box-shadow:0 4px 24px rgba(0,0,0,0.18);
   animation:modalIn 0.22s ease;
 }
 @keyframes modalIn{from{opacity:0;transform:translateY(12px) scale(0.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.modal-toolbar{
+  position:sticky;top:0;z-index:10;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:10px 20px;background:#fff;border-bottom:1px solid #e2e8f0;
+  gap:10px;flex-wrap:wrap;
+}
+.modal-toolbar-left{display:flex;align-items:center;gap:8px}
+.modal-toolbar .btn-print{
+  padding:7px 16px;border-radius:6px;border:1px solid var(--pri);
+  background:var(--pri);color:#fff;font-family:var(--body);font-size:12px;
+  font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;
+  transition:all 0.15s;letter-spacing:0.3px;
+}
+.modal-toolbar .btn-print:hover{background:var(--pri-deep);transform:translateY(-1px);box-shadow:0 4px 12px -2px rgba(37,99,235,0.4)}
+.modal-toolbar .btn-print svg{width:14px;height:14px}
 .modal-close{
-  float:right;background:var(--surf-2);border:1px solid var(--bdr);color:var(--txt-2);
-  font-size:18px;cursor:pointer;width:34px;height:34px;border-radius:10px;
-  transition:all 0.15s;display:grid;place-items:center;
+  background:var(--surf-2);border:1px solid var(--bdr);color:var(--txt-2);
+  font-size:16px;cursor:pointer;width:32px;height:32px;border-radius:6px;
+  transition:all 0.15s;display:grid;place-items:center;flex-shrink:0;
 }
 .modal-close:hover{background:var(--rose-soft);color:var(--rose);border-color:rgba(244,63,94,0.20)}
-.detail-section-title{
-  font-family:var(--display);font-size:14px;font-weight:700;color:var(--txt);
-  letter-spacing:0.3px;margin-bottom:10px;padding-bottom:6px;
-  border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:8px;
+
+/* report content area */
+.report-page{padding:36px 40px 40px;font-family:'Manrope',sans-serif;color:#1e293b;line-height:1.5}
+
+/* report header */
+.rpt-header{
+  border:2px solid #1e293b;padding:0;margin-bottom:24px;
 }
-.detail-section-title::before{content:'';width:3px;height:14px;background:var(--pri);border-radius:2px}
-.detail-items-table{width:100%;border-collapse:collapse;font-size:12px}
-.detail-items-table th{text-align:left;padding:8px 10px;color:var(--txt-3);font-family:var(--mono);font-size:10px;letter-spacing:1px;border-bottom:1px solid var(--bdr);background:var(--surf-2);font-weight:600}
-.detail-items-table td{padding:8px 10px;border-bottom:1px solid var(--bdr);color:var(--txt)}
+.rpt-header-top{
+  display:flex;border-bottom:2px solid #1e293b;
+}
+.rpt-header-logo{
+  width:180px;padding:12px 16px;border-right:2px solid #1e293b;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+}
+.rpt-header-logo .mark{
+  font-family:var(--display);font-weight:700;font-size:28px;color:#1e40af;letter-spacing:-0.5px;
+}
+.rpt-header-logo .sub{font-family:var(--mono);font-size:9px;color:#64748b;letter-spacing:1.5px;text-transform:uppercase}
+.rpt-header-title{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 16px;
+}
+.rpt-header-title .doc-type{
+  font-family:var(--mono);font-size:10px;color:#64748b;letter-spacing:2px;text-transform:uppercase;margin-bottom:4px;
+}
+.rpt-header-title .doc-name{
+  font-family:var(--display);font-size:20px;font-weight:700;color:#1e293b;text-align:center;letter-spacing:-0.3px;
+}
+.rpt-header-title .doc-tag{
+  font-family:var(--mono);font-size:11px;color:#2563eb;font-weight:600;margin-top:4px;letter-spacing:0.5px;
+}
+.rpt-header-info{
+  display:grid;grid-template-columns:1fr 1fr;
+}
+.rpt-header-info .info-cell{
+  padding:6px 14px;border-right:1px solid #cbd5e1;border-top:1px solid #cbd5e1;
+  display:flex;gap:6px;font-size:12px;
+}
+.rpt-header-info .info-cell:nth-child(even){border-right:none}
+.rpt-header-info .info-cell:nth-child(1),.rpt-header-info .info-cell:nth-child(2){border-top:none}
+.rpt-header-info .info-lbl{color:#64748b;font-family:var(--mono);font-size:10px;letter-spacing:0.5px;min-width:80px;font-weight:500}
+.rpt-header-info .info-val{color:#1e293b;font-weight:600}
+
+/* summary bar */
+.rpt-summary{
+  display:flex;border:2px solid #1e293b;margin-bottom:24px;
+}
+.rpt-summary-cell{
+  flex:1;text-align:center;padding:10px 8px;border-right:1px solid #cbd5e1;
+}
+.rpt-summary-cell:last-child{border-right:none}
+.rpt-summary-cell .s-label{font-family:var(--mono);font-size:9px;color:#64748b;letter-spacing:1.5px;text-transform:uppercase}
+.rpt-summary-cell .s-value{font-family:var(--display);font-size:26px;font-weight:700;color:#1e293b;margin-top:2px}
+.rpt-summary-cell.ok .s-value{color:#059669}
+.rpt-summary-cell.ng .s-value{color:#dc2626}
+.rpt-summary-cell.na .s-value{color:#64748b}
+.rpt-summary-cell .s-bar{height:3px;border-radius:2px;margin:6px auto 0;width:60%;background:#e2e8f0;overflow:hidden}
+.rpt-summary-cell .s-bar i{display:block;height:100%;border-radius:2px}
+
+/* section titles */
+.rpt-section{
+  font-family:var(--display);font-size:13px;font-weight:700;color:#1e293b;
+  text-transform:uppercase;letter-spacing:1px;
+  padding:8px 12px;margin:20px 0 0;
+  background:#f1f5f9;border:1px solid #cbd5e1;border-bottom:none;
+}
+
+/* bordered report tables */
+.rpt-table{
+  width:100%;border-collapse:collapse;font-size:12px;margin-bottom:20px;
+  border:1px solid #cbd5e1;
+}
+.rpt-table th{
+  background:#f1f5f9;color:#475569;
+  padding:7px 10px;text-align:left;
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  letter-spacing:0.8px;text-transform:uppercase;
+  border:1px solid #cbd5e1;white-space:nowrap;
+}
+.rpt-table td{
+  padding:6px 10px;border:1px solid #cbd5e1;color:#1e293b;vertical-align:top;
+}
+.rpt-table tr:nth-child(even) td{background:#f8fafc}
+.rpt-table tr:hover td{background:#eef2ff}
+.rpt-table .sec-row td{
+  font-weight:700;color:#1e40af;font-size:11px;
+  background:#dbeafe;padding:5px 10px;
+}
+.rpt-table .val-ok{color:#059669;font-weight:700;font-family:var(--mono)}
+.rpt-table .val-ng{color:#dc2626;font-weight:700;font-family:var(--mono)}
+.rpt-table .val-na{color:#94a3b8;font-family:var(--mono)}
+.rpt-table .val-num{font-family:var(--mono);color:#1e293b}
+
+/* status badge in report */
+.rpt-status{
+  display:inline-block;padding:2px 10px;border-radius:3px;
+  font-family:var(--mono);font-size:10px;font-weight:700;letter-spacing:0.5px;
+}
+.rpt-status.ok{background:#dcfce7;color:#166534;border:1px solid #86efac}
+.rpt-status.ng{background:#fee2e2;color:#991b1b;border:1px solid #fca5a5}
+
+/* findings box */
+.rpt-findings{
+  border:1px solid #cbd5e1;padding:12px 16px;margin-bottom:20px;font-size:12px;
+  color:#334155;white-space:pre-wrap;line-height:1.7;
+}
+.rpt-findings .f-label{
+  font-family:var(--mono);font-size:10px;font-weight:700;color:#64748b;
+  letter-spacing:1px;text-transform:uppercase;margin-bottom:4px;display:block;
+}
+
+/* footer stamp */
+.rpt-footer{
+  margin-top:28px;padding-top:14px;border-top:2px solid #1e293b;
+  display:flex;justify-content:space-between;align-items:flex-end;gap:16px;
+  font-size:11px;color:#64748b;font-family:var(--mono);
+}
+
+/* Print styles */
+@media print{
+  body>*:not(.modal-overlay){display:none!important}
+  .modal-overlay{position:static!important;background:none!important;backdrop-filter:none!important;display:block!important;padding:0!important;overflow:visible!important}
+  .modal{box-shadow:none!important;margin:0!important;max-width:100%!important;border-radius:0!important}
+  .modal-toolbar{display:none!important}
+  .report-page{padding:20px!important}
+  .rpt-header{border-width:1.5px!important}
+  .rpt-summary{border-width:1.5px!important}
+  .rpt-table{page-break-inside:auto}
+  .rpt-table tr{page-break-inside:avoid}
+  .rpt-section{page-break-after:avoid}
+  .rpt-table th{background:#f1f5f9!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rpt-table tr:nth-child(even) td{background:#f8fafc!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .rpt-summary-cell .s-bar,.rpt-summary-cell.ok .s-value,.rpt-summary-cell.ng .s-value,.sec-row td,.val-ok,.val-ng,.rpt-status{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
 
 @media(max-width:1000px){
   .chart-grid{grid-template-columns:1fr}
@@ -696,8 +836,16 @@ table.dtbl tr:last-child td{border-bottom:none}
 <!-- DETAIL MODAL -->
 <div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()">
   <div class="modal">
-    <button class="modal-close" onclick="closeModal()">✕</button>
-    <div id="m-content"></div>
+    <div class="modal-toolbar">
+      <div class="modal-toolbar-left">
+        <button class="btn-print" onclick="window.print()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+          Print / Save PDF
+        </button>
+      </div>
+      <button class="modal-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="report-page" id="m-content"></div>
   </div>
 </div>
 
@@ -1080,72 +1228,86 @@ async function showDetail(id) {
   const ngCount = d.countNg || 0;
   const naCount = d.countNa || 0;
   const total = okCount + ngCount + naCount;
+  const okPct = total > 0 ? (okCount/total*100).toFixed(1) : '0';
+  const ngPct = total > 0 ? (ngCount/total*100).toFixed(1) : '0';
+  const statusClass = d.overallStatus === 'OK' ? 'ok' : 'ng';
 
   let html = `
-    <div style="background:linear-gradient(135deg,var(--pri-soft) 0%,var(--ind-soft) 100%);border:1px solid rgba(37,99,235,0.18);border-radius:14px;padding:18px 22px;margin-bottom:22px">
-      <div style="font-family:var(--mono);font-size:11px;color:var(--pri);letter-spacing:1.5px;font-weight:600;margin-bottom:6px">${esc(d.assetTag || '')} · ${esc(d.frequency || '')} PM CHECK SHEET</div>
-      <div style="font-family:var(--display);font-size:22px;font-weight:700;color:var(--txt);letter-spacing:-0.4px">${esc(d.assetName || d.assetTag || '-')}</div>
+    <!-- REPORT HEADER -->
+    <div class="rpt-header">
+      <div class="rpt-header-top">
+        <div class="rpt-header-logo">
+          <div class="mark">ELECTRIC 7</div>
+          <div class="sub">POMI · Unit 7</div>
+        </div>
+        <div class="rpt-header-title">
+          <div class="doc-type">PM Check Sheet Report</div>
+          <div class="doc-name">${esc(d.assetName || d.assetTag || '-')}</div>
+          <div class="doc-tag">${esc(d.assetTag || '')}${d.frequency ? ' · ' + esc(d.frequency) : ''}</div>
+        </div>
+      </div>
+      <div class="rpt-header-info">
+        <div class="info-cell"><span class="info-lbl">Work Order</span><span class="info-val">${esc(d.woNumber || '-')}</span></div>
+        <div class="info-cell"><span class="info-lbl">Tanggal</span><span class="info-val">${esc(d.executionDate || '-')}</span></div>
+        <div class="info-cell"><span class="info-lbl">Shift</span><span class="info-val">${esc(d.shift || '-')}</span></div>
+        <div class="info-cell"><span class="info-lbl">Waktu</span><span class="info-val">${esc(d.timeStart || '-')} — ${esc(d.timeEnd || '-')}</span></div>
+        <div class="info-cell"><span class="info-lbl">Checked By</span><span class="info-val">${esc(d.checkedBy || '-')}</span></div>
+        <div class="info-cell"><span class="info-lbl">NIK</span><span class="info-val">${esc(d.nik || '-')}</span></div>
+        <div class="info-cell"><span class="info-lbl">Reviewed By</span><span class="info-val">${esc(d.reviewedBy || '-')}</span></div>
+        <div class="info-cell"><span class="info-lbl">Status</span><span class="info-val"><span class="rpt-status ${statusClass}">${d.overallStatus || '-'}</span></span></div>
+      </div>
     </div>
 
-    <div class="detail-section-title" style="margin-top:0">Work Order Information</div>
-    <table class="detail-items-table" style="margin-bottom:22px">
-      <tbody>
-        <tr><td style="color:var(--txt-3);width:140px">Work Order</td><td style="font-family:var(--mono);color:var(--txt);font-weight:600">${esc(d.woNumber || '-')}</td>
-            <td style="color:var(--txt-3);width:140px">Tanggal</td><td style="font-family:var(--mono);color:var(--txt);font-weight:600">${esc(d.executionDate || '-')}</td></tr>
-        <tr><td style="color:var(--txt-3)">Shift</td><td style="color:var(--txt)">${esc(d.shift || '-')}</td>
-            <td style="color:var(--txt-3)">Waktu</td><td style="font-family:var(--mono);color:var(--txt)">${esc(d.timeStart || '-')} - ${esc(d.timeEnd || '-')}</td></tr>
-        <tr><td style="color:var(--txt-3)">Checked By</td><td style="color:var(--txt)">${esc(d.checkedBy || '-')}</td>
-            <td style="color:var(--txt-3)">NIK</td><td style="font-family:var(--mono);color:var(--txt)">${esc(d.nik || '-')}</td></tr>
-        <tr><td style="color:var(--txt-3)">Reviewed By</td><td style="color:var(--txt)" colspan="3">${esc(d.reviewedBy || '-')}</td></tr>
-      </tbody>
-    </table>
-
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:22px">
-      <div style="flex:1;min-width:90px;padding:14px 18px;border-radius:12px;border:1px solid var(--bdr);background:var(--surf-2)"><div style="font-family:var(--mono);font-size:10px;color:var(--txt-3);letter-spacing:1.5px">TOTAL</div><div style="font-family:var(--display);font-size:24px;font-weight:700;color:var(--txt);margin-top:4px">${total}</div></div>
-      <div style="flex:1;min-width:90px;padding:14px 18px;border-radius:12px;border:1px solid #a7f3d0;background:var(--ok-soft)"><div style="font-family:var(--mono);font-size:10px;color:#047857;letter-spacing:1.5px">OK</div><div style="font-family:var(--display);font-size:24px;font-weight:700;color:#065f46;margin-top:4px">${okCount}</div></div>
-      <div style="flex:1;min-width:90px;padding:14px 18px;border-radius:12px;border:1px solid #fecdd3;background:var(--rose-soft)"><div style="font-family:var(--mono);font-size:10px;color:#be123c;letter-spacing:1.5px">NG</div><div style="font-family:var(--display);font-size:24px;font-weight:700;color:#9f1239;margin-top:4px">${ngCount}</div></div>
-      <div style="flex:1;min-width:90px;padding:14px 18px;border-radius:12px;border:1px solid var(--ind-soft);background:#eef2ff"><div style="font-family:var(--mono);font-size:10px;color:#4338ca;letter-spacing:1.5px">N/A</div><div style="font-family:var(--display);font-size:24px;font-weight:700;color:#3730a3;margin-top:4px">${naCount}</div></div>
+    <!-- SUMMARY BAR -->
+    <div class="rpt-summary">
+      <div class="rpt-summary-cell"><div class="s-label">Total Items</div><div class="s-value">${total}</div><div class="s-bar"><i style="width:100%;background:#2563eb"></i></div></div>
+      <div class="rpt-summary-cell ok"><div class="s-label">OK</div><div class="s-value">${okCount}</div><div class="s-bar"><i style="width:${okPct}%;background:#059669"></i></div></div>
+      <div class="rpt-summary-cell ng"><div class="s-label">NG</div><div class="s-value">${ngCount}</div><div class="s-bar"><i style="width:${ngPct}%;background:#dc2626"></i></div></div>
+      <div class="rpt-summary-cell na"><div class="s-label">N/A</div><div class="s-value">${naCount}</div><div class="s-bar"><i style="width:${total>0?(naCount/total*100).toFixed(1):'0'}%;background:#94a3b8"></i></div></div>
     </div>`;
+
+  function valClass(v) {
+    const isOk = v === 'OK' || v === 'No Leak' || v === 'Clean' || v === 'Normal';
+    const isNg = v === 'NG' || v === 'Leak' || v === 'Dirty' || v === 'Noise';
+    return isOk ? 'val-ok' : isNg ? 'val-ng' : v === 'N/A' ? 'val-na' : 'val-num';
+  }
 
   if (d.sheets) {
     Object.entries(d.sheets).forEach(([key, sheet]) => {
       if (!sheet.rows || sheet.rows.length === 0) return;
-      html += `<div class="detail-section-title">${esc(sheet.title || key)}</div>`;
+      html += `<div class="rpt-section">${esc(sheet.title || key)}</div>`;
       if (sheet.columns) {
-        html += `<div style="overflow-x:auto;margin-bottom:18px"><table class="detail-items-table" style="min-width:600px">
+        html += `<div style="overflow-x:auto"><table class="rpt-table">
           <thead><tr><th style="width:36px;text-align:center">No</th><th>Inspection Item</th>`;
-        sheet.columns.forEach(c => { html += `<th style="text-align:center;min-width:65px;font-size:9px">${esc(c)}</th>`; });
+        sheet.columns.forEach(c => { html += `<th style="text-align:center;min-width:60px">${esc(c)}</th>`; });
         html += `</tr></thead><tbody>`;
         let curSec = '';
         sheet.rows.forEach(r => {
           if (r.section && r.section !== curSec) {
             curSec = r.section;
-            html += `<tr><td colspan="${sheet.columns.length + 2}" style="font-weight:700;color:var(--pri);font-size:11px;padding:8px 6px;background:var(--pri-soft)">${esc(curSec)}</td></tr>`;
+            html += `<tr class="sec-row"><td colspan="${sheet.columns.length + 2}">${esc(curSec)}</td></tr>`;
           }
-          html += `<tr><td style="text-align:center;font-family:var(--mono);color:var(--txt-3);font-size:11px">${esc(r.no || '')}</td>`;
-          html += `<td style="font-size:12px;color:var(--txt)">${esc(r.desc || '')}${r.crit ? '<span style="display:block;font-size:10px;color:var(--txt-3)">▸ ' + esc(r.crit) + '</span>' : ''}</td>`;
+          html += `<tr><td style="text-align:center;font-family:var(--mono);color:#64748b;font-size:11px">${esc(r.no || '')}</td>`;
+          html += `<td>${esc(r.desc || '')}${r.crit ? '<div style="font-size:10px;color:#94a3b8;margin-top:1px">▸ ' + esc(r.crit) + '</div>' : ''}</td>`;
           sheet.columns.forEach(c => {
             const v = (r.values && r.values[c]) || '—';
-            const isOk = v === 'OK' || v === 'No Leak' || v === 'Clean' || v === 'Normal';
-            const isNg = v === 'NG' || v === 'Leak' || v === 'Dirty' || v === 'Noise';
-            const cls = isOk ? 'color:var(--ok);font-weight:700' : isNg ? 'color:var(--rose);font-weight:700' : v === 'N/A' ? 'color:var(--txt-3)' : 'color:var(--txt)';
-            html += `<td style="text-align:center;font-family:var(--mono);font-size:11px;${cls}">${esc(v)}</td>`;
+            html += `<td style="text-align:center" class="${valClass(v)}">${esc(v)}</td>`;
           });
           html += `</tr>`;
         });
         html += `</tbody></table></div>`;
-        if (sheet.remark) html += `<div style="font-size:12px;color:var(--txt-2);padding:10px 14px;background:var(--surf-2);border:1px solid var(--bdr);border-radius:10px;margin-bottom:14px"><span style="color:var(--txt-3);font-family:var(--mono);font-size:10px;letter-spacing:1px">REMARK:</span> ${esc(sheet.remark)}</div>`;
+        if (sheet.remark) html += `<div class="rpt-findings" style="margin-top:0;border-top:none"><span class="f-label">Remark</span>${esc(sheet.remark)}</div>`;
       } else {
-        html += `<div style="overflow-x:auto;margin-bottom:18px"><table class="detail-items-table">
+        html += `<div style="overflow-x:auto"><table class="rpt-table">
           <thead><tr><th style="width:36px;text-align:center">No</th>`;
         const allTags = new Set();
         sheet.rows.forEach(r => Object.keys(r.values || {}).forEach(k => allTags.add(k)));
         const tags = [...allTags];
-        tags.forEach(t => { html += `<th style="text-align:center;font-size:9px;min-width:55px">${esc(t)}</th>`; });
+        tags.forEach(t => { html += `<th style="text-align:center;min-width:55px">${esc(t)}</th>`; });
         html += `</tr></thead><tbody>`;
         sheet.rows.forEach(r => {
-          html += `<tr><td style="text-align:center;font-family:var(--mono);color:var(--txt-3)">${r.no || ''}</td>`;
-          tags.forEach(t => { html += `<td style="text-align:center;font-family:var(--mono);color:var(--txt);font-size:11px">${esc((r.values && r.values[t]) || '—')}</td>`; });
+          html += `<tr><td style="text-align:center;font-family:var(--mono);color:#64748b">${r.no || ''}</td>`;
+          tags.forEach(t => { html += `<td style="text-align:center" class="val-num">${esc((r.values && r.values[t]) || '—')}</td>`; });
           html += `</tr>`;
         });
         html += `</tbody></table></div>`;
@@ -1153,46 +1315,48 @@ async function showDetail(id) {
     });
   } else if (d.items && d.items.length > 0) {
     const hasColumns = d.items.some(it => it.column);
-    html += `
-    <div class="detail-section-title">Inspection Items</div>
-    <table class="detail-items-table" style="margin-bottom:18px">
-      <thead><tr><th style="width:40px;text-align:center">No</th>${hasColumns ? '<th style="width:90px;text-align:center">Column</th>' : ''}<th>Task Description</th>${hasColumns && d.items[0].id ? '<th style="width:100px">ID</th>' : ''}<th style="width:60px;text-align:center">Result</th></tr></thead>
+    html += `<div class="rpt-section">Inspection Items</div>
+    <table class="rpt-table">
+      <thead><tr><th style="width:36px;text-align:center">No</th>${hasColumns ? '<th style="text-align:center">Column</th>' : ''}<th>Task Description</th>${hasColumns && d.items[0].id ? '<th>ID</th>' : ''}<th style="width:70px;text-align:center">Result</th></tr></thead>
       <tbody>`;
     d.items.forEach((it, i) => {
-      const rc = it.result === 'OK' ? 'tag-ok' : it.result === 'NG' ? 'tag-ng' : '';
-      html += `<tr><td style="text-align:center;font-family:var(--mono);color:var(--txt-3)">${i + 1}</td>`;
-      if (hasColumns) html += `<td style="text-align:center;font-family:var(--mono);font-size:10px;color:var(--pri)">${esc(it.column || '')}</td>`;
+      const vc = valClass(it.result);
+      html += `<tr><td style="text-align:center;font-family:var(--mono);color:#64748b">${i + 1}</td>`;
+      if (hasColumns) html += `<td style="text-align:center;font-family:var(--mono);font-size:10px;color:#2563eb">${esc(it.column || '')}</td>`;
       html += `<td>${esc(it.label)}</td>`;
-      if (hasColumns && d.items[0].id) html += `<td style="font-family:var(--mono);font-size:10px;color:var(--txt-3)">${esc(it.id || '')}</td>`;
-      html += `<td style="text-align:center"><span class="tag ${rc}">${it.result}</span></td></tr>`;
+      if (hasColumns && d.items[0].id) html += `<td style="font-family:var(--mono);font-size:10px;color:#64748b">${esc(it.id || '')}</td>`;
+      html += `<td style="text-align:center" class="${vc}">${it.result}</td></tr>`;
     });
     html += `</tbody></table>`;
   }
 
   if (!d.sheets && d.measurements && d.measurements.length > 0) {
     const measHasCol = d.measurements.some(m => m.column);
-    html += `
-    <div class="detail-section-title">Measurements</div>
-    <table class="detail-items-table" style="margin-bottom:18px">
-      <thead><tr>${measHasCol ? '<th style="width:90px;text-align:center">Column</th>' : ''}<th>Parameter</th>${d.measurements[0].id ? '<th style="width:100px">ID</th>' : ''}<th style="width:100px;text-align:center">Value</th><th style="width:60px;text-align:center">Unit</th></tr></thead>
+    html += `<div class="rpt-section">Measurements</div>
+    <table class="rpt-table">
+      <thead><tr>${measHasCol ? '<th style="text-align:center">Column</th>' : ''}<th>Parameter</th>${d.measurements[0].id ? '<th>ID</th>' : ''}<th style="width:100px;text-align:center">Value</th><th style="width:60px;text-align:center">Unit</th></tr></thead>
       <tbody>`;
     d.measurements.forEach(m => {
       html += `<tr>`;
-      if (measHasCol) html += `<td style="text-align:center;font-family:var(--mono);font-size:10px;color:var(--pri)">${esc(m.column || '')}</td>`;
+      if (measHasCol) html += `<td style="text-align:center;font-family:var(--mono);font-size:10px;color:#2563eb">${esc(m.column || '')}</td>`;
       html += `<td>${esc(m.label)}</td>`;
-      if (d.measurements[0].id) html += `<td style="font-family:var(--mono);font-size:10px;color:var(--txt-3)">${esc(m.id || '')}</td>`;
-      html += `<td style="text-align:center;font-family:var(--mono);color:var(--txt);font-weight:600">${esc(m.value)}</td><td style="text-align:center;color:var(--txt-3);font-family:var(--mono)">${esc(m.unit)}</td></tr>`;
+      if (d.measurements[0].id) html += `<td style="font-family:var(--mono);font-size:10px;color:#64748b">${esc(m.id || '')}</td>`;
+      html += `<td style="text-align:center" class="val-num" style="font-weight:600">${esc(m.value)}</td><td style="text-align:center;color:#64748b;font-family:var(--mono)">${esc(m.unit)}</td></tr>`;
     });
     html += `</tbody></table>`;
   }
 
   if (d.findings || d.recommendations) {
-    html += `<div class="detail-section-title">Findings &amp; Recommendations</div>
-    <div style="font-size:13px;color:var(--txt-2);white-space:pre-wrap;padding:14px 16px;background:var(--surf-2);border:1px solid var(--bdr);border-radius:12px;line-height:1.6">`;
-    if (d.findings) html += `<div style="margin-bottom:10px"><span style="color:var(--txt-3);font-family:var(--mono);font-size:10px;letter-spacing:1px;font-weight:600">FINDINGS</span><br>${esc(d.findings)}</div>`;
-    if (d.recommendations) html += `<div><span style="color:var(--txt-3);font-family:var(--mono);font-size:10px;letter-spacing:1px;font-weight:600">RECOMMENDATIONS</span><br>${esc(d.recommendations)}</div>`;
-    html += `</div>`;
+    html += `<div class="rpt-section">Findings &amp; Recommendations</div>`;
+    if (d.findings) html += `<div class="rpt-findings"><span class="f-label">Findings</span>${esc(d.findings)}</div>`;
+    if (d.recommendations) html += `<div class="rpt-findings" style="border-top:none;margin-top:-1px"><span class="f-label">Recommendations</span>${esc(d.recommendations)}</div>`;
   }
+
+  html += `
+    <div class="rpt-footer">
+      <div>ELECTRIC 7 — POMI · Electrical Maintenance Unit 7</div>
+      <div>Generated ${new Date().toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'})} · ${new Date().toLocaleTimeString('id-ID')}</div>
+    </div>`;
 
   document.getElementById('m-content').innerHTML = html;
   document.getElementById('modal').classList.add('show');
