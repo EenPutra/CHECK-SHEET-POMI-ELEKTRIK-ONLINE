@@ -1,165 +1,423 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ELECTRIC 7 — Maintenance PM Portal</title>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
 <style>
-:root {
-  --bg:#0f1510;--bg2:#141c17;--surf:#1a2420;--surf2:#1f2d27;
-  --bdr:rgba(80,130,95,0.18);--steel:#4a7a5a;--steel2:#5d9970;
-  --acc:#c0392b;--gold:#d4a032;--ok:#27ae60;--warn:#f39c12;
-  --txt:#d4e8db;--txt2:#8fb89a;--txt3:#4a6a54;
-  --mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
-  --glow:0 0 30px rgba(39,174,96,0.12);
+:root{
+  /* base palette — bright, cool, optimistic */
+  --bg:#f4f7fb;
+  --bg-2:#eaf0f7;
+  --surf:#ffffff;
+  --surf-2:#f8fafc;
+  --bdr:#e3e8f0;
+  --bdr-2:#d6dde7;
+  --txt:#0b1220;
+  --txt-2:#475569;
+  --txt-3:#94a3b8;
+  /* brand colors */
+  --pri:#2563eb;
+  --pri-soft:#dbeafe;
+  --pri-deep:#1d4ed8;
+  --acc:#f59e0b;
+  --acc-soft:#fef3c7;
+  --ind:#6366f1;
+  --ind-soft:#e0e7ff;
+  --ok:#10b981;
+  --ok-soft:#d1fae5;
+  --ng:#f43f5e;
+  --ng-soft:#ffe4e6;
+  --warn:#f59e0b;
+  --warn-soft:#fef3c7;
+  /* fonts */
+  --display:'Space Grotesk',system-ui,sans-serif;
+  --body:'Manrope',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  /* effects */
+  --shadow-sm:0 1px 2px rgba(15,23,42,0.04);
+  --shadow:0 2px 8px rgba(15,23,42,0.06),0 1px 2px rgba(15,23,42,0.04);
+  --shadow-lg:0 14px 40px -10px rgba(37,99,235,0.18),0 4px 12px rgba(15,23,42,0.06);
+  --shadow-hover:0 18px 48px -12px rgba(37,99,235,0.28),0 6px 16px rgba(15,23,42,0.08);
 }
+
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:100vh;overflow-x:hidden}
+body{
+  font-family:var(--body);
+  background:var(--bg);
+  color:var(--txt);
+  min-height:100vh;
+  overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+  line-height:1.5;
+}
 
-body::before{content:'';position:fixed;inset:0;z-index:0;
-  background-image:linear-gradient(rgba(39,174,96,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(39,174,96,0.03) 1px,transparent 1px);
-  background-size:48px 48px;animation:gridShift 40s linear infinite;pointer-events:none}
-@keyframes gridShift{from{background-position:0 0}to{background-position:48px 48px}}
-body::after{content:'';position:fixed;inset:0;z-index:0;
-  background:radial-gradient(ellipse at 15% 20%,rgba(39,174,96,0.07) 0%,transparent 50%),
-  radial-gradient(ellipse at 85% 75%,rgba(74,122,90,0.06) 0%,transparent 50%),
-  radial-gradient(ellipse at 50% 50%,rgba(15,21,16,0.4) 0%,transparent 80%);pointer-events:none}
+/* subtle dotted pattern + soft color blobs */
+body::before{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:radial-gradient(rgba(37,99,235,0.07) 1px,transparent 1px);
+  background-size:24px 24px;
+}
+body::after{
+  content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 800px 500px at 8% -5%,rgba(37,99,235,0.10) 0%,transparent 60%),
+    radial-gradient(ellipse 700px 500px at 100% 30%,rgba(245,158,11,0.07) 0%,transparent 55%),
+    radial-gradient(ellipse 900px 600px at 50% 110%,rgba(99,102,241,0.08) 0%,transparent 60%);
+}
 
-/* TOPBAR */
-.topbar{position:sticky;top:0;z-index:100;height:52px;background:rgba(10,14,11,0.95);
-  backdrop-filter:blur(16px);border-bottom:1px solid var(--bdr);
-  display:flex;align-items:center;padding:0 32px;gap:0}
-.topbar::after{content:'';position:absolute;bottom:0;left:0;right:0;height:1px;
-  background:linear-gradient(90deg,transparent,var(--steel2),transparent);opacity:0.5}
-.tb-logo{font-family:var(--raj);font-size:22px;font-weight:700;letter-spacing:4px;color:#fff;display:flex;align-items:center;gap:10px}
-.tb-logo span{color:var(--ok)}
-.tb-plant{font-size:12px;color:var(--txt2);letter-spacing:2px;font-family:var(--mono);
-  margin-left:20px;border-left:1px solid var(--bdr);padding-left:20px}
-.tb-right{margin-left:auto;display:flex;align-items:center;gap:16px}
-.live{display:flex;align-items:center;gap:7px}
-.live-dot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:pulse 2s ease-in-out infinite}
-@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(39,174,96,0.4)}50%{opacity:0.6;box-shadow:0 0 0 5px rgba(39,174,96,0)}}
-.live-txt{font-family:var(--mono);font-size:12px;color:var(--txt2)}
-.tb-time{font-family:var(--mono);font-size:13px;color:var(--steel2)}
+/* ────────── TOPBAR ────────── */
+.topbar{
+  position:sticky;top:0;z-index:50;
+  background:rgba(255,255,255,0.85);
+  backdrop-filter:blur(16px) saturate(180%);
+  -webkit-backdrop-filter:blur(16px) saturate(180%);
+  border-bottom:1px solid var(--bdr);
+  height:64px;display:flex;align-items:center;
+  padding:0 32px;gap:18px;
+}
+.tb-brand{display:flex;align-items:center;gap:12px;font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:-0.3px}
+.tb-logo-mark{
+  width:34px;height:34px;border-radius:10px;
+  background:linear-gradient(135deg,var(--pri) 0%,var(--ind) 100%);
+  display:grid;place-items:center;color:#fff;font-weight:700;font-size:16px;
+  box-shadow:0 6px 16px -4px rgba(37,99,235,0.45);
+  position:relative;overflow:hidden;
+}
+.tb-logo-mark::after{
+  content:'';position:absolute;inset:2px;border-radius:8px;
+  background:linear-gradient(180deg,rgba(255,255,255,0.18),transparent);
+}
+.tb-logo-mark span{position:relative;z-index:1}
+.tb-brand .accent{color:var(--pri)}
+.tb-plant{
+  font-family:var(--mono);font-size:11px;letter-spacing:1.5px;color:var(--txt-3);
+  border-left:1px solid var(--bdr);padding-left:18px;text-transform:uppercase;
+}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+.tb-dash-link{
+  font-family:var(--body);font-size:13px;font-weight:600;color:var(--pri);
+  text-decoration:none;padding:8px 16px;border-radius:10px;
+  background:var(--pri-soft);border:1px solid rgba(37,99,235,0.18);
+  display:inline-flex;align-items:center;gap:8px;
+  transition:all 0.18s ease;
+}
+.tb-dash-link:hover{background:#cfdcfa;transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.tb-dash-link svg{width:15px;height:15px}
+.live{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--txt-2)}
+.live-dot{width:8px;height:8px;border-radius:50%;background:var(--ok);box-shadow:0 0 0 0 rgba(16,185,129,0.5);animation:livePulse 2s infinite}
+@keyframes livePulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,0.45)}
+  50%{box-shadow:0 0 0 7px rgba(16,185,129,0)}
+}
+.tb-time{font-family:var(--mono);font-size:13px;color:var(--txt-2);min-width:84px;text-align:right}
 
-/* HERO */
-.hero{position:relative;z-index:1;padding:72px 48px 52px;max-width:1380px;margin:0 auto;
-  display:flex;align-items:flex-end;justify-content:space-between;gap:40px;flex-wrap:wrap}
-.hero-eyebrow{font-family:var(--mono);font-size:11px;color:var(--ok);letter-spacing:3px;text-transform:uppercase;
-  display:flex;align-items:center;gap:10px;margin-bottom:18px}
-.hero-eyebrow::before{content:'';width:28px;height:1px;background:var(--ok)}
-.hero-title{font-family:var(--raj);font-weight:700;line-height:0.92;letter-spacing:-1px;margin-bottom:6px}
-.hero-title .l1{font-size:76px;color:var(--txt2);display:block}
-.hero-title .l2{font-size:96px;color:#fff;display:block}
-.hero-title .l3{font-size:30px;color:var(--ok);display:block;letter-spacing:8px;font-weight:600;margin-top:6px}
-.hero-sub{margin-top:20px;font-size:14px;color:var(--txt2);max-width:480px;line-height:1.75;font-weight:300}
+/* ────────── HERO ────────── */
+.hero{
+  position:relative;z-index:1;
+  max-width:1380px;margin:0 auto;
+  padding:56px 48px 32px;
+  display:grid;grid-template-columns:1fr auto;gap:48px;align-items:end;
+}
+.eyebrow{
+  display:inline-flex;align-items:center;gap:10px;
+  font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:2.5px;
+  color:var(--pri);text-transform:uppercase;margin-bottom:16px;
+  background:var(--pri-soft);padding:6px 14px;border-radius:999px;
+  border:1px solid rgba(37,99,235,0.15);
+}
+.eyebrow .pip{width:6px;height:6px;border-radius:50%;background:var(--pri);box-shadow:0 0 0 3px rgba(37,99,235,0.15)}
+.h-title{font-family:var(--display);font-weight:700;line-height:0.95;letter-spacing:-2px;margin-bottom:18px}
+.h-title .l1{font-size:52px;color:var(--txt-3);display:block;font-weight:500}
+.h-title .l2{font-size:84px;color:var(--txt);display:block;background:linear-gradient(135deg,#0b1220 0%,#2563eb 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.h-title .l3{font-size:22px;color:var(--pri);display:block;letter-spacing:6px;font-weight:600;margin-top:14px;font-family:var(--mono)}
+.h-sub{
+  margin-top:18px;font-size:15px;color:var(--txt-2);max-width:520px;
+  line-height:1.7;font-weight:400;
+}
 
-.hero-stats{display:flex;gap:2px}
-.hstat{padding:18px 22px;text-align:center;border:1px solid var(--bdr);background:rgba(26,36,32,0.8);backdrop-filter:blur(8px)}
-.hstat:first-child{border-radius:10px 0 0 10px}
-.hstat:last-child{border-radius:0 10px 10px 0}
-.hstat-num{font-family:var(--raj);font-size:36px;font-weight:700;color:#fff;line-height:1;display:block}
-.hstat-num.g{color:var(--ok)}.hstat-num.gold{color:var(--gold)}.hstat-num.d{color:var(--txt3)}
-.hstat-lbl{font-family:var(--mono);font-size:10px;color:var(--txt3);letter-spacing:1.5px;text-transform:uppercase;margin-top:4px;display:block}
+/* hero stats */
+.h-stats{
+  display:grid;grid-template-columns:repeat(4,1fr);gap:0;
+  background:var(--surf);
+  border:1px solid var(--bdr);
+  border-radius:18px;
+  box-shadow:var(--shadow-lg);
+  overflow:hidden;
+  min-width:520px;
+}
+.h-stat{padding:22px 24px;text-align:left;position:relative}
+.h-stat + .h-stat::before{content:'';position:absolute;left:0;top:18px;bottom:18px;width:1px;background:var(--bdr)}
+.h-stat-num{font-family:var(--display);font-size:34px;font-weight:700;line-height:1;display:block;letter-spacing:-1px}
+.h-stat.t .h-stat-num{color:var(--txt)}
+.h-stat.g .h-stat-num{color:var(--ok)}
+.h-stat.a .h-stat-num{color:var(--acc)}
+.h-stat.d .h-stat-num{color:var(--txt-3)}
+.h-stat-lbl{font-family:var(--mono);font-size:10px;color:var(--txt-3);letter-spacing:1.5px;text-transform:uppercase;margin-top:8px;display:block;font-weight:500}
+.h-stat-bar{height:3px;border-radius:2px;margin-top:10px;background:var(--bg-2);overflow:hidden}
+.h-stat-bar i{display:block;height:100%;border-radius:2px;background:currentColor;width:0;transition:width 0.9s cubic-bezier(0.22,1,0.36,1) 0.3s}
+.h-stat.t .h-stat-bar i{background:var(--pri)}
+.h-stat.g .h-stat-bar i{background:var(--ok)}
+.h-stat.a .h-stat-bar i{background:var(--acc)}
+.h-stat.d .h-stat-bar i{background:var(--txt-3)}
 
-/* SEARCH */
-.search-wrap{position:relative;z-index:1;max-width:1380px;margin:0 auto;padding:0 48px 24px}
-.search-box{display:flex;align-items:center;gap:12px;background:var(--surf);border:1px solid var(--bdr);
-  border-radius:8px;padding:10px 16px;max-width:420px}
-.search-box input{background:transparent;border:none;outline:none;color:var(--txt);font-family:var(--sans);font-size:14px;flex:1;width:100%}
-.search-box input::placeholder{color:var(--txt3)}
-.s-icon{color:var(--txt3);font-size:15px;flex-shrink:0}
+/* ────────── CONTROL BAR ────────── */
+.control{
+  position:relative;z-index:1;
+  max-width:1380px;margin:0 auto;
+  padding:0 48px 18px;
+  display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+}
+.search-box{
+  flex:1;min-width:280px;max-width:480px;
+  display:flex;align-items:center;gap:10px;
+  background:var(--surf);
+  border:1px solid var(--bdr);border-radius:12px;
+  padding:11px 16px;
+  transition:all 0.18s;
+  box-shadow:var(--shadow-sm);
+}
+.search-box:focus-within{border-color:var(--pri);box-shadow:0 0 0 4px rgba(37,99,235,0.10),var(--shadow-sm)}
+.search-box input{
+  background:transparent;border:none;outline:none;flex:1;width:100%;
+  font-family:var(--body);font-size:14px;color:var(--txt);
+}
+.search-box input::placeholder{color:var(--txt-3)}
+.search-box svg{width:18px;height:18px;color:var(--txt-3);flex-shrink:0}
+.search-key{
+  font-family:var(--mono);font-size:10px;color:var(--txt-3);
+  border:1px solid var(--bdr);background:var(--bg-2);
+  padding:2px 7px;border-radius:4px;letter-spacing:0.5px;
+}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{
+  font-family:var(--body);font-size:12px;font-weight:600;
+  background:var(--surf);color:var(--txt-2);
+  border:1px solid var(--bdr);border-radius:999px;
+  padding:8px 14px;cursor:pointer;
+  display:inline-flex;align-items:center;gap:7px;
+  transition:all 0.16s ease;
+  box-shadow:var(--shadow-sm);
+  letter-spacing:0.2px;
+}
+.chip:hover{border-color:var(--pri);color:var(--pri);transform:translateY(-1px)}
+.chip.on{background:var(--pri);color:#fff;border-color:var(--pri);box-shadow:0 6px 16px -6px rgba(37,99,235,0.5)}
+.chip .chip-dot{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:0.6}
+.chip.on .chip-dot{opacity:1;background:#fff}
+.chip .chip-count{
+  font-family:var(--mono);font-size:10px;background:rgba(0,0,0,0.06);
+  padding:1px 6px;border-radius:6px;margin-left:2px;letter-spacing:0.5px;
+}
+.chip.on .chip-count{background:rgba(255,255,255,0.22)}
 
-/* NOTICE */
-.notice-wrap{position:relative;z-index:1;max-width:1380px;margin:0 auto;padding:0 48px 20px}
-.notice-inner{background:rgba(39,174,96,0.06);border:1px solid rgba(39,174,96,0.18);border-radius:8px;
-  padding:13px 18px;display:flex;align-items:center;gap:12px;font-size:13px;color:var(--txt2)}
-.notice-inner strong{color:var(--ok)}
-.notice-inner code{background:rgba(255,255,255,0.08);padding:1px 5px;border-radius:3px;font-family:var(--mono)}
+/* ────────── NOTICE ────────── */
+.notice{
+  position:relative;z-index:1;
+  max-width:1380px;margin:0 auto;
+  padding:0 48px 12px;
+}
+.notice-inner{
+  background:linear-gradient(180deg,#fffbeb 0%,#fef3c7 100%);
+  border:1px solid #fde68a;border-radius:12px;
+  padding:14px 18px;display:flex;align-items:flex-start;gap:12px;
+  font-size:13px;color:#78350f;
+}
+.notice-inner svg{width:18px;height:18px;color:var(--acc);flex-shrink:0;margin-top:1px}
+.notice-inner strong{color:#92400e;font-weight:700}
+.notice-inner code{background:rgba(146,64,14,0.10);padding:1px 6px;border-radius:4px;font-family:var(--mono);font-size:12px;color:#78350f}
 
-/* MAIN */
-.main{position:relative;z-index:1;max-width:1380px;margin:0 auto;padding:24px 48px 80px}
+/* ────────── MAIN GRID ────────── */
+.main{
+  position:relative;z-index:1;
+  max-width:1380px;margin:0 auto;
+  padding:24px 48px 80px;
+}
 
-/* CATEGORY */
-.cat-section{margin-bottom:52px}
-.cat-hdr{display:flex;align-items:center;gap:14px;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--bdr);flex-wrap:wrap}
-.cat-icon{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-.cat-title{font-family:var(--raj);font-size:20px;font-weight:700;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
-.cat-sub{font-family:var(--mono);font-size:11px;color:var(--txt3);letter-spacing:1px}
-.cat-count{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--txt3);
-  padding:3px 10px;border:1px solid var(--bdr);border-radius:20px}
+/* category */
+.cat{margin-bottom:48px;animation:fadeIn 0.5s ease both}
+.cat-hdr{
+  display:flex;align-items:center;gap:16px;margin-bottom:20px;
+  padding-bottom:14px;border-bottom:1px solid var(--bdr);
+  flex-wrap:wrap;
+}
+.cat-icon{
+  width:42px;height:42px;border-radius:12px;
+  display:grid;place-items:center;font-size:20px;
+  background:var(--pri-soft);color:var(--pri);
+  flex-shrink:0;
+}
+.cat-title{
+  font-family:var(--display);font-size:22px;font-weight:700;color:var(--txt);
+  letter-spacing:-0.4px;
+}
+.cat-sub{font-family:var(--body);font-size:13px;color:var(--txt-3);font-weight:500;margin-top:2px}
+.cat-count{
+  margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--txt-2);
+  padding:6px 12px;border:1px solid var(--bdr);border-radius:999px;
+  background:var(--surf);letter-spacing:0.5px;
+}
 
-/* DIVIDER */
-.divider{position:relative;z-index:1;max-width:1380px;margin:0 auto;padding:0 48px;
-  display:flex;align-items:center;gap:16px}
-.div-line{flex:1;height:1px;background:var(--bdr)}
-.div-lbl{font-family:var(--mono);font-size:11px;color:var(--txt3);letter-spacing:3px;text-transform:uppercase;white-space:nowrap}
-.div-dia{width:6px;height:6px;background:var(--ok);transform:rotate(45deg);flex-shrink:0}
+/* asset grid */
+.asset-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(310px,1fr));
+  gap:16px;
+}
 
-/* GRID */
-.asset-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-
-/* CARD */
-.card{position:relative;overflow:hidden;background:var(--surf);border:1px solid var(--bdr);
-  border-radius:10px;padding:20px;cursor:pointer;
-  transition:all 0.22s cubic-bezier(0.34,1.56,0.64,1);
-  text-decoration:none;color:inherit;display:block;animation:fadeUp 0.5s ease both}
-.card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;
-  background:linear-gradient(90deg,transparent,var(--steel2),transparent);opacity:0;transition:opacity 0.2s}
-.card:hover{transform:translateY(-4px);border-color:rgba(93,153,112,0.4);background:var(--surf2);
-  box-shadow:0 8px 32px rgba(0,0,0,0.4),0 0 0 1px rgba(93,153,112,0.2),var(--glow)}
-.card:hover::before{opacity:1}
-.card::after{content:'';position:absolute;top:16px;bottom:16px;left:0;width:3px;
-  border-radius:0 2px 2px 0;background:var(--txt3);transition:background 0.2s}
+/* card */
+.card{
+  position:relative;overflow:hidden;
+  background:var(--surf);border:1px solid var(--bdr);
+  border-radius:16px;padding:20px 22px;
+  cursor:pointer;text-decoration:none;color:inherit;
+  display:flex;flex-direction:column;
+  transition:transform 0.22s cubic-bezier(0.22,1,0.36,1),
+             box-shadow 0.22s ease,
+             border-color 0.18s ease;
+  box-shadow:var(--shadow-sm);
+  animation:cardIn 0.5s ease both;
+  min-height:178px;
+}
+.card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:3px;
+  background:var(--pri);opacity:0;transition:opacity 0.2s;
+}
+.card::after{
+  content:'';position:absolute;top:0;left:0;width:4px;height:100%;
+  background:var(--txt-3);transition:background 0.2s;
+}
 .card.s-ready::after{background:var(--ok)}
 .card.s-pending::after{background:var(--warn)}
-.card.s-draft::after{background:var(--gold)}
+.card.s-draft::after{background:var(--acc)}
+.card:hover{
+  transform:translateY(-4px);
+  box-shadow:var(--shadow-hover);
+  border-color:rgba(37,99,235,0.30);
+}
+.card:hover::before{opacity:1}
+.card.soon{cursor:default;opacity:0.7;background:var(--surf-2)}
+.card.soon:hover{transform:none;box-shadow:var(--shadow-sm);border-color:var(--bdr)}
+.card.soon:hover::before{opacity:0}
 
-.card.soon{opacity:0.55;cursor:default;background:rgba(26,36,32,0.4)}
-.card.soon:hover{transform:none;border-color:var(--bdr);background:rgba(26,36,32,0.4);box-shadow:none}
-.card.soon::before{display:none}
+.c-tag{
+  font-family:var(--mono);font-size:10.5px;font-weight:500;
+  color:var(--txt-3);letter-spacing:1.5px;text-transform:uppercase;
+  margin-bottom:10px;display:flex;align-items:center;gap:8px;
+}
+.c-tag .dot{width:6px;height:6px;border-radius:50%;background:var(--txt-3);flex-shrink:0}
+.card.s-ready .c-tag .dot{background:var(--ok);box-shadow:0 0 0 3px var(--ok-soft)}
+.card.s-pending .c-tag .dot{background:var(--warn);box-shadow:0 0 0 3px var(--warn-soft)}
+.c-name{
+  font-family:var(--display);font-size:17px;font-weight:700;
+  color:var(--txt);line-height:1.25;margin-bottom:8px;letter-spacing:-0.3px;
+}
+.c-desc{
+  font-size:12.5px;color:var(--txt-2);line-height:1.6;
+  margin-bottom:auto;font-weight:400;
+}
+.c-foot{
+  display:flex;align-items:center;justify-content:space-between;
+  padding-top:14px;margin-top:14px;
+  border-top:1px solid var(--bdr);gap:8px;flex-wrap:wrap;
+}
+.c-freq{
+  font-family:var(--mono);font-size:10px;font-weight:500;
+  color:var(--txt-2);padding:4px 10px;
+  background:var(--surf-2);border:1px solid var(--bdr);
+  border-radius:6px;letter-spacing:1px;
+}
+.c-status{
+  font-family:var(--body);font-size:10.5px;font-weight:700;
+  padding:4px 10px;border-radius:6px;letter-spacing:0.8px;text-transform:uppercase;
+  display:inline-flex;align-items:center;gap:5px;
+}
+.cs-ready{background:var(--ok-soft);color:#065f46;border:1px solid #a7f3d0}
+.cs-pending{background:var(--warn-soft);color:#92400e;border:1px solid #fde68a}
+.cs-draft{background:var(--acc-soft);color:#92400e;border:1px solid #fde68a}
+.cs-soon{background:var(--surf-2);color:var(--txt-3);border:1px solid var(--bdr)}
+.cs-live{background:var(--ok-soft);color:#065f46;border:1px solid #a7f3d0}
+.c-arrow{
+  position:absolute;top:18px;right:18px;
+  width:30px;height:30px;border-radius:8px;
+  background:var(--pri-soft);color:var(--pri);
+  display:grid;place-items:center;
+  opacity:0;transform:translate(-4px,4px);
+  transition:all 0.2s ease;
+}
+.card:not(.soon):hover .c-arrow{opacity:1;transform:translate(0,0)}
+.c-arrow svg{width:14px;height:14px}
 
-.c-tag{font-family:var(--mono);font-size:10px;color:var(--txt3);letter-spacing:1.5px;
-  text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
-.c-dot{width:5px;height:5px;border-radius:50%;background:currentColor}
-.c-name{font-family:var(--raj);font-size:17px;font-weight:700;color:#fff;line-height:1.2;margin-bottom:5px}
-.c-desc{font-size:12px;color:var(--txt2);line-height:1.6;margin-bottom:14px}
-.c-foot{display:flex;align-items:center;justify-content:space-between;padding-top:12px;
-  border-top:1px solid var(--bdr);flex-wrap:wrap;gap:6px}
-.c-freq{font-family:var(--mono);font-size:10px;color:var(--txt3);padding:3px 8px;
-  border:1px solid var(--bdr);border-radius:3px;letter-spacing:1px}
-.c-status{font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 10px;border-radius:3px;letter-spacing:1px;text-transform:uppercase}
-.cs-ready{background:rgba(39,174,96,0.12);color:var(--ok);border:1px solid rgba(39,174,96,0.3)}
-.cs-pending{background:rgba(243,156,18,0.12);color:var(--warn);border:1px solid rgba(243,156,18,0.3)}
-.cs-draft{background:rgba(212,160,50,0.12);color:var(--gold);border:1px solid rgba(212,160,50,0.3)}
-.cs-soon{background:rgba(74,106,84,0.12);color:var(--txt3);border:1px solid var(--bdr)}
-.c-arrow{position:absolute;top:18px;right:18px;font-size:16px;color:var(--txt3);transition:all 0.2s;opacity:0}
-.card:not(.soon):hover .c-arrow{opacity:1;transform:translate(2px,-2px)}
+/* divider between categories */
+.divider{
+  position:relative;z-index:1;
+  max-width:1380px;margin:0 auto;
+  padding:0 48px 24px;
+  display:flex;align-items:center;gap:14px;
+}
+.div-line{flex:1;height:1px;background:linear-gradient(90deg,transparent,var(--bdr),var(--bdr),transparent)}
+.div-lbl{
+  font-family:var(--mono);font-size:10.5px;font-weight:500;
+  color:var(--txt-3);letter-spacing:3px;text-transform:uppercase;
+  background:var(--surf);padding:5px 14px;border-radius:999px;
+  border:1px solid var(--bdr);white-space:nowrap;
+}
 
-/* FOOTER */
-.footer{position:relative;z-index:1;border-top:1px solid var(--bdr);padding:24px 48px;
-  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
-.footer-l,.footer-r{font-family:var(--mono);font-size:11px;color:var(--txt3);letter-spacing:1px}
+/* category color swatches via icon backgrounds */
+.cat-icon.dc{background:#d1fae5;color:#047857}
+.cat-icon.tx{background:#fef3c7;color:#a16207}
+.cat-icon.sg{background:#dbeafe;color:#1d4ed8}
+.cat-icon.gen{background:#ffedd5;color:#c2410c}
+.cat-icon.motor{background:#fee2e2;color:#b91c1c}
+.cat-icon.prot{background:#e0e7ff;color:#4338ca}
+.cat-icon.ups{background:#cffafe;color:#0e7490}
+.cat-icon.esp{background:#dbeafe;color:#1e40af}
+.cat-icon.gnd{background:#fef3c7;color:#a16207}
 
-@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
-.card:nth-child(1){animation-delay:.04s}.card:nth-child(2){animation-delay:.08s}
-.card:nth-child(3){animation-delay:.12s}.card:nth-child(4){animation-delay:.16s}
-.card:nth-child(5){animation-delay:.20s}.card:nth-child(6){animation-delay:.24s}
+/* footer */
+.footer{
+  position:relative;z-index:1;border-top:1px solid var(--bdr);
+  padding:24px 48px;display:flex;align-items:center;justify-content:space-between;
+  flex-wrap:wrap;gap:12px;background:var(--surf);
+}
+.footer-l{font-family:var(--display);font-weight:600;font-size:13px;color:var(--txt-2)}
+.footer-r{font-family:var(--mono);font-size:11px;color:var(--txt-3);letter-spacing:1px}
 
-@media(max-width:900px){
-  .hero,.main,.search-wrap,.notice-wrap,.divider,.footer{padding-left:20px;padding-right:20px}
-  .hero{padding-top:44px;padding-bottom:36px}
-  .hero-title .l1{font-size:52px}.hero-title .l2{font-size:68px}.hero-title .l3{font-size:22px}
+/* hidden empty cat */
+.cat.hidden{display:none}
+
+/* animations */
+@keyframes cardIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+.card:nth-child(1){animation-delay:.04s}
+.card:nth-child(2){animation-delay:.08s}
+.card:nth-child(3){animation-delay:.12s}
+.card:nth-child(4){animation-delay:.16s}
+.card:nth-child(5){animation-delay:.20s}
+.card:nth-child(6){animation-delay:.24s}
+
+@media(max-width:960px){
+  .hero{grid-template-columns:1fr;padding:36px 24px 24px}
+  .h-title .l1{font-size:38px}.h-title .l2{font-size:60px}.h-title .l3{font-size:18px}
+  .h-stats{min-width:0;grid-template-columns:repeat(2,1fr)}
+  .h-stat + .h-stat:nth-child(3)::before{display:none}
+  .control,.notice,.main,.divider{padding-left:24px;padding-right:24px}
+  .footer{padding:20px 24px}
 }
 @media(max-width:600px){
-  .topbar{padding:0 16px}.tb-plant{display:none}.hero-stats{display:none}
+  .topbar{padding:0 16px;gap:10px}
+  .tb-plant{display:none}
   .asset-grid{grid-template-columns:1fr}
+  .h-title .l2{font-size:46px}
+  .h-stats{grid-template-columns:1fr 1fr}
 }
 </style>
 </head>
@@ -167,16 +425,17 @@ body::after{content:'';position:fixed;inset:0;z-index:0;
 
 <!-- TOPBAR -->
 <div class="topbar">
-  <div class="tb-logo">ELECTRIC <span>7</span></div>
-  <div class="tb-plant">POMI · ELECTRICAL MAINTENANCE UNIT 7</div>
+  <div class="tb-brand">
+    <div class="tb-logo-mark"><span>E7</span></div>
+    <span>ELECTRIC <span class="accent">7</span></span>
+  </div>
+  <div class="tb-plant">POMI · Electrical Maintenance Unit 7</div>
   <div class="tb-right">
-    <a href="dashboard.html" style="font-family:var(--mono);font-size:12px;color:var(--ok);text-decoration:none;
-      padding:6px 14px;border:1px solid rgba(39,174,96,0.3);border-radius:4px;background:rgba(39,174,96,0.1);
-      letter-spacing:1px;transition:all 0.15s;display:flex;align-items:center;gap:6px"
-      onmouseover="this.style.background='rgba(39,174,96,0.2)'" onmouseout="this.style.background='rgba(39,174,96,0.1)'">
-      &#128202; DASHBOARD
+    <a class="tb-dash-link" href="dashboard.html">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+      Dashboard
     </a>
-    <div class="live"><div class="live-dot"></div><span class="live-txt">PORTAL ACTIVE</span></div>
+    <div class="live"><span class="live-dot"></span><span>PORTAL AKTIF</span></div>
     <span class="tb-time" id="clock">--:--:--</span>
   </div>
 </div>
@@ -184,36 +443,57 @@ body::after{content:'';position:fixed;inset:0;z-index:0;
 <!-- HERO -->
 <section class="hero">
   <div>
-    <div class="hero-eyebrow">PM Check Sheet Portal</div>
-    <div class="hero-title">
-      <span class="l1">ELECTRICAL</span>
-      <span class="l2">MAINT.</span>
-      <span class="l3">UNIT 7 — POMI</span>
-    </div>
-    <p class="hero-sub">Portal terpusat check sheet Preventive Maintenance — mencakup seluruh aset kelistrikan Unit 7 POMI. Pilih aset untuk membuka check sheet digital dan generate laporan PDF.</p>
+    <div class="eyebrow"><span class="pip"></span>PM Check Sheet Portal</div>
+    <h1 class="h-title">
+      <span class="l1">Electrical</span>
+      <span class="l2">Maintenance.</span>
+      <span class="l3">Unit 7 — POMI</span>
+    </h1>
+    <p class="h-sub">Portal terpusat check sheet Preventive Maintenance — mencakup seluruh aset kelistrikan Unit 7 POMI. Pilih aset untuk membuka check sheet digital dan generate laporan PDF.</p>
   </div>
-  <div>
-    <div class="hero-stats">
-      <div class="hstat"><span class="hstat-num" id="h-total">0</span><span class="hstat-lbl">Total Aset</span></div>
-      <div class="hstat"><span class="hstat-num g" id="h-ready">0</span><span class="hstat-lbl">Ready</span></div>
-      <div class="hstat"><span class="hstat-num gold" id="h-draft">0</span><span class="hstat-lbl">Draft</span></div>
-      <div class="hstat"><span class="hstat-num d" id="h-soon">0</span><span class="hstat-lbl">Soon</span></div>
+  <div class="h-stats" id="hstats">
+    <div class="h-stat t">
+      <span class="h-stat-num" data-target="0" id="h-total">0</span>
+      <span class="h-stat-lbl">Total Aset</span>
+      <div class="h-stat-bar"><i style="width:100%"></i></div>
+    </div>
+    <div class="h-stat g">
+      <span class="h-stat-num" data-target="0" id="h-ready">0</span>
+      <span class="h-stat-lbl">Ready</span>
+      <div class="h-stat-bar"><i id="bar-ready"></i></div>
+    </div>
+    <div class="h-stat a">
+      <span class="h-stat-num" data-target="0" id="h-draft">0</span>
+      <span class="h-stat-lbl">Draft</span>
+      <div class="h-stat-bar"><i id="bar-draft"></i></div>
+    </div>
+    <div class="h-stat d">
+      <span class="h-stat-num" data-target="0" id="h-soon">0</span>
+      <span class="h-stat-lbl">Coming Soon</span>
+      <div class="h-stat-bar"><i id="bar-soon"></i></div>
     </div>
   </div>
 </section>
 
 <!-- NOTICE -->
-<div class="notice-wrap">
+<div class="notice">
   <div class="notice-inner">
-    💡 <span>Card <strong>READY</strong> terhubung ke check sheet aktif. Card <strong>COMING SOON</strong> adalah placeholder — ganti atribut <code>href="#"</code> dengan path file HTML ketika check sheet sudah tersedia.</span>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+    <span>Card <strong>READY</strong> terhubung ke check sheet aktif. Card <strong>COMING SOON</strong> adalah placeholder — ganti atribut <code>href="#"</code> dengan path file HTML ketika check sheet sudah tersedia.</span>
   </div>
 </div>
 
-<!-- SEARCH -->
-<div class="search-wrap">
+<!-- CONTROL BAR -->
+<div class="control">
   <div class="search-box">
-    <span class="s-icon">🔍</span>
-    <input type="text" id="srch" placeholder="Cari nama aset atau tag…" oninput="filterCards()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input type="text" id="srch" placeholder="Cari nama aset, tag, atau kategori…" oninput="filterCards()">
+    <span class="search-key">/</span>
+  </div>
+  <div class="chips" id="chips">
+    <button class="chip on" data-filter="all" onclick="setFilter('all')"><span class="chip-dot"></span>Semua <span class="chip-count" id="cnt-all">0</span></button>
+    <button class="chip" data-filter="ready" onclick="setFilter('ready')"><span class="chip-dot" style="background:var(--ok)"></span>Ready <span class="chip-count" id="cnt-ready">0</span></button>
+    <button class="chip" data-filter="soon" onclick="setFilter('soon')"><span class="chip-dot" style="background:var(--txt-3)"></span>Coming Soon <span class="chip-count" id="cnt-soon">0</span></button>
   </div>
 </div>
 
@@ -221,11 +501,13 @@ body::after{content:'';position:fixed;inset:0;z-index:0;
 <div class="main">
 
   <!-- ═══ DC SYSTEM & BATTERY CHARGER ═══ -->
-  <div class="cat-section" data-cat="dc">
+  <div class="cat" data-cat="dc">
     <div class="cat-hdr">
-      <div class="cat-icon" style="background:rgba(39,174,96,0.12)">🔋</div>
+      <div class="cat-icon dc">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="18" height="10" rx="2"/><path d="M22 11v2"/><path d="M6 10v4"/><path d="M10 10v4"/><path d="M14 10v4"/></svg>
+      </div>
       <div>
-        <div class="cat-title">DC System & Battery Charger</div>
+        <div class="cat-title">DC System &amp; Battery Charger</div>
         <div class="cat-sub">125VDC / 110VDC Distribution · Battery Charger Units · DCDB</div>
       </div>
       <div class="cat-count" id="cnt-dc">—</div>
@@ -233,32 +515,32 @@ body::after{content:'';position:fixed;inset:0;z-index:0;
     <div class="asset-grid">
 
       <a class="card s-ready" href="PM_CheckSheet_BYC125.html" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>7EB-BYC-125 A/B</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>7EB-BYC-125 A/B</div>
         <div class="c-name">Battery Charger Unit 125 A/B</div>
         <div class="c-desc">2 Yearly PM — Rectifier, SCR/IGBT, transformer, cooling fan, float/equalize voltage check.</div>
-        <div class="c-foot"><span class="c-freq">2 YEARLY</span><span class="c-status cs-ready">✓ READY</span></div>
+        <div class="c-foot"><span class="c-freq">2 YEARLY</span><span class="c-status cs-ready">● READY</span></div>
       </a>
 
       <a class="card s-pending soon" href="#" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>7EB-BYC-125 C/D</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>7EB-BYC-125 C/D</div>
         <div class="c-name">Battery Charger Unit 125 C/D</div>
         <div class="c-desc">2 Yearly PM — Rectifier, SCR/IGBT, transformer, cooling fan, float/equalize voltage check.</div>
         <div class="c-foot"><span class="c-freq">2 YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div>
       </a>
 
       <a class="card soon" href="#" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>7EB-DCDB-125</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>7EB-DCDB-125</div>
         <div class="c-name">DC Distribution Board 125V</div>
         <div class="c-desc">Yearly PM — Bus voltage, breaker condition, connection torque check, busbar temp IR scan.</div>
         <div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div>
       </a>
 
       <a class="card soon" href="#" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>7EB-BAT-125</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>7EB-BAT-125</div>
         <div class="c-name">Battery Bank 125VDC</div>
         <div class="c-desc">Yearly PM — Cell voltage, specific gravity, electrolyte level, inter-cell connection, capacity test.</div>
         <div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div>
@@ -268,11 +550,13 @@ body::after{content:'';position:fixed;inset:0;z-index:0;
   </div>
 
   <!-- ═══ TRANSFORMER ═══ -->
-  <div class="divider"><div class="div-line"></div><div class="div-dia"></div><div class="div-lbl">Transformer</div><div class="div-dia"></div><div class="div-line"></div></div>
+  <div class="divider"><div class="div-line"></div><div class="div-lbl">Transformer</div><div class="div-line"></div></div>
 
-  <div class="cat-section" style="margin-top:28px" data-cat="tx">
+  <div class="cat" data-cat="tx">
     <div class="cat-hdr">
-      <div class="cat-icon" style="background:rgba(212,160,50,0.12)">⚡</div>
+      <div class="cat-icon tx">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m13 2-3 7h4l-3 7"/><path d="M12 17v5"/><path d="M5 12H2"/><path d="M22 12h-3"/></svg>
+      </div>
       <div>
         <div class="cat-title">Transformer</div>
         <div class="cat-sub">Unit Transformer · Station Service Transformer · Auxiliary Transformer</div>
@@ -282,40 +566,42 @@ body::after{content:'';position:fixed;inset:0;z-index:0;
     <div class="asset-grid">
 
       <a class="card s-ready" href="Transformer_Weekly_Inspection.html" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>7EX-XFMR-AT + DGA</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>7EX-XFMR-AT + DGA</div>
         <div class="c-name">Unit Transformer — AT + DGA</div>
         <div class="c-desc">Weekly — Oil temp, winding temp, voltage, power, DGA feedback current, oil leak, silicagel, cooling, bushing, PRD, OLTC, purifier, N₂ pressure.</div>
-        <div class="c-foot"><span class="c-freq">WEEKLY</span><span class="c-status cs-ready">✓ READY</span></div>
+        <div class="c-foot"><span class="c-freq">WEEKLY</span><span class="c-status cs-ready">● READY</span></div>
       </a>
 
       <a class="card s-ready" href="Transformer_Weekly_Inspection.html" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>7EX-XFMR-AT · USST · SST</div>
-        <div class="c-name">USST & Common SST Transformers</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>7EX-XFMR-AT · USST · SST</div>
+        <div class="c-name">USST &amp; Common SST Transformers</div>
         <div class="c-desc">Three Monthly PM — Winding temp (L/C/R), HV voltage/current, apparent power, cooling fan, electrical component check. Covers SWRO, Scrubber, Admin, CHCB, Warehouse, CUCB.</div>
-        <div class="c-foot"><span class="c-freq">3 MONTHLY</span><span class="c-status cs-ready">✓ READY</span></div>
+        <div class="c-foot"><span class="c-freq">3 MONTHLY</span><span class="c-status cs-ready">● READY</span></div>
       </a>
 
       <a class="card s-ready" href="DRY_TRAFO_PM.html" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>DRY TRANSFORMER PM</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>DRY TRANSFORMER PM</div>
         <div class="c-name">DRY TRANSFORMER USST</div>
         <div class="c-desc">2 YEARLY DRY TRANSFORMER USST.</div>
-        <div class="c-foot"><span class="c-freq">2 YEARLY</span><span class="c-status cs-ready">✓ READY</span></div>
+        <div class="c-foot"><span class="c-freq">2 YEARLY</span><span class="c-status cs-ready">● READY</span></div>
       </a>
 
     </div>
   </div>
 
   <!-- ═══ SWITCHGEAR ═══ -->
-  <div class="divider"><div class="div-line"></div><div class="div-dia"></div><div class="div-lbl">Switchgear & MV Panel</div><div class="div-dia"></div><div class="div-line"></div></div>
+  <div class="divider"><div class="div-line"></div><div class="div-lbl">Switchgear &amp; MV Panel</div><div class="div-line"></div></div>
 
-  <div class="cat-section" style="margin-top:28px" data-cat="sg">
+  <div class="cat" data-cat="sg">
     <div class="cat-hdr">
-      <div class="cat-icon" style="background:rgba(88,166,255,0.10)">🔌</div>
+      <div class="cat-icon sg">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10v8"/><path d="M16 10v8"/><path d="M12 4v4"/></svg>
+      </div>
       <div>
-        <div class="cat-title">Switchgear & MV Panel</div>
+        <div class="cat-title">Switchgear &amp; MV Panel</div>
         <div class="cat-sub">6kV / 11kV / 20kV Switchgear · LV Switchboard · MCC</div>
       </div>
       <div class="cat-count" id="cnt-sg">—</div>
@@ -323,39 +609,40 @@ body::after{content:'';position:fixed;inset:0;z-index:0;
     <div class="asset-grid">
 
       <a class="card s-ready" href="7EPLCB4_Maintenance.html" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>7EP-LC-B4</div>
-        <div class="c-name">Load Center B4 — Switchgear & Breaker</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>7EP-LC-B4</div>
+        <div class="c-name">Load Center B4 — Switchgear &amp; Breaker</div>
         <div class="c-desc">Switchgear PM — 6 compartments (102B, 102C, 103B, 103C, 104B, 104C). Cubicle inspection, breaker check, MicroVersa Trip test, trip settings record, after cleaning photos.</div>
-        <div class="c-foot"><span class="c-freq">PERIODIC</span><span class="c-status cs-ready">✓ READY</span></div>
+        <div class="c-foot"><span class="c-freq">PERIODIC</span><span class="c-status cs-ready">● READY</span></div>
       </a>
 
       <a class="card s-ready" href="7EPMCC_Maintenance.html" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>7EP-MCC</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>7EP-MCC</div>
         <div class="c-name">MCC — Switchboard Shutdown PM</div>
-        <div class="c-desc">4 Yearly PM — Motor Control Center Switchboard. 12 item check, bus bar & wiring inspection, starter contacts, interlocks, foto kegiatan & after cleaning.</div>
-        <div class="c-foot"><span class="c-freq">4 YEARLY</span><span class="c-status cs-ready">✓ READY</span></div>
+        <div class="c-desc">4 Yearly PM — Motor Control Center Switchboard. 12 item check, bus bar &amp; wiring inspection, starter contacts, interlocks, foto kegiatan &amp; after cleaning.</div>
+        <div class="c-foot"><span class="c-freq">4 YEARLY</span><span class="c-status cs-ready">● READY</span></div>
       </a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-SWG-6KV</div><div class="c-name">6kV Switchgear</div><div class="c-desc">Yearly PM — Vacuum breaker, bus bar insulation, PT/CT secondary, relay trip test, IR scan.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-SWG-6KV</div><div class="c-name">6kV Switchgear</div><div class="c-desc">Yearly PM — Vacuum breaker, bus bar insulation, PT/CT secondary, relay trip test, IR scan.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-MCC-001</div><div class="c-name">Motor Control Centre (MCC)</div><div class="c-desc">Yearly PM — MCCB, contactor, overload relay, bus bar condition, terminal torque, door gasket.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-MCC-001</div><div class="c-name">Motor Control Centre (MCC)</div><div class="c-desc">Yearly PM — MCCB, contactor, overload relay, bus bar condition, terminal torque, door gasket.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-LV-SWB</div><div class="c-name">LV Switchboard 380V</div><div class="c-desc">Yearly PM — ACB/MCCB condition, bus bar temp, feeder labeling, interlock mechanism check.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-LV-SWB</div><div class="c-name">LV Switchboard 380V</div><div class="c-desc">Yearly PM — ACB/MCCB condition, bus bar temp, feeder labeling, interlock mechanism check.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-PMCC-001</div><div class="c-name">Power MCC — Boiler</div><div class="c-desc">Yearly PM — Starter, VFD, thermal relay setting, busbar connection, overcurrent protection.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-PMCC-001</div><div class="c-name">Power MCC — Boiler</div><div class="c-desc">Yearly PM — Starter, VFD, thermal relay setting, busbar connection, overcurrent protection.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
     </div>
   </div>
 
-
   <!-- ═══ GENERATOR ═══ -->
-  <div class="divider"><div class="div-line"></div><div class="div-dia"></div><div class="div-lbl">Generator</div><div class="div-dia"></div><div class="div-line"></div></div>
+  <div class="divider"><div class="div-line"></div><div class="div-lbl">Generator</div><div class="div-line"></div></div>
 
-  <div class="cat-section" style="margin-top:28px" data-cat="gen">
+  <div class="cat" data-cat="gen">
     <div class="cat-hdr">
-      <div class="cat-icon" style="background:rgba(245,158,11,0.12)">⚡</div>
+      <div class="cat-icon gen">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18"/><path d="M3 12h18"/><path d="m5.6 5.6 12.8 12.8"/><path d="m18.4 5.6-12.8 12.8"/></svg>
+      </div>
       <div>
         <div class="cat-title">Generator</div>
         <div class="cat-sub">Brush Gear · Exciter · Generator Monitoring</div>
@@ -365,132 +652,141 @@ body::after{content:'';position:fixed;inset:0;z-index:0;
     <div class="asset-grid">
 
       <a class="card s-ready" href="GEN_BrushGear_PM_Checksheet.html" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>7TG-GEN-100</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>7TG-GEN-100</div>
         <div class="c-name">Generator Brush Gear PM</div>
-        <div class="c-desc">Weekly PM — Brush length & spring pressure, sparking, chattering, pigtail condition, dust contamination, slip ring temperature. 20 magazine rotation (4/week).</div>
-        <div class="c-foot"><span class="c-freq">WEEKLY</span><span class="c-status cs-live">LIVE</span></div>
+        <div class="c-desc">Weekly PM — Brush length &amp; spring pressure, sparking, chattering, pigtail condition, dust contamination, slip ring temperature. 20 magazine rotation (4/week).</div>
+        <div class="c-foot"><span class="c-freq">WEEKLY</span><span class="c-status cs-live">● LIVE</span></div>
       </a>
 
     </div>
   </div>
 
-
   <!-- ═══ MOTOR & DRIVE ═══ -->
-  <div class="divider"><div class="div-line"></div><div class="div-dia"></div><div class="div-lbl">Motor & Drive</div><div class="div-dia"></div><div class="div-line"></div></div>
+  <div class="divider"><div class="div-line"></div><div class="div-lbl">Motor &amp; Drive</div><div class="div-line"></div></div>
 
-  <div class="cat-section" style="margin-top:28px" data-cat="motor">
+  <div class="cat" data-cat="motor">
     <div class="cat-hdr">
-      <div class="cat-icon" style="background:rgba(192,57,43,0.12)">⚙️</div>
+      <div class="cat-icon motor">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3"/><path d="M12 19v3"/><path d="M5 5l2 2"/><path d="M17 17l2 2"/><path d="M2 12h3"/><path d="M19 12h3"/><path d="M5 19l2-2"/><path d="M17 7l2-2"/></svg>
+      </div>
       <div>
-        <div class="cat-title">Motor & Variable Speed Drive</div>
+        <div class="cat-title">Motor &amp; Variable Speed Drive</div>
         <div class="cat-sub">HV Motor · LV Motor · VFD · Soft Starter</div>
       </div>
       <div class="cat-count" id="cnt-motor">—</div>
     </div>
     <div class="asset-grid">
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-BFP-MTR</div><div class="c-name">Boiler Feed Pump Motor (HV)</div><div class="c-desc">Yearly PM — Winding insulation, bearing temperature, vibration, terminal connection, PI index.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-BFP-MTR</div><div class="c-name">Boiler Feed Pump Motor (HV)</div><div class="c-desc">Yearly PM — Winding insulation, bearing temperature, vibration, terminal connection, PI index.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-CWP-MTR</div><div class="c-name">Cooling Water Pump Motor</div><div class="c-desc">Yearly PM — Insulation resistance, bearing condition, coupling alignment, terminal tightness.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-CWP-MTR</div><div class="c-name">Cooling Water Pump Motor</div><div class="c-desc">Yearly PM — Insulation resistance, bearing condition, coupling alignment, terminal tightness.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-VFD-001</div><div class="c-name">Variable Frequency Drive (VFD)</div><div class="c-desc">Yearly PM — DC bus voltage, IGBT temperature, cooling fan, filter, firmware parameter backup.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-VFD-001</div><div class="c-name">Variable Frequency Drive (VFD)</div><div class="c-desc">Yearly PM — DC bus voltage, IGBT temperature, cooling fan, filter, firmware parameter backup.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-ID-FAN-MTR</div><div class="c-name">ID Fan Motor</div><div class="c-desc">Yearly PM — Insulation resistance, winding temperature, vibration spectrum, bearing lubrication.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-ID-FAN-MTR</div><div class="c-name">ID Fan Motor</div><div class="c-desc">Yearly PM — Insulation resistance, winding temperature, vibration spectrum, bearing lubrication.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-PA-FAN-MTR</div><div class="c-name">PA Fan Motor</div><div class="c-desc">Yearly PM — Insulation resistance, current balance, bearing temperature, coupling check.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-PA-FAN-MTR</div><div class="c-name">PA Fan Motor</div><div class="c-desc">Yearly PM — Insulation resistance, current balance, bearing temperature, coupling check.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
     </div>
   </div>
 
   <!-- ═══ PROTECTION ═══ -->
-  <div class="divider"><div class="div-line"></div><div class="div-dia"></div><div class="div-lbl">Protection & Metering</div><div class="div-dia"></div><div class="div-line"></div></div>
+  <div class="divider"><div class="div-line"></div><div class="div-lbl">Protection &amp; Metering</div><div class="div-line"></div></div>
 
-  <div class="cat-section" style="margin-top:28px" data-cat="prot">
+  <div class="cat" data-cat="prot">
     <div class="cat-hdr">
-      <div class="cat-icon" style="background:rgba(142,68,173,0.12)">🛡️</div>
+      <div class="cat-icon prot">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      </div>
       <div>
-        <div class="cat-title">Protection Relay & Metering</div>
+        <div class="cat-title">Protection Relay &amp; Metering</div>
         <div class="cat-sub">Numerical Relay · Overcurrent · Differential · Energy Meter</div>
       </div>
       <div class="cat-count" id="cnt-prot">—</div>
     </div>
     <div class="asset-grid">
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-REL-OC</div><div class="c-name">Overcurrent Relay (OCR)</div><div class="c-desc">2 Yearly PM — Setting verification, trip test, CT ratio check, timing test, event log review.</div><div class="c-foot"><span class="c-freq">2 YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-REL-OC</div><div class="c-name">Overcurrent Relay (OCR)</div><div class="c-desc">2 Yearly PM — Setting verification, trip test, CT ratio check, timing test, event log review.</div><div class="c-foot"><span class="c-freq">2 YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-REL-DIFF</div><div class="c-name">Differential Relay (87T)</div><div class="c-desc">2 Yearly PM — Bias characteristic test, CT check, interposing CT, restraint current, trip test.</div><div class="c-foot"><span class="c-freq">2 YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-REL-DIFF</div><div class="c-name">Differential Relay (87T)</div><div class="c-desc">2 Yearly PM — Bias characteristic test, CT check, interposing CT, restraint current, trip test.</div><div class="c-foot"><span class="c-freq">2 YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-MET-KWHR</div><div class="c-name">Energy Meter (kWh)</div><div class="c-desc">Yearly PM — Meter accuracy, PT/CT secondary circuit, display reading, billing reconciliation.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-MET-KWHR</div><div class="c-name">Energy Meter (kWh)</div><div class="c-desc">Yearly PM — Meter accuracy, PT/CT secondary circuit, display reading, billing reconciliation.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
     </div>
   </div>
 
   <!-- ═══ UPS & INVERTER ═══ -->
-  <div class="divider"><div class="div-line"></div><div class="div-dia"></div><div class="div-lbl">UPS & Inverter</div><div class="div-dia"></div><div class="div-line"></div></div>
+  <div class="divider"><div class="div-line"></div><div class="div-lbl">UPS &amp; Inverter</div><div class="div-line"></div></div>
 
-  <div class="cat-section" style="margin-top:28px" data-cat="ups">
+  <div class="cat" data-cat="ups">
     <div class="cat-hdr">
-      <div class="cat-icon" style="background:rgba(88,166,255,0.10)">🔄</div>
+      <div class="cat-icon ups">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/></svg>
+      </div>
       <div>
-        <div class="cat-title">UPS & Inverter</div>
+        <div class="cat-title">UPS &amp; Inverter</div>
         <div class="cat-sub">Online UPS · Static Inverter · Bypass Switch</div>
       </div>
       <div class="cat-count" id="cnt-ups">—</div>
     </div>
     <div class="asset-grid">
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-UPS-001</div><div class="c-name">Online UPS — Control System</div><div class="c-desc">Yearly PM — Input/output voltage, battery health, bypass test, runtime test, alarm check.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-UPS-001</div><div class="c-name">Online UPS — Control System</div><div class="c-desc">Yearly PM — Input/output voltage, battery health, bypass test, runtime test, alarm check.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-INV-001</div><div class="c-name">Static Inverter</div><div class="c-desc">Yearly PM — DC input voltage, AC output voltage/frequency, thyristor temp, filter capacitor.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-INV-001</div><div class="c-name">Static Inverter</div><div class="c-desc">Yearly PM — DC input voltage, AC output voltage/frequency, thyristor temp, filter capacitor.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
     </div>
   </div>
 
   <!-- ═══ ELECTROSTATIC PRECIPITATOR ═══ -->
-  <div class="divider"><div class="div-line"></div><div class="div-dia"></div><div class="div-lbl">Electrostatic Precipitator</div><div class="div-dia"></div><div class="div-line"></div></div>
+  <div class="divider"><div class="div-line"></div><div class="div-lbl">Electrostatic Precipitator</div><div class="div-line"></div></div>
 
-  <div class="cat-section" style="margin-top:28px" data-cat="esp">
+  <div class="cat" data-cat="esp">
     <div class="cat-hdr">
-      <div class="cat-icon" style="background:rgba(37,99,235,0.12)">🌫️</div>
+      <div class="cat-icon esp">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19h14"/><path d="M5 15h14"/><path d="M5 11h14"/><path d="M5 7h14"/></svg>
+      </div>
       <div>
         <div class="cat-title">Electrostatic Precipitator</div>
-        <div class="cat-sub">Rectifier T/R · CE & DE Rapping Motors · Hopper Heater · GD Motors</div>
+        <div class="cat-sub">Rectifier T/R · CE &amp; DE Rapping Motors · Hopper Heater · GD Motors</div>
       </div>
       <div class="cat-count" id="cnt-esp">—</div>
     </div>
     <div class="asset-grid">
 
       <a class="card s-ready" href="ESP_7BGPCP800A_B.html" target="_blank">
-        <span class="c-arrow">↗</span>
-        <div class="c-tag"><span class="c-dot"></span>7BG-PCP-800A/B</div>
+        <span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span>
+        <div class="c-tag"><span class="dot"></span>7BG-PCP-800A/B</div>
         <div class="c-name">ESP Weekly Maintenance</div>
         <div class="c-desc">Weekly PM — Rectifier T/R (16 unit), CE Rapping West/East (8+8), DE Rapping Roof (16), GD Motors (8), Hopper Heater (8), Panel Cleaning.</div>
-        <div class="c-foot"><span class="c-freq">WEEKLY</span><span class="c-status cs-ready">✓ READY</span></div>
+        <div class="c-foot"><span class="c-freq">WEEKLY</span><span class="c-status cs-ready">● READY</span></div>
       </a>
 
     </div>
   </div>
 
   <!-- ═══ GROUNDING ═══ -->
-  <div class="divider"><div class="div-line"></div><div class="div-dia"></div><div class="div-lbl">Grounding & Lightning</div><div class="div-dia"></div><div class="div-line"></div></div>
+  <div class="divider"><div class="div-line"></div><div class="div-lbl">Grounding &amp; Lightning</div><div class="div-line"></div></div>
 
-  <div class="cat-section" style="margin-top:28px" data-cat="gnd">
+  <div class="cat" data-cat="gnd">
     <div class="cat-hdr">
-      <div class="cat-icon" style="background:rgba(243,156,18,0.10)">⚡</div>
+      <div class="cat-icon gnd">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-2 8 9-12h-7l2-8Z"/></svg>
+      </div>
       <div>
-        <div class="cat-title">Grounding & Lightning Protection</div>
+        <div class="cat-title">Grounding &amp; Lightning Protection</div>
         <div class="cat-sub">Earthing System · Lightning Arrester · Surge Protection Device</div>
       </div>
       <div class="cat-count" id="cnt-gnd">—</div>
     </div>
     <div class="asset-grid">
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-GND-SYSTEM</div><div class="c-name">Earthing / Grounding System</div><div class="c-desc">Yearly PM — Earth electrode resistance (≤1Ω), continuity check, visual inspection ground conductor.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-GND-SYSTEM</div><div class="c-name">Earthing / Grounding System</div><div class="c-desc">Yearly PM — Earth electrode resistance (≤1Ω), continuity check, visual inspection ground conductor.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-LA-ARRESTER</div><div class="c-name">Lightning Arrester</div><div class="c-desc">Yearly PM — Leakage current, resistive current, counter reading, visual insulator inspection.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-LA-ARRESTER</div><div class="c-name">Lightning Arrester</div><div class="c-desc">Yearly PM — Leakage current, resistive current, counter reading, visual insulator inspection.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
-      <a class="card soon" href="#"><span class="c-arrow">↗</span><div class="c-tag"><span class="c-dot"></span>7EB-SPD-001</div><div class="c-name">Surge Protection Device (SPD)</div><div class="c-desc">Yearly PM — SPD indicator status, earth continuity, physical damage inspection, replacement check.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
+      <a class="card soon" href="#"><span class="c-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></span><div class="c-tag"><span class="dot"></span>7EB-SPD-001</div><div class="c-name">Surge Protection Device (SPD)</div><div class="c-desc">Yearly PM — SPD indicator status, earth continuity, physical damage inspection, replacement check.</div><div class="c-foot"><span class="c-freq">YEARLY</span><span class="c-status cs-soon">COMING SOON</span></div></a>
 
     </div>
   </div>
@@ -499,50 +795,110 @@ body::after{content:'';position:fixed;inset:0;z-index:0;
 
 <!-- FOOTER -->
 <footer class="footer">
-  <div class="footer-l">ELECTRIC 7 · POMI · ELECTRICAL MAINTENANCE UNIT 7</div>
+  <div class="footer-l">ELECTRIC <span style="color:var(--pri)">7</span> · POMI · Electrical Maintenance Unit 7</div>
   <div class="footer-r" id="fdate">—</div>
 </footer>
 
 <script>
-// CLOCK
+/* CLOCK */
 function tick(){
   const n=new Date();
   document.getElementById('clock').textContent=n.toLocaleTimeString('id-ID');
-  document.getElementById('fdate').textContent=n.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  document.getElementById('fdate').textContent=n.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
 }
 setInterval(tick,1000);tick();
 
-// STATS
+/* COUNT-UP ANIMATION */
+function animateCount(el, target){
+  const dur=900;const start=performance.now();
+  function step(t){
+    const p=Math.min(1,(t-start)/dur);
+    const eased=1-Math.pow(1-p,3);
+    el.textContent=Math.round(eased*target);
+    if(p<1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+/* STATS */
 function countStats(){
   const all=document.querySelectorAll('.card');
   const ready=document.querySelectorAll('.card.s-ready');
-  const draft=document.querySelectorAll('.card.s-draft');
+  const draft=document.querySelectorAll('.card.s-pending:not(.soon), .card.s-draft');
   const soon=document.querySelectorAll('.card.soon');
-  document.getElementById('h-total').textContent=all.length;
-  document.getElementById('h-ready').textContent=ready.length;
-  document.getElementById('h-draft').textContent=draft.length;
-  document.getElementById('h-soon').textContent=soon.length;
+  const total=all.length;
+  animateCount(document.getElementById('h-total'),total);
+  animateCount(document.getElementById('h-ready'),ready.length);
+  animateCount(document.getElementById('h-draft'),draft.length);
+  animateCount(document.getElementById('h-soon'),soon.length);
+  /* mini bars */
+  setTimeout(()=>{
+    document.getElementById('bar-ready').style.width=(ready.length/total*100)+'%';
+    document.getElementById('bar-draft').style.width=(draft.length/total*100)+'%';
+    document.getElementById('bar-soon').style.width=(soon.length/total*100)+'%';
+  },80);
+  /* chip counts */
+  document.getElementById('cnt-all').textContent=total;
+  document.getElementById('cnt-ready').textContent=ready.length;
+  document.getElementById('cnt-soon').textContent=soon.length;
 }
 
-// COUNT PER CATEGORY
+/* CATEGORY COUNTS */
 function countCats(){
-  const map={'dc':'cnt-dc','tx':'cnt-tx','sg':'cnt-sg','motor':'cnt-motor','prot':'cnt-prot','ups':'cnt-ups','esp':'cnt-esp','gnd':'cnt-gnd'};
+  const map={'dc':'cnt-dc','tx':'cnt-tx','sg':'cnt-sg','motor':'cnt-motor','prot':'cnt-prot','ups':'cnt-ups','esp':'cnt-esp','gnd':'cnt-gnd','gen':'cnt-gen'};
   Object.entries(map).forEach(([cat,elId])=>{
     const sec=document.querySelector(`[data-cat="${cat}"]`);
     const el=document.getElementById(elId);
-    if(sec&&el){const n=sec.querySelectorAll('.card').length;el.textContent=`${n} item${n!==1?'s':''}`;}
+    if(sec&&el){
+      const cards=sec.querySelectorAll('.card');
+      const ready=sec.querySelectorAll('.card.s-ready').length;
+      const n=cards.length;
+      el.textContent=`${n} · ${ready} ready`;
+    }
   });
 }
 
-// SEARCH
+/* SEARCH + FILTER */
+let activeFilter='all';
+function setFilter(f){
+  activeFilter=f;
+  document.querySelectorAll('.chip').forEach(c=>{
+    c.classList.toggle('on',c.dataset.filter===f);
+  });
+  filterCards();
+}
 function filterCards(){
   const q=document.getElementById('srch').value.toLowerCase().trim();
-  document.querySelectorAll('.card').forEach(c=>{c.style.display=(!q||c.textContent.toLowerCase().includes(q))?'':'none';});
-  document.querySelectorAll('.cat-section').forEach(s=>{
+  document.querySelectorAll('.card').forEach(c=>{
+    const txt=c.textContent.toLowerCase();
+    const isReady=c.classList.contains('s-ready');
+    const isSoon=c.classList.contains('soon');
+    let matchFilter=true;
+    if(activeFilter==='ready') matchFilter=isReady;
+    else if(activeFilter==='soon') matchFilter=isSoon;
+    const matchQuery=!q||txt.includes(q);
+    c.style.display=(matchFilter&&matchQuery)?'':'none';
+  });
+  document.querySelectorAll('.cat').forEach(s=>{
     const vis=[...s.querySelectorAll('.card')].some(c=>c.style.display!=='none');
-    s.style.display=vis?'':'none';
+    s.classList.toggle('hidden',!vis);
+  });
+  document.querySelectorAll('.divider').forEach((d,i)=>{
+    /* keep dividers visible alongside their following category */
+    const next=d.nextElementSibling;
+    if(next&&next.classList.contains('cat')){
+      d.style.display=next.classList.contains('hidden')?'none':'';
+    }
   });
 }
+
+/* KEYBOARD SHORTCUT — "/" focuses search */
+document.addEventListener('keydown',e=>{
+  if(e.key==='/'&&document.activeElement.tagName!=='INPUT'&&document.activeElement.tagName!=='TEXTAREA'){
+    e.preventDefault();
+    document.getElementById('srch').focus();
+  }
+});
 
 countStats();countCats();
 </script>
