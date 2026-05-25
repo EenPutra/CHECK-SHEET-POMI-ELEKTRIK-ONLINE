@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Battery Inspection — 7EB-BY-125/250</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1e3a5f;--navy2:#0f2744;--blue:#2563eb;--sky:#7dd3fc;--sky2:#bfdbfe;
+  --bg:#f8fbff;--bg2:#f0f7ff;--surf:#ffffff;--bdr:#bfdbfe;--bdr2:#dbeafe;
+  --ok:#16a34a;--ok2:#15803d;--ok-bg:#dcfce7;--ok-ring:#bbf7d0;
+  --ng:#dc2626;--ng2:#b91c1c;--ng-bg:#fee2e2;--ng-ring:#fecaca;
+  --idle:#e5e7eb;--idle-txt:#9ca3af;
+  --txt:#0f172a;--txt2:#1e3a5f;--txt3:#3b82f6;--txt4:#64748b;
+  --mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:100vh}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:100;background:var(--navy2);height:52px;
+  display:flex;align-items:center;padding:0 20px;gap:12px;
+  border-bottom:2px solid var(--blue)}
+.tb-logo{font-family:var(--raj);font-size:20px;font-weight:700;letter-spacing:3px;color:#fff}
+.tb-logo em{color:var(--sky);font-style:normal}
+.tb-sep{width:1px;height:26px;background:rgba(255,255,255,0.15);flex-shrink:0}
+.tb-sub{font-size:11px;color:var(--sky);font-family:var(--mono);letter-spacing:1px;white-space:nowrap}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--sky);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.tb-time{font-family:var(--mono);font-size:12px;color:var(--sky);white-space:nowrap}
+.btn{padding:6px 14px;border-radius:5px;border:none;cursor:pointer;
+  font-family:var(--raj);font-size:13px;font-weight:600;letter-spacing:1px;
+  transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.btn-draft{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)}
+.btn-draft:hover{background:rgba(255,255,255,0.2)}
+.btn-pdf{background:var(--blue);color:#fff}
+.btn-pdf:hover{background:#1d4ed8;transform:translateY(-1px)}
+.btn-sm{padding:4px 10px;font-size:12px}
+
+/* HERO */
+.hero{background:var(--navy);padding:24px 20px 20px;color:#fff}
+.hero-eyebrow{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--sky)}
+.hero-title{font-family:var(--raj);font-size:clamp(28px,6vw,52px);font-weight:700;line-height:1;color:#fff;letter-spacing:1px}
+.hero-title em{color:var(--sky);font-style:normal}
+.hero-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-top:8px;font-weight:300}
+.hero-stats{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.hstat{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+  border-radius:8px;padding:10px 16px;text-align:center;min-width:72px}
+.hstat-n{font-family:var(--raj);font-size:26px;font-weight:700;color:#fff;line-height:1;display:block}
+.hstat-n.ok{color:#4ade80}
+.hstat-n.ng{color:#f87171}
+.hstat-n.pend{color:var(--sky)}
+.hstat-l{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;display:block}
+
+/* WRAP */
+.wrap{max-width:900px;margin:0 auto;padding:20px 16px 80px}
+
+/* PANEL */
+.panel{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;
+  margin-bottom:16px;overflow:hidden;box-shadow:0 1px 6px rgba(30,58,95,0.06)}
+
+/* WO PANEL */
+.wo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;padding:16px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf label{font-size:10px;color:var(--txt4);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.mf input,.mf select{border:1.5px solid var(--bdr);border-radius:5px;padding:7px 10px;
+  font-family:var(--sans);font-size:13px;background:var(--bg2);color:var(--txt);
+  transition:border-color .18s;width:100%}
+.mf input:focus,.mf select:focus{outline:none;border-color:var(--blue);background:#fff}
+.mf input[type=date]{font-family:var(--mono)}
+
+/* SECTION HEADER */
+.sec-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;
+  background:var(--navy);cursor:pointer;user-select:none}
+.sec-hdr-icon{width:28px;height:28px;border-radius:6px;background:rgba(37,99,235,0.3);
+  display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.sec-hdr-title{font-family:var(--raj);font-size:15px;font-weight:700;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.sec-hdr-sub{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:1px;margin-left:4px}
+.sec-hdr-cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.4);
+  padding:2px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:10px}
+.sec-hdr-arrow{color:rgba(255,255,255,0.4);font-size:14px;transition:transform .2s;margin-left:6px}
+.sec-hdr.open .sec-hdr-arrow{transform:rotate(180deg)}
+
+/* TABLE WRAPPER */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl-wrap::-webkit-scrollbar{height:4px}
+.tbl-wrap::-webkit-scrollbar-track{background:var(--bg2)}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--sky2);border-radius:2px}
+
+/* VOLTAGE TABLE */
+.ct{width:100%;border-collapse:collapse;font-size:12px}
+.ct th{background:var(--navy);color:var(--sky2);padding:8px 12px;text-align:center;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;
+  white-space:nowrap;border-right:1px solid rgba(255,255,255,0.08)}
+.ct th:last-child{border-right:none}
+.ct td{padding:8px 12px;border-bottom:1px solid var(--bdr2);background:var(--surf);
+  vertical-align:middle;text-align:center;border-right:1px solid var(--bdr2)}
+.ct td:last-child{border-right:none}
+.ct tr:last-child td{border-bottom:none}
+.ct tr:hover td{background:var(--bg2)}
+.ct td.rack-lbl{font-family:var(--raj);font-size:14px;font-weight:700;color:var(--navy);
+  text-align:center;letter-spacing:1px;background:rgba(37,99,235,0.04)!important}
+.ct td.cell-no{font-family:var(--mono);font-size:11px;color:var(--txt2);text-align:left;padding-left:16px}
+.ct td.total-cell{background:rgba(37,99,235,0.04)!important}
+
+/* MEAS INPUT */
+.mi{font-size:11px;padding:4px 6px;border-radius:3px;font-family:var(--mono);
+  text-align:center;border:1.5px solid var(--bdr);background:var(--bg2);color:var(--txt);
+  transition:border-color .15s;width:64px}
+.mi:focus{outline:none;border-color:var(--blue);background:#fff}
+.mi-sm{width:54px}
+
+/* OK/NG BUTTONS */
+.tog{display:inline-flex;gap:3px;justify-content:center}
+.rb{font-size:10px;padding:4px 8px;border-radius:4px;cursor:pointer;font-weight:700;
+  letter-spacing:.5px;border:none;transition:all .15s;font-family:var(--mono)}
+.rb.ok-idle{background:var(--idle);color:var(--idle-txt)}
+.rb.ng-idle{background:var(--idle);color:var(--idle-txt)}
+.rb.ok-act{background:var(--ok);color:#fff;box-shadow:0 0 0 2px var(--ok-ring)}
+.rb.ng-act{background:var(--ng);color:#fff;box-shadow:0 0 0 2px var(--ng-ring)}
+.rb:hover{opacity:0.85;transform:translateY(-1px)}
+
+/* BATTERY SPEC BOX */
+.bat-spec{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));
+  background:var(--bg2);border-bottom:1px solid var(--bdr)}
+.bat-spec-item{padding:10px 14px;border-right:1px solid var(--bdr)}
+.bat-spec-item:last-child{border-right:none}
+.bat-spec-l{font-size:9px;color:var(--txt4);font-weight:500;letter-spacing:1px;text-transform:uppercase;
+  margin-bottom:3px;font-family:var(--mono)}
+.bat-spec-v{font-family:var(--mono);font-size:12px;color:var(--navy);font-weight:700}
+
+/* CHECKLIST */
+.chk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));
+  gap:10px;padding:14px 16px;border-bottom:1px solid var(--bdr2)}
+.chk-item{background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;
+  padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.chk-label{font-size:12px;color:var(--txt);font-weight:500}
+
+/* PANEL CLEANING style for ventilation fans */
+.pc-item{background:var(--bg2);border:1px solid var(--bdr);border-radius:8px;
+  padding:10px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  min-width:160px}
+.pc-label{font-size:12px;color:var(--txt);font-weight:500}
+.pc-sub{font-size:10px;color:var(--txt4);margin-top:1px}
+
+/* FINDINGS */
+.findings-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
+.mf textarea{border:1.5px solid var(--bdr);border-radius:5px;padding:8px 10px;
+  font-family:var(--sans);font-size:13px;background:var(--bg2);color:var(--txt);
+  resize:vertical;min-height:80px;width:100%;transition:border-color .18s}
+.mf textarea:focus{outline:none;border-color:var(--blue);background:#fff}
+
+/* NOTICE */
+.notice{padding:10px 16px;border-radius:6px;font-size:13px;display:none;margin:12px 0 0}
+.notice.ok{background:#dcfce7;border:1px solid #86efac;color:#15803d;display:block}
+.notice.err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;display:block}
+.notice.info{background:#dbeafe;border:1px solid #93c5fd;color:#1e40af;display:block}
+
+/* FOOTER */
+.footer{background:var(--navy2);padding:16px 20px;display:flex;align-items:center;
+  justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:20px}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px}
+
+/* RESPONSIVE */
+@media(max-width:640px){
+  .tb-sub{display:none}
+  .tb-sep{display:none}
+  .hero-stats .hstat{min-width:60px;padding:8px 10px}
+  .hstat-n{font-size:20px}
+  .findings-grid{grid-template-columns:1fr}
+  .btn-draft{display:none}
+}
+@media(max-width:400px){
+  .topbar{padding:0 12px}
+  .wrap{padding:12px 10px 60px}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="live-dot"></div>
+  <span class="tb-logo">BATTERY <em>BY</em></span>
+  <div class="tb-sep"></div>
+  <span class="tb-sub">7EB-BY-125/250 · BATTERY INSPECTION & MAINTENANCE</span>
+  <div class="tb-right">
+    <span class="tb-time" id="clock">--:--:--</span>
+    <button class="btn btn-draft btn-sm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 PDF</button>
+    <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">Battery Inspection &amp; Maintenance</div>
+  <div class="hero-title">125/250 VDC <em>BATTERY</em></div>
+  <div class="hero-sub">Unit 7 · 7EB-BY-125 (NiCd FNC 605L · 605 Ah · 92 cells) &nbsp;|&nbsp; 7EB-BY-250 (NiCd FNC 990L · 990 Ah · 200 cells)</div>
+  <div class="hero-stats">
+    <div class="hstat"><span class="hstat-n" id="h-total">0</span><span class="hstat-l">Total</span></div>
+    <div class="hstat"><span class="hstat-n ok" id="h-ok">0</span><span class="hstat-l">OK</span></div>
+    <div class="hstat"><span class="hstat-n ng" id="h-ng">0</span><span class="hstat-l">NG</span></div>
+    <div class="hstat"><span class="hstat-n pend" id="h-pend">0</span><span class="hstat-l">Pending</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<!-- WORK ORDER -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📋</div>
+    <div><div class="sec-hdr-title">Work Order Information</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid">
+      <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
+      <div class="mf"><label>Time</label><input type="time" id="wo-time"></div>
+      <div class="mf"><label>Unit</label>
+        <select id="wo-unit"><option>7</option><option>8</option><option>7/8</option></select>
+      </div>
+      <div class="mf"><label>Equipment</label>
+        <select id="wo-equip"><option>7EB-BY-125/250</option><option>7EB-BY-250</option><option>7EB-BY-125</option></select>
+      </div>
+      <div class="mf"><label>Checked By</label><input type="text" id="checked-by" placeholder="Full name"></div>
+      <div class="mf"><label>Reviewed By</label><input type="text" id="reviewed-by" placeholder="Supervisor name"></div>
+      <div class="mf"><label>Shift</label>
+        <select id="shift">
+          <option>Shift 1 (07:00–15:00)</option>
+          <option>Shift 2 (15:00–23:00)</option>
+          <option>Shift 3 (23:00–07:00)</option>
+          <option>Normal Hours</option>
+        </select>
+      </div>
+      <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION A: 7EB-BY-250 -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🔋</div>
+    <div>
+      <div class="sec-hdr-title">A — 7EB-BY-250 &nbsp;(250 VDC Battery)</div>
+      <span class="sec-hdr-sub">NiCd FNC 990L · 990 Ah · 200 cells · 4 Racks</span>
+    </div>
+    <span class="sec-hdr-cnt">200 cells</span>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+
+    <!-- Battery Specs -->
+    <div class="bat-spec">
+      <div class="bat-spec-item"><div class="bat-spec-l">Type</div><div class="bat-spec-v">FNC 990L (NiCd)</div></div>
+      <div class="bat-spec-item"><div class="bat-spec-l">Capacity</div><div class="bat-spec-v">990 Ah</div></div>
+      <div class="bat-spec-item"><div class="bat-spec-l">Quantity</div><div class="bat-spec-v">200 cells</div></div>
+      <div class="bat-spec-item"><div class="bat-spec-l">Nominal Voltage</div><div class="bat-spec-v">1.2 V/cell</div></div>
+      <div class="bat-spec-item"><div class="bat-spec-l">Float Charge</div><div class="bat-spec-v">1.40–1.45 V/cell</div></div>
+      <div class="bat-spec-item"><div class="bat-spec-l">Boost Charge</div><div class="bat-spec-v">1.50–1.60 V/cell</div></div>
+    </div>
+
+    <!-- Checklist -->
+    <div class="chk-grid">
+      <div class="chk-item">
+        <div class="chk-label">Under Warranty</div>
+        <div class="tog" id="chk-250-warranty"></div>
+      </div>
+      <div class="chk-item">
+        <div class="chk-label">Check Electrolyte Level</div>
+        <div class="tog" id="chk-250-electrolyte"></div>
+      </div>
+      <div class="chk-item">
+        <div class="chk-label">Cleaning &amp; Check Voltage</div>
+        <div class="tog" id="chk-250-cleaning"></div>
+      </div>
+    </div>
+
+    <!-- Voltage Measurement Table -->
+    <div class="tbl-wrap">
+      <table class="ct">
+        <thead>
+          <tr>
+            <th style="width:90px">Description</th>
+            <th style="min-width:180px;text-align:left;padding-left:16px">Cell No.</th>
+            <th style="width:130px">Cell Voltage</th>
+            <th style="width:150px">Total Voltage<br><span style="font-size:8px;opacity:0.7">(1 – 200)</span></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-250"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- SECTION B: 7EB-BY-125 -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🔋</div>
+    <div>
+      <div class="sec-hdr-title">B — 7EB-BY-125 &nbsp;(125 VDC Battery)</div>
+      <span class="sec-hdr-sub">NiCd FNC 605L · 605 Ah · 92 cells · 1 Rack</span>
+    </div>
+    <span class="sec-hdr-cnt">92 cells</span>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+
+    <!-- Battery Specs -->
+    <div class="bat-spec">
+      <div class="bat-spec-item"><div class="bat-spec-l">Type</div><div class="bat-spec-v">FNC 605L (NiCd)</div></div>
+      <div class="bat-spec-item"><div class="bat-spec-l">Capacity</div><div class="bat-spec-v">605 Ah</div></div>
+      <div class="bat-spec-item"><div class="bat-spec-l">Quantity</div><div class="bat-spec-v">92 cells</div></div>
+      <div class="bat-spec-item"><div class="bat-spec-l">Nominal Voltage</div><div class="bat-spec-v">1.2 V/cell</div></div>
+      <div class="bat-spec-item"><div class="bat-spec-l">Float Charge</div><div class="bat-spec-v">1.40–1.45 V/cell</div></div>
+      <div class="bat-spec-item"><div class="bat-spec-l">Boost Charge</div><div class="bat-spec-v">1.50–1.60 V/cell</div></div>
+    </div>
+
+    <!-- Checklist -->
+    <div class="chk-grid">
+      <div class="chk-item">
+        <div class="chk-label">Under Warranty</div>
+        <div class="tog" id="chk-125-warranty"></div>
+      </div>
+      <div class="chk-item">
+        <div class="chk-label">Check Electrolyte Level</div>
+        <div class="tog" id="chk-125-electrolyte"></div>
+      </div>
+      <div class="chk-item">
+        <div class="chk-label">Cleaning &amp; Check Voltage</div>
+        <div class="tog" id="chk-125-cleaning"></div>
+      </div>
+    </div>
+
+    <!-- Voltage Measurement Table -->
+    <div class="tbl-wrap">
+      <table class="ct">
+        <thead>
+          <tr>
+            <th style="width:90px">Description</th>
+            <th style="min-width:180px;text-align:left;padding-left:16px">Cell No.</th>
+            <th style="width:130px">Cell Voltage</th>
+            <th style="width:150px">Total Voltage<br><span style="font-size:8px;opacity:0.7">(1 – 92)</span></th>
+          </tr>
+        </thead>
+        <tbody id="tbody-125"></tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- SECTION C: NOTES -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📝</div>
+    <div><div class="sec-hdr-title">C — Notes &amp; Site Conditions</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+
+    <!-- Room Ventilation Fan -->
+    <div style="padding:14px 16px 0">
+      <div style="font-family:var(--raj);font-size:12px;font-weight:700;color:var(--navy);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px">
+        Room Ventilation Fan
+      </div>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+        <div class="pc-item">
+          <div><div class="pc-label">Fan 420 A</div><div class="pc-sub">Battery Room Ventilation</div></div>
+          <div class="tog" id="fan-420a"></div>
+        </div>
+        <div class="pc-item">
+          <div><div class="pc-label">Fan 420 B</div><div class="pc-sub">Battery Room Ventilation</div></div>
+          <div class="tog" id="fan-420b"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes fields -->
+    <div class="wo-grid" style="padding-top:0">
+      <div class="mf">
+        <label>Room Temperature (°C)</label>
+        <input type="number" step="0.1" id="room-temp" placeholder="e.g. 25.5">
+      </div>
+      <div class="mf">
+        <label>Note 3</label>
+        <input type="text" id="note3" placeholder="Additional note...">
+      </div>
+      <div class="mf">
+        <label>Note 4</label>
+        <input type="text" id="note4" placeholder="Additional note...">
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FINDINGS -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📊</div>
+    <div><div class="sec-hdr-title">Findings &amp; Conclusion</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid" style="padding-bottom:0">
+      <div class="mf">
+        <label>Overall Condition</label>
+        <select id="overall">
+          <option>✅ GOOD — Normal Operation</option>
+          <option>⚠️ FAIR — Requires Monitoring</option>
+          <option>🔧 POOR — Maintenance Required</option>
+          <option>🛑 CRITICAL — Must Shutdown</option>
+        </select>
+      </div>
+      <div class="mf"><label>Next PM Due</label><input type="date" id="next-pm"></div>
+    </div>
+    <div class="findings-grid">
+      <div class="mf"><label>Findings / Observations</label>
+        <textarea id="findings" placeholder="Catat semua temuan, abnormalitas, atau observasi…"></textarea>
+      </div>
+      <div class="mf"><label>Corrective Actions / Recommendations</label>
+        <textarea id="recommendations" placeholder="Tindakan yang diambil dan rekomendasi tindak lanjut…"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ACTION ROW -->
+<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
+  <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
+  <button class="btn btn-draft" style="background:var(--navy);color:#fff" onclick="saveDraft()">💾 Save Draft</button>
+  <button class="btn btn-pdf" onclick="generatePDF()">📄 Download PDF</button>
+  <button class="btn" style="background:#16a34a;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">📊 Submit to Database</button>
+</div>
+<div id="notice" class="notice"></div>
+
+</div><!-- /wrap -->
+
+<footer class="footer">
+  <div class="footer-l">UNIT 7 · 125/250 VDC BATTERY · 7EB-BY-125/250 · BATTERY INSPECTION & MAINTENANCE</div>
+  <div class="footer-r" id="fdate">—</div>
+</footer>
+
+<script>
+// ── CLOCK ──────────────────────────────────────────
+function tick(){
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('id-ID');
+  document.getElementById('fdate').textContent=n.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(tick,1000);tick();
+
+// ── TOGGLE SECTION ─────────────────────────────────
+function toggleSec(hdr){
+  hdr.classList.toggle('open');
+  const body=hdr.nextElementSibling;
+  body.style.display=hdr.classList.contains('open')?'':'none';
+}
+
+// ── STATE ──────────────────────────────────────────
+const ST={};
+function setBtn(id,val,btn){
+  const par=btn.closest('.tog');
+  par.querySelectorAll('.rb').forEach(b=>{
+    b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle');
+  });
+  if(ST[id]===val){delete ST[id];}
+  else{
+    btn.className='rb '+(val==='OK'?'ok-act':'ng-act');
+    ST[id]=val;
+  }
+  updateStats();
+}
+function mkTog(id){
+  return `<div class="tog">
+    <button class="rb ok-idle" data-v="OK" onclick="setBtn('${id}','OK',this)">✓ OK</button>
+    <button class="rb ng-idle" data-v="NG" onclick="setBtn('${id}','NG',this)">✗ NG</button>
+  </div>`;
+}
+function mkInp(id,wide){
+  return `<input class="mi${wide?' ':' mi-sm'}" type="number" step="0.01" id="${id}" placeholder="—">`;
+}
+
+// ── UPDATE STATS ───────────────────────────────────
+function updateStats(){
+  const vals=Object.values(ST);
+  const ok=vals.filter(v=>v==='OK').length;
+  const ng=vals.filter(v=>v==='NG').length;
+  const total=document.querySelectorAll('.tog').length;
+  const pending=total-ok-ng;
+  document.getElementById('h-total').textContent=total;
+  document.getElementById('h-ok').textContent=ok;
+  document.getElementById('h-ng').textContent=ng;
+  document.getElementById('h-pend').textContent=pending;
+}
+
+// ── BUILD VOLTAGE TABLE ────────────────────────────
+function buildVoltageTable(tbodyId,batId,racks){
+  const tb=document.getElementById(tbodyId);
+  racks.forEach(rack=>{
+    // Row 1: Rack label (rowspan=2), first cell range, cell voltage, total voltage (rowspan=2)
+    const tr1=document.createElement('tr');
+    tr1.innerHTML=`
+      <td class="rack-lbl" rowspan="2">${rack.name}</td>
+      <td class="cell-no">${rack.rows[0]}</td>
+      <td>
+        ${mkInp(batId+'_cv_'+rack.id+'_0',true)}
+        <span style="font-size:9px;color:var(--txt4);display:block;margin-top:1px">V/cell</span>
+      </td>
+      <td class="total-cell" rowspan="2">
+        ${mkInp(batId+'_tv_'+rack.id,true)}
+        <span style="font-size:9px;color:var(--txt4);display:block;margin-top:1px">V total</span>
+      </td>
+    `;
+    tb.appendChild(tr1);
+
+    // Row 2: second cell range + cell voltage (total cell merged above)
+    const tr2=document.createElement('tr');
+    tr2.innerHTML=`
+      <td class="cell-no">${rack.rows[1]}</td>
+      <td>
+        ${mkInp(batId+'_cv_'+rack.id+'_1',true)}
+        <span style="font-size:9px;color:var(--txt4);display:block;margin-top:1px">V/cell</span>
+      </td>
+    `;
+    tb.appendChild(tr2);
+  });
+}
+
+// ── BUILD SECTION A: 7EB-BY-250 ───────────────────
+function build250(){
+  ['chk-250-warranty','chk-250-electrolyte','chk-250-cleaning'].forEach(id=>{
+    document.getElementById(id).innerHTML=mkTog(id);
+  });
+  buildVoltageTable('tbody-250','by250',[
+    {name:'Rack 1',id:'r1',rows:['101 ~ 125 + 176 ~ 200','126 ~ 175']},
+    {name:'Rack 2',id:'r2',rows:['1 ~ 25 + 76 ~ 100','26 ~ 75']},
+    {name:'Rack 3',id:'r3',rows:['1 ~ 25 + 76 ~ 100','26 ~ 75']},
+    {name:'Rack 4',id:'r4',rows:['101 ~ 125 + 176 ~ 200','126 ~ 175']},
+  ]);
+}
+
+// ── BUILD SECTION B: 7EB-BY-125 ───────────────────
+function build125(){
+  ['chk-125-warranty','chk-125-electrolyte','chk-125-cleaning'].forEach(id=>{
+    document.getElementById(id).innerHTML=mkTog(id);
+  });
+  buildVoltageTable('tbody-125','by125',[
+    {name:'Rack 1',id:'r1',rows:['1 – 46','47 – 92']},
+  ]);
+}
+
+// ── BUILD NOTES ────────────────────────────────────
+function buildNotes(){
+  ['fan-420a','fan-420b'].forEach(id=>{
+    document.getElementById(id).innerHTML=mkTog(id);
+  });
+}
+
+// ── DRAFT ──────────────────────────────────────────
+function saveDraft(){
+  const d={};
+  document.querySelectorAll('input[type=text],input[type=date],input[type=time],input[type=number],select,textarea').forEach((el,i)=>d['f'+i]=el.value);
+  d._st=ST;
+  try{
+    localStorage.setItem('battery_7eb_draft',JSON.stringify(d));
+    showNote('💾 Draft tersimpan.','ok');
+  }catch(e){showNote('❌ Gagal menyimpan: '+e.message,'err');}
+}
+function loadDraft(){
+  try{
+    const raw=localStorage.getItem('battery_7eb_draft');
+    if(!raw)return;
+    const d=JSON.parse(raw);
+    document.querySelectorAll('input[type=text],input[type=date],input[type=time],input[type=number],select,textarea').forEach((el,i)=>{
+      if(d['f'+i]!==undefined)el.value=d['f'+i];
+    });
+    if(d._st){
+      Object.entries(d._st).forEach(([id,val])=>{
+        ST[id]=val;
+        const tog=document.querySelector(`.tog .rb[data-v="${val}"][onclick*="'${id}'"]`);
+        if(tog)tog.className='rb '+(val==='OK'?'ok-act':'ng-act');
+      });
+    }
+    updateStats();
+  }catch(e){}
+}
+function resetForm(){
+  if(!confirm('Reset semua data? Tindakan ini tidak dapat dibatalkan.'))return;
+  document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file')el.value='';});
+  Object.keys(ST).forEach(k=>delete ST[k]);
+  document.querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
+  updateStats();
+}
+function showNote(msg,t){
+  const n=document.getElementById('notice');
+  n.textContent=msg;n.className='notice '+t;
+  setTimeout(()=>n.className='notice',4000);
+}
+
+// ── HELPERS ────────────────────────────────────────
+const v=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
+const tr2=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'');
+function getTogVal(id){return ST[id]||'—';}
+function getInpVal(id){const e=document.getElementById(id);return e&&e.value?e.value:'—';}
+
+// ── PDF ────────────────────────────────────────────
+async function generatePDF(){
+  showNote('⏳ Membuat PDF, harap tunggu…','info');
+  await new Promise(r=>setTimeout(r,200));
+  const{jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297,M=12;let y=M;
+  const NAVY=[30,58,95],BLUE=[37,99,235],SKY=[125,211,252],LT=[240,247,255],
+        OK=[22,163,74],NG=[220,38,38],GRAY=[100,116,139],WHITE=[255,255,255];
+
+  function nPage(){pdf.addPage();y=M;miniHdr();}
+  function ckY(n){if(y+n>H-M)nPage();}
+  function miniHdr(){
+    pdf.setFillColor(...NAVY);pdf.rect(0,0,W,8,'F');
+    pdf.setTextColor(...SKY);pdf.setFont('helvetica','bold');pdf.setFontSize(7);
+    pdf.text('125/250 VDC BATTERY — 7EB-BY-125/250',M,5.5);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);
+    pdf.text(`Date: ${v('wo-date')||'—'}  Unit: ${v('wo-unit')||'—'}  By: ${v('checked-by')||'—'}`,W-M,5.5,{align:'right'});
+    y=12;
+  }
+
+  // Cover
+  pdf.setFillColor(...NAVY);pdf.rect(0,0,W,35,'F');
+  pdf.setFillColor(...BLUE);pdf.rect(0,33,W,2,'F');
+  pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(16);
+  pdf.text('125/250 VDC BATTERY',M,13);
+  pdf.setFontSize(10);pdf.setTextColor(...SKY);
+  pdf.text('Battery Inspection & Maintenance — 7EB-BY-125/250',M,21);
+  pdf.setFontSize(7.5);pdf.setTextColor(...SKY);pdf.setFont('helvetica','normal');
+  pdf.text('Generated: '+new Date().toLocaleString('en-GB'),M,29);
+  pdf.text('POMI — Unit 7 Electrical Maintenance',W-M,29,{align:'right'});
+  y=40;
+
+  // Info box
+  pdf.setFillColor(...LT);pdf.setDrawColor(125,211,252);pdf.setLineWidth(0.25);
+  pdf.roundedRect(M,y,W-M*2,26,2,2,'FD');
+  function ib(lbl,val,x,yy){
+    pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...GRAY);pdf.text(lbl.toUpperCase(),x,yy);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8.5);pdf.setTextColor(...NAVY);pdf.text(tr2(val||'—',26),x,yy+5);
+  }
+  const cx=[M+3,52,100,148];
+  ib('Date',v('wo-date'),cx[0],y+8);ib('Unit',v('wo-unit'),cx[1],y+8);
+  ib('Equipment',v('wo-equip'),cx[2],y+8);ib('Shift',v('shift').split(' ')[0],cx[3],y+8);
+  ib('WO No.',v('wo-no'),cx[0],y+20);ib('Checked By',v('checked-by'),cx[1],y+20);
+  ib('Reviewed By',v('reviewed-by'),cx[2],y+20);ib('Condition',v('overall').replace(/[✅⚠️🔧🛑]/g,'').trim(),cx[3],y+20);
+  y+=32;
+
+  // Stats
+  const ok_c=Object.values(ST).filter(x=>x==='OK').length;
+  const ng_c=Object.values(ST).filter(x=>x==='NG').length;
+  const tot=document.querySelectorAll('.tog').length;
+  [[M,'TOTAL',String(tot),NAVY],[M+32,'OK',String(ok_c),OK],[M+64,'NG',String(ng_c),NG]].forEach(([x,l,val,cl])=>{
+    pdf.setFillColor(...cl);pdf.setDrawColor(...cl);pdf.setLineWidth(0.3);
+    pdf.roundedRect(x,y,24,10,1.5,1.5,'FD');
+    pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...WHITE);pdf.text(l,x+2,y+4);
+    pdf.setFontSize(10);pdf.text(val,x+2,y+9);
+  });
+  y+=16;
+
+  function sectionHdr(title){
+    ckY(14);
+    pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,7,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
+    pdf.text('▶  '+title,M+3,y+5);y+=10;
+  }
+  function specLine(text){
+    pdf.setFillColor(...LT);pdf.rect(M,y,W-M*2,8,'F');
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(...NAVY);
+    pdf.text(text,M+3,y+5);y+=11;
+  }
+  function chkTable(rows){
+    pdf.autoTable({startY:y,
+      head:[['#','Check Item','Status']],body:rows,theme:'grid',
+      styles:{font:'helvetica',fontSize:8,cellPadding:2.5,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+      headStyles:{fillColor:NAVY,textColor:[125,211,252],fontStyle:'bold',fontSize:7},
+      columnStyles:{0:{cellWidth:10,halign:'center'},2:{cellWidth:28,halign:'center'}},
+      didParseCell:d=>{const val=d.cell.text[0];
+        if(val==='OK'){d.cell.styles.textColor=[...OK];d.cell.styles.fontStyle='bold';}
+        if(val==='NG'){d.cell.styles.textColor=[...NG];d.cell.styles.fontStyle='bold';}},
+      margin:{left:M,right:M}});
+    y=pdf.lastAutoTable.finalY+4;
+  }
+  function voltTable(header,rows){
+    pdf.autoTable({startY:y,
+      head:[header],body:rows,theme:'grid',
+      styles:{font:'helvetica',fontSize:8,cellPadding:2.5,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+      headStyles:{fillColor:NAVY,textColor:[125,211,252],fontStyle:'bold',fontSize:7,halign:'center'},
+      columnStyles:{0:{cellWidth:22,halign:'center',fontStyle:'bold'},2:{halign:'center'},3:{halign:'center'}},
+      margin:{left:M,right:M}});
+    y=pdf.lastAutoTable.finalY+6;
+  }
+
+  // Section A
+  sectionHdr('A — 7EB-BY-250 (250 VDC Battery)');
+  specLine('Type: FNC 990L (NiCd)  |  Capacity: 990 Ah  |  Qty: 200 cells  |  Nominal: 1.2 V/cell  |  Float: 1.40–1.45 V/cell  |  Boost: 1.50–1.60 V/cell');
+  chkTable([
+    ['1','Under Warranty',getTogVal('chk-250-warranty')],
+    ['2','Check Electrolyte Level',getTogVal('chk-250-electrolyte')],
+    ['3','Cleaning & Check Voltage',getTogVal('chk-250-cleaning')],
+  ]);
+  voltTable(['Rack','Cell No.','Cell Voltage','Total Voltage (1–200)'],[
+    ['Rack 1','101~125 + 176~200',getInpVal('by250_cv_r1_0')+' V/cell',getInpVal('by250_tv_r1')+' V'],
+    ['',       '126~175',          getInpVal('by250_cv_r1_1')+' V/cell',''],
+    ['Rack 2','1~25 + 76~100',    getInpVal('by250_cv_r2_0')+' V/cell',getInpVal('by250_tv_r2')+' V'],
+    ['',       '26~75',            getInpVal('by250_cv_r2_1')+' V/cell',''],
+    ['Rack 3','1~25 + 76~100',    getInpVal('by250_cv_r3_0')+' V/cell',getInpVal('by250_tv_r3')+' V'],
+    ['',       '26~75',            getInpVal('by250_cv_r3_1')+' V/cell',''],
+    ['Rack 4','101~125 + 176~200',getInpVal('by250_cv_r4_0')+' V/cell',getInpVal('by250_tv_r4')+' V'],
+    ['',       '126~175',          getInpVal('by250_cv_r4_1')+' V/cell',''],
+  ]);
+
+  // Section B
+  sectionHdr('B — 7EB-BY-125 (125 VDC Battery)');
+  specLine('Type: FNC 605L (NiCd)  |  Capacity: 605 Ah  |  Qty: 92 cells  |  Nominal: 1.2 V/cell  |  Float: 1.40–1.45 V/cell  |  Boost: 1.50–1.60 V/cell');
+  chkTable([
+    ['1','Under Warranty',getTogVal('chk-125-warranty')],
+    ['2','Check Electrolyte Level',getTogVal('chk-125-electrolyte')],
+    ['3','Cleaning & Check Voltage',getTogVal('chk-125-cleaning')],
+  ]);
+  voltTable(['Rack','Cell No.','Cell Voltage','Total Voltage (1–92)'],[
+    ['Rack 1','1 – 46', getInpVal('by125_cv_r1_0')+' V/cell',getInpVal('by125_tv_r1')+' V'],
+    ['',       '47 – 92',getInpVal('by125_cv_r1_1')+' V/cell',''],
+  ]);
+
+  // Notes
+  sectionHdr('C — Notes & Site Conditions');
+  pdf.autoTable({startY:y,
+    head:[['Note','Detail']],
+    body:[
+      ['Room Temperature',v('room-temp')?(v('room-temp')+' °C'):'—'],
+      ['Ventilation Fan 420 A',getTogVal('fan-420a')],
+      ['Ventilation Fan 420 B',getTogVal('fan-420b')],
+      ['Note 3',v('note3')||'—'],
+      ['Note 4',v('note4')||'—'],
+    ],
+    theme:'grid',
+    styles:{font:'helvetica',fontSize:8,cellPadding:2.5,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+    headStyles:{fillColor:NAVY,textColor:[125,211,252],fontStyle:'bold',fontSize:7},
+    columnStyles:{0:{cellWidth:50,fontStyle:'bold',fillColor:LT,textColor:NAVY}},
+    didParseCell:d=>{const val=d.cell.text[0];
+      if(val==='OK'){d.cell.styles.textColor=[...OK];d.cell.styles.fontStyle='bold';}
+      if(val==='NG'){d.cell.styles.textColor=[...NG];d.cell.styles.fontStyle='bold';}},
+    margin:{left:M,right:M}});
+  y=pdf.lastAutoTable.finalY+6;
+
+  // Findings
+  ckY(30);
+  sectionHdr('Findings & Conclusion');
+  pdf.autoTable({startY:y,
+    body:[
+      ['Overall Condition',v('overall')],
+      ['Next PM Due',v('next-pm')||'—'],
+      ['Findings',v('findings')||'—'],
+      ['Corrective Actions',v('recommendations')||'—'],
+    ],
+    theme:'grid',
+    styles:{font:'helvetica',fontSize:8.5,cellPadding:3,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+    columnStyles:{0:{cellWidth:46,fontStyle:'bold',fillColor:LT,textColor:NAVY}},
+    margin:{left:M,right:M}});
+
+  // Page numbers
+  const pages=pdf.internal.getNumberOfPages();
+  for(let pg=1;pg<=pages;pg++){
+    pdf.setPage(pg);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(150);
+    pdf.text(`Page ${pg}/${pages}`,W-M,H-5,{align:'right'});
+    pdf.text('POMI — Unit 7 Battery Inspection & Maintenance — 7EB-BY-125/250',M,H-5);
+  }
+
+  const fn=`Battery_PM_${v('wo-unit')||'7'}_${(v('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
+  pdf.save(fn);
+  showNote('✅ PDF tersimpan: '+fn,'ok');
+}
+
+// ── INIT ───────────────────────────────────────────
+build250();
+build125();
+buildNotes();
+loadDraft();
+updateStats();
+
+// Auto-load last submission from database
+setTimeout(async()=>{
+  const d=await DB.loadLastSubmission('7EB-BY-125/250');
+  if(d)showNote('📂 Data terakhir dimuat dari database.','ok');
+},800);
+
+async function submitToDb(){
+  const data=DB.collectCheckSheetData('battery','7EB-BY-125/250','Battery Inspection & Maintenance','PERIODIC');
+  if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
+  if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+  try{
+    const id=await DB.save(data);
+    DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
+  }catch(e){
+    DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+  }
+}
+</script>
+</body>
+</html>
