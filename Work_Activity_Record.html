@@ -801,6 +801,68 @@ function updatePrintTxt(id,val){
   if(pc)pc.textContent=val;
 }
 
+// ── EXIF ORIENTATION HELPERS ─────────────────────
+function getExifOrientation(ab){
+  const v=new DataView(ab);
+  if(v.byteLength<2||v.getUint16(0,false)!==0xFFD8)return 1;
+  let off=2;
+  while(off+4<=v.byteLength){
+    const mk=v.getUint16(off,false);off+=2;
+    if(mk===0xFFE1){
+      if(off+10>v.byteLength)return 1;
+      if(v.getUint32(off+2,false)!==0x45786966)return 1;
+      const le=v.getUint16(off+8,false)===0x4949;
+      const ifdOff=off+8+v.getUint32(off+12,le);
+      if(ifdOff+2>v.byteLength)return 1;
+      const n=v.getUint16(ifdOff,le);
+      for(let i=0;i<n;i++){
+        const t=ifdOff+2+i*12;
+        if(t+10>v.byteLength)break;
+        if(v.getUint16(t,le)===0x0112)return v.getUint16(t+8,le);
+      }
+      return 1;
+    }
+    if((mk&0xFF00)!==0xFF00)break;
+    if(off+2>v.byteLength)break;
+    off+=v.getUint16(off,false);
+  }
+  return 1;
+}
+function normalizeImgOrientation(dataUrl){
+  return new Promise(res=>{
+    let orientation=1;
+    try{
+      const b64=dataUrl.split(',')[1];
+      const bin=atob(b64);
+      const ab=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)ab[i]=bin.charCodeAt(i);
+      orientation=getExifOrientation(ab.buffer);
+    }catch(e){}
+    if(orientation===1){res(dataUrl);return;}
+    const img=new Image();
+    img.onload=()=>{
+      const W=img.naturalWidth,H=img.naturalHeight;
+      const canvas=document.createElement('canvas');
+      const ctx=canvas.getContext('2d');
+      if(orientation>=5&&orientation<=8){canvas.width=H;canvas.height=W;}
+      else{canvas.width=W;canvas.height=H;}
+      switch(orientation){
+        case 2:ctx.transform(-1,0,0,1,W,0);break;
+        case 3:ctx.transform(-1,0,0,-1,W,H);break;
+        case 4:ctx.transform(1,0,0,-1,0,H);break;
+        case 5:ctx.transform(0,1,1,0,0,0);break;
+        case 6:ctx.transform(0,1,-1,0,H,0);break;
+        case 7:ctx.transform(0,-1,-1,0,H,W);break;
+        case 8:ctx.transform(0,-1,1,0,0,W);break;
+      }
+      ctx.drawImage(img,0,0);
+      res(canvas.toDataURL('image/jpeg',0.92));
+    };
+    img.onerror=()=>res(dataUrl);
+    img.src=dataUrl;
+  });
+}
+
 // ── FILE HANDLERS ────────────────────────────────
 function onAddPhotos(blockIdx,inp){
   const files=Array.from(inp.files);if(!files.length)return;
@@ -809,8 +871,9 @@ function onAddPhotos(blockIdx,inp){
     if(f.size>15*1024*1024){showNotice('File terlalu besar (maks 15 MB): '+f.name,'err');return;}
     pending++;
     const r=new FileReader();
-    r.onload=e=>{
-      BLOCKS[blockIdx].photos.push({src:e.target.result,filename:f.name,caption:'',size:'m',full:false});
+    r.onload=async e=>{
+      const fixedSrc=await normalizeImgOrientation(e.target.result);
+      BLOCKS[blockIdx].photos.push({src:fixedSrc,filename:f.name,caption:'',size:'m',full:false});
       pending--;
       if(pending===0)renderBlocks();
     };
