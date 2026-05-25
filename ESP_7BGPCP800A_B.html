@@ -839,11 +839,87 @@ setTimeout(async()=>{
 },800);
 
 async function submitToDb(){
-  const data=DB.collectCheckSheetData('esp2','7BG-PCP-800A/B','ESP Weekly Maintenance','WEEKLY');
-  if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
-  if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+  const base=DB.collectCheckSheetData('esp2','7BG-PCP-800A/B','ESP Weekly Maintenance','WEEKLY');
+  if(!base.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
+  if(!base.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+
+  const tv=id=>ST[id]||'—';
+  const iv=id=>{const e=document.getElementById(id);return e&&e.value.trim()?e.value.trim():'—'};
+
+  const COLS_A=['817A','827A','837A','847A','815A','825A','835A','845A','817B','827B','837B','847B','815B','825B','835B','845B'];
+  const COLS_B=['815J','817J','825J','827J','835J','837J','845J','847J'];
+  const COLS_C=['815K','817K','825K','827K','835K','837K','845K','847K'];
+  const COLS_D=['815F','825F','835F','845F','817F','827F','837F','847F','815E','825E','835E','845E','817E','827E','837E','847E'];
+  const COLS_E=['815H','817H','845H','847H','815G','817G','845G','847G'];
+  const COLS_F=['815E','825E','835E','845E','815F','825F','835F','845F'];
+
+  function mkSheet(title,cols,rowDefs){
+    return{title,columns:cols,rows:rowDefs.map(([no,desc,crit,fn])=>({no,desc,crit,values:Object.fromEntries(cols.map(c=>[c,fn(c)]))}))};
+  }
+
+  base.sheets={
+    sA:mkSheet('A — Rectifier Transformer Unit',COLS_A,[
+      ['1','Ambient Temp. (°C)','< 40°C',c=>iv('1_'+c)],
+      ['2','AC Input Voltage T/R (V)','380 V',c=>iv('2_'+c)],
+      ['3','AC Input Current T/R (A)','< 275 A',c=>iv('3_'+c)],
+      ['4','DC Output Voltage T/R (kV)','< 60 kV',c=>iv('4_'+c)],
+      ['5','DC Output Current T/R (mA)','< 1200 mA',c=>iv('5_'+c)],
+      ['6','DC Current Limit Is (mA)','< 1200 mA',c=>iv('6_'+c)],
+      ['6b','DC Voltage Limit Vs (kV)','< 60 kV',c=>iv('6b_'+c)],
+      ['7','Oil Level T/R','> Oil fill mark',c=>iv('7_'+c)],
+      ['8','Oil Temperature (°C)','< 90°C',c=>iv('8_'+c)],
+      ['9','Oil Leakage','No Leak',c=>tv('9_'+c)],
+      ['10','Contamination','Clean',c=>tv('10_'+c)],
+      ['11','Sparks / Arcs Record','Record',c=>iv('11_'+c)],
+      ['12','Panel Indication Check','Check',c=>iv('12_'+c)],
+    ]),
+    sB:mkSheet('B — CE Rapping Motors (West)',COLS_B,[
+      ['1','Overheating (°C)','< 155°C',c=>iv('b_1_'+c)],
+      ['2','Lubrication Leakage','No Leak',c=>tv('b_2_'+c)],
+      ['3','Grease Leakage','No Leak',c=>tv('b_3_'+c)],
+      ['4','Abnormal Sound','No Noise',c=>tv('b_4_'+c)],
+      ['5','Contamination','Clean',c=>tv('b_5_'+c)],
+    ]),
+    sC:mkSheet('C — CE Rapping Motors (East)',COLS_C,[
+      ['1','Overheating (°C)','< 155°C',c=>iv('c_1_'+c)],
+      ['2','Lubrication Leakage','No Leak',c=>tv('c_2_'+c)],
+      ['3','Grease Leakage','No Leak',c=>tv('c_3_'+c)],
+      ['4','Abnormal Sound','No Noise',c=>tv('c_4_'+c)],
+      ['5','Contamination','Clean',c=>tv('c_5_'+c)],
+    ]),
+    sD:mkSheet('D — DE Rapping Motors (Roof)',COLS_D,[
+      ['1','Overheating (°C)','< 155°C',c=>iv('d_1_'+c)],
+      ['2','Lubrication Leakage','No Leak',c=>tv('d_2_'+c)],
+      ['3','Grease Leakage','No Leak',c=>tv('d_3_'+c)],
+      ['4','Abnormal Sound','No Noise',c=>tv('d_4_'+c)],
+      ['5','Contamination','Clean',c=>tv('d_5_'+c)],
+    ]),
+    sE:mkSheet('E — Gas Distribution Rapping Motors',COLS_E,[
+      ['1','Overheating (°C)','< 155°C',c=>iv('e_1_'+c)],
+      ['2','Lubrication Leakage','No Leak',c=>tv('e_2_'+c)],
+      ['3','Grease Leakage','No Leak',c=>tv('e_3_'+c)],
+      ['4','Abnormal Sound','No Noise',c=>tv('e_4_'+c)],
+      ['5','Contamination','Clean',c=>tv('e_5_'+c)],
+    ]),
+    sF:mkSheet('F — Hopper Heater Current (A)',COLS_F,[
+      ['1','Hopper Heater Current (A)','< 30 A',c=>iv('htr_'+c)],
+    ]),
+    sF2:{
+      title:'F.2 — Panel Cleaning from Dust & Contamination',
+      columns:['Result'],
+      rows:[
+        {no:'1',desc:'BG-CAB-800A — Hopper Level Switch Local Indicator',crit:'Clean',values:{Result:tv('pc-800a')}},
+        {no:'2',desc:'BG-CAB-800B — Hopper Level Switch Local Indicator',crit:'Clean',values:{Result:tv('pc-800b')}},
+        {no:'3',desc:'BG-CAB-800C — Hopper Vibrator Local Control',crit:'Clean',values:{Result:tv('pc-800c')}},
+        {no:'4',desc:'BG-CAB-800D — Hopper Vibrator Local Control',crit:'Clean',values:{Result:tv('pc-800d')}},
+        {no:'5',desc:'BG-CAB-800E — Hopper Heater Local Control Panel',crit:'Clean',values:{Result:tv('pc-800e')}},
+        {no:'6',desc:'BG-CAB-800F — Hopper Heater Local Control Panel',crit:'Clean',values:{Result:tv('pc-800f')}},
+      ],
+    },
+  };
+
   try{
-    const id=await DB.save(data);
+    const id=await DB.save(base);
     DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
   }catch(e){
     DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
