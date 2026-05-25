@@ -131,30 +131,60 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   font-family:var(--sans);font-style:italic}
 .img-cap:focus{outline:none;border-color:var(--blue);background:#fff}
 
-/* ── PHOTO GRID (multi-photo) ─── */
-.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+/* ── PHOTO GRID (multi-photo, 6-col base) ─── */
+.photo-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
 .photo-item-wrap{border:1px solid var(--bdr2);border-radius:6px;overflow:hidden;background:var(--bg2);display:flex;flex-direction:column}
-.photo-item-wrap.span-2{grid-column:1/-1}
+.photo-item-wrap[data-size="s"]{grid-column:span 2}
+.photo-item-wrap[data-size="m"]{grid-column:span 3}
+.photo-item-wrap[data-size="l"]{grid-column:span 6}
 .photo-img-area{background:#e8f0f8;display:flex;align-items:center;justify-content:center;overflow:hidden}
-.photo-img-area img{display:block;width:100%;height:auto;object-fit:contain}
+.photo-img-area img{display:block;width:auto;max-width:100%;height:auto;object-fit:contain}
 .photo-item-wrap[data-size="s"] .photo-img-area img{max-height:110px}
 .photo-item-wrap[data-size="m"] .photo-img-area img{max-height:200px}
-.photo-item-wrap[data-size="l"] .photo-img-area img{max-height:340px}
+.photo-item-wrap[data-size="l"] .photo-img-area img{max-height:300px}
 .photo-btns{display:flex;align-items:center;gap:3px;padding:4px 7px;background:var(--bg2);border-top:1px solid var(--bdr2)}
 .photo-sz-lbl{font-size:8px;color:var(--txt4);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-right:2px;flex-shrink:0}
-.photo-sz,.photo-span-btn{padding:2px 6px;border-radius:3px;border:1px solid var(--bdr);background:var(--surf);font-size:9px;cursor:pointer;font-family:var(--mono);color:var(--txt4);transition:all .12s}
+.photo-sz{padding:2px 6px;border-radius:3px;border:1px solid var(--bdr);background:var(--surf);font-size:9px;cursor:pointer;font-family:var(--mono);color:var(--txt4);transition:all .12s}
 .photo-sz.active{background:var(--blue);color:#fff;border-color:var(--blue)}
-.photo-span-btn{margin-left:3px}
-.photo-span-btn.active{background:#7c3aed;color:#fff;border-color:#7c3aed}
+.photo-edit{padding:2px 7px;border-radius:3px;border:1px solid #bfdbfe;background:#dbeafe;color:#1e40af;font-size:9px;cursor:pointer;font-family:var(--mono);margin-left:3px}
+.photo-edit:hover{background:#bfdbfe}
 .photo-del{margin-left:auto;padding:2px 8px;border-radius:3px;border:1px solid #fca5a5;background:#fff5f5;color:#dc2626;font-size:9px;cursor:pointer;font-family:var(--mono)}
 .photo-del:hover{background:#fee2e2}
 .photo-cap{border:none;border-top:1px solid var(--bdr2);padding:5px 8px;font-size:11px;font-family:var(--sans);background:#fff;color:var(--txt);font-style:italic;width:100%}
 .photo-cap:focus{outline:none;background:#fffbe6}
-.photo-add-btn{grid-column:1/-1;border:2px dashed var(--bdr);border-radius:6px;padding:12px;text-align:center;
+.photo-add-btn{grid-column:1/-1;border:2px dashed var(--bdr);border-radius:6px;padding:10px;text-align:center;
   cursor:pointer;background:var(--bg2);transition:all .2s;font-family:var(--mono);font-size:11px;
   color:var(--txt4);letter-spacing:1px;display:flex;align-items:center;justify-content:center;gap:6px;position:relative}
 .photo-add-btn:hover{border-color:var(--blue);color:var(--blue);background:#eef4ff}
 .photo-add-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+
+/* ── IMAGE EDITOR MODAL ─── */
+.ed-overlay{position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:2000;display:flex;align-items:center;justify-content:center;padding:10px}
+.ed-box{background:#fff;border-radius:12px;overflow:hidden;display:flex;flex-direction:column;width:min(860px,100%);max-height:calc(100vh - 20px)}
+.ed-hdr{display:flex;align-items:center;padding:10px 14px;background:var(--navy);gap:8px}
+.ed-title{font-family:var(--raj);font-size:15px;font-weight:700;color:#fff;letter-spacing:1px;flex:1}
+.ed-x{background:rgba(255,255,255,.15);border:none;color:#fff;width:28px;height:28px;border-radius:4px;cursor:pointer;font-size:14px}
+.ed-x:hover{background:rgba(255,255,255,.3)}
+.ed-tb{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:8px 12px;background:var(--bg2);border-bottom:1px solid var(--bdr2)}
+.ed-tg{display:flex;align-items:center;gap:4px}
+.ed-lbl{font-size:9px;color:var(--txt4);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;white-space:nowrap}
+.ed-t{width:32px;height:32px;border:1.5px solid var(--bdr);border-radius:5px;background:var(--surf);cursor:pointer;font-size:14px;transition:all .12s;color:var(--txt4)}
+.ed-t:hover{background:var(--bg2)}
+.ed-t.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.ed-clrs{display:flex;gap:3px;align-items:center}
+.ed-c{width:20px;height:20px;border-radius:3px;border:2px solid transparent;cursor:pointer;flex-shrink:0;transition:transform .1s}
+.ed-c:hover{transform:scale(1.2)}
+.ed-c.active{border-color:var(--navy)!important;transform:scale(1.1)}
+.ed-cw{flex:1;overflow:auto;background:#555;display:flex;align-items:center;justify-content:center;padding:10px;min-height:180px;position:relative}
+#ed-cv{cursor:crosshair;display:block;max-width:100%;max-height:calc(100vh - 260px)}
+.ed-ti{position:absolute;border:2px dashed #fff;background:rgba(255,255,255,.92);padding:3px 6px;font-size:14px;font-weight:bold;min-width:80px;outline:none;border-radius:3px;display:none}
+.ed-foot{padding:10px 12px;border-top:1px solid var(--bdr2);background:var(--bg2)}
+.ed-sz-row{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.ed-sz-track{display:flex;align-items:center;gap:4px;flex:1}
+.ed-sz-track input[type=range]{flex:1;accent-color:var(--blue)}
+.ed-sz-stops{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:var(--txt4);margin-top:1px}
+.ed-sz-cur{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--blue);width:18px;text-align:center}
+.ed-acts{display:flex;gap:6px;justify-content:flex-end}
 
 /* ── FILE BLOCK ─── */
 .file-dz{border:2px dashed #c4b5fd;border-radius:8px;padding:24px 20px;text-align:center;
@@ -299,13 +329,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   .findings-grid{display:none!important}
 
   /* ── PHOTO GRID print ── */
-  .photo-grid.print-only{display:grid!important;grid-template-columns:1fr 1fr!important;gap:4pt!important}
+  .photo-grid.print-only{display:grid!important;grid-template-columns:repeat(6,1fr)!important;gap:3pt!important}
   .photo-item-print{break-inside:avoid;page-break-inside:avoid}
-  .photo-item-print.span-2{grid-column:1/-1!important}
-  .photo-item-print img{max-width:100%!important;height:auto!important;display:block!important;object-fit:contain!important}
-  .photo-item-print[data-size="s"] img{max-height:22vh!important}
-  .photo-item-print[data-size="m"] img{max-height:35vh!important}
-  .photo-item-print[data-size="l"] img{max-height:52vh!important}
+  .photo-item-print[data-size="s"]{grid-column:span 2!important}
+  .photo-item-print[data-size="m"]{grid-column:span 3!important}
+  .photo-item-print[data-size="l"]{grid-column:span 6!important}
+  .photo-item-print img{max-width:100%!important;width:auto!important;height:auto!important;display:block!important;object-fit:contain!important;margin:0 auto}
+  .photo-item-print[data-size="s"] img{max-height:18vh!important}
+  .photo-item-print[data-size="m"] img{max-height:30vh!important}
+  .photo-item-print[data-size="l"] img{max-height:48vh!important}
   .photo-cap-print{display:block!important;font-style:italic;font-size:8pt;color:#555;text-align:center;padding:2pt 0}
 
 }
@@ -464,6 +496,62 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   <div class="footer-txt" id="fdate">—</div>
 </div>
 
+<!-- ══ IMAGE EDITOR MODAL ══════════════════════════════════════════════ -->
+<div id="ed-modal" class="ed-overlay" style="display:none">
+  <div class="ed-box">
+    <div class="ed-hdr">
+      <span class="ed-title">✏️ Edit Photo</span>
+      <button class="ed-x" onclick="closeEditor()">✕</button>
+    </div>
+    <div class="ed-tb">
+      <div class="ed-tg">
+        <span class="ed-lbl">Shape:</span>
+        <button class="ed-t active" data-t="rect"   onclick="edSetTool(this,'rect')"   title="Rectangle">▭</button>
+        <button class="ed-t"        data-t="circle" onclick="edSetTool(this,'circle')" title="Circle / Ellipse">○</button>
+        <button class="ed-t"        data-t="arrow"  onclick="edSetTool(this,'arrow')"  title="Arrow">→</button>
+        <button class="ed-t"        data-t="text"   onclick="edSetTool(this,'text')"   title="Text / Comment">T</button>
+      </div>
+      <div class="ed-tg">
+        <span class="ed-lbl">Color:</span>
+        <div class="ed-clrs">
+          <button class="ed-c active" style="background:#e74c3c" onclick="edSetColor(this,'#e74c3c')"></button>
+          <button class="ed-c"        style="background:#f39c12" onclick="edSetColor(this,'#f39c12')"></button>
+          <button class="ed-c"        style="background:#27ae60" onclick="edSetColor(this,'#27ae60')"></button>
+          <button class="ed-c"        style="background:#2980b9" onclick="edSetColor(this,'#2980b9')"></button>
+          <button class="ed-c"        style="background:#8e44ad" onclick="edSetColor(this,'#8e44ad')"></button>
+          <button class="ed-c"        style="background:#fff;border-color:#aaa" onclick="edSetColor(this,'#ffffff')"></button>
+          <button class="ed-c"        style="background:#111" onclick="edSetColor(this,'#111111')"></button>
+        </div>
+      </div>
+      <div class="ed-tg">
+        <span class="ed-lbl">Width:</span>
+        <input type="range" id="ed-lw" min="1" max="8" value="2" style="width:72px;accent-color:var(--blue)"
+          oninput="ED.lineWidth=+this.value">
+      </div>
+      <button class="ed-t" onclick="edUndo()" title="Undo last" style="margin-left:auto">↩</button>
+    </div>
+    <div class="ed-cw">
+      <canvas id="ed-cv"
+        onmousedown="edDown(event)" onmousemove="edMove(event)" onmouseup="edUp(event)" onmouseleave="edUp(event)"></canvas>
+      <input type="text" id="ed-ti" class="ed-ti" placeholder="Type, press Enter…" onkeydown="edTextKey(event)">
+    </div>
+    <div class="ed-foot">
+      <div class="ed-sz-row">
+        <span class="ed-lbl">Display Size:</span>
+        <div class="ed-sz-track">
+          <input type="range" id="ed-sz" min="1" max="3" step="1" value="2" oninput="edSzChange(this.value)">
+          <div class="ed-sz-stops"><span>S</span><span>M</span><span>L</span></div>
+        </div>
+        <span id="ed-sz-cur" class="ed-sz-cur">M</span>
+      </div>
+      <div class="ed-acts">
+        <button class="btn" style="background:#f1f5f9;color:#374151;border:1px solid #d1d5db" onclick="closeEditor()">Cancel</button>
+        <button class="btn btn-blue" onclick="applyEdit()">✓ Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 // ══════════════════════════════════════════════════
 //  CLOCK
@@ -579,15 +667,14 @@ function renderImgBlock(b,i){
   const screenItems=photos.map((p,pi)=>{
     if(!p.src)return'';
     const sz=p.size||'m';
-    const spanCls=p.full?'span-2':'';
-    return `<div class="photo-item-wrap ${spanCls}" data-size="${sz}">
+    return `<div class="photo-item-wrap" data-size="${sz}">
       <div class="photo-img-area"><img src="${p.src}" alt="${esc(p.filename||'')}"></div>
       <div class="photo-btns">
         <span class="photo-sz-lbl">Size:</span>
-        <button class="photo-sz ${sz==='s'?'active':''}" onclick="setPhotoSize(${i},${pi},'s')">S</button>
-        <button class="photo-sz ${sz==='m'?'active':''}" onclick="setPhotoSize(${i},${pi},'m')">M</button>
-        <button class="photo-sz ${sz==='l'?'active':''}" onclick="setPhotoSize(${i},${pi},'l')">L</button>
-        <button class="photo-span-btn${p.full?' active':''}" onclick="setPhotoSpan(${i},${pi},${!p.full})" title="Toggle full width">⟷ Full</button>
+        <button class="photo-sz ${sz==='s'?'active':''}" onclick="setPhotoSize(${i},${pi},'s')" title="Small — 3/row">S</button>
+        <button class="photo-sz ${sz==='m'?'active':''}" onclick="setPhotoSize(${i},${pi},'m')" title="Medium — 2/row">M</button>
+        <button class="photo-sz ${sz==='l'?'active':''}" onclick="setPhotoSize(${i},${pi},'l')" title="Large — full width">L</button>
+        <button class="photo-edit" onclick="openPhotoEditor(${i},${pi})" title="Edit photo">✏️ Edit</button>
         <button class="photo-del" onclick="removePhoto(${i},${pi})">✕</button>
       </div>
       <input type="text" class="photo-cap" id="${b.id}_p${pi}_cap"
@@ -604,8 +691,7 @@ function renderImgBlock(b,i){
   const printItems=photos.map((p,pi)=>{
     if(!p.src)return'';
     const sz=p.size||'m';
-    const spanCls=p.full?'span-2':'';
-    return `<div class="photo-item-print ${spanCls}" data-size="${sz}">
+    return `<div class="photo-item-print" data-size="${sz}">
       <img src="${p.src}" alt="${esc(p.filename||'')}">
       <span class="photo-cap-print" id="${b.id}_p${pi}_pcap">${esc(p.caption||'')}</span>
     </div>`;
@@ -728,6 +814,157 @@ function setPhotoSpan(blockIdx,photoIdx,full){
   BLOCKS[blockIdx].photos[photoIdx].full=full;
   renderBlocks();
 }
+
+// ═══════════════════════════════════════════════════
+//  IMAGE EDITOR
+// ═══════════════════════════════════════════════════
+const ED={
+  bi:-1,pi:-1,tool:'rect',color:'#e74c3c',lineWidth:2,fontSize:16,
+  ops:[],dragging:false,sx:0,sy:0,baseImg:null,textPending:null
+};
+
+function openPhotoEditor(bi,pi){
+  const p=BLOCKS[bi].photos[pi];
+  if(!p||!p.src){showNotice('Foto belum ditambahkan','err');return;}
+  ED.bi=bi; ED.pi=pi; ED.ops=[];
+  const sMap={s:1,m:2,l:3};
+  document.getElementById('ed-sz').value=sMap[p.size||'m']||2;
+  edSzChange(sMap[p.size||'m']||2);
+  document.getElementById('ed-modal').style.display='flex';
+  document.querySelectorAll('.ed-t').forEach(b=>b.classList.remove('active'));
+  document.querySelector('.ed-t[data-t="rect"]').classList.add('active');
+  ED.tool='rect';
+  const cv=document.getElementById('ed-cv');
+  const img=new Image();
+  img.onload=()=>{
+    const maxW=Math.min(800, cv.parentElement.clientWidth-20);
+    const maxH=Math.min(480, window.innerHeight-280);
+    const r=Math.min(1,maxW/img.naturalWidth,maxH/img.naturalHeight);
+    cv.width=Math.round(img.naturalWidth*r);
+    cv.height=Math.round(img.naturalHeight*r);
+    ED.baseImg=img; ED.scale=r;
+    edDraw();
+  };
+  img.src=p.src;
+}
+
+function closeEditor(){
+  document.getElementById('ed-modal').style.display='none';
+  document.getElementById('ed-ti').style.display='none';
+}
+
+function edSetTool(btn,t){
+  document.querySelectorAll('.ed-t[data-t]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ED.tool=t;
+  document.getElementById('ed-cv').style.cursor=t==='text'?'text':'crosshair';
+}
+
+function edSetColor(btn,c){
+  document.querySelectorAll('.ed-c').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  ED.color=c;
+}
+
+function edSzChange(v){
+  document.getElementById('ed-sz-cur').textContent=['','S','M','L'][v]||'M';
+}
+
+function edDraw(){
+  const cv=document.getElementById('ed-cv');
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.drawImage(ED.baseImg,0,0,cv.width,cv.height);
+  ED.ops.forEach(op=>edDrawOp(ctx,op));
+}
+
+function edDrawOp(ctx,op,temp){
+  ctx.save();
+  ctx.strokeStyle=op.color; ctx.fillStyle=op.color;
+  ctx.lineWidth=op.lw; ctx.lineCap='round'; ctx.lineJoin='round';
+  if(op.type==='rect'){ctx.strokeRect(op.x,op.y,op.w,op.h);}
+  else if(op.type==='circle'){ctx.beginPath();ctx.ellipse(op.cx,op.cy,Math.abs(op.rx)||1,Math.abs(op.ry)||1,0,0,Math.PI*2);ctx.stroke();}
+  else if(op.type==='arrow'){edDrawArrow(ctx,op.x1,op.y1,op.x2,op.y2,op.lw);}
+  else if(op.type==='text'){ctx.font=`bold ${op.fs}px Arial`;ctx.fillText(op.text,op.x,op.y);}
+  ctx.restore();
+}
+
+function edDrawArrow(ctx,x1,y1,x2,y2,lw){
+  const a=Math.atan2(y2-y1,x2-x1), hl=Math.max(12,lw*4);
+  ctx.beginPath();
+  ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+  ctx.moveTo(x2,y2); ctx.lineTo(x2-hl*Math.cos(a-Math.PI/6),y2-hl*Math.sin(a-Math.PI/6));
+  ctx.moveTo(x2,y2); ctx.lineTo(x2-hl*Math.cos(a+Math.PI/6),y2-hl*Math.sin(a+Math.PI/6));
+  ctx.stroke();
+}
+
+function edUndo(){if(ED.ops.length){ED.ops.pop();edDraw();}}
+
+function edPos(e){
+  const cv=document.getElementById('ed-cv');
+  const r=cv.getBoundingClientRect();
+  return{x:(e.clientX-r.left)*(cv.width/r.width),y:(e.clientY-r.top)*(cv.height/r.height)};
+}
+
+function edDown(e){
+  if(e.button!==0)return;
+  const pos=edPos(e);
+  if(ED.tool==='text'){
+    const cv=document.getElementById('ed-cv');
+    const wr=cv.closest('.ed-cw').getBoundingClientRect();
+    const ti=document.getElementById('ed-ti');
+    ti.style.left=(e.clientX-wr.left)+'px'; ti.style.top=(e.clientY-wr.top)+'px';
+    ti.style.display='block'; ti.value=''; ti.focus();
+    ED.textPending={x:pos.x,y:pos.y};
+    return;
+  }
+  ED.dragging=true; ED.sx=pos.x; ED.sy=pos.y;
+}
+
+function edMove(e){
+  if(!ED.dragging)return;
+  const pos=edPos(e);
+  edDraw();
+  const ctx=document.getElementById('ed-cv').getContext('2d');
+  const op=edBuildOp(pos.x,pos.y);
+  if(op)edDrawOp(ctx,op,true);
+}
+
+function edUp(e){
+  if(!ED.dragging)return;
+  ED.dragging=false;
+  const pos=edPos(e);
+  const op=edBuildOp(pos.x,pos.y);
+  if(op&&(op.type!=='rect'||Math.abs(op.w)>2||Math.abs(op.h)>2)){ED.ops.push(op);edDraw();}
+}
+
+function edBuildOp(cx,cy){
+  const{sx:sx,sy:sy,tool:t,color:c,lineWidth:lw}=ED;
+  if(t==='rect') return{type:'rect',x:Math.min(sx,cx),y:Math.min(sy,cy),w:cx-sx,h:cy-sy,color:c,lw};
+  if(t==='circle') return{type:'circle',cx:(sx+cx)/2,cy:(sy+cy)/2,rx:(cx-sx)/2,ry:(cy-sy)/2,color:c,lw};
+  if(t==='arrow') return{type:'arrow',x1:sx,y1:sy,x2:cx,y2:cy,color:c,lw};
+  return null;
+}
+
+function edTextKey(e){
+  if(e.key!=='Enter'&&e.key!=='Escape')return;
+  const ti=document.getElementById('ed-ti');
+  const txt=ti.value.trim();
+  if(e.key==='Enter'&&txt&&ED.textPending){
+    ED.ops.push({type:'text',x:ED.textPending.x,y:ED.textPending.y,text:txt,color:ED.color,lw:ED.lineWidth,fs:Math.round(ED.fontSize*(1/ED.scale))});
+    edDraw();
+  }
+  ti.style.display='none'; ti.value=''; ED.textPending=null;
+}
+
+function applyEdit(){
+  const cv=document.getElementById('ed-cv');
+  BLOCKS[ED.bi].photos[ED.pi].src=cv.toDataURL('image/jpeg',0.92);
+  const sMap={1:'s',2:'m',3:'l'};
+  BLOCKS[ED.bi].photos[ED.pi].size=sMap[+document.getElementById('ed-sz').value]||'m';
+  closeEditor(); renderBlocks();
+}
+
 function onFileFile(idx,inp){
   const f=inp.files[0];if(!f)return;
   BLOCKS[idx].name=f.name;
