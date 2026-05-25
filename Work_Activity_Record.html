@@ -98,7 +98,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .block-card{background:var(--surf);border:1.5px solid var(--bdr2);border-radius:8px;
   overflow:hidden;transition:box-shadow .2s}
 .block-card:hover{box-shadow:0 2px 10px rgba(30,58,95,0.1)}
-.block-card.bc-text,.block-card.bc-file{grid-column:1/-1}
+.block-card.bc-text,.block-card.bc-file,.block-card.bc-image{grid-column:1/-1}
 .block-controls{display:flex;align-items:center;gap:4px;padding:6px 10px;
   background:var(--bg2);border-bottom:1px solid var(--bdr2)}
 .btag{font-family:var(--mono);font-size:9px;letter-spacing:1px;text-transform:uppercase;
@@ -130,6 +130,31 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   padding:6px 10px;font-size:12px;background:var(--bg2);color:var(--txt);
   font-family:var(--sans);font-style:italic}
 .img-cap:focus{outline:none;border-color:var(--blue);background:#fff}
+
+/* ── PHOTO GRID (multi-photo) ─── */
+.photo-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.photo-item-wrap{border:1px solid var(--bdr2);border-radius:6px;overflow:hidden;background:var(--bg2);display:flex;flex-direction:column}
+.photo-item-wrap.span-2{grid-column:1/-1}
+.photo-img-area{background:#e8f0f8;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.photo-img-area img{display:block;width:100%;height:auto;object-fit:contain}
+.photo-item-wrap[data-size="s"] .photo-img-area img{max-height:110px}
+.photo-item-wrap[data-size="m"] .photo-img-area img{max-height:200px}
+.photo-item-wrap[data-size="l"] .photo-img-area img{max-height:340px}
+.photo-btns{display:flex;align-items:center;gap:3px;padding:4px 7px;background:var(--bg2);border-top:1px solid var(--bdr2)}
+.photo-sz-lbl{font-size:8px;color:var(--txt4);font-family:var(--mono);text-transform:uppercase;letter-spacing:1px;margin-right:2px;flex-shrink:0}
+.photo-sz,.photo-span-btn{padding:2px 6px;border-radius:3px;border:1px solid var(--bdr);background:var(--surf);font-size:9px;cursor:pointer;font-family:var(--mono);color:var(--txt4);transition:all .12s}
+.photo-sz.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.photo-span-btn{margin-left:3px}
+.photo-span-btn.active{background:#7c3aed;color:#fff;border-color:#7c3aed}
+.photo-del{margin-left:auto;padding:2px 8px;border-radius:3px;border:1px solid #fca5a5;background:#fff5f5;color:#dc2626;font-size:9px;cursor:pointer;font-family:var(--mono)}
+.photo-del:hover{background:#fee2e2}
+.photo-cap{border:none;border-top:1px solid var(--bdr2);padding:5px 8px;font-size:11px;font-family:var(--sans);background:#fff;color:var(--txt);font-style:italic;width:100%}
+.photo-cap:focus{outline:none;background:#fffbe6}
+.photo-add-btn{grid-column:1/-1;border:2px dashed var(--bdr);border-radius:6px;padding:12px;text-align:center;
+  cursor:pointer;background:var(--bg2);transition:all .2s;font-family:var(--mono);font-size:11px;
+  color:var(--txt4);letter-spacing:1px;display:flex;align-items:center;justify-content:center;gap:6px;position:relative}
+.photo-add-btn:hover{border-color:var(--blue);color:var(--blue);background:#eef4ff}
+.photo-add-btn input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 
 /* ── FILE BLOCK ─── */
 .file-dz{border:2px dashed #c4b5fd;border-radius:8px;padding:24px 20px;text-align:center;
@@ -232,7 +257,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   /* ── BLOCKS ── */
   .blocks-list{display:grid!important;grid-template-columns:1fr 1fr!important;gap:4pt!important;padding:0!important}
   .block-card{border:none!important;border-radius:0!important;margin-bottom:4pt;break-inside:avoid;page-break-inside:avoid}
-  .block-card.bc-text,.block-card.bc-file{grid-column:1/-1!important}
+  .block-card.bc-text,.block-card.bc-file,.block-card.bc-image{grid-column:1/-1!important}
   .block-inner{padding:0!important}
 
   /* ── IMAGE: preserve natural aspect ratio, NEVER stretch ── */
@@ -272,6 +297,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   .print-concl-tbl td{border:1px solid #888;padding:5pt 8pt;vertical-align:top}
   .print-concl-tbl td:first-child{font-weight:bold;width:22%;background:#f2f2f2}
   .findings-grid{display:none!important}
+
+  /* ── PHOTO GRID print ── */
+  .photo-grid{display:grid!important;grid-template-columns:1fr 1fr!important;gap:4pt!important}
+  .photo-item-print{break-inside:avoid;page-break-inside:avoid}
+  .photo-item-print.span-2{grid-column:1/-1!important}
+  .photo-item-print img{max-width:100%!important;height:auto!important;display:block!important;object-fit:contain!important}
+  .photo-item-print[data-size="s"] img{max-height:22vh!important}
+  .photo-item-print[data-size="m"] img{max-height:35vh!important}
+  .photo-item-print[data-size="l"] img{max-height:52vh!important}
+  .photo-cap-print{display:block!important;font-style:italic;font-size:8pt;color:#555;text-align:center;padding:2pt 0}
 
 }
 </style>
@@ -459,7 +494,7 @@ function uid(){return 'b'+(++_uid);}
 function addBlock(type){
   const id=uid();
   if(type==='text')  BLOCKS.push({id,type,headingType:'none',heading:'',content:''});
-  if(type==='image') BLOCKS.push({id,type,src:null,caption:'',filename:''});
+  if(type==='image') BLOCKS.push({id,type,photos:[]});
   if(type==='file')  BLOCKS.push({id,type,name:'',ext:'',size:0,note:'',dataUrl:null});
   renderBlocks();
   setTimeout(()=>document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'center'}),120);
@@ -500,9 +535,11 @@ function renderBlocks(){
       const nt=document.getElementById(b.id+'_note');
       if(nt)nt.value=b.note;
     }
-    if(b.type==='image'&&b.caption){
-      const cp=document.getElementById(b.id+'_cap');
-      if(cp)cp.value=b.caption;
+    if(b.type==='image'){
+      (b.photos||[]).forEach((p,pi)=>{
+        const cp=document.getElementById(b.id+'_p'+pi+'_cap');
+        if(cp)cp.value=p.caption||'';
+      });
     }
   });
 }
@@ -529,28 +566,53 @@ function renderInner(b,i){
 
 // ── IMAGE BLOCK ─────────────────────────────────
 function renderImgBlock(b,i){
-  const preview=b.src?`
-    <div class="img-wrap">
-      <img src="${b.src}" alt="${esc(b.filename)}">
-      <button class="img-chg" onclick="document.getElementById('${b.id}_fi').click()">🔄 Change</button>
-      <input type="file" id="${b.id}_fi" accept="image/*" style="display:none" onchange="onImgFile(${i},this)">
-    </div>
-    <input type="text" class="img-cap" id="${b.id}_cap" placeholder="Caption / Keterangan foto (opsional)…"
-      oninput="BLOCKS[${i}].caption=this.value">`
-    :`<div class="drop-zone">
-      <input type="file" accept="image/*" onchange="onImgFile(${i},this)">
+  const photos=b.photos||[];
+
+  if(photos.length===0){
+    return `<div class="drop-zone">
+      <input type="file" accept="image/*" multiple onchange="onAddPhotos(${i},this)">
       <div class="drop-ico">🖼️</div>
-      <div class="drop-hint">Click to select image<br><small style="font-size:10px">JPG · PNG · WEBP</small></div>
+      <div class="drop-hint">Click to add photos<br><small style="font-size:10px">JPG · PNG · WEBP · Multiple OK</small></div>
     </div>`;
+  }
 
-  // Print representation (always included, hidden on screen via CSS handled by print only)
-  const printImg=b.src?`
-    <div class="print-only img-wrap" style="margin-bottom:4pt">
-      <img src="${b.src}" alt="${esc(b.filename)}" style="max-width:100%;height:auto;display:block">
-      ${b.caption?`<span class="img-cap-print">${esc(b.caption)}</span>`:''}
-    </div>`:'';
+  const screenItems=photos.map((p,pi)=>{
+    if(!p.src)return'';
+    const sz=p.size||'m';
+    const spanCls=p.full?'span-2':'';
+    return `<div class="photo-item-wrap ${spanCls}" data-size="${sz}">
+      <div class="photo-img-area"><img src="${p.src}" alt="${esc(p.filename||'')}"></div>
+      <div class="photo-btns">
+        <span class="photo-sz-lbl">Size:</span>
+        <button class="photo-sz ${sz==='s'?'active':''}" onclick="setPhotoSize(${i},${pi},'s')">S</button>
+        <button class="photo-sz ${sz==='m'?'active':''}" onclick="setPhotoSize(${i},${pi},'m')">M</button>
+        <button class="photo-sz ${sz==='l'?'active':''}" onclick="setPhotoSize(${i},${pi},'l')">L</button>
+        <button class="photo-span-btn${p.full?' active':''}" onclick="setPhotoSpan(${i},${pi},${!p.full})" title="Toggle full width">⟷ Full</button>
+        <button class="photo-del" onclick="removePhoto(${i},${pi})">✕</button>
+      </div>
+      <input type="text" class="photo-cap" id="${b.id}_p${pi}_cap"
+        placeholder="Caption foto (opsional)…"
+        oninput="BLOCKS[${i}].photos[${pi}].caption=this.value;const pe=document.getElementById('${b.id}_p${pi}_pcap');if(pe)pe.textContent=this.value">
+    </div>`;
+  }).join('');
 
-  return preview+printImg;
+  const addBtn=`<div class="photo-add-btn">
+    <input type="file" accept="image/*" multiple onchange="onAddPhotos(${i},this)">
+    ➕ Add Photo
+  </div>`;
+
+  const printItems=photos.map((p,pi)=>{
+    if(!p.src)return'';
+    const sz=p.size||'m';
+    const spanCls=p.full?'span-2':'';
+    return `<div class="photo-item-print ${spanCls}" data-size="${sz}">
+      <img src="${p.src}" alt="${esc(p.filename||'')}">
+      <span class="photo-cap-print" id="${b.id}_p${pi}_pcap">${esc(p.caption||'')}</span>
+    </div>`;
+  }).join('');
+
+  return `<div class="photo-grid screen-only">${screenItems}${addBtn}</div>
+    <div class="photo-grid print-only">${printItems}</div>`;
 }
 
 // ── FILE BLOCK ───────────────────────────────────
@@ -638,12 +700,33 @@ function updatePrintTxt(id,val){
 }
 
 // ── FILE HANDLERS ────────────────────────────────
-function onImgFile(idx,inp){
-  const f=inp.files[0];if(!f)return;
-  if(f.size>15*1024*1024){showNotice('Ukuran file terlalu besar (maks 15 MB)','err');return;}
-  const r=new FileReader();
-  r.onload=e=>{BLOCKS[idx].src=e.target.result;BLOCKS[idx].filename=f.name;renderBlocks();};
-  r.readAsDataURL(f);
+function onAddPhotos(blockIdx,inp){
+  const files=Array.from(inp.files);if(!files.length)return;
+  let pending=0;
+  files.forEach(f=>{
+    if(f.size>15*1024*1024){showNotice('File terlalu besar (maks 15 MB): '+f.name,'err');return;}
+    pending++;
+    const r=new FileReader();
+    r.onload=e=>{
+      BLOCKS[blockIdx].photos.push({src:e.target.result,filename:f.name,caption:'',size:'m',full:false});
+      pending--;
+      if(pending===0)renderBlocks();
+    };
+    r.readAsDataURL(f);
+  });
+}
+function removePhoto(blockIdx,photoIdx){
+  if(!confirm('Hapus foto ini?'))return;
+  BLOCKS[blockIdx].photos.splice(photoIdx,1);
+  renderBlocks();
+}
+function setPhotoSize(blockIdx,photoIdx,size){
+  BLOCKS[blockIdx].photos[photoIdx].size=size;
+  renderBlocks();
+}
+function setPhotoSpan(blockIdx,photoIdx,full){
+  BLOCKS[blockIdx].photos[photoIdx].full=full;
+  renderBlocks();
 }
 function onFileFile(idx,inp){
   const f=inp.files[0];if(!f)return;
@@ -670,7 +753,6 @@ function syncPrint(){
 
 window.addEventListener('beforeprint',()=>{
   syncPrint();
-  // Sync all text block print content
   BLOCKS.forEach(b=>{
     if(b.type==='text'){
       const pc=document.getElementById(b.id+'_pc');
@@ -680,6 +762,12 @@ window.addEventListener('beforeprint',()=>{
         const lbl=b.headingType==='custom'?b.heading:(HTYPE_LABELS[b.headingType]||'');
         ph.textContent=lbl;
       }
+    }
+    if(b.type==='image'){
+      (b.photos||[]).forEach((p,pi)=>{
+        const pe=document.getElementById(b.id+'_p'+pi+'_pcap');
+        if(pe)pe.textContent=p.caption||'';
+      });
     }
   });
 });
@@ -695,7 +783,7 @@ function saveDraft(){
     'failure-desc':gv('failure-desc'),pic:gv('pic'),conclusion:gv('conclusion'),recommendations:gv('recommendations')};
   // Save text/file blocks only (skip images — too large for localStorage)
   const blocksToSave=BLOCKS.map(b=>{
-    if(b.type==='image')return{id:b.id,type:'image',src:null,caption:b.caption,filename:b.filename,_dropped:true};
+    if(b.type==='image')return{...b,photos:(b.photos||[]).map(p=>({...p,src:null,_dropped:true}))};
     return{...b};
   });
   try{
