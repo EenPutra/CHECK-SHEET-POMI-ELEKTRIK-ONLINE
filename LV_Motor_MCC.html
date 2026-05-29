@@ -177,9 +177,77 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   resize:vertical;min-height:80px;width:100%;transition:border-color .18s}
 .mf textarea:focus{outline:none;border-color:var(--blue);background:#fff}
 @media(max-width:640px){.photo-item{flex:0 0 100%}.conc-grid{grid-template-columns:1fr}}
+
+/* ── PRINT / SAVE AS PDF ──────────────────────── */
+@media print{
+  @page{size:A4 portrait;margin:12mm 15mm}
+  *,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  /* hide interactive chrome */
+  .topbar,.actions,.footer,.notice,
+  .photo-drop,.photo-ctrl,.sec-hdr-arrow,
+  .live-dot,.hero-stats,.ss-drop{display:none!important}
+  /* print header (hidden on screen) */
+  .print-header{display:flex!important}
+  body{background:#fff!important;font-size:11px}
+  .hero{padding:14px 20px 12px}
+  .wrap{padding:10px 0 0;max-width:100%}
+  /* expand all collapsed panels */
+  .sec-body{display:block!important}
+  .panel{box-shadow:none!important;border:1px solid #bfdbfe;margin-bottom:10px;break-inside:avoid;page-break-inside:avoid}
+  .sec-hdr{cursor:default;padding:8px 14px}
+  /* clean form controls */
+  .mf input,.mf select,.mf textarea,
+  .md-input,.ss-input,.photo-cap{
+    background:transparent!important;
+    border:none!important;
+    border-bottom:1px solid #dbeafe!important;
+    border-radius:0!important;
+    padding:2px 0!important;
+    color:#0f172a!important;
+    font-size:11px!important}
+  .mf input[readonly],.md-input[readonly]{color:#1e3a5f!important}
+  .mf select,.md-input[id="m-ins"],.md-input[id="m-mount"]{
+    -webkit-appearance:none;appearance:none}
+  /* result selects — keep colour coding */
+  .r-sel{border:none!important;border-radius:3px!important;padding:2px 4px!important;font-size:10px!important;-webkit-appearance:none;appearance:none}
+  .r-sel.ok{background:var(--ok-bg)!important;color:var(--ok)!important}
+  .r-sel.ng{background:var(--ng-bg)!important;color:var(--ng)!important}
+  .r-sel.na{background:var(--na-bg)!important;color:#92400e!important}
+  /* remark & measure inputs */
+  .rmk-inp,.meas-inp{background:transparent!important;border:none!important;border-bottom:1px solid #dbeafe!important;border-radius:0!important;padding:2px 0!important;font-size:10px!important}
+  /* tables */
+  .tbl-wrap{overflow:visible}
+  .ct{min-width:unset;width:100%}
+  .ct th,.ct td{font-size:10px!important;padding:5px 7px!important}
+  .ol-box{background:#f8fbff!important}
+  .meas-tbl th{background:rgba(30,58,95,0.08)!important}
+  /* photo grid */
+  .photo-item{flex:0 0 calc(50% - 4px);break-inside:avoid;page-break-inside:avoid}
+  .photo-img-wrap img{max-height:150px}
+  .photo-cap{border-top:1px solid #dbeafe!important;padding:4px 6px!important;font-size:11px!important}
+  .photo-grid{gap:8px;padding:10px}
+  /* conclusion */
+  .conc-grid{grid-template-columns:1fr 1fr}
+  .mf textarea{border:none!important;border-bottom:1px solid #dbeafe!important;border-radius:0!important;padding:2px 0!important;resize:none!important;min-height:unset!important;font-size:11px!important}
+  /* wo-grid & md-grid spacing */
+  .wo-grid{gap:8px;padding:10px}
+  .md-grid{gap:8px;padding:10px}
+}
+.print-header{display:none;font-family:var(--mono);font-size:10px;color:var(--txt4);
+  padding:4px 0 8px;border-bottom:2px solid var(--navy);margin-bottom:8px;
+  justify-content:space-between;align-items:center}
+.print-header strong{font-size:13px;color:var(--navy);font-family:var(--raj);letter-spacing:1px}
 </style>
 </head>
 <body>
+
+<!-- print-only header strip (hidden on screen, visible when printing) -->
+<div class="print-header" id="print-header">
+  <div><strong>POMI — LV MOTOR MCC PM CHECK SHEET</strong><br>
+    <span id="ph-tag">—</span> · <span id="ph-desc">—</span></div>
+  <div style="text-align:right">Date: <span id="ph-date">—</span><br>
+    WO: <span id="ph-wo">—</span></div>
+</div>
 
 <div class="topbar">
   <div class="live-dot"></div>
@@ -189,7 +257,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   <div class="tb-right">
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-draft btn-sm" onclick="saveDraft()">💾 Draft</button>
-    <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 PDF</button>
+    <button class="btn btn-pdf btn-sm" onclick="printPage()">🖨️ Print / PDF</button>
     <button class="btn btn-submit btn-sm" onclick="submitToDb()">🗄️ Submit</button>
   </div>
 </div>
@@ -373,7 +441,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="actions">
   <button class="btn" style="background:var(--navy);color:#fff" onclick="resetForm()">🔄 Reset</button>
   <button class="btn btn-draft" onclick="saveDraft()">💾 Save Draft</button>
-  <button class="btn btn-pdf" onclick="generatePDF()">📄 Download PDF</button>
+  <button class="btn btn-pdf" onclick="printPage()">🖨️ Print / Save PDF</button>
   <button class="btn btn-submit" style="font-size:14px;padding:8px 24px" onclick="submitToDb()">🗄️ Submit to Database</button>
 </div>
 
@@ -599,7 +667,7 @@ function buildTable(){
           <small style="color:var(--txt4);font-size:10px">Min. insulation resistance: ≥ 1.5 MΩ (500 Vdc)</small></td>
         <td colspan="3" class="spec-cell">
           <table class="meas-tbl">
-            <thead><tr><th>Phase — Ground</th><th>1 Minute (GΩ)</th><th>10 Minute (GΩ)</th><th>Result</th><th>Remark</th></tr></thead>
+            <thead><tr><th>Phase — Ground</th><th>1 Minute (MΩ)</th><th>10 Minute (MΩ)</th><th>Result</th><th>Remark</th></tr></thead>
             <tbody><tr>
               <td>T1 / T2 / T3 — Ground</td>
               <td><input class="meas-inp" id="meg-1min" type="number" step="0.01" min="0" placeholder="0.00"></td>
@@ -984,8 +1052,8 @@ async function generatePDF(){
     startY:y,
     head:[['Test','Points','Value','Unit']],
     body:[
-      ['Megger 500 Vdc','T1/T2/T3 — Ground (1 min)',meg1,'GΩ'],
-      ['Megger 500 Vdc','T1/T2/T3 — Ground (10 min)',meg10,'GΩ'],
+      ['Megger 500 Vdc','T1/T2/T3 — Ground (1 min)',meg1,'MΩ'],
+      ['Megger 500 Vdc','T1/T2/T3 — Ground (10 min)',meg10,'MΩ'],
       ['3-Phase Resistance','T1 – T2',rt12,'Ω'],
       ['3-Phase Resistance','T1 – T3',rt13,'Ω'],
       ['3-Phase Resistance','T2 – T3',rt23,'Ω'],
@@ -1262,6 +1330,67 @@ function removePhoto(idx){
   if(!confirm('Hapus foto ini?')) return;
   PHOTOS.splice(idx,1);
   renderPhotos();
+}
+
+// ═══════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════
+//  PRINT / SAVE AS PDF
+// ═══════════════════════════════════════════════════
+function printPage(){
+  // populate the print-only header strip
+  const tag  = document.getElementById('tag-search')?.value  || '—';
+  const desc = document.getElementById('tag-desc')?.value    || '—';
+  const date = document.getElementById('wo-date')?.value     || '—';
+  const wo   = document.getElementById('wo-no')?.value       || '—';
+  document.getElementById('ph-tag').textContent  = tag;
+  document.getElementById('ph-desc').textContent = desc;
+  document.getElementById('ph-date').textContent = date;
+  document.getElementById('ph-wo').textContent   = wo;
+  // force-expand all collapsed panels so everything prints
+  document.querySelectorAll('.sec-hdr').forEach(h => h.classList.add('open'));
+  document.querySelectorAll('.sec-body').forEach(b => b.style.display = 'block');
+
+  // Compress photos before print to keep PDF file size ≤ ~5 MB
+  const MAX_PX  = 900;   // max dimension (px) — good quality at A4 half-width
+  const QUALITY = 0.60;  // JPEG quality for print output
+
+  const imgs     = Array.from(document.querySelectorAll('.photo-img-wrap img'));
+  const origSrcs = imgs.map(el => el.src);
+
+  function compressDataUrl(src){
+    return new Promise(resolve => {
+      const im = new Image();
+      im.onload = () => {
+        const W = im.naturalWidth, H = im.naturalHeight;
+        const scale = Math.min(1, MAX_PX / Math.max(W, H));
+        const cv  = document.createElement('canvas');
+        cv.width  = Math.round(W * scale);
+        cv.height = Math.round(H * scale);
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL('image/jpeg', QUALITY));
+      };
+      im.onerror = () => resolve(src); // fallback — keep original on error
+      im.src = src;
+    });
+  }
+
+  if(!imgs.length){
+    window.print();
+    return;
+  }
+
+  Promise.all(origSrcs.map(compressDataUrl)).then(compressed => {
+    imgs.forEach((el, i) => { el.src = compressed[i]; });
+
+    // restore originals once print dialog closes (print or cancel)
+    const restore = () => {
+      imgs.forEach((el, i) => { el.src = origSrcs[i]; });
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+
+    window.print();
+  });
 }
 
 // ═══════════════════════════════════════════════════
