@@ -566,9 +566,9 @@ function buildA(){
   row('2','AC Input Voltage T/R','380 V',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">V</span>');
   row('3','AC Input Current T/R','&lt; 275 A',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">A</span>');
   row('4','DC Output Voltage T/R','&lt; 60 kV',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">kV</span>');
+  row('4b','DC Voltage Limit (Vs)<br><small>Voltage Set Point / Limit</small>','&lt; 60 kV',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">kV</span>');
   row('5','DC Output Current T/R','&lt; 1200 mA',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">mA</span>');
   row('6','DC Output Current Limit (Is)<br><small>Current Set Point / Limit</small>','&lt; 1200 mA',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">mA</span>');
-  row('6b','DC Voltage Limit (Vs)<br><small>Voltage Set Point / Limit</small>','&lt; 60 kV',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">kV</span>');
   row('7','Oil Level T/R','&gt; Oil fill mark',id=>mkOilSel(id));
   row('8','Oil Temperature','&lt; 90°C',id=>mkInp(id)+'<span style="font-size:9px;color:var(--txt4);display:block">°C</span>');
   row('9','Oil Leakage<br><small>Drain Valve, Oil Sight Glass, Bushings, Thermostat, Radiator, Welds</small>','No Leak',id=>mkTog(id));
