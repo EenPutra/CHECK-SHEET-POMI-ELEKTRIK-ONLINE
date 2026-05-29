@@ -1351,8 +1351,8 @@ function printPage(){
   document.querySelectorAll('.sec-body').forEach(b => b.style.display = 'block');
 
   // Compress photos before print to keep PDF file size ≤ ~5 MB
-  const MAX_PX  = 900;   // max dimension (px) — good quality at A4 half-width
-  const QUALITY = 0.60;  // JPEG quality for print output
+  const MAX_PX  = 560;   // max dimension (px) — A4 half-width ~85mm @ 167dpi
+  const QUALITY = 0.45;  // JPEG quality for print output (~40-60KB per photo)
 
   const imgs     = Array.from(document.querySelectorAll('.photo-img-wrap img'));
   const origSrcs = imgs.map(el => el.src);
@@ -1380,6 +1380,13 @@ function printPage(){
   }
 
   Promise.all(origSrcs.map(compressDataUrl)).then(compressed => {
+    // estimate total compressed size and warn if still large
+    const totalKB = compressed.reduce((s, d) => s + Math.round(d.length * 0.75 / 1024), 0);
+    if(totalKB > 4000){
+      const ok = confirm(`Estimasi ukuran foto: ~${Math.round(totalKB/1024)} MB.\nFile PDF mungkin besar. Lanjut cetak?`);
+      if(!ok) return;
+    }
+
     imgs.forEach((el, i) => { el.src = compressed[i]; });
 
     // restore originals once print dialog closes (print or cancel)
