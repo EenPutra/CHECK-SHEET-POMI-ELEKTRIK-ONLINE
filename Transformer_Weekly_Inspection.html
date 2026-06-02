@@ -218,7 +218,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;wi
   <div class="tr">
     <div class="ldot"></div><span class="tclock" id="clock">--:--:--</span><div class="tsep"></div>
     <button class="btn bo bsm" onclick="saveDraft()">💾 Draft</button>
-    <button class="btn br bsm" onclick="printPage()">🖨️ Print / PDF</button>
+    <button class="btn br bsm" onclick="openPdfModal()">📥 Download PDF</button>
     <button class="btn bsm" style="background:#27ae60;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
 </div>
@@ -383,7 +383,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;wi
     <button class="btn bo" onclick="saveDraft()">💾 Save Draft</button>
     <button class="btn" style="background:#27ae60;color:#fff;font-size:15px;padding:10px 24px;border:none;border-radius:6px;cursor:pointer" onclick="submitToDb()">&#128202; Submit to Database</button>
     <button class="btn bp" onclick="resetForm()">🔄 Reset</button>
-    <button class="btn br" onclick="printPage()">🖨️ Print / Save PDF</button>
+    <button class="btn br" onclick="openPdfModal()">📥 Download PDF</button>
   </div>
   <div id="notice" class="notice"></div>
 </div>
@@ -665,27 +665,30 @@ function getPct(baseId, n){
 async function generatePDF(selSet){
   if(!selSet)selSet=new Set(PDF_SHEETS.map(s=>s.key));
   note('⏳ Generating PDF…','info');await new Promise(r=>setTimeout(r,200));
+  if(!window.jspdf||!window.jspdf.jsPDF){note('❌ jsPDF library tidak tersedia.','err');return;}
   const{jsPDF}=window.jspdf;
   const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const BASE_FONT='times';
+  const sanitizeText = s => s ? String(s).replace(/[^\x20-\x7E]/g,'') : '';
   const W=297,H=210,M=11;let y=M;let firstPage=true;
   const DARK=[44,62,48],STL=[74,94,82],RED=[192,57,43],OK=[39,174,96],NA=[142,68,173],LT=[240,245,241];
   function nPage(){pdf.addPage();y=M;pgHdr();}
   function ck(n){if(y+n>H-M)nPage();}
-  function pgHdr(){pdf.setFillColor(...DARK);pdf.rect(0,0,W,9,'F');pdf.setTextColor(168,212,184);pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.text('TRANSFORMER INSPECTION — UNIT '+vv('unit-sel'),M,6.5);pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(100,150,120);pdf.text(`WO: ${vv('wo-no')||'—'}  Date: ${vv('wo-date')||'—'}  By: ${vv('checked-by')||'—'}`,W-M,6.5,{align:'right'});y=13;}
+  function pgHdr(){pdf.setFillColor(...DARK);pdf.rect(0,0,W,9,'F');pdf.setTextColor(168,212,184);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7.5);pdf.text(sanitizeText('TRANSFORMER INSPECTION - UNIT '+vv('unit-sel')),M,6.5);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(6.5);pdf.setTextColor(100,150,120);pdf.text(sanitizeText(`WO: ${vv('wo-no')||' - '}  Date: ${vv('wo-date')||' - '}  By: ${vv('checked-by')||' - '}`),W-M,6.5,{align:'right'});y=13;}
   function ensurePage(){if(!firstPage){nPage();}else{firstPage=false;pgHdr();}}
 
   // Cover
   if(selSet.has('cover')){
     firstPage=false;
     pdf.setFillColor(...DARK);pdf.rect(0,0,W,44,'F');pdf.setFillColor(...RED);pdf.rect(0,42,W,2,'F');
-    pdf.setTextColor(...LT);pdf.setFont('helvetica','bold');pdf.setFontSize(20);pdf.text('TRANSFORMER WEEKLY INSPECTION',M,15);
-    pdf.setFontSize(12);pdf.setTextColor(168,212,184);pdf.text('UNIT '+vv('unit-sel')+' — XFMR-AT · USST · COMMON SST · GIS SF₆',M,25);
-    pdf.setFontSize(8);pdf.setTextColor(100,150,120);pdf.text('Generated: '+new Date().toLocaleString('en-GB'),M,35);pdf.text('PLTU Maintenance Dept.',W-M,35,{align:'right'});
+    pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(20);pdf.text(sanitizeText('TRANSFORMER WEEKLY INSPECTION'),M,15);
+    pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(12);pdf.setTextColor(168,212,184);pdf.text(sanitizeText('UNIT '+vv('unit-sel')+' - XFMR-AT - USST - COMMON SST - GIS SF6'),M,25);
+    pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(8);pdf.setTextColor(100,150,120);pdf.text(sanitizeText('Generated: '+new Date().toLocaleString('en-GB')),M,35);pdf.text(sanitizeText('PLTU Maintenance Dept.'),W-M,35,{align:'right'});
     const sheetNames=PDF_SHEETS.filter(s=>selSet.has(s.key)&&s.key!=='cover').map(s=>s.label).join(' · ');
     if(sheetNames){pdf.setFontSize(6.5);pdf.text('Included: '+trunc(sheetNames,130),M,40);}
     y=50;
     pdf.setFillColor(244,248,245);pdf.setDrawColor(180,200,185);pdf.setLineWidth(0.25);pdf.roundedRect(M,y,W-M*2,28,2,2,'FD');
-    function ib(l,v,x,yy){pdf.setFont('helvetica','bold');pdf.setFontSize(6.5);pdf.setTextColor(120,160,135);pdf.text(l.toUpperCase(),x,yy);pdf.setFont('helvetica','normal');pdf.setFontSize(9.5);pdf.setTextColor(...DARK);pdf.text(trunc(v||'—',28),x,yy+5.5);}
+    function ib(l,v,x,yy){pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(6.5);pdf.setTextColor(120,160,135);pdf.text(sanitizeText(l.toUpperCase()),x,yy);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(9.5);pdf.setTextColor(...DARK);pdf.text(sanitizeText(trunc(v||' - ',28)),x,yy+5.5);}
     const cx=[M+3,62,115,165,215];
     ib('WO',vv('wo-no'),cx[0],y+7);ib('Date',vv('wo-date'),cx[1],y+7);ib('Unit',vv('unit-sel'),cx[2],y+7);ib('Type',vv('itype'),cx[3],y+7);
     ib('Checked By',vv('checked-by'),cx[0],y+19);ib('NIK',vv('nik'),cx[1],y+19);ib('Reviewed By',vv('reviewed-by'),cx[2],y+19);ib('Shift',vv('shift').split(' ')[0],cx[3],y+19);
@@ -695,51 +698,53 @@ async function generatePDF(selSet){
     const nc=parseInt(document.getElementById('cnt-ng').textContent)||0;
     [[M,'TOTAL',String(to),STL],[M+36,'OK/NORMAL',String(oc),OK],[M+72,'NG/ISSUE',String(nc),RED]].forEach(([x,l,v,cl])=>{
       pdf.setFillColor(...cl,.06);pdf.setDrawColor(...cl);pdf.setLineWidth(0.35);pdf.roundedRect(x,y,30,11,2,2,'FD');
-      pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...cl);pdf.text(l,x+2,y+4.5);pdf.setFontSize(11);pdf.text(v,x+2,y+10);
+      pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(6);pdf.setTextColor(...cl);pdf.text(sanitizeText(l),x+2,y+4.5);pdf.setFontSize(11);pdf.text(sanitizeText(v),x+2,y+10);
     });y+=17;
   }
 
   function drawTbl(title,tbId,hdrs,cws){
-    ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.text('▶  '+title,M+3,y+5);y+=10;
+    ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(8.5);pdf.text('>  '+sanitizeText(title),M+3,y+5);y+=10;
     const body=[];
     document.getElementById(tbId).querySelectorAll('tr').forEach(tr=>{
       if(tr.classList.contains('shdr')){body.push([{content:tr.querySelector('td').textContent,colSpan:99,styles:{fillColor:[240,245,241],fontStyle:'bold',fontSize:7,textColor:[74,94,82]}}]);return;}
       const tds=[...tr.querySelectorAll('td')];if(tds.length<2)return;
-      const no=tds[0].textContent.trim();const desc=tds[1].textContent.replace(/▸.*/,'').trim();
-      const crit=tds[1].querySelector('.crit')?.textContent.replace('▸ ','').trim()||'';
+      const no=sanitizeText(tds[0].textContent.trim());const desc=sanitizeText(tds[1].textContent.replace(/▸.*/,'').trim());
+      const crit=sanitizeText(tds[1].querySelector('.crit')?.textContent.replace('▸ ','').trim()||'');
       const vals=tds.slice(2).map(td=>{
         if(td.querySelector('.nac'))return'N/A';
-        const a=td.querySelector('.rb.a,.lb.a');if(a)return a.textContent;
+        const a=td.querySelector('.rb.a,.lb.a');if(a)return sanitizeText(a.textContent);
         const pctInps=td.querySelectorAll('.pct-inp');
-        if(pctInps.length>0)return[...pctInps].map(i=>i.value?i.value+'%':'—').join('/');
+        if(pctInps.length>0)return sanitizeText([...pctInps].map(i=>i.value?i.value+'%':'-').join('/'));
         const miInps=td.querySelectorAll('.mi');
-        if(miInps.length>1)return[...miInps].map(i=>i.value||'—').join('/');
+        if(miInps.length>1)return sanitizeText([...miInps].map(i=>i.value||'-').join('/'));
         const inp=td.querySelector('input[type=number]');
-        return inp&&inp.value?inp.value:'—';
+        return inp&&inp.value?sanitizeText(inp.value):'-';
       });
-      body.push([no,crit?`${desc}\n▸ ${crit}`:desc,...vals]);
+      body.push([no,crit?`${desc}\n- ${crit}`:desc,...vals]);
     });
     pdf.autoTable({startY:y,head:[['No.','Inspection Item',...hdrs]],body,theme:'grid',
-      styles:{font:'helvetica',fontSize:6.8,cellPadding:2,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.16},
+      styles:{font:BASE_FONT,fontSize:6.8,cellPadding:2,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.16},
       headStyles:{fillColor:[240,245,241],textColor:[80,110,90],fontStyle:'bold',fontSize:6.5,halign:'center'},
       columnStyles:{0:{cellWidth:8,halign:'center'},1:{cellWidth:cws[0]||70},...hdrs.reduce((o,_,i)=>({...o,[i+2]:{cellWidth:cws[i+1]||22,halign:'center'}}),{})},
       didParseCell:d=>{const v=d.cell.text[0];if(['OK','No Leak','Clean','Normal'].includes(v)){d.cell.styles.textColor=[...OK];d.cell.styles.fontStyle='bold';}if(['NG','Leak','Dirty','Noise'].includes(v)){d.cell.styles.textColor=[...RED];d.cell.styles.fontStyle='bold';}if(v==='N/A')d.cell.styles.textColor=[...NA];},
       margin:{left:M,right:M}});y=pdf.lastAutoTable.finalY+5;
   }
 
+  function drawNote(label,text){text=sanitizeText(text||'').trim();if(!text)return;const lines=pdf.splitTextToSize(text, W-M*2);const need=10+lines.length*4.2;ck(need);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7);pdf.setTextColor(...STL);pdf.text(sanitizeText(label), M, y);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(7);pdf.setTextColor(...DARK);pdf.text(lines, M, y+4);y+=need;}
+
   if(selSet.has('s1')){ensurePage();drawTbl('Sheet 1: 7EX-XFMR-AT + DGA','tb-s1',['EZ-GSU','EY-SU','EX-UAT','EX-EXC','EM-A1','EM-B1','EM-C1'],[72,22,22,22,22,22,22,22]);}
   if(selSet.has('s2')){ensurePage();drawTbl('Sheet 2: 7EX-XFMR-AT (Without DGA)','tb-s2',['EZ-GSU','EY-SU','EX-UAT','EX-EXC','EM-A1','EM-B1','EM-C1'],[72,22,22,22,22,22,22,22]);}
-  if(selSet.has('s3')){ensurePage();drawTbl('Sheet 3: U78 USST — Three Monthly PM','tb-s3',['EM-A2','EM-B2','EM-A3','EM-B3','EM-A6','EM-B6','EN-B11','EN-C11'],[65,20,20,20,20,20,20,20,20]);}
-  if(selSet.has('s4')){ensurePage();drawTbl('Sheet 4: Common SST — SWRO/Scrubber/Admin','tb-s4',['7EM-A4','8EM-B4','7EN-B1A1','8EN-B1A1','7EM-A5','8EM-A5','7EM-B5'],[68,24,24,24,24,24,24,24]);}
-  if(selSet.has('s5')){ensurePage();drawTbl('Sheet 5: Common SST — CHCB/Warehouse/CUCB','tb-s5',['CCH-100A','CCH-100B','7EM-B4','8EM-B4','CCH-200','7EM-B5'],[78,28,28,28,28,28,28]);}
+  if(selSet.has('s3')){ensurePage();drawTbl('Sheet 3: U78 USST — Three Monthly PM','tb-s3',['EM-A2','EM-B2','EM-A3','EM-B3','EM-A6','EM-B6','EN-B11','EN-C11'],[65,20,20,20,20,20,20,20,20]);drawNote('Remark',vv('rmk-s3'));}
+  if(selSet.has('s4')){ensurePage();drawTbl('Sheet 4: Common SST — SWRO/Scrubber/Admin','tb-s4',['7EM-A4','8EM-B4','7EN-B1A1','8EN-B1A1','7EM-A5','8EM-A5','7EM-B5'],[68,24,24,24,24,24,24,24]);drawNote('Remark',vv('rmk-s4'));}
+  if(selSet.has('s5')){ensurePage();drawTbl('Sheet 5: Common SST — CHCB/Warehouse/CUCB','tb-s5',['CCH-100A','CCH-100B','7EM-B4','8EM-B4','CCH-200','7EM-B5'],[78,28,28,28,28,28,28]);drawNote('Remark',vv('rmk-s5'));}
 
   // GIS
   if(selSet.has('gis')){
     ensurePage();
-    ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.text('▶  GIS SF₆ Gas Pressure Monitoring',M+3,y+5);y+=10;
-    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(...OK);pdf.text('Setting: Alarm ≥ 0.45 MPa  ·  Trip ≤ 0.40 MPa',M,y+5);y+=9;
-    const gb=GTAGS.map((tags,i)=>{const v150=tags.map(t=>{const e=document.getElementById('g150_'+t);return e?e.value||'—':'—';});const v500=tags.map(t=>{const e=document.getElementById('g500_'+t);return e?e.value||'—':'—';});return[i+1,tags[0],v150[0],tags[1],v150[1],tags[2],v150[2],'',i+1,tags[0],v500[0],tags[1],v500[1],tags[2],v500[2]];});
-    pdf.autoTable({startY:y,head:[['No','150kV-A','MPa','150kV-B','MPa','150kV-C','MPa','','No','500kV-A','MPa','500kV-B','MPa','500kV-C','MPa']],body:gb,theme:'grid',styles:{font:'helvetica',fontSize:7,cellPadding:2,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.16},headStyles:{fillColor:[240,245,241],textColor:[80,110,90],fontStyle:'bold',fontSize:6.5},columnStyles:{0:{cellWidth:8,halign:'center'},7:{cellWidth:4,fillColor:[230,237,232]}},margin:{left:M,right:M}});y=pdf.lastAutoTable.finalY+6;
+    ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(8.5);pdf.text('>  '+sanitizeText('GIS SF6 Gas Pressure Monitoring'),M+3,y+5);y+=10;
+    pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(8);pdf.setTextColor(...OK);pdf.text(sanitizeText('Setting: Alarm >= 0.45 MPa - Trip <= 0.40 MPa'),M,y+5);y+=9;
+    const gb=GTAGS.map((tags,i)=>{const v150=tags.map(t=>{const e=document.getElementById('g150_'+t);return e?sanitizeText(e.value||'-'):'-';});const v500=tags.map(t=>{const e=document.getElementById('g500_'+t);return e?sanitizeText(e.value||'-'):'-';});return[i+1,tags[0],v150[0],tags[1],v150[1],tags[2],v150[2],'',i+1,tags[0],v500[0],tags[1],v500[1],tags[2],v500[2]];});
+    pdf.autoTable({startY:y,head:[['No','150kV-A','MPa','150kV-B','MPa','150kV-C','MPa','','No','500kV-A','MPa','500kV-B','MPa','500kV-C','MPa']],body:gb,theme:'grid',styles:{font:BASE_FONT,fontSize:7,cellPadding:2,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.16},headStyles:{fillColor:[240,245,241],textColor:[80,110,90],fontStyle:'bold',fontSize:6.5},columnStyles:{0:{cellWidth:8,halign:'center'},7:{cellWidth:4,fillColor:[230,237,232]}},margin:{left:M,right:M}});y=pdf.lastAutoTable.finalY+6;drawNote('GIS Remarks',vv('gis-rmk'));
   }
 
   // Photos
@@ -747,25 +752,25 @@ async function generatePDF(selSet){
     const hp=PSLOTS.filter(p=>PS[p.id]);
     if(hp.length){
       ensurePage();
-      ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.text('▶  Evidence Photos',M+3,y+5);y+=11;
+      ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(8.5);pdf.text(sanitizeText('>  Evidence Photos'),M+3,y+5);y+=11;
       const cw=(W-M*2)/3-3;
-      for(let i=0;i<hp.length;i+=3){const g=hp.slice(i,i+3);const ih=50;ck(ih+14);g.forEach((p,pi)=>{const xo=M+pi*(cw+3);pdf.setFont('helvetica','bold');pdf.setFontSize(7);pdf.setTextColor(...STL);pdf.text(trunc(p.title,32),xo,y+5);try{pdf.addImage(PS[p.id],'JPEG',xo,y+7,cw,ih,undefined,'MEDIUM');}catch(e){}const cap=document.getElementById(p.id+'-cap')?.value||'';if(cap){pdf.setFont('helvetica','italic');pdf.setFontSize(6.5);pdf.setTextColor(120,155,135);pdf.text(trunc(cap,40),xo,y+7+ih+4);}});y+=ih+18;}
+      for(let i=0;i<hp.length;i+=3){const g=hp.slice(i,i+3);const ih=50;ck(ih+14);g.forEach((p,pi)=>{const xo=M+pi*(cw+3);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7);pdf.setTextColor(...STL);pdf.text(sanitizeText(trunc(p.title,32)),xo,y+5);try{pdf.addImage(PS[p.id],'JPEG',xo,y+7,cw,ih,undefined,'MEDIUM');}catch(e){}const cap=document.getElementById(p.id+'-cap')?.value||'';if(cap){pdf.setFont(BASE_FONT,'italic');pdf.setFontSize(6.5);pdf.setTextColor(120,155,135);pdf.text(sanitizeText(trunc(cap,40)),xo,y+7+ih+4);}});y+=ih+18;}
     }
   }
 
   // Findings & Signatures
   if(selSet.has('findings')){
     ensurePage();
-    ck(48);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);pdf.text('▶  Findings & Conclusion',M+3,y+5);y+=10;
-    pdf.autoTable({startY:y,body:[['Overall',vv('overall')||'—'],['Next Inspection',vv('next-insp')||'—'],['Findings',vv('findings')||'—'],['Corrective Actions',vv('recommendations')||'—']],theme:'grid',styles:{font:'helvetica',fontSize:8.5,cellPadding:3.5,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.18},columnStyles:{0:{cellWidth:46,fontStyle:'bold',fillColor:[244,248,245],textColor:[74,94,82]}},margin:{left:M,right:M}});y=pdf.lastAutoTable.finalY+7;
+    ck(48);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(8.5);pdf.text(sanitizeText('>  Findings & Conclusion'),M+3,y+5);y+=10;
+    pdf.autoTable({startY:y,body:[[sanitizeText('Overall'),sanitizeText(vv('overall')||' - ')],[sanitizeText('Next Inspection'),sanitizeText(vv('next-insp')||' - ')],[sanitizeText('Findings'),sanitizeText(vv('findings')||' - ')],[sanitizeText('Corrective Actions'),sanitizeText(vv('recommendations')||' - ')]],theme:'grid',styles:{font:BASE_FONT,fontSize:8.5,cellPadding:3.5,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.18},columnStyles:{0:{cellWidth:46,fontStyle:'bold',fillColor:[244,248,245],textColor:[74,94,82]}},margin:{left:M,right:M}});y=pdf.lastAutoTable.finalY+7;
     ck(42);const sw=(W-M*2)/2-5;
-    ['sig-tech','sig-super'].forEach((id,i)=>{const xo=M+i*(sw+10);const lbl=i===0?'Checked By — Technician':'Reviewed By — Supervisor';const nm=i===0?(vv('sig-tech-name')||vv('checked-by')):(vv('sig-super-name')||vv('reviewed-by'));pdf.setFillColor(244,248,245);pdf.setDrawColor(180,200,185);pdf.setLineWidth(0.25);pdf.roundedRect(xo,y,sw,36,2,2,'FD');pdf.setFont('helvetica','bold');pdf.setFontSize(7.5);pdf.setTextColor(...STL);pdf.text(lbl,xo+3,y+5.5);pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(...DARK);pdf.text(nm||'',xo+3,y+12);const c=document.getElementById(id);if(c){const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data.some(v=>v);if(d)try{pdf.addImage(c.toDataURL('image/png'),'PNG',xo+3,y+14,sw-6,18);}catch(e){}}pdf.setDrawColor(180,200,185);pdf.line(xo+3,y+33,xo+sw-3,y+33);pdf.setFont('helvetica','italic');pdf.setFontSize(6.5);pdf.setTextColor(120,155,135);pdf.text('Signature',xo+3,y+36);});
+    ['sig-tech','sig-super'].forEach((id,i)=>{const xo=M+i*(sw+10);const lbl=sanitizeText(i===0?'Checked By - Technician':'Reviewed By - Supervisor');const nm=sanitizeText(i===0?(vv('sig-tech-name')||vv('checked-by')):(vv('sig-super-name')||vv('reviewed-by')));pdf.setFillColor(244,248,245);pdf.setDrawColor(180,200,185);pdf.setLineWidth(0.25);pdf.roundedRect(xo,y,sw,36,2,2,'FD');pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7.5);pdf.setTextColor(...STL);pdf.text(lbl,xo+3,y+5.5);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(9);pdf.setTextColor(...DARK);pdf.text(nm||'',xo+3,y+12);const c=document.getElementById(id);if(c){const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data.some(v=>v);if(d)try{pdf.addImage(c.toDataURL('image/png'),'PNG',xo+3,y+14,sw-6,18);}catch(e){}}pdf.setDrawColor(180,200,185);pdf.line(xo+3,y+33,xo+sw-3,y+33);pdf.setFont(BASE_FONT,'italic');pdf.setFontSize(6.5);pdf.setTextColor(120,155,135);pdf.text('Signature',xo+3,y+36);});
   }
 
   const pages=pdf.internal.getNumberOfPages();
-  for(let pg=1;pg<=pages;pg++){pdf.setPage(pg);pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(150);pdf.text(`Page ${pg}/${pages}`,W-M,H-5,{align:'right'});pdf.text('PLTU — Transformer Weekly Inspection',M,H-5);}
+  for(let pg=1;pg<=pages;pg++){pdf.setPage(pg);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(6.5);pdf.setTextColor(150);pdf.text(`Page ${pg}/${pages}`,W-M,H-5,{align:'right'});pdf.text(sanitizeText('PLTU - Transformer Weekly Inspection'),M,H-5);}
 
-  const fn=`TX_Inspection_U${vv('unit-sel')}_${(vv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
+  const fn=`transformer_${(vv('wo-no')||'workorder')}_${(vv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
   pdf.save(fn);note('✅ PDF saved: '+fn,'ok');
 }
 
@@ -787,14 +792,15 @@ function openPdfModal(){_pdfSel=new Set(PDF_SHEETS.map(s=>s.key));renderPdfModal
 function closePdfModal(){document.getElementById('pdf-modal-overlay').style.display='none';}
 function renderPdfModal(){
   const list=document.getElementById('pdf-sheet-list');
+  if(!list){note('⚠️ Modal sheet list not found.','err');return;}
   list.innerHTML=PDF_SHEETS.map(s=>`<div class="psl-item ${_pdfSel.has(s.key)?'psl-on':''}" id="pslrow-${s.key}" onclick="toggleSheet('${s.key}')"><span class="psl-icon">${s.icon}</span><span class="psl-info"><span class="psl-name">${s.label}</span><span class="psl-desc">${s.desc}</span></span><span class="psl-chk" id="pslchk-${s.key}">${_pdfSel.has(s.key)?'✓':''}</span></div>`).join('');
   updatePdfBadge();
 }
-function toggleSheet(key){if(_pdfSel.has(key))_pdfSel.delete(key);else _pdfSel.add(key);const row=document.getElementById('pslrow-'+key);const chk=document.getElementById('pslchk-'+key);if(row)row.className='psl-item'+(_pdfSel.has(key)?' psl-on':'');if(chk)chk.textContent=_pdfSel.has(key)?'✓':'';updatePdfBadge();}
+function toggleSheet(key){if(!_pdfSel||!(_pdfSel instanceof Set))_pdfSel=new Set();if(_pdfSel.has(key))_pdfSel.delete(key);else _pdfSel.add(key);const row=document.getElementById('pslrow-'+key);const chk=document.getElementById('pslchk-'+key);if(row)row.className='psl-item'+(_pdfSel.has(key)?' psl-on':'');if(chk)chk.textContent=_pdfSel.has(key)?'✓':'';updatePdfBadge();}
 function updatePdfBadge(){const el=document.getElementById('pdf-count-badge');if(el)el.textContent=_pdfSel.size+' sheet'+(_pdfSel.size!==1?'s':'');}
 function pdfSelectAll(){_pdfSel=new Set(PDF_SHEETS.map(s=>s.key));renderPdfModal();}
 function pdfClearAll(){_pdfSel=new Set();renderPdfModal();}
-function generatePDFSelected(){if(_pdfSel.size===0){note('⚠️ Pilih minimal 1 sheet!','err');return;}closePdfModal();generatePDF(_pdfSel);}
+function generatePDFSelected(){if(!_pdfSel||_pdfSel.size===0){note('⚠️ Pilih minimal 1 sheet!','err');return;}closePdfModal();try{generatePDF(new Set(_pdfSel));}catch(e){console.error('PDF generation failed:',e);note('❌ Gagal membuat PDF: '+(e.message||'Unknown error'),'err');}}
 
 // INIT
 mkAT_s1('tb-s1','s1');
@@ -858,20 +864,6 @@ function collectGISData(tbId, pfx) {
   return rows;
 }
 
-function printPage(){
-  const date = document.querySelector('input[type=date]')?.value || '—';
-  const wo   = document.querySelector('[id*=wo],[id*=work]')?.value || '—';
-  const ph = document.getElementById('print-header');
-  if(ph){
-    document.getElementById('ph-date').textContent = date;
-    document.getElementById('ph-wo').textContent   = wo;
-  }
-  // close PDF modal if open, expand all sections
-  document.getElementById('pdf-modal-overlay').style.display = 'none';
-  document.querySelectorAll('.sec-body,.panel-body,.section-body').forEach(b => b.style.display = 'block');
-  window.print();
-}
-
 async function submitToDb(){
   const data = {
     assetTag: '7EX-XFMR',
@@ -904,8 +896,8 @@ async function submitToDb(){
   data.sheets.s2 = { title: 'AT (Without DGA)', columns: s2cols, rows: collectSheetData('tb-s2', s2cols, 's2') };
   data.sheets.s3 = { title: 'USST', columns: s3cols, rows: collectSheetData('tb-s3', s3cols, 's3'), remark: vv('rmk-s3') };
   data.sheets.s4 = { title: 'Common SST', columns: s4cols, rows: collectSheetData('tb-s4', s4cols, 's4'), remark: vv('rmk-s4') };
-  data.sheets.s5 = { title: 'SST CHCB/WH', columns: s5cols, rows: collectSheetData('tb-s5', s5cols, 's5') };
-  data.sheets.gis = { title: 'GIS SF₆', rows: collectGISData('tb-gis', 'gis') };
+  data.sheets.s5 = { title: 'SST CHCB/WH', columns: s5cols, rows: collectSheetData('tb-s5', s5cols, 's5'), remark: vv('rmk-s5') };
+  data.sheets.gis = { title: 'GIS SF₆', rows: collectGISData('tb-gis', 'gis'), remark: vv('gis-rmk') };
 
   data.items = [];
   data.measurements = [];
@@ -989,6 +981,8 @@ async function loadLastSubmission() {
     });
     if (d.sheets.s3 && d.sheets.s3.remark) document.getElementById('rmk-s3').value = d.sheets.s3.remark;
     if (d.sheets.s4 && d.sheets.s4.remark) document.getElementById('rmk-s4').value = d.sheets.s4.remark;
+    if (d.sheets.s5 && d.sheets.s5.remark) document.getElementById('rmk-s5').value = d.sheets.s5.remark;
+    if (d.sheets.gis && d.sheets.gis.remark) document.getElementById('gis-rmk').value = d.sheets.gis.remark;
     upStats();
     note('📂 Data terakhir dimuat dari database.', 'ok');
   } catch(e) { console.log('Auto-load skip:', e.message); }
@@ -1013,9 +1007,9 @@ async function loadLastSubmission() {
       </div>
       <div id="pdf-sheet-list" style="display:flex;flex-direction:column;gap:5px;max-height:360px;overflow-y:auto;padding-right:4px"></div>
     </div>
-    <div style="padding:14px 18px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #dde3de;margin-top:10px">
+      <div style="padding:14px 18px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #dde3de;margin-top:10px">
       <button onclick="closePdfModal()" class="btn bo">Batal</button>
-      <button onclick="printPage()" class="btn br" style="min-width:140px">🖨️ Print / Save PDF</button>
+      <button onclick="generatePDFSelected()" class="btn br" style="min-width:140px">📥 Download Selected</button>
     </div>
   </div>
 </div>
