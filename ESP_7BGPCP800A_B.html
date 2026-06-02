@@ -682,9 +682,9 @@ async function generatePDF(){
   function ckY(n){if(y+n>H-M)nPage();}
   function miniHdr(){
     pdf.setFillColor(...NAVY);pdf.rect(0,0,W,8,'F');
-    pdf.setTextColor(...SKY);pdf.setFont('helvetica','bold');pdf.setFontSize(7);
+    pdf.setTextColor(...SKY);pdf.setFont('times','bold');pdf.setFontSize(7);
     pdf.text('ESP 7BG-PCP-800A/B — WEEKLY PM',M,5.5);
-    pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(...SKY);
+    pdf.setFont('times','normal');pdf.setFontSize(6.5);pdf.setTextColor(...SKY);
     pdf.text(`Date: ${v('wo-date')||'—'}  Unit: ${v('wo-unit')||'—'}  By: ${v('checked-by')||'—'}`,W-M,5.5,{align:'right'});
     y=12;
   }
@@ -692,11 +692,11 @@ async function generatePDF(){
   // Cover
   pdf.setFillColor(...NAVY);pdf.rect(0,0,W,38,'F');
   pdf.setFillColor(...BLUE);pdf.rect(0,36,W,2,'F');
-  pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(18);
+  pdf.setTextColor(255,255,255);pdf.setFont('times','bold');pdf.setFontSize(18);
   pdf.text('ELECTROSTATIC PRECIPITATOR',M,14);
   pdf.setFontSize(11);pdf.setTextColor(...SKY);
   pdf.text('Weekly Maintenance Check Sheet — 7BG-PCP-800A/B',M,22);
-  pdf.setFontSize(8);pdf.setTextColor(...SKY);pdf.setFont('helvetica','normal');
+  pdf.setFontSize(8);pdf.setTextColor(...SKY);pdf.setFont('times','normal');
   pdf.text('Generated: '+new Date().toLocaleString('en-GB'),M,31);
   pdf.text('POMI — Unit 7/8 Electrical Maintenance',W-M,31,{align:'right'});
   y=44;
@@ -705,8 +705,8 @@ async function generatePDF(){
   pdf.setFillColor(...LT);pdf.setDrawColor(125,211,252);pdf.setLineWidth(0.25);
   pdf.roundedRect(M,y,W-M*2,26,2,2,'FD');
   function ib(lbl,val,x,yy){
-    pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...GRAY);pdf.text(lbl.toUpperCase(),x,yy);
-    pdf.setFont('helvetica','normal');pdf.setFontSize(9);pdf.setTextColor(...NAVY);pdf.text(tr2(val||'—',26),x,yy+5);
+    pdf.setFont('times','bold');pdf.setFontSize(6);pdf.setTextColor(...GRAY);pdf.text(lbl.toUpperCase(),x,yy);
+    pdf.setFont('times','normal');pdf.setFontSize(9);pdf.setTextColor(...NAVY);pdf.text(tr2(val||'—',26),x,yy+5);
   }
   const cx=[M+3,58,106,160,210,250];
   ib('Date',v('wo-date'),cx[0],y+8);ib('Unit',v('wo-unit'),cx[1],y+8);
@@ -722,7 +722,7 @@ async function generatePDF(){
   [[M,'TOTAL',String(tot),NAVY],[M+36,'OK',String(ok_c),OK],[M+72,'NG',String(ng_c),NG]].forEach(([x,l,val,cl])=>{
     pdf.setFillColor(...cl,.08);pdf.setDrawColor(...cl);pdf.setLineWidth(0.3);
     pdf.roundedRect(x,y,28,10,1.5,1.5,'FD');
-    pdf.setFont('helvetica','bold');pdf.setFontSize(6);pdf.setTextColor(...cl);pdf.text(l,x+2,y+4);
+    pdf.setFont('times','bold');pdf.setFontSize(6);pdf.setTextColor(...cl);pdf.text(l,x+2,y+4);
     pdf.setFontSize(10);pdf.text(val,x+2,y+9);
   });
   y+=16;
@@ -731,11 +731,11 @@ async function generatePDF(){
   function drawSection(title,headers,rows){
     ckY(14);
     pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,7,'F');
-    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
+    pdf.setTextColor(255,255,255);pdf.setFont('times','bold');pdf.setFontSize(8.5);
     pdf.text('▶  '+title,M+3,y+5);y+=10;
     pdf.autoTable({
       startY:y,head:[['No.','Inspection Item','Criteria',...headers]],body:rows,theme:'grid',
-      styles:{font:'helvetica',fontSize:6.5,cellPadding:2,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+      styles:{font:'times',fontSize:6.5,cellPadding:2,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
       headStyles:{fillColor:NAVY,textColor:[125,211,252],fontStyle:'bold',fontSize:6,halign:'center'},
       columnStyles:{0:{cellWidth:8,halign:'center'},1:{cellWidth:42},2:{cellWidth:20,halign:'center'}},
       didParseCell:d=>{
@@ -788,11 +788,11 @@ async function generatePDF(){
   // Panel cleaning
   ckY(20);
   pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,7,'F');
-  pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
+  pdf.setTextColor(255,255,255);pdf.setFont('times','bold');pdf.setFontSize(8.5);
   pdf.text('▶  F.2 — Panel Cleaning',M+3,y+5);y+=10;
   pdf.autoTable({startY:y,head:[['Panel','Description','Status']],
     body:[['BG-CAB-800A','Hopper Level Switch Local Indicator',getTogVal('pc-800a')],['BG-CAB-800B','Hopper Level Switch Local Indicator',getTogVal('pc-800b')],['BG-CAB-800C','Hopper Vibrator Local Control',getTogVal('pc-800c')],['BG-CAB-800D','Hopper Vibrator Local Control',getTogVal('pc-800d')],['BG-CAB-800E','Hopper Heater Local Control Panel',getTogVal('pc-800e')],['BG-CAB-800F','Hopper Heater Local Control Panel',getTogVal('pc-800f')]],
-    theme:'grid',styles:{font:'helvetica',fontSize:8,cellPadding:2.5,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+    theme:'grid',styles:{font:'times',fontSize:8,cellPadding:2.5,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
     headStyles:{fillColor:NAVY,textColor:[125,211,252],fontStyle:'bold',fontSize:7},
     didParseCell:d=>{if(d.cell.text[0]==='OK'){d.cell.styles.textColor=[...OK];d.cell.styles.fontStyle='bold';}if(d.cell.text[0]==='NG'){d.cell.styles.textColor=[...NG];d.cell.styles.fontStyle='bold';}},
     margin:{left:M,right:M}});
@@ -801,10 +801,10 @@ async function generatePDF(){
   // Findings
   ckY(30);
   pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,7,'F');
-  pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
+  pdf.setTextColor(255,255,255);pdf.setFont('times','bold');pdf.setFontSize(8.5);
   pdf.text('▶  Findings & Conclusion',M+3,y+5);y+=10;
   pdf.autoTable({startY:y,body:[['Overall Condition',v('overall')],['Next PM Due',v('next-pm')||'—'],['Findings',v('findings')||'—'],['Corrective Actions',v('recommendations')||'—']],
-    theme:'grid',styles:{font:'helvetica',fontSize:8.5,cellPadding:3,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+    theme:'grid',styles:{font:'times',fontSize:8.5,cellPadding:3,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
     columnStyles:{0:{cellWidth:46,fontStyle:'bold',fillColor:LT,textColor:NAVY}},margin:{left:M,right:M}});
   y=pdf.lastAutoTable.finalY+6;
 
@@ -812,7 +812,7 @@ async function generatePDF(){
   const pages=pdf.internal.getNumberOfPages();
   for(let pg=1;pg<=pages;pg++){
     pdf.setPage(pg);
-    pdf.setFont('helvetica','normal');pdf.setFontSize(6.5);pdf.setTextColor(150);
+    pdf.setFont('times','normal');pdf.setFontSize(6.5);pdf.setTextColor(150);
     pdf.text(`Page ${pg}/${pages}`,W-M,H-5,{align:'right'});
     pdf.text('POMI — Unit 7/8 ESP Weekly PM — 7BG-PCP-800A/B',M,H-5);
   }
