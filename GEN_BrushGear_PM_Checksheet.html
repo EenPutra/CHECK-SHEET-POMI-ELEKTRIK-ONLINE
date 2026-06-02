@@ -639,8 +639,9 @@ const INS_ITEMS=[
   {no:'2',desc:'Chattering of brushes or brush springs',crit:'No Chatter',type:'tog'},
   {no:'3',desc:'Loose, frayed, blued or burned off pigtails',crit:'No Damage',type:'tog'},
   {no:'4',desc:'Dust or oil contamination',crit:'Clean',type:'tog'},
-  {no:'5',desc:'Noise level (abnormal noise from brush gear)',crit:'Normal',type:'tog'},
-  {no:'6',desc:'Operating temperature',crit:'< 80°C',type:'temp',unit:'°C'},
+  {no:'5',desc:'Noise level (brush gear)',crit:'< 85 dB',type:'num',unit:'dB'},
+  {no:'6',desc:'Operating temperature',crit:'< 80°C',type:'num',unit:'°C'},
+  {no:'7',desc:'Air flow (cooling air)',crit:'Normal',type:'num',unit:'m/s'},
 ];
 function buildInsTable(tbodyId,pfx){
   const tb=document.getElementById(tbodyId);
@@ -1093,8 +1094,10 @@ function collectFormData(){
   // inspection
   const insPos={},insNeg={};
   INS_ITEMS.forEach(item=>{
-    insPos[item.no]={val:ST['pos_'+item.no]||'',note:gv('note_pos_'+item.no)};
-    insNeg[item.no]={val:ST['neg_'+item.no]||'',note:gv('note_neg_'+item.no)};
+    const posVal=item.type==='tog'?(ST['pos_'+item.no]||''):(gv('pos_'+item.no)||'');
+    const negVal=item.type==='tog'?(ST['neg_'+item.no]||''):(gv('neg_'+item.no)||'');
+    insPos[item.no]={val:posVal,note:gv('note_pos_'+item.no)};
+    insNeg[item.no]={val:negVal,note:gv('note_neg_'+item.no)};
   });
   const replaced=document.querySelectorAll('.bc-replace-chk:checked').length;
   return{
@@ -1203,13 +1206,11 @@ async function generatePDF(){
   }
 
   // Inspection tasks
-  const insRows=INS_ITEMS.map(item=>[
-    item.no,item.desc,item.crit,
-    ST['pos_'+item.no]||'—',
-    gv('note_pos_'+item.no)||'—',
-    ST['neg_'+item.no]||'—',
-    gv('note_neg_'+item.no)||'—',
-  ]);
+  const insRows=INS_ITEMS.map(item=>{
+    const posVal=item.type==='tog'?(ST['pos_'+item.no]||'—'):(gv('pos_'+item.no)?(gv('pos_'+item.no)+' '+(item.unit||'')):'—');
+    const negVal=item.type==='tog'?(ST['neg_'+item.no]||'—'):(gv('neg_'+item.no)?(gv('neg_'+item.no)+' '+(item.unit||'')):'—');
+    return[item.no,item.desc,item.crit,posVal,gv('note_pos_'+item.no)||'—',negVal,gv('note_neg_'+item.no)||'—'];
+  });
   drawSec('A — Inspection Tasks',insRows,
     ['No.','Inspection Item','Criteria','Pole + Result','Pole + Note','Pole − Result','Pole − Note'],
     {0:{cellWidth:8,halign:'center'},1:{cellWidth:52},2:{cellWidth:22,halign:'center'},3:{cellWidth:20,halign:'center'},4:{cellWidth:40},5:{cellWidth:20,halign:'center'}});
