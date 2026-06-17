@@ -675,20 +675,56 @@ function buildRowspanTable(tbodyId,rows){
 
 // ── PHOTOS ────────────────────────────────────────
 const PHOTOS=[];
-function handlePhotoInput(inp){Array.from(inp.files).forEach(addPhoto);inp.value='';}
-function addPhoto(file){
-  const rd=new FileReader();
-  rd.onload=e=>{PHOTOS.push({dataUrl:e.target.result,caption:''});renderPhotos();};
-  rd.readAsDataURL(file);
+
+// Compress: resize to max 1200px, JPEG quality 0.78
+function compressImage(file){
+  return new Promise(resolve=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const MAX=1200,Q=0.78;
+        let w=img.naturalWidth,h=img.naturalHeight;
+        if(w>MAX||h>MAX){
+          if(w>=h){h=Math.round(h*MAX/w);w=MAX;}
+          else{w=Math.round(w*MAX/h);h=MAX;}
+        }
+        const canvas=document.createElement('canvas');
+        canvas.width=w;canvas.height=h;
+        canvas.getContext('2d').drawImage(img,0,0,w,h);
+        resolve({dataUrl:canvas.toDataURL('image/jpeg',Q),w,h});
+      };
+      img.src=e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
 }
+
+function handlePhotoInput(inp){
+  const files=Array.from(inp.files);inp.value='';
+  if(!files.length)return;
+  showNote('⏳ Memproses '+files.length+' foto…','info');
+  Promise.all(files.map(addPhoto)).then(()=>showNote('✅ '+files.length+' foto dikompres & ditambahkan.','ok'));
+}
+
+async function addPhoto(file){
+  const{dataUrl,w,h}=await compressImage(file);
+  PHOTOS.push({dataUrl,caption:'',w,h});
+  renderPhotos();
+}
+
 function renderPhotos(){
   const grid=document.getElementById('photo-grid');
   grid.innerHTML='';
   PHOTOS.forEach((p,i)=>{
+    const kb=Math.round(p.dataUrl.length*0.75/1024);
+    const dim=p.w&&p.h?`${p.w}×${p.h} px · `:'';
+    const ratio=p.w&&p.h?((p.w/p.h)>=1?'landscape':'portrait'):'';
     const card=document.createElement('div');
     card.className='pcard';
-    card.innerHTML=`<img src="${p.dataUrl}" alt="Photo ${i+1}" onclick="zoomPhoto(${i})">
+    card.innerHTML=`<img src="${p.dataUrl}" alt="Photo ${i+1}" onclick="zoomPhoto(${i})" style="width:100%;height:130px;object-fit:cover;display:block;cursor:zoom-in">
       <div class="pcard-body">
+        <div style="font-family:var(--mono);font-size:9px;color:var(--txt4);margin-bottom:3px">${dim}~${kb} KB · ${ratio}</div>
         <input class="pcap" type="text" placeholder="Caption…" value="${p.caption.replace(/"/g,'&quot;')}" oninput="PHOTOS[${i}].caption=this.value">
         <button class="pdel" onclick="delPhoto(${i})">✕ Hapus foto</button>
       </div>`;
@@ -697,22 +733,27 @@ function renderPhotos(){
   document.getElementById('photo-cnt').textContent=PHOTOS.length+' photo'+(PHOTOS.length!==1?'s':'');
   updateStats();
 }
+
 function delPhoto(i){if(!confirm('Hapus foto ini?'))return;PHOTOS.splice(i,1);renderPhotos();}
 function zoomPhoto(i){
   const w=window.open('','_blank','width=1000,height=750');
   w.document.write(`<html><body style="margin:0;background:#000;display:flex;align-items:center;justify-content:center;height:100vh">
     <img src="${PHOTOS[i].dataUrl}" style="max-width:100%;max-height:100%;object-fit:contain">
     <div style="position:fixed;bottom:10px;left:50%;transform:translateX(-50%);color:#fff;font:12px monospace;background:rgba(0,0,0,.6);padding:4px 10px;border-radius:4px">
-      [${i+1}] ${PHOTOS[i].caption||'No caption'}</div>
+      [${i+1}] ${PHOTOS[i].caption||'No caption'} &nbsp;·&nbsp; ${PHOTOS[i].w||'?'}×${PHOTOS[i].h||'?'} px</div>
     </body></html>`);
 }
+
 // Drag-drop
 const pd=document.getElementById('photo-drop');
 pd.addEventListener('dragover',e=>{e.preventDefault();pd.classList.add('dov');});
 pd.addEventListener('dragleave',()=>pd.classList.remove('dov'));
 pd.addEventListener('drop',e=>{
   e.preventDefault();pd.classList.remove('dov');
-  Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')).forEach(addPhoto);
+  const files=Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/'));
+  if(!files.length)return;
+  showNote('⏳ Memproses '+files.length+' foto…','info');
+  Promise.all(files.map(addPhoto)).then(()=>showNote('✅ '+files.length+' foto dikompres & ditambahkan.','ok'));
 });
 
 // ── DRAFT ─────────────────────────────────────────
@@ -720,7 +761,7 @@ function saveDraft(){
   const d={};
   document.querySelectorAll('input[type=text],input[type=date],input[type=time],input[type=number],select,textarea').forEach((el,i)=>d['f'+i]=el.value);
   d._st=JSON.parse(JSON.stringify(ST));
-  d._ph=PHOTOS.map(p=>({dataUrl:p.dataUrl,caption:p.caption}));
+  d._ph=PHOTOS.map(p=>({dataUrl:p.dataUrl,caption:p.caption,w:p.w||0,h:p.h||0}));
   try{
     localStorage.setItem('ups_7eb_draft',JSON.stringify(d));
     showNote('💾 Draft tersimpan.','ok');
@@ -737,7 +778,15 @@ function loadDraft(){
     const d=JSON.parse(raw);
     document.querySelectorAll('input[type=text],input[type=date],input[type=time],input[type=number],select,textarea').forEach((el,i)=>{if(d['f'+i]!==undefined)el.value=d['f'+i];});
     if(d._st){Object.entries(d._st).forEach(([id,val])=>{ST[id]=val;const b=document.querySelector(`.tog .rb[data-v="${val}"][onclick*="'${id}'"]`);if(b)b.className='rb '+(val==='OK'?'ok-act':'ng-act');});}
-    if(d._ph&&d._ph.length){d._ph.forEach(p=>PHOTOS.push(p));renderPhotos();}
+    if(d._ph&&d._ph.length){
+      d._ph.forEach(p=>{
+        const ph={dataUrl:p.dataUrl,caption:p.caption,w:p.w||0,h:p.h||0};
+        // recover dimensions if missing (old draft format)
+        if(!ph.w||!ph.h){const img=new Image();img.onload=()=>{ph.w=img.naturalWidth;ph.h=img.naturalHeight;renderPhotos();};img.src=ph.dataUrl;}
+        PHOTOS.push(ph);
+      });
+      renderPhotos();
+    }
     updateStats();
   }catch(e){}
 }
@@ -897,28 +946,36 @@ async function generatePDF(){
     margin:{left:M,right:M}});
   y=pdf.lastAutoTable.finalY+8;
 
-  // G: Photos
+  // G: Photos — aspect-ratio aware, 2 columns
   if(PHOTOS.length>0){
     pdf.addPage();y=M;miniHdr();
     secHdr('G — Photos & Documentation');
-    const PW=85,PH=65,GAP=8,ROW_H=80;
-    let rowY=y;
-    PHOTOS.forEach((p,i)=>{
-      const col=i%2;
-      if(col===0&&i>0){
-        rowY+=ROW_H;
-        if(rowY+ROW_H>H-M){pdf.addPage();miniHdr();rowY=y;}
-      }
-      const x=M+(PW+GAP)*col;
-      try{pdf.addImage(p.dataUrl,'JPEG',x,rowY,PW,PH);}
-      catch(e){
-        pdf.setFillColor(220,220,220);pdf.rect(x,rowY,PW,PH,'F');
-        pdf.setFont('times','normal');pdf.setFontSize(8);pdf.setTextColor(150);
-        pdf.text('Photo '+(i+1),x+PW/2,rowY+PH/2,{align:'center'});
-      }
+    const BOX_W=85,BOX_MAX_H=95,GAP_X=8,CAP_H=10;
+    // Fit image into box preserving aspect ratio
+    const fitBox=(pw,ph)=>{
+      if(!pw||!ph){pw=4;ph=3;} // fallback 4:3
+      const sc=Math.min(BOX_W/pw,BOX_MAX_H/ph);
+      return{dw:pw*sc,dh:ph*sc};
+    };
+    for(let i=0;i<PHOTOS.length;i+=2){
+      const s0=fitBox(PHOTOS[i].w,PHOTOS[i].h);
+      const s1=PHOTOS[i+1]?fitBox(PHOTOS[i+1].w,PHOTOS[i+1].h):null;
+      const rowH=Math.max(s0.dh,s1?s1.dh:0)+CAP_H;
+      ckY(rowH);
+      // Left
+      try{pdf.addImage(PHOTOS[i].dataUrl,'JPEG',M,y,s0.dw,s0.dh);}
+      catch(e){pdf.setFillColor(220,220,220);pdf.rect(M,y,s0.dw,s0.dh,'F');}
       pdf.setFont('times','italic');pdf.setFontSize(7);pdf.setTextColor(...GRAY);
-      pdf.text(`[${i+1}] ${p.caption||'No caption'}`,x,rowY+PH+5,{maxWidth:PW});
-    });
+      pdf.text(`[${i+1}] ${PHOTOS[i].caption||'No caption'}`,M,y+s0.dh+5,{maxWidth:BOX_W});
+      // Right
+      if(s1){
+        const x1=M+BOX_W+GAP_X;
+        try{pdf.addImage(PHOTOS[i+1].dataUrl,'JPEG',x1,y,s1.dw,s1.dh);}
+        catch(e){pdf.setFillColor(220,220,220);pdf.rect(x1,y,s1.dw,s1.dh,'F');}
+        pdf.text(`[${i+2}] ${PHOTOS[i+1].caption||'No caption'}`,x1,y+s1.dh+5,{maxWidth:BOX_W});
+      }
+      y+=rowH;
+    }
   }
 
   // Page numbers
