@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Weekly Report Dashboard - EIC7</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --navy:#002060; --teal:#1C7293; --teal-dark:#21295C; --light:#F2F6F9;
+    --green:#1E7A4A; --red:#C00000; --amber:#B88600; --grey:#595959; --border:#D9E2EC;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:Calibri,Arial,sans-serif;margin:0;background:#eef2f6;color:var(--navy);}
+  header{background:var(--navy);color:#fff;padding:18px 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  header h1{font-size:20px;margin:0;}
+  header .sub{font-size:12px;color:#cfe0f0;}
+  .wrap{max-width:1300px;margin:0 auto;padding:20px;}
+  .card{background:#fff;border-radius:10px;padding:18px 22px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .card h2{font-size:16px;margin:0 0 12px;color:var(--navy);}
+  .row{display:flex;gap:14px;flex-wrap:wrap;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .kpi{border:1.5px solid var(--teal);border-radius:10px;padding:14px;text-align:center;background:var(--light);}
+  .kpi .num{font-size:30px;font-weight:bold;color:var(--teal);}
+  .kpi .lbl{font-size:11px;font-weight:bold;color:var(--navy);margin-top:4px;}
+  .kpi.completed{border-color:var(--green);} .kpi.completed .num{color:var(--green);}
+  .kpi.cancelled{border-color:var(--red);} .kpi.cancelled .num{color:var(--red);}
+  .kpi.total{border-color:var(--navy);} .kpi.total .num{color:var(--navy);}
+  label{font-size:12px;font-weight:bold;color:var(--navy);display:block;margin-bottom:4px;}
+  input[type=text], textarea, input[type=date]{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;}
+  textarea{resize:vertical;}
+  .btn{background:var(--teal);color:#fff;border:none;padding:9px 16px;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;}
+  .btn:hover{opacity:.9;}
+  .btn.secondary{background:#fff;color:var(--teal);border:1.5px solid var(--teal);}
+  .btn.danger{background:var(--red);}
+  .btn.green{background:var(--green);}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
+  .file-btn{position:relative;overflow:hidden;display:inline-block;}
+  .file-btn input[type=file]{position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{background:var(--navy);color:#fff;text-align:left;padding:8px 10px;position:sticky;top:0;}
+  td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tr:nth-child(even) td{background:var(--light);}
+  .status-pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:bold;color:#fff;}
+  .st-APPR{background:#8a94a6;} .st-INPRG{background:var(--teal);} .st-WMATL{background:var(--amber);}
+  .st-WPCOND{background:#6d4fc2;} .st-COMP{background:var(--green);} .st-CAN{background:var(--red);}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .chip{padding:6px 14px;border-radius:20px;border:1.5px solid var(--teal);background:#fff;color:var(--teal);font-size:12px;font-weight:bold;cursor:pointer;}
+  .chip.active{background:var(--teal);color:#fff;}
+  .detail-row td{background:#fbfcfe;padding:14px 18px;}
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .photo-zone{border:2px dashed var(--border);border-radius:8px;padding:10px;text-align:center;font-size:12px;color:var(--grey);}
+  .photo-zone.drag{border-color:var(--teal);background:#eef7fa;}
+  .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .thumb{width:90px;}
+  .thumb img{width:90px;height:70px;object-fit:cover;border-radius:6px;border:1px solid var(--border);}
+  .thumb input{margin-top:3px;font-size:10px;padding:3px;}
+  .thumb .rm{font-size:10px;color:var(--red);cursor:pointer;text-align:center;margin-top:2px;}
+  .hl-toggle{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:bold;}
+  .badge-hl{background:var(--amber);color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;margin-left:6px;}
+  .empty-state{text-align:center;padding:50px 20px;color:var(--grey);}
+  .steps{font-size:12.5px;color:var(--grey);line-height:1.7;}
+  .steps b{color:var(--navy);}
+  .footer-note{font-size:11px;color:var(--grey);margin-top:6px;}
+  #dropOverlay{position:fixed;inset:0;background:rgba(28,114,147,.15);border:4px dashed var(--teal);z-index:999;display:none;align-items:center;justify-content:center;font-size:24px;color:var(--teal);font-weight:bold;}
+</style>
+</head>
+<body>
+
+<div id="dropOverlay">Lepaskan file Excel di sini...</div>
+
+<header>
+  <div>
+    <h1>Weekly Report Dashboard - Maintenance EIC7</h1>
+    <div class="sub">Tool input data mingguan: Excel WO &rarr; update &amp; foto &rarr; export untuk dibuatkan PPT oleh Claude</div>
+  </div>
+  <div class="toolbar">
+    <button class="btn secondary" onclick="document.getElementById('helpCard').scrollIntoView({behavior:'smooth'})">Cara Pakai</button>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="card" id="helpCard">
+    <h2>Cara Pakai</h2>
+    <div class="steps">
+      <b>1.</b> Klik <b>Import Excel WO</b>, pilih file export List of Work Order dari CMMS (format sama seperti sebelumnya).<br>
+      <b>2.</b> Data otomatis dikelompokkan: Completed / Outstanding / Cancelled, plus ringkasan KPI di bawah.<br>
+      <b>3.</b> Klik satu baris WO untuk buka detail &rarr; isi/edit kolom <b>Update (What was Complete?)</b>, centang <b>Highlight untuk laporan</b> jika WO tsb perlu ditampilkan di PPT, dan upload foto evidence bila ada.<br>
+      <b>4.</b> Isi catatan <b>Rekomendasi &amp; Rencana Tindak Lanjut</b> di bagian bawah bila ingin menambahkan poin manual.<br>
+      <b>5.</b> Klik <b>Export Data (.json)</b> &rarr; upload file hasil export ini ke chat Claude, lalu minta: <i>"buatkan laporan PPT minggu ini dari data ini"</i>. Foto ikut tersimpan di dalam file JSON, jadi cukup 1 file yang diupload.<br>
+      <span class="footer-note">Data tersimpan otomatis di browser ini (draft) selama tidak clear cache. Selalu Export ke .json setiap selesai kerja agar tidak hilang &amp; bisa dipakai lintas perangkat.</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Data Sumber</h2>
+    <div class="toolbar">
+      <span class="file-btn btn">Import Excel WO (.xlsx)<input type="file" id="xlsxInput" accept=".xlsx,.xls"></span>
+      <span class="file-btn btn secondary">Lanjutkan dari file .json sebelumnya<input type="file" id="jsonInput" accept=".json"></span>
+      <button class="btn green" id="exportBtn">Export Data (.json)</button>
+      <button class="btn danger" id="clearBtn">Clear Draft</button>
+      <span class="footer-note" id="sourceInfo"></span>
+    </div>
+    <div class="row" style="max-width:420px;">
+      <div style="flex:1;">
+        <label>Periode Laporan</label>
+        <input type="text" id="periodInput" placeholder="contoh: s.d. 01 Juli 2026">
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="kpiCard" style="display:none;">
+    <h2>Ringkasan KPI</h2>
+    <div class="kpis">
+      <div class="kpi total"><div class="num" id="kpiTotal">0</div><div class="lbl">TOTAL WORK ORDER</div></div>
+      <div class="kpi completed"><div class="num" id="kpiComp">0</div><div class="lbl">COMPLETED</div></div>
+      <div class="kpi"><div class="num" id="kpiOut">0</div><div class="lbl">OUTSTANDING</div></div>
+      <div class="kpi cancelled"><div class="num" id="kpiCan">0</div><div class="lbl">CANCELLED</div></div>
+    </div>
+  </div>
+
+  <div class="card" id="tableCard" style="display:none;">
+    <h2>Daftar Work Order</h2>
+    <div class="filters" id="filterBar"></div>
+    <div class="row" style="margin-bottom:10px;">
+      <input type="text" id="searchBox" placeholder="Cari WO / asset / deskripsi...">
+    </div>
+    <table>
+      <thead><tr>
+        <th style="width:26px;"></th><th>WO</th><th>Asset</th><th>Team</th><th>Status</th><th>Work Desc</th><th style="width:70px;">Foto</th>
+      </tr></thead>
+      <tbody id="tblBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="noDataCard">
+    <div class="empty-state">Belum ada data. Silakan import file Excel WO untuk mulai.</div>
+  </div>
+
+  <div class="card" id="recCard" style="display:none;">
+    <h2>Rekomendasi &amp; Rencana Tindak Lanjut (catatan manual)</h2>
+    <textarea id="recNotes" rows="5" placeholder="Tulis poin rekomendasi tambahan di sini, satu poin per baris..."></textarea>
+  </div>
+
+</div>
+
+<script>
+window.DATA = { period: "", recNotes: "", workOrders: [] };
+let activeFilter = "ALL";
+let searchTerm = "";
+
+const HEADER_MAP = {
+  wo: ["Work Order"], asset: ["Asset"], location: ["Location"], route: ["Route"],
+  assetDesc: ["Asset Description"], locDesc: ["Location/Route Desc"], failureDesc: ["Failure Desc"],
+  workDesc: ["Work Desc"], team: ["Team"], sysOwner: ["SPV/Sys Owner"], workType: ["Work Type"],
+  priority: ["Priority"], scheduledStart: ["Scheduled Start"], status: ["Status"],
+  whatComplete: ["What was Complete?"], outage: ["Outage #"], originator: ["Originator"]
+};
+
+function findCol(headers, names){
+  for(const n of names){
+    const idx = headers.findIndex(h => (h||"").toString().trim().toLowerCase() === n.toLowerCase());
+    if(idx !== -1) return idx;
+  }
+  return -1;
+}
+
+document.getElementById('xlsxInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  loadExcelFile(file);
+});
+
+function loadExcelFile(file){
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    const wb = XLSX.read(evt.target.result, {type:'array', cellDates:true});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:false, dateNF:'yyyy-mm-dd'});
+    const headers = rows[0];
+    const colIdx = {};
+    for(const key in HEADER_MAP) colIdx[key] = findCol(headers, HEADER_MAP[key]);
+
+    const existingByWo = {};
+    DATA.workOrders.forEach(w => existingByWo[w.wo] = w);
+
+    const newList = [];
+    for(let r = 1; r < rows.length; r++){
+      const row = rows[r];
+      if(!row || row.length === 0) continue;
+      const woNum = (colIdx.wo>=0 ? row[colIdx.wo] : "") || "";
+      if(!woNum) continue;
+      const existing = existingByWo[woNum];
+      newList.push({
+        wo: String(woNum),
+        asset: colIdx.asset>=0 ? (row[colIdx.asset]||"") : "",
+        assetDesc: colIdx.assetDesc>=0 ? (row[colIdx.assetDesc]||"") : "",
+        locDesc: colIdx.locDesc>=0 ? (row[colIdx.locDesc]||"") : "",
+        failureDesc: colIdx.failureDesc>=0 ? (row[colIdx.failureDesc]||"") : "",
+        workDesc: colIdx.workDesc>=0 ? (row[colIdx.workDesc]||"") : "",
+        team: colIdx.team>=0 ? (row[colIdx.team]||"") : "",
+        workType: colIdx.workType>=0 ? (row[colIdx.workType]||"") : "",
+        priority: colIdx.priority>=0 ? (row[colIdx.priority]||"") : "",
+        scheduledStart: colIdx.scheduledStart>=0 ? (row[colIdx.scheduledStart]||"") : "",
+        status: colIdx.status>=0 ? (row[colIdx.status]||"") : "",
+        // preserve user-entered update/highlight/photos if this WO already existed in current draft
+        whatComplete: existing ? existing.whatComplete : (colIdx.whatComplete>=0 ? (row[colIdx.whatComplete]||"") : ""),
+        highlight: existing ? existing.highlight : false,
+        photos: existing ? existing.photos : []
+      });
+    }
+    DATA.workOrders = newList;
+    document.getElementById('sourceInfo').textContent = "Sumber: " + file.name + " (" + newList.length + " WO dimuat)";
+    saveDraft();
+    render();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+document.getElementById('jsonInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      const loaded = JSON.parse(evt.target.result);
+      DATA = loaded;
+      document.getElementById('periodInput').value = DATA.period || "";
+      document.getElementById('recNotes').value = DATA.recNotes || "";
+      document.getElementById('sourceInfo').textContent = "Melanjutkan dari: " + file.name;
+      saveDraft();
+      render();
+    }catch(err){ alert("File JSON tidak valid: " + err.message); }
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('periodInput').addEventListener('input', function(e){ DATA.period = e.target.value; saveDraft(); });
+document.getElementById('recNotes').addEventListener('input', function(e){ DATA.recNotes = e.target.value; saveDraft(); });
+
+document.getElementById('exportBtn').addEventListener('click', function(){
+  if(DATA.workOrders.length === 0){ alert("Belum ada data untuk di-export."); return; }
+  DATA.generatedAt = new Date().toISOString();
+  const blob = new Blob([JSON.stringify(DATA)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const dateStr = new Date().toISOString().slice(0,10);
+  a.href = url;
+  a.download = "weekly-report-data-" + dateStr + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+document.getElementById('clearBtn').addEventListener('click', function(){
+  if(confirm("Hapus semua draft data di browser ini?")){
+    localStorage.removeItem('eic7_weekly_draft');
+    DATA = { period:"", recNotes:"", workOrders:[] };
+    document.getElementById('periodInput').value = "";
+    document.getElementById('recNotes').value = "";
+    document.getElementById('sourceInfo').textContent = "";
+    render();
+  }
+});
+
+function saveDraft(){
+  try{ localStorage.setItem('eic7_weekly_draft', JSON.stringify(DATA)); }catch(e){ /* storage full - ignore */ }
+}
+function loadDraft(){
+  const raw = localStorage.getItem('eic7_weekly_draft');
+  if(raw){
+    try{
+      DATA = JSON.parse(raw);
+      document.getElementById('periodInput').value = DATA.period || "";
+      document.getElementById('recNotes').value = DATA.recNotes || "";
+    }catch(e){}
+  }
+}
+
+function classify(status){
+  const s = (status||"").toUpperCase();
+  if(s === "COMP") return "COMP";
+  if(s === "CAN") return "CAN";
+  return "OUT"; // APPR, INPRG, WMATL, WPCOND, others
+}
+
+function setFilter(f){ activeFilter = f; renderFilterBar(); renderTable(); }
+
+function renderFilterBar(){
+  const bar = document.getElementById('filterBar');
+  const counts = {ALL:0, COMP:0, OUT:0, CAN:0, HL:0};
+  DATA.workOrders.forEach(w => {
+    counts.ALL++;
+    counts[classify(w.status)]++;
+    if(w.highlight) counts.HL++;
+  });
+  const chips = [
+    ["ALL","Semua ("+counts.ALL+")"],
+    ["OUT","Outstanding ("+counts.OUT+")"],
+    ["COMP","Completed ("+counts.COMP+")"],
+    ["CAN","Cancelled ("+counts.CAN+")"],
+    ["HL","Highlight laporan ("+counts.HL+")"]
+  ];
+  bar.innerHTML = chips.map(c => `<div class="chip ${activeFilter===c[0]?'active':''}" onclick="setFilter('${c[0]}')">${c[1]}</div>`).join("");
+}
+
+document.getElementById('searchBox').addEventListener('input', function(e){
+  searchTerm = e.target.value.toLowerCase();
+  renderTable();
+});
+
+function render(){
+  const hasData = DATA.workOrders.length > 0;
+  document.getElementById('noDataCard').style.display = hasData ? 'none' : 'block';
+  document.getElementById('kpiCard').style.display = hasData ? 'block' : 'none';
+  document.getElementById('tableCard').style.display = hasData ? 'block' : 'none';
+  document.getElementById('recCard').style.display = hasData ? 'block' : 'none';
+  if(!hasData) return;
+
+  const comp = DATA.workOrders.filter(w => classify(w.status)==='COMP').length;
+  const out = DATA.workOrders.filter(w => classify(w.status)==='OUT').length;
+  const can = DATA.workOrders.filter(w => classify(w.status)==='CAN').length;
+  document.getElementById('kpiTotal').textContent = DATA.workOrders.length;
+  document.getElementById('kpiComp').textContent = comp;
+  document.getElementById('kpiOut').textContent = out;
+  document.getElementById('kpiCan').textContent = can;
+
+  renderFilterBar();
+  renderTable();
+}
+
+function renderTable(){
+  const tbody = document.getElementById('tblBody');
+  let list = DATA.workOrders;
+  if(activeFilter === 'HL') list = list.filter(w => w.highlight);
+  else if(activeFilter !== 'ALL') list = list.filter(w => classify(w.status) === activeFilter);
+  if(searchTerm){
+    list = list.filter(w => (w.wo+" "+w.asset+" "+w.assetDesc+" "+w.workDesc+" "+w.failureDesc).toLowerCase().includes(searchTerm));
+  }
+  tbody.innerHTML = "";
+  list.forEach((w) => {
+    const realIdx = DATA.workOrders.indexOf(w);
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.innerHTML = `
+      <td>${w.highlight?'&#9733;':''}</td>
+      <td><b>${w.wo}</b></td>
+      <td>${escapeHtml(w.asset)}<br><span style="color:var(--grey);font-size:11px;">${escapeHtml(w.assetDesc||'')}</span></td>
+      <td>${escapeHtml(w.team)}</td>
+      <td><span class="status-pill st-${(w.status||'').toUpperCase()}">${escapeHtml(w.status)}</span></td>
+      <td>${escapeHtml(truncate(w.workDesc,70))}</td>
+      <td>${w.photos && w.photos.length ? w.photos.length+' foto' : '-'}</td>
+    `;
+    tr.addEventListener('click', () => toggleDetail(realIdx));
+    tbody.appendChild(tr);
+    if(w._open){
+      const dtr = document.createElement('tr');
+      dtr.className = 'detail-row';
+      const td = document.createElement('td');
+      td.colSpan = 7;
+      td.appendChild(buildDetailPanel(realIdx));
+      dtr.appendChild(td);
+      tbody.appendChild(dtr);
+    }
+  });
+  if(list.length === 0){
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--grey);padding:20px;">Tidak ada WO yang cocok.</td></tr>';
+  }
+}
+
+function toggleDetail(idx){
+  DATA.workOrders[idx]._open = !DATA.workOrders[idx]._open;
+  renderTable();
+}
+
+function buildDetailPanel(idx){
+  const w = DATA.workOrders[idx];
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="detail-grid">
+      <div>
+        <label>Failure Desc</label>
+        <div style="font-size:12.5px;color:var(--grey);margin-bottom:10px;white-space:pre-wrap;">${escapeHtml(w.failureDesc||'-')}</div>
+        <label>Work Desc</label>
+        <div style="font-size:12.5px;color:var(--grey);margin-bottom:10px;white-space:pre-wrap;">${escapeHtml(w.workDesc||'-')}</div>
+        <label class="hl-toggle"><input type="checkbox" id="hl_${idx}" ${w.highlight?'checked':''}> Highlight untuk laporan (tampilkan di PPT)</label>
+      </div>
+      <div>
+        <label>Update / What was Complete?</label>
+        <textarea id="wc_${idx}" rows="6" placeholder="Tulis progress/update terbaru untuk WO ini...">${escapeHtml(w.whatComplete||'')}</textarea>
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <label>Foto Evidence</label>
+      <div class="photo-zone" id="pz_${idx}">
+        Tarik &amp; lepas foto ke sini, atau
+        <span class="file-btn btn secondary" style="padding:5px 10px;font-size:11px;">Pilih Foto<input type="file" accept="image/*" multiple id="pf_${idx}"></span>
+      </div>
+      <div class="thumbs" id="th_${idx}"></div>
+    </div>
+  `;
+  setTimeout(() => {
+    document.getElementById('hl_'+idx).addEventListener('change', e => { w.highlight = e.target.checked; saveDraft(); renderFilterBar(); });
+    document.getElementById('wc_'+idx).addEventListener('input', e => { w.whatComplete = e.target.value; saveDraft(); });
+    document.getElementById('pf_'+idx).addEventListener('change', e => handleFiles(idx, e.target.files));
+    const zone = document.getElementById('pz_'+idx);
+    zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+    zone.addEventListener('drop', e => {
+      e.preventDefault(); zone.classList.remove('drag');
+      handleFiles(idx, e.dataTransfer.files);
+    });
+    renderThumbs(idx);
+  }, 0);
+  return wrap;
+}
+
+function handleFiles(idx, files){
+  const w = DATA.workOrders[idx];
+  if(!w.photos) w.photos = [];
+  Array.from(files).forEach(file => {
+    if(!file.type.startsWith('image/')) return;
+    resizeImage(file, 1280, 0.75).then(dataUrl => {
+      w.photos.push({filename:file.name, dataUrl:dataUrl, caption:""});
+      saveDraft();
+      renderThumbs(idx);
+      renderTable();
+    });
+  });
+}
+
+function resizeImage(file, maxWidth, quality){
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const img = new Image();
+      img.onload = function(){
+        let w = img.width, h = img.height;
+        if(w > maxWidth){ h = Math.round(h * maxWidth / w); w = maxWidth; }
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderThumbs(idx){
+  const w = DATA.workOrders[idx];
+  const box = document.getElementById('th_'+idx);
+  if(!box) return;
+  box.innerHTML = "";
+  (w.photos||[]).forEach((p, pi) => {
+    const div = document.createElement('div');
+    div.className = 'thumb';
+    div.innerHTML = `
+      <img src="${p.dataUrl}">
+      <input type="text" placeholder="caption..." value="${escapeHtml(p.caption||'')}">
+      <div class="rm">Hapus</div>
+    `;
+    div.querySelector('input').addEventListener('input', e => { p.caption = e.target.value; saveDraft(); });
+    div.querySelector('.rm').addEventListener('click', () => { w.photos.splice(pi,1); saveDraft(); renderThumbs(idx); renderTable(); });
+    box.appendChild(div);
+  });
+}
+
+function escapeHtml(s){
+  if(s === undefined || s === null) return "";
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function truncate(s, n){ s = String(s||""); return s.length > n ? s.slice(0,n)+"..." : s; }
+
+// Drag-and-drop Excel anywhere on the page
+let dragCounter = 0;
+window.addEventListener('dragenter', e => {
+  if(Array.from(e.dataTransfer.items||[]).some(it => it.kind==='file')){
+    dragCounter++;
+    document.getElementById('dropOverlay').style.display = 'flex';
+  }
+});
+window.addEventListener('dragleave', () => {
+  dragCounter--;
+  if(dragCounter <= 0){ dragCounter = 0; document.getElementById('dropOverlay').style.display = 'none'; }
+});
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+  e.preventDefault();
+  dragCounter = 0;
+  document.getElementById('dropOverlay').style.display = 'none';
+  const file = e.dataTransfer.files[0];
+  if(!file) return;
+  if(file.name.match(/\.xlsx?$/i)) loadExcelFile(file);
+  else if(file.name.match(/\.json$/i)){
+    const reader = new FileReader();
+    reader.onload = evt => {
+      DATA = JSON.parse(evt.target.result);
+      document.getElementById('periodInput').value = DATA.period || "";
+      document.getElementById('recNotes').value = DATA.recNotes || "";
+      saveDraft(); render();
+    };
+    reader.readAsText(file);
+  }
+});
+
+loadDraft();
+render();
+</script>
+</body>
+</html>

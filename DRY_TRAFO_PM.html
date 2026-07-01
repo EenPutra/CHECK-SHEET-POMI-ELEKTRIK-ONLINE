@@ -136,6 +136,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   .tb-sub,.tb-sep{display:none}
   .findings-grid{grid-template-columns:1fr}
   .photo-grid.cols-2,.photo-grid.cols-3{grid-template-columns:1fr}
+  .hero-stats .hstat{min-width:60px;padding:8px 10px}
+  .hstat-n{font-size:20px}
+}
+@media(max-width:400px){
+  .topbar{padding:0 12px}
+  .wrap{padding:12px 10px 60px}
+  .hero-stats{gap:6px}
+  .hero-stats .hstat{min-width:52px;padding:6px 8px;font-size:11px}
+  .hstat-n{font-size:17px}
 }
 @media print{
   @page{size:A4 portrait;margin:12mm 15mm}
