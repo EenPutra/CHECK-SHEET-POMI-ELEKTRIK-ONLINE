@@ -97,6 +97,8 @@
     <div class="toolbar">
       <span class="file-btn btn">Import Excel WO (.xlsx)<input type="file" id="xlsxInput" accept=".xlsx,.xls"></span>
       <span class="file-btn btn secondary">Lanjutkan dari file .json sebelumnya<input type="file" id="jsonInput" accept=".json"></span>
+      <button class="btn" id="saveWeekBtn" style="background:#1e4d8c;">&#128190; Simpan Laporan</button>
+      <button class="btn secondary" id="newWeekBtn">&#43; Minggu Baru</button>
       <button class="btn green" id="exportBtn">Export Data (.json)</button>
       <button class="btn danger" id="clearBtn">Clear Draft</button>
       <span class="footer-note" id="sourceInfo"></span>
@@ -140,6 +142,11 @@
   <div class="card" id="recCard" style="display:none;">
     <h2>Rekomendasi &amp; Rencana Tindak Lanjut (catatan manual)</h2>
     <textarea id="recNotes" rows="5" placeholder="Tulis poin rekomendasi tambahan di sini, satu poin per baris..."></textarea>
+  </div>
+
+  <div class="card" id="historyCard">
+    <h2 style="margin-bottom:14px;">&#128197; Riwayat Laporan Mingguan</h2>
+    <div id="weekList"><div style="color:var(--grey);font-size:12.5px;">Belum ada laporan tersimpan.</div></div>
   </div>
 
 </div>
@@ -507,6 +514,136 @@ window.addEventListener('drop', e => {
   }
 });
 
+// ── IndexedDB — riwayat laporan mingguan ──
+let currentWeekId = null;
+
+function openDB(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open('eic7_weekly',1);
+    r.onupgradeneeded = e => {
+      const db = e.target.result;
+      if(!db.objectStoreNames.contains('weeks'))
+        db.createObjectStore('weeks',{keyPath:'id'});
+    };
+    r.onsuccess = e => res(e.target.result);
+    r.onerror   = e => rej(e.target.error);
+  });
+}
+function dbPut(rec){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx = db.transaction('weeks','readwrite');
+    tx.objectStore('weeks').put(rec);
+    tx.oncomplete = res;
+    tx.onerror = e=>rej(e.target.error);
+  }));
+}
+function dbGetAll(){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx = db.transaction('weeks','readonly');
+    const r = tx.objectStore('weeks').getAll();
+    r.onsuccess = ()=>res(r.result);
+    r.onerror   = e=>rej(e.target.error);
+  }));
+}
+function dbDeleteRec(id){
+  return openDB().then(db=>new Promise((res,rej)=>{
+    const tx = db.transaction('weeks','readwrite');
+    tx.objectStore('weeks').delete(id);
+    tx.oncomplete = res;
+    tx.onerror = e=>rej(e.target.error);
+  }));
+}
+
+function saveWeek(){
+  if(DATA.workOrders.length===0){ alert('Belum ada data WO untuk disimpan.'); return; }
+  if(!currentWeekId) currentWeekId = Date.now().toString();
+  const label = DATA.period || '(tanpa periode)';
+  const rec = {
+    id: currentWeekId,
+    period: label,
+    savedAt: new Date().toISOString(),
+    data: JSON.parse(JSON.stringify(DATA))
+  };
+  dbPut(rec).then(()=>{
+    renderHistory();
+    const info = document.getElementById('sourceInfo');
+    info.textContent = '✓ Disimpan: ' + label;
+    setTimeout(()=>{ if(info.textContent.startsWith('✓')) info.textContent=''; }, 3000);
+  }).catch(e=>alert('Gagal menyimpan: '+e));
+}
+
+function newWeek(){
+  if(DATA.workOrders.length>0){
+    if(!confirm('Mulai laporan minggu baru?\nDraft aktif saat ini akan dihapus — pastikan sudah klik "Simpan Laporan" sebelum lanjut.\n\nLanjutkan?')) return;
+  }
+  currentWeekId = null;
+  localStorage.removeItem('eic7_weekly_draft');
+  DATA = { period:'', recNotes:'', workOrders:[] };
+  document.getElementById('periodInput').value = '';
+  document.getElementById('recNotes').value = '';
+  document.getElementById('sourceInfo').textContent = '';
+  activeFilter = 'ALL';
+  searchTerm = '';
+  lastOpenIdx = -1;
+  render();
+}
+
+function loadWeek(id, period){
+  if(DATA.workOrders.length>0){
+    if(!confirm('Muat laporan "'+period+'"?\nDraft aktif saat ini akan diganti. Pastikan sudah disimpan.')) return;
+  }
+  dbGetAll().then(all=>{
+    const rec = all.find(r=>r.id===id);
+    if(!rec){ alert('Data tidak ditemukan.'); return; }
+    DATA = JSON.parse(JSON.stringify(rec.data));
+    currentWeekId = id;
+    document.getElementById('periodInput').value = DATA.period||'';
+    document.getElementById('recNotes').value = DATA.recNotes||'';
+    document.getElementById('sourceInfo').textContent = 'Memuat: '+rec.period+' ('+rec.savedAt.slice(0,10)+')';
+    saveDraft();
+    activeFilter = 'ALL';
+    searchTerm = '';
+    lastOpenIdx = -1;
+    render();
+    window.scrollTo({top:0,behavior:'smooth'});
+  });
+}
+
+function deleteWeekRecord(id, period){
+  if(!confirm('Hapus laporan "'+period+'" dari riwayat?\nTindakan ini tidak dapat dibatalkan.')) return;
+  dbDeleteRec(id).then(()=>{
+    if(currentWeekId===id) currentWeekId=null;
+    renderHistory();
+  }).catch(e=>alert('Gagal hapus: '+e));
+}
+
+function renderHistory(){
+  dbGetAll().then(all=>{
+    const box = document.getElementById('weekList');
+    all.sort((a,b)=>b.savedAt.localeCompare(a.savedAt));
+    if(all.length===0){
+      box.innerHTML='<div style="color:var(--grey);font-size:12.5px;">Belum ada laporan tersimpan.</div>';
+      return;
+    }
+    box.innerHTML = all.map(r=>{
+      const fotoCount = (r.data.workOrders||[]).filter(w=>w.photos&&w.photos.length).length;
+      const hlCount   = (r.data.workOrders||[]).filter(w=>w.highlight).length;
+      const isActive  = (r.id===currentWeekId) ? 'style="background:var(--light);border-left:3px solid var(--teal);padding-left:10px;"' : '';
+      return `<div ${isActive} style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="flex:1;">
+          <div style="font-weight:bold;font-size:13px;color:var(--navy);">${escapeHtml(r.period)}${r.id===currentWeekId?' <span style="font-size:10px;color:var(--teal);font-weight:normal;">(aktif)</span>':''}</div>
+          <div style="font-size:11px;color:var(--grey);">Disimpan: ${r.savedAt.slice(0,16).replace('T',' ')} &nbsp;·&nbsp; ${(r.data.workOrders||[]).length} WO &nbsp;·&nbsp; ${fotoCount} berfoto &nbsp;·&nbsp; ${hlCount} highlight</div>
+        </div>
+        <button class="btn secondary" style="padding:5px 12px;font-size:11px;" onclick="loadWeek('${r.id}','${escapeHtml(r.period).replace(/'/g,"\\'")}')">Muat</button>
+        <button class="btn danger" style="padding:5px 10px;font-size:11px;" onclick="deleteWeekRecord('${r.id}','${escapeHtml(r.period).replace(/'/g,"\\'")}')">Hapus</button>
+      </div>`;
+    }).join('');
+  }).catch(()=>{});
+}
+
+document.getElementById('saveWeekBtn').addEventListener('click', saveWeek);
+document.getElementById('newWeekBtn').addEventListener('click', newWeek);
+
 // Paste image from clipboard (Ctrl+V)
 document.addEventListener('paste', function(e){
   const items = (e.clipboardData || window.clipboardData || {}).items;
@@ -537,6 +674,7 @@ document.addEventListener('paste', function(e){
 
 loadDraft();
 render();
+renderHistory();
 </script>
 </body>
 </html>
