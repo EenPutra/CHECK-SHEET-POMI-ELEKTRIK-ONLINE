@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <title>Weekly Report Dashboard - EIC7</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
 <style>
   :root{
     --navy:#002060; --teal:#1C7293; --teal-dark:#21295C; --light:#F2F6F9;
@@ -77,6 +78,17 @@
   .rs-stat.s-done b{color:var(--green);}
   .rs-stat.s-inprogress b{color:var(--amber);}
   .rs-stat.s-notaccessed b{color:#8a95a0;}
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable:hover{background:#001845;}
+  th.sortable.active-sort{background:#00318c;}
+  .sort-arrow{font-size:9px;margin-left:3px;display:inline-block;}
+  select.prog-pill{width:100%;padding:4px 6px;border:1.5px solid transparent;border-radius:6px;font-size:11px;font-weight:bold;color:#fff;}
+  .prog-scheduled{background:#8a94a6;}
+  .prog-inprogress{background:var(--teal);}
+  .prog-need_material{background:var(--amber);}
+  .prog-need_access{background:#6d4fc2;}
+  .prog-done{background:var(--green);}
+  .prog-done_note{background:#0f5c33;}
 </style>
 </head>
 <body>
@@ -168,6 +180,7 @@
       <button class="btn" id="saveWeekBtn" style="background:#1e4d8c;">&#128190; Simpan Laporan</button>
       <button class="btn secondary" id="newWeekBtn">&#43; Minggu Baru</button>
       <button class="btn green" id="exportBtn">Export Data (.json)</button>
+      <button class="btn" id="exportExcelBtn" style="background:#217346;">&#128202; Export Excel (.xlsx)</button>
       <button class="btn danger" id="clearBtn">Clear Draft</button>
       <span class="footer-note" id="sourceInfo"></span>
     </div>
@@ -205,12 +218,23 @@
       <span style="font-size:11px;font-weight:700;color:var(--grey);white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;">Pengisian:</span>
       <div class="filters" id="rsFilterBar"></div>
     </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <span style="font-size:11px;font-weight:700;color:var(--grey);white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;">Progress:</span>
+      <div class="filters" id="progFilterBar"></div>
+    </div>
     <div class="row" style="margin-bottom:10px;">
       <input type="text" id="searchBox" placeholder="Cari WO / asset / deskripsi...">
     </div>
     <table>
       <thead><tr>
-        <th style="width:26px;"></th><th>WO</th><th>Asset</th><th>Team</th><th>Status</th><th>Work Desc</th><th style="width:70px;">Foto</th>
+        <th style="width:26px;"></th>
+        <th class="sortable" data-key="wo" onclick="setSort('wo')">WO <span class="sort-arrow" id="arrow-wo"></span></th>
+        <th class="sortable" data-key="asset" onclick="setSort('asset')">Asset <span class="sort-arrow" id="arrow-asset"></span></th>
+        <th class="sortable" data-key="team" onclick="setSort('team')">Team <span class="sort-arrow" id="arrow-team"></span></th>
+        <th class="sortable" data-key="status" onclick="setSort('status')">Status <span class="sort-arrow" id="arrow-status"></span></th>
+        <th class="sortable" data-key="progress" onclick="setSort('progress')">Progress <span class="sort-arrow" id="arrow-progress"></span></th>
+        <th>Work Desc</th>
+        <th style="width:70px;">Foto</th>
       </tr></thead>
       <tbody id="tblBody"></tbody>
     </table>
@@ -236,9 +260,20 @@
 window.DATA = { period: "", recNotes: "", workOrders: [] };
 let activeFilter = "ALL";
 let activeRsFilter = "ALL";
+let activeProgFilter = "ALL";
 let searchTerm = "";
 let lastOpenIdx = -1;
+let sortKey = null;
+let sortDir = 1;
 
+const PROGRESS_OPTIONS = [
+  {value:"scheduled",      label:"Scheduled"},
+  {value:"inprogress",     label:"In Progress"},
+  {value:"need_material",  label:"Need Material"},
+  {value:"need_access",    label:"Need Access"},
+  {value:"done",           label:"Done"},
+  {value:"done_note",      label:"Done with Note"}
+];
 const HEADER_MAP = {
   wo: ["Work Order"], asset: ["Asset"], location: ["Location"], route: ["Route"],
   assetDesc: ["Asset Description"], locDesc: ["Location/Route Desc"], failureDesc: ["Failure Desc"],
@@ -296,7 +331,8 @@ function loadExcelFile(file){
         // preserve user-entered update/highlight/photos if this WO already existed in current draft
         whatComplete: existing ? existing.whatComplete : (colIdx.whatComplete>=0 ? (row[colIdx.whatComplete]||"") : ""),
         highlight: existing ? existing.highlight : false,
-        photos: existing ? existing.photos : []
+        photos: existing ? existing.photos : [],
+        progress: existing ? (existing.progress || "scheduled") : "scheduled"
       });
     }
     DATA.workOrders = newList;
@@ -340,6 +376,79 @@ document.getElementById('exportBtn').addEventListener('click', function(){
   a.click();
   URL.revokeObjectURL(url);
 });
+
+const PROGRESS_COLOR = {
+  scheduled:     {strong:"8A94A6", tint:"E9EBEF"},
+  inprogress:    {strong:"1C7293", tint:"DCEBF0"},
+  need_material: {strong:"B88600", tint:"F7ECD1"},
+  need_access:   {strong:"6D4FC2", tint:"E7E1F7"},
+  done:          {strong:"1E7A4A", tint:"DCEEE3"},
+  done_note:     {strong:"0F5C33", tint:"D3E6DB"}
+};
+
+document.getElementById('exportExcelBtn').addEventListener('click', function(){
+  if(DATA.workOrders.length === 0){ alert("Belum ada data untuk di-export."); return; }
+  exportExcel();
+});
+
+function exportExcel(){
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Work Orders');
+  ws.columns = [
+    {header:'No. WO / SR',                 key:'wo',             width:18},
+    {header:'Asset',                       key:'asset',          width:16},
+    {header:'Asset Description',           key:'assetDesc',      width:24},
+    {header:'Team',                        key:'team',           width:14},
+    {header:'Status',                      key:'status',         width:10},
+    {header:'Progress',                    key:'progress',       width:16},
+    {header:'Scheduled Start',             key:'scheduledStart', width:14},
+    {header:'Work Desc',                   key:'workDesc',       width:36},
+    {header:'Failure Desc',                key:'failureDesc',    width:30},
+    {header:'Update / What was Complete?', key:'whatComplete',   width:36},
+    {header:'Highlight',                   key:'highlight',      width:10}
+  ];
+  ws.getRow(1).eachCell(c => {
+    c.font = {bold:true, color:{argb:'FFFFFFFF'}};
+    c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF002060'}};
+  });
+
+  DATA.workOrders.forEach(w => {
+    const prog = w.progress || 'scheduled';
+    const colors = PROGRESS_COLOR[prog] || PROGRESS_COLOR.scheduled;
+    const row = ws.addRow({
+      wo: w.wo,
+      asset: w.asset,
+      assetDesc: w.assetDesc,
+      team: w.team,
+      status: w.status,
+      progress: PROGRESS_OPTIONS.find(o => o.value === prog).label,
+      scheduledStart: w.scheduledStart,
+      workDesc: w.workDesc,
+      failureDesc: w.failureDesc,
+      whatComplete: w.whatComplete,
+      highlight: w.highlight ? 'Ya' : ''
+    });
+    row.eachCell(c => {
+      c.alignment = {vertical:'top', wrapText:true};
+      c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF'+colors.tint}};
+    });
+    const progCell = row.getCell('progress');
+    progCell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF'+colors.strong}};
+    progCell.font = {bold:true, color:{argb:'FFFFFFFF'}};
+  });
+  ws.views = [{state:'frozen', ySplit:1}];
+
+  wb.xlsx.writeBuffer().then(buffer => {
+    const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = "weekly-report-eic7-" + dateStr + ".xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
 
 document.getElementById('clearBtn').addEventListener('click', function(){
   if(confirm("Hapus semua draft data di browser ini?")){
@@ -402,6 +511,38 @@ function renderRsFilterBar(){
      </div>`
   ).join('');
 }
+function setProgFilter(f){ activeProgFilter = f; renderProgFilterBar(); renderTable(); }
+function renderProgFilterBar(){
+  const bar = document.getElementById('progFilterBar');
+  if(!bar) return;
+  const counts = {ALL:0};
+  PROGRESS_OPTIONS.forEach(o => counts[o.value] = 0);
+  DATA.workOrders.forEach(w => { counts.ALL++; const p = w.progress || 'scheduled'; if(counts[p]===undefined) counts[p]=0; counts[p]++; });
+  const chips = [["ALL","Semua ("+counts.ALL+")"]].concat(
+    PROGRESS_OPTIONS.map(o => [o.value, o.label+" ("+(counts[o.value]||0)+")"])
+  );
+  bar.innerHTML = chips.map(c => `<div class="chip ${activeProgFilter===c[0]?'active':''}" onclick="setProgFilter('${c[0]}')">${c[1]}</div>`).join("");
+}
+
+function setSort(key){
+  if(sortKey === key){ sortDir = -sortDir; } else { sortKey = key; sortDir = 1; }
+  renderTable();
+}
+function updateSortArrows(){
+  ['wo','asset','team','status','progress'].forEach(k => {
+    const th = document.querySelector('th.sortable[data-key="'+k+'"]');
+    const arrow = document.getElementById('arrow-'+k);
+    if(!th || !arrow) return;
+    if(sortKey === k){
+      th.classList.add('active-sort');
+      arrow.textContent = sortDir === 1 ? '▲' : '▼';
+    } else {
+      th.classList.remove('active-sort');
+      arrow.textContent = '';
+    }
+  });
+}
+
 function setFilter(f){ activeFilter = f; renderFilterBar(); renderTable(); }
 
 function renderFilterBar(){
@@ -445,6 +586,7 @@ function render(){
 
   renderFilterBar();
   renderRsFilterBar();
+  renderProgFilterBar();
   renderTable();
 }
 
@@ -454,12 +596,29 @@ function renderTable(){
   if(activeFilter === 'HL') list = list.filter(w => w.highlight);
   else if(activeFilter !== 'ALL') list = list.filter(w => classify(w.status) === activeFilter);
   if(activeRsFilter !== 'ALL') list = list.filter(w => reportingStatus(w) === activeRsFilter);
+  if(activeProgFilter !== 'ALL') list = list.filter(w => (w.progress||'scheduled') === activeProgFilter);
   if(searchTerm){
     list = list.filter(w => (w.wo+" "+w.asset+" "+w.assetDesc+" "+w.workDesc+" "+w.failureDesc).toLowerCase().includes(searchTerm));
+  }
+  if(sortKey){
+    list = list.slice().sort((a,b) => {
+      let va, vb;
+      if(sortKey === 'progress'){
+        va = PROGRESS_OPTIONS.findIndex(o => o.value === (a.progress||'scheduled'));
+        vb = PROGRESS_OPTIONS.findIndex(o => o.value === (b.progress||'scheduled'));
+      } else {
+        va = (a[sortKey]||'').toString().toLowerCase();
+        vb = (b[sortKey]||'').toString().toLowerCase();
+      }
+      if(va < vb) return -1*sortDir;
+      if(va > vb) return 1*sortDir;
+      return 0;
+    });
   }
   tbody.innerHTML = "";
   list.forEach((w) => {
     const realIdx = DATA.workOrders.indexOf(w);
+    const prog = w.progress || 'scheduled';
     const tr = document.createElement('tr');
     tr.style.cursor = 'pointer';
     tr.innerHTML = `
@@ -468,24 +627,47 @@ function renderTable(){
       <td>${escapeHtml(w.asset)}<br><span style="color:var(--grey);font-size:11px;">${escapeHtml(w.assetDesc||'')}</span></td>
       <td>${escapeHtml(w.team)}</td>
       <td><span class="status-pill st-${(w.status||'').toUpperCase()}">${escapeHtml(w.status)}</span></td>
+      <td></td>
       <td>${escapeHtml(truncate(w.workDesc,70))}</td>
       <td>${w.photos && w.photos.length ? w.photos.length+' foto' : '-'}</td>
     `;
+    const progTd = tr.children[5];
+    progTd.addEventListener('click', e => e.stopPropagation());
+    const progSelect = document.createElement('select');
+    progSelect.className = 'prog-pill prog-'+prog;
+    PROGRESS_OPTIONS.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = o.value;
+      opt.textContent = o.label;
+      if(o.value === prog) opt.selected = true;
+      progSelect.appendChild(opt);
+    });
+    progSelect.addEventListener('click', e => e.stopPropagation());
+    progSelect.addEventListener('change', e => setProgress(realIdx, e.target.value));
+    progTd.appendChild(progSelect);
     tr.addEventListener('click', () => toggleDetail(realIdx));
     tbody.appendChild(tr);
     if(w._open){
       const dtr = document.createElement('tr');
       dtr.className = 'detail-row';
       const td = document.createElement('td');
-      td.colSpan = 7;
+      td.colSpan = 8;
       td.appendChild(buildDetailPanel(realIdx));
       dtr.appendChild(td);
       tbody.appendChild(dtr);
     }
   });
   if(list.length === 0){
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--grey);padding:20px;">Tidak ada WO yang cocok.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--grey);padding:20px;">Tidak ada WO yang cocok.</td></tr>';
   }
+  updateSortArrows();
+}
+
+function setProgress(idx, value){
+  DATA.workOrders[idx].progress = value;
+  saveDraft();
+  renderProgFilterBar();
+  renderTable();
 }
 
 function toggleDetail(idx){
@@ -660,6 +842,7 @@ function submitAddWO(){
     whatComplete: '',
     highlight:    false,
     photos:       [],
+    progress:     'scheduled',
     manual:       true,
     _open:        true
   };
