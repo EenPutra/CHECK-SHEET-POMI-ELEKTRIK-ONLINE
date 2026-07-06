@@ -222,6 +222,19 @@
       <span style="font-size:11px;font-weight:700;color:var(--grey);white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;">Progress:</span>
       <div class="filters" id="progFilterBar"></div>
     </div>
+    <div class="row" style="margin-bottom:10px;align-items:flex-end;">
+      <div style="max-width:170px;">
+        <label>Scheduled Dari</label>
+        <input type="date" id="dateFromFilter">
+      </div>
+      <div style="max-width:170px;">
+        <label>Scheduled Sampai</label>
+        <input type="date" id="dateToFilter">
+      </div>
+      <div>
+        <button class="btn secondary" id="clearDateFilterBtn" style="padding:7px 14px;">Reset Tanggal</button>
+      </div>
+    </div>
     <div class="row" style="margin-bottom:10px;">
       <input type="text" id="searchBox" placeholder="Cari WO / asset / deskripsi...">
     </div>
@@ -232,6 +245,7 @@
         <th class="sortable" data-key="asset" onclick="setSort('asset')">Asset <span class="sort-arrow" id="arrow-asset"></span></th>
         <th class="sortable" data-key="team" onclick="setSort('team')">Team <span class="sort-arrow" id="arrow-team"></span></th>
         <th class="sortable" data-key="status" onclick="setSort('status')">Status <span class="sort-arrow" id="arrow-status"></span></th>
+        <th class="sortable" data-key="scheduledStart" onclick="setSort('scheduledStart')">Scheduled Date <span class="sort-arrow" id="arrow-scheduledStart"></span></th>
         <th class="sortable" data-key="progress" onclick="setSort('progress')">Progress <span class="sort-arrow" id="arrow-progress"></span></th>
         <th>Work Desc</th>
         <th style="width:70px;">Foto</th>
@@ -262,6 +276,8 @@ let activeFilter = "ALL";
 let activeRsFilter = "ALL";
 let activeProgFilter = "ALL";
 let searchTerm = "";
+let dateFilterFrom = "";
+let dateFilterTo = "";
 let lastOpenIdx = -1;
 let sortKey = null;
 let sortDir = 1;
@@ -274,6 +290,15 @@ const PROGRESS_OPTIONS = [
   {value:"done",           label:"Done"},
   {value:"done_note",      label:"Done with Note"}
 ];
+
+function toDateInputValue(v){
+  if(!v) return "";
+  const s = String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const d = new Date(s);
+  if(!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+  return "";
+}
 const HEADER_MAP = {
   wo: ["Work Order"], asset: ["Asset"], location: ["Location"], route: ["Route"],
   assetDesc: ["Asset Description"], locDesc: ["Location/Route Desc"], failureDesc: ["Failure Desc"],
@@ -529,7 +554,7 @@ function setSort(key){
   renderTable();
 }
 function updateSortArrows(){
-  ['wo','asset','team','status','progress'].forEach(k => {
+  ['wo','asset','team','status','scheduledStart','progress'].forEach(k => {
     const th = document.querySelector('th.sortable[data-key="'+k+'"]');
     const arrow = document.getElementById('arrow-'+k);
     if(!th || !arrow) return;
@@ -568,6 +593,21 @@ document.getElementById('searchBox').addEventListener('input', function(e){
   renderTable();
 });
 
+document.getElementById('dateFromFilter').addEventListener('change', function(e){
+  dateFilterFrom = e.target.value;
+  renderTable();
+});
+document.getElementById('dateToFilter').addEventListener('change', function(e){
+  dateFilterTo = e.target.value;
+  renderTable();
+});
+document.getElementById('clearDateFilterBtn').addEventListener('click', function(){
+  dateFilterFrom = ""; dateFilterTo = "";
+  document.getElementById('dateFromFilter').value = "";
+  document.getElementById('dateToFilter').value = "";
+  renderTable();
+});
+
 function render(){
   const hasData = DATA.workOrders.length > 0;
   document.getElementById('noDataCard').style.display = hasData ? 'none' : 'block';
@@ -597,6 +637,8 @@ function renderTable(){
   else if(activeFilter !== 'ALL') list = list.filter(w => classify(w.status) === activeFilter);
   if(activeRsFilter !== 'ALL') list = list.filter(w => reportingStatus(w) === activeRsFilter);
   if(activeProgFilter !== 'ALL') list = list.filter(w => (w.progress||'scheduled') === activeProgFilter);
+  if(dateFilterFrom) list = list.filter(w => { const d = toDateInputValue(w.scheduledStart); return d && d >= dateFilterFrom; });
+  if(dateFilterTo) list = list.filter(w => { const d = toDateInputValue(w.scheduledStart); return d && d <= dateFilterTo; });
   if(searchTerm){
     list = list.filter(w => (w.wo+" "+w.asset+" "+w.assetDesc+" "+w.workDesc+" "+w.failureDesc).toLowerCase().includes(searchTerm));
   }
@@ -606,6 +648,9 @@ function renderTable(){
       if(sortKey === 'progress'){
         va = PROGRESS_OPTIONS.findIndex(o => o.value === (a.progress||'scheduled'));
         vb = PROGRESS_OPTIONS.findIndex(o => o.value === (b.progress||'scheduled'));
+      } else if(sortKey === 'scheduledStart'){
+        va = toDateInputValue(a.scheduledStart);
+        vb = toDateInputValue(b.scheduledStart);
       } else {
         va = (a[sortKey]||'').toString().toLowerCase();
         vb = (b[sortKey]||'').toString().toLowerCase();
@@ -628,10 +673,20 @@ function renderTable(){
       <td>${escapeHtml(w.team)}</td>
       <td><span class="status-pill st-${(w.status||'').toUpperCase()}">${escapeHtml(w.status)}</span></td>
       <td></td>
+      <td></td>
       <td>${escapeHtml(truncate(w.workDesc,70))}</td>
       <td>${w.photos && w.photos.length ? w.photos.length+' foto' : '-'}</td>
     `;
-    const progTd = tr.children[5];
+    const dateTd = tr.children[5];
+    dateTd.addEventListener('click', e => e.stopPropagation());
+    const dateInput = document.createElement('input');
+    dateInput.type = 'date';
+    dateInput.value = toDateInputValue(w.scheduledStart);
+    dateInput.addEventListener('click', e => e.stopPropagation());
+    dateInput.addEventListener('change', e => setScheduledDate(realIdx, e.target.value));
+    dateTd.appendChild(dateInput);
+
+    const progTd = tr.children[6];
     progTd.addEventListener('click', e => e.stopPropagation());
     const progSelect = document.createElement('select');
     progSelect.className = 'prog-pill prog-'+prog;
@@ -651,16 +706,22 @@ function renderTable(){
       const dtr = document.createElement('tr');
       dtr.className = 'detail-row';
       const td = document.createElement('td');
-      td.colSpan = 8;
+      td.colSpan = 9;
       td.appendChild(buildDetailPanel(realIdx));
       dtr.appendChild(td);
       tbody.appendChild(dtr);
     }
   });
   if(list.length === 0){
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--grey);padding:20px;">Tidak ada WO yang cocok.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--grey);padding:20px;">Tidak ada WO yang cocok.</td></tr>';
   }
   updateSortArrows();
+}
+
+function setScheduledDate(idx, value){
+  DATA.workOrders[idx].scheduledStart = value;
+  saveDraft();
+  renderTable();
 }
 
 function setProgress(idx, value){
