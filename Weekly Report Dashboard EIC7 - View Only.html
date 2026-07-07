@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Weekly Report Dashboard - EIC7 (View Only)</title>
+<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<style>
+  :root{
+    --navy:#002060; --teal:#1C7293; --teal-dark:#21295C; --light:#F2F6F9;
+    --green:#1E7A4A; --red:#C00000; --amber:#B88600; --grey:#595959; --border:#D9E2EC;
+  }
+  *{box-sizing:border-box;}
+  body{font-family:Calibri,Arial,sans-serif;margin:0;background:#eef2f6;color:var(--navy);}
+  header{background:var(--navy);color:#fff;padding:18px 28px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+  header h1{font-size:20px;margin:0;}
+  header .sub{font-size:12px;color:#cfe0f0;}
+  .wrap{max-width:1300px;margin:0 auto;padding:20px;}
+  .card{background:#fff;border-radius:10px;padding:18px 22px;margin-bottom:18px;box-shadow:0 1px 3px rgba(0,0,0,.08);}
+  .card h2{font-size:16px;margin:0 0 12px;color:var(--navy);}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+  .kpi{border:1.5px solid var(--teal);border-radius:10px;padding:14px;text-align:center;background:var(--light);}
+  .kpi .num{font-size:30px;font-weight:bold;color:var(--teal);}
+  .kpi .lbl{font-size:11px;font-weight:bold;color:var(--navy);margin-top:4px;}
+  .kpi.completed{border-color:var(--green);} .kpi.completed .num{color:var(--green);}
+  .kpi.cancelled{border-color:var(--red);} .kpi.cancelled .num{color:var(--red);}
+  .kpi.total{border-color:var(--navy);} .kpi.total .num{color:var(--navy);}
+  .btn{background:var(--teal);color:#fff;border:none;padding:9px 16px;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;}
+  .btn:hover{opacity:.9;}
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
+  input[type=text], input[type=date]{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;}
+  th{background:var(--navy);color:#fff;text-align:left;padding:8px 10px;position:sticky;top:0;}
+  th.sortable{cursor:pointer;user-select:none;}
+  th.sortable:hover{background:#001845;}
+  th.sortable.active-sort{background:#00318c;}
+  .sort-arrow{font-size:9px;margin-left:3px;display:inline-block;}
+  td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tr:nth-child(even) td{background:var(--light);}
+  .status-pill{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10.5px;font-weight:bold;color:#fff;}
+  .st-APPR{background:#8a94a6;} .st-INPRG{background:var(--teal);} .st-WMATL{background:var(--amber);}
+  .st-WPCOND{background:#6d4fc2;} .st-COMP{background:var(--green);} .st-CAN{background:var(--red);}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;}
+  .chip{padding:6px 14px;border-radius:20px;border:1.5px solid var(--teal);background:#fff;color:var(--teal);font-size:12px;font-weight:bold;cursor:pointer;}
+  .chip.active{background:var(--teal);color:#fff;}
+  .detail-row td{background:#fbfcfe;padding:14px 18px;}
+  .detail-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
+  .thumb{width:130px;}
+  .thumb img{width:130px;height:auto;border-radius:6px;border:1px solid var(--border);display:block;}
+  .thumb .cap{font-size:10.5px;color:var(--grey);margin-top:3px;}
+  .badge-hl{background:var(--amber);color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;margin-left:6px;}
+  .badge-manual{display:inline-block;padding:1px 6px;border-radius:4px;font-size:9px;font-weight:bold;background:var(--amber);color:#fff;margin-left:5px;vertical-align:middle;letter-spacing:.5px;}
+  .empty-state{text-align:center;padding:50px 20px;color:var(--grey);}
+  .footer-note{font-size:11px;color:var(--grey);margin-top:6px;}
+  label{font-size:12px;font-weight:bold;color:var(--navy);display:block;margin-bottom:4px;}
+  .rs-dot{display:inline-block;width:9px;height:9px;border-radius:50%;vertical-align:middle;flex-shrink:0;}
+  .rs-done{background:var(--green);}
+  .rs-inprogress{background:var(--amber);}
+  .rs-notaccessed{background:#d0d5dd;border:1px solid #b8bec7;}
+  .rs-bar{display:flex;gap:20px;flex-wrap:wrap;align-items:center;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
+  .rs-stat{display:flex;align-items:center;gap:7px;font-size:13px;}
+  .rs-stat b{font-size:20px;font-weight:700;}
+  .rs-stat.s-done b{color:var(--green);}
+  .rs-stat.s-inprogress b{color:var(--amber);}
+  .rs-stat.s-notaccessed b{color:#8a95a0;}
+  .prog-pill{display:inline-block;padding:3px 8px;border-radius:6px;font-size:11px;font-weight:bold;color:#fff;}
+  .prog-scheduled{background:#8a94a6;}
+  .prog-inprogress{background:var(--teal);}
+  .prog-need_material{background:var(--amber);}
+  .prog-need_access{background:#6d4fc2;}
+  .prog-done{background:var(--green);}
+  .prog-done_note{background:#0f5c33;}
+  .readonly-banner{background:#fff6e0;border:1.5px solid var(--amber);color:#7a5c00;border-radius:8px;padding:10px 16px;font-size:12.5px;margin-bottom:18px;}
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Weekly Report Dashboard - Maintenance EIC7</h1>
+    <div class="sub">Tampilan snapshot (read-only) &mdash; hanya untuk melihat data, tidak bisa diedit</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="readonly-banner" id="snapshotBanner">
+    &#128274; Ini adalah snapshot read-only. Untuk mengubah data, hubungi pemegang tool utama (Weekly Report Dashboard EIC7.html).
+  </div>
+
+  <div class="card" id="kpiCard" style="display:none;">
+    <h2>Ringkasan KPI &mdash; Periode: <span id="periodLabel">-</span></h2>
+    <div class="kpis">
+      <div class="kpi total"><div class="num" id="kpiTotal">0</div><div class="lbl">TOTAL WORK ORDER</div></div>
+      <div class="kpi completed"><div class="num" id="kpiComp">0</div><div class="lbl">COMPLETED</div></div>
+      <div class="kpi"><div class="num" id="kpiOut">0</div><div class="lbl">OUTSTANDING</div></div>
+      <div class="kpi cancelled"><div class="num" id="kpiCan">0</div><div class="lbl">CANCELLED</div></div>
+    </div>
+    <div class="rs-bar">
+      <span style="font-size:10.5px;font-weight:700;color:var(--grey);text-transform:uppercase;letter-spacing:.5px;">Status Pengisian:</span>
+      <span class="rs-stat s-done"><span class="rs-dot rs-done"></span><b id="rsDone">0</b><span style="color:var(--grey);">Sudah Diisi</span></span>
+      <span class="rs-stat s-inprogress"><span class="rs-dot rs-inprogress"></span><b id="rsInprogress">0</b><span style="color:var(--grey);">In Progress</span></span>
+      <span class="rs-stat s-notaccessed"><span class="rs-dot rs-notaccessed"></span><b id="rsNotaccessed">0</b><span style="color:var(--grey);">Belum Diakses</span></span>
+    </div>
+    <div class="footer-note" id="generatedAtNote"></div>
+  </div>
+
+  <div class="card" id="tableCard" style="display:none;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;flex-wrap:wrap;gap:8px;">
+      <h2 style="margin:0;">Daftar Work Order</h2>
+      <button class="btn" id="exportExcelBtn" style="background:#217346;">&#128202; Export Excel (.xlsx)</button>
+    </div>
+    <div class="filters" id="filterBar"></div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <span style="font-size:11px;font-weight:700;color:var(--grey);white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;">Pengisian:</span>
+      <div class="filters" id="rsFilterBar"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+      <span style="font-size:11px;font-weight:700;color:var(--grey);white-space:nowrap;text-transform:uppercase;letter-spacing:.5px;">Progress:</span>
+      <div class="filters" id="progFilterBar"></div>
+    </div>
+    <div class="toolbar" style="margin-bottom:10px;align-items:flex-end;">
+      <div style="max-width:170px;">
+        <label>Scheduled Dari</label>
+        <input type="date" id="dateFromFilter">
+      </div>
+      <div style="max-width:170px;">
+        <label>Scheduled Sampai</label>
+        <input type="date" id="dateToFilter">
+      </div>
+      <button class="btn" id="clearDateFilterBtn" style="background:#fff;color:var(--teal);border:1.5px solid var(--teal);padding:7px 14px;">Reset Tanggal</button>
+    </div>
+    <div class="toolbar" style="margin-bottom:10px;">
+      <input type="text" id="searchBox" placeholder="Cari WO / asset / deskripsi...">
+    </div>
+    <table>
+      <thead><tr>
+        <th style="width:26px;"></th>
+        <th class="sortable" data-key="wo" onclick="setSort('wo')">WO <span class="sort-arrow" id="arrow-wo"></span></th>
+        <th class="sortable" data-key="asset" onclick="setSort('asset')">Asset <span class="sort-arrow" id="arrow-asset"></span></th>
+        <th class="sortable" data-key="team" onclick="setSort('team')">Team <span class="sort-arrow" id="arrow-team"></span></th>
+        <th class="sortable" data-key="status" onclick="setSort('status')">Status <span class="sort-arrow" id="arrow-status"></span></th>
+        <th class="sortable" data-key="scheduledStart" onclick="setSort('scheduledStart')">Scheduled Date <span class="sort-arrow" id="arrow-scheduledStart"></span></th>
+        <th class="sortable" data-key="progress" onclick="setSort('progress')">Progress <span class="sort-arrow" id="arrow-progress"></span></th>
+        <th>Work Desc</th>
+        <th style="width:70px;">Foto</th>
+      </tr></thead>
+      <tbody id="tblBody"></tbody>
+    </table>
+  </div>
+
+  <div class="card" id="noDataCard">
+    <div class="empty-state">Belum ada snapshot data yang dipublikasikan.</div>
+  </div>
+
+  <div class="card" id="recCard" style="display:none;">
+    <h2>Rekomendasi &amp; Rencana Tindak Lanjut</h2>
+    <div id="recNotesView" style="font-size:12.5px;color:var(--grey);white-space:pre-wrap;">-</div>
+  </div>
+
+</div>
+
+<script type="application/json" id="data-snapshot">
+{"period":"","recNotes":"","workOrders":[],"generatedAt":""}
+</script>
+
+<script>
+const DATA = JSON.parse(document.getElementById('data-snapshot').textContent);
+let activeFilter = "ALL";
+let activeRsFilter = "ALL";
+let activeProgFilter = "ALL";
+let searchTerm = "";
+let dateFilterFrom = "";
+let dateFilterTo = "";
+let sortKey = null;
+let sortDir = 1;
+let openIdx = -1;
+
+const PROGRESS_OPTIONS = [
+  {value:"scheduled",      label:"Scheduled"},
+  {value:"inprogress",     label:"In Progress"},
+  {value:"need_material",  label:"Need Material"},
+  {value:"need_access",    label:"Need Access"},
+  {value:"done",           label:"Done"},
+  {value:"done_note",      label:"Done with Note"}
+];
+
+const PROGRESS_COLOR = {
+  scheduled:     {strong:"8A94A6", tint:"E9EBEF"},
+  inprogress:    {strong:"1C7293", tint:"DCEBF0"},
+  need_material: {strong:"B88600", tint:"F7ECD1"},
+  need_access:   {strong:"6D4FC2", tint:"E7E1F7"},
+  done:          {strong:"1E7A4A", tint:"DCEEE3"},
+  done_note:     {strong:"0F5C33", tint:"D3E6DB"}
+};
+
+function toDateInputValue(v){
+  if(!v) return "";
+  const s = String(v).trim();
+  if(/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  const d = new Date(s);
+  if(!isNaN(d.getTime())) return d.toISOString().slice(0,10);
+  return "";
+}
+
+function classify(status){
+  const s = (status||"").toUpperCase();
+  if(s === "COMP") return "COMP";
+  if(s === "CAN") return "CAN";
+  return "OUT";
+}
+
+function reportingStatus(w){
+  const hasUpdate = (w.whatComplete||'').trim().length > 0;
+  const hasPhotos  = (w.photos||[]).length > 0;
+  if(hasUpdate) return 'done';
+  if(hasPhotos || w.highlight) return 'inprogress';
+  return 'notaccessed';
+}
+
+function escapeHtml(s){
+  if(s === undefined || s === null) return "";
+  return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+function truncate(s, n){ s = String(s||""); return s.length > n ? s.slice(0,n)+"..." : s; }
+
+function setFilter(f){ activeFilter = f; renderFilterBar(); renderTable(); }
+function renderFilterBar(){
+  const bar = document.getElementById('filterBar');
+  const counts = {ALL:0, COMP:0, OUT:0, CAN:0, HL:0};
+  DATA.workOrders.forEach(w => {
+    counts.ALL++;
+    counts[classify(w.status)]++;
+    if(w.highlight) counts.HL++;
+  });
+  const chips = [
+    ["ALL","Semua ("+counts.ALL+")"],
+    ["OUT","Outstanding ("+counts.OUT+")"],
+    ["COMP","Completed ("+counts.COMP+")"],
+    ["CAN","Cancelled ("+counts.CAN+")"],
+    ["HL","Highlight laporan ("+counts.HL+")"]
+  ];
+  bar.innerHTML = chips.map(c => `<div class="chip ${activeFilter===c[0]?'active':''}" onclick="setFilter('${c[0]}')">${c[1]}</div>`).join("");
+}
+
+function setRsFilter(f){ activeRsFilter = f; renderRsFilterBar(); renderTable(); }
+function renderRsFilterBar(){
+  const c = {done:0, inprogress:0, notaccessed:0};
+  DATA.workOrders.forEach(w => c[reportingStatus(w)]++);
+  document.getElementById('rsDone').textContent        = c.done;
+  document.getElementById('rsInprogress').textContent  = c.inprogress;
+  document.getElementById('rsNotaccessed').textContent = c.notaccessed;
+  const items = [
+    ['ALL',         'Semua',          ''],
+    ['done',        'Sudah Diisi',    'var(--green)'],
+    ['inprogress',  'In Progress',    'var(--amber)'],
+    ['notaccessed', 'Belum Diakses',  'var(--grey)']
+  ];
+  const bar = document.getElementById('rsFilterBar');
+  bar.innerHTML = items.map(([f,label,color])=>
+    `<div class="chip ${activeRsFilter===f?'active':''}" onclick="setRsFilter('${f}')">${label} (${f==='ALL'?DATA.workOrders.length:c[f]})</div>`
+  ).join('');
+}
+
+function setProgFilter(f){ activeProgFilter = f; renderProgFilterBar(); renderTable(); }
+function renderProgFilterBar(){
+  const bar = document.getElementById('progFilterBar');
+  const counts = {ALL:0};
+  PROGRESS_OPTIONS.forEach(o => counts[o.value] = 0);
+  DATA.workOrders.forEach(w => { counts.ALL++; const p = w.progress || 'scheduled'; if(counts[p]===undefined) counts[p]=0; counts[p]++; });
+  const chips = [["ALL","Semua ("+counts.ALL+")"]].concat(
+    PROGRESS_OPTIONS.map(o => [o.value, o.label+" ("+(counts[o.value]||0)+")"])
+  );
+  bar.innerHTML = chips.map(c => `<div class="chip ${activeProgFilter===c[0]?'active':''}" onclick="setProgFilter('${c[0]}')">${c[1]}</div>`).join("");
+}
+
+function setSort(key){
+  if(sortKey === key){ sortDir = -sortDir; } else { sortKey = key; sortDir = 1; }
+  renderTable();
+}
+function updateSortArrows(){
+  ['wo','asset','team','status','scheduledStart','progress'].forEach(k => {
+    const th = document.querySelector('th.sortable[data-key="'+k+'"]');
+    const arrow = document.getElementById('arrow-'+k);
+    if(!th || !arrow) return;
+    if(sortKey === k){
+      th.classList.add('active-sort');
+      arrow.textContent = sortDir === 1 ? '▲' : '▼';
+    } else {
+      th.classList.remove('active-sort');
+      arrow.textContent = '';
+    }
+  });
+}
+
+function toggleDetail(idx){
+  openIdx = (openIdx === idx) ? -1 : idx;
+  renderTable();
+}
+
+function buildDetailPanel(w){
+  const prog = w.progress || 'scheduled';
+  const wrap = document.createElement('div');
+  wrap.innerHTML = `
+    <div class="detail-grid">
+      <div>
+        <label>Failure Desc</label>
+        <div style="font-size:12.5px;color:var(--grey);margin-bottom:10px;white-space:pre-wrap;">${escapeHtml(w.failureDesc||'-')}</div>
+        <label>Work Desc</label>
+        <div style="font-size:12.5px;color:var(--grey);margin-bottom:10px;white-space:pre-wrap;">${escapeHtml(w.workDesc||'-')}</div>
+        <label>Scheduled Date</label>
+        <div style="font-size:12.5px;color:var(--grey);margin-bottom:10px;">${escapeHtml(toDateInputValue(w.scheduledStart)||'-')}</div>
+        <label>Progress</label>
+        <div style="margin-bottom:10px;"><span class="prog-pill prog-${prog}">${escapeHtml(PROGRESS_OPTIONS.find(o=>o.value===prog).label)}</span></div>
+        ${w.highlight ? '<span class="badge-hl">&#9733; Highlight untuk laporan</span>' : ''}
+      </div>
+      <div>
+        <label>Update / What was Complete?</label>
+        <div style="font-size:12.5px;color:var(--grey);white-space:pre-wrap;">${escapeHtml(w.whatComplete||'(belum ada update)')}</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;">
+      <label>Foto Evidence</label>
+      <div class="thumbs" id="th_view"></div>
+    </div>
+  `;
+  const box = wrap.querySelector('#th_view');
+  (w.photos||[]).forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'thumb';
+    div.innerHTML = `<img src="${p.dataUrl}"><div class="cap">${escapeHtml(p.caption||'')}</div>`;
+    box.appendChild(div);
+  });
+  if(!(w.photos||[]).length) box.innerHTML = '<span style="font-size:12px;color:var(--grey);">Tidak ada foto.</span>';
+  return wrap;
+}
+
+function renderTable(){
+  const tbody = document.getElementById('tblBody');
+  let list = DATA.workOrders;
+  if(activeFilter === 'HL') list = list.filter(w => w.highlight);
+  else if(activeFilter !== 'ALL') list = list.filter(w => classify(w.status) === activeFilter);
+  if(activeRsFilter !== 'ALL') list = list.filter(w => reportingStatus(w) === activeRsFilter);
+  if(activeProgFilter !== 'ALL') list = list.filter(w => (w.progress||'scheduled') === activeProgFilter);
+  if(dateFilterFrom) list = list.filter(w => { const d = toDateInputValue(w.scheduledStart); return d && d >= dateFilterFrom; });
+  if(dateFilterTo) list = list.filter(w => { const d = toDateInputValue(w.scheduledStart); return d && d <= dateFilterTo; });
+  if(searchTerm){
+    list = list.filter(w => (w.wo+" "+w.asset+" "+w.assetDesc+" "+w.workDesc+" "+w.failureDesc).toLowerCase().includes(searchTerm));
+  }
+  if(sortKey){
+    list = list.slice().sort((a,b) => {
+      let va, vb;
+      if(sortKey === 'progress'){
+        va = PROGRESS_OPTIONS.findIndex(o => o.value === (a.progress||'scheduled'));
+        vb = PROGRESS_OPTIONS.findIndex(o => o.value === (b.progress||'scheduled'));
+      } else if(sortKey === 'scheduledStart'){
+        va = toDateInputValue(a.scheduledStart);
+        vb = toDateInputValue(b.scheduledStart);
+      } else {
+        va = (a[sortKey]||'').toString().toLowerCase();
+        vb = (b[sortKey]||'').toString().toLowerCase();
+      }
+      if(va < vb) return -1*sortDir;
+      if(va > vb) return 1*sortDir;
+      return 0;
+    });
+  }
+  tbody.innerHTML = "";
+  list.forEach((w) => {
+    const realIdx = DATA.workOrders.indexOf(w);
+    const prog = w.progress || 'scheduled';
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.innerHTML = `
+      <td>${w.highlight?'&#9733;':''}</td>
+      <td><b>${escapeHtml(w.wo)}</b>${w.manual?'<span class="badge-manual">MANUAL</span>':''}<br><span class="rs-dot rs-${reportingStatus(w)}"></span> <span style="font-size:10px;color:var(--grey);">${{done:'Sudah Diisi',inprogress:'In Progress',notaccessed:'Belum Diakses'}[reportingStatus(w)]}</span></td>
+      <td>${escapeHtml(w.asset)}<br><span style="color:var(--grey);font-size:11px;">${escapeHtml(w.assetDesc||'')}</span></td>
+      <td>${escapeHtml(w.team)}</td>
+      <td><span class="status-pill st-${(w.status||'').toUpperCase()}">${escapeHtml(w.status)}</span></td>
+      <td>${escapeHtml(toDateInputValue(w.scheduledStart)||'-')}</td>
+      <td><span class="prog-pill prog-${prog}">${escapeHtml(PROGRESS_OPTIONS.find(o=>o.value===prog).label)}</span></td>
+      <td>${escapeHtml(truncate(w.workDesc,70))}</td>
+      <td>${w.photos && w.photos.length ? w.photos.length+' foto' : '-'}</td>
+    `;
+    tr.addEventListener('click', () => toggleDetail(realIdx));
+    tbody.appendChild(tr);
+    if(openIdx === realIdx){
+      const dtr = document.createElement('tr');
+      dtr.className = 'detail-row';
+      const td = document.createElement('td');
+      td.colSpan = 9;
+      td.appendChild(buildDetailPanel(w));
+      dtr.appendChild(td);
+      tbody.appendChild(dtr);
+    }
+  });
+  if(list.length === 0){
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;color:var(--grey);padding:20px;">Tidak ada WO yang cocok.</td></tr>';
+  }
+  updateSortArrows();
+}
+
+document.getElementById('searchBox').addEventListener('input', function(e){
+  searchTerm = e.target.value.toLowerCase();
+  renderTable();
+});
+document.getElementById('dateFromFilter').addEventListener('change', function(e){
+  dateFilterFrom = e.target.value;
+  renderTable();
+});
+document.getElementById('dateToFilter').addEventListener('change', function(e){
+  dateFilterTo = e.target.value;
+  renderTable();
+});
+document.getElementById('clearDateFilterBtn').addEventListener('click', function(){
+  dateFilterFrom = ""; dateFilterTo = "";
+  document.getElementById('dateFromFilter').value = "";
+  document.getElementById('dateToFilter').value = "";
+  renderTable();
+});
+
+document.getElementById('exportExcelBtn').addEventListener('click', function(){
+  if(DATA.workOrders.length === 0){ alert("Belum ada data untuk di-export."); return; }
+  exportExcel();
+});
+
+function exportExcel(){
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet('Work Orders');
+  ws.columns = [
+    {header:'No. WO / SR',                 key:'wo',             width:18},
+    {header:'Asset',                       key:'asset',          width:16},
+    {header:'Asset Description',           key:'assetDesc',      width:24},
+    {header:'Team',                        key:'team',           width:14},
+    {header:'Status',                      key:'status',         width:10},
+    {header:'Progress',                    key:'progress',       width:16},
+    {header:'Scheduled Start',             key:'scheduledStart', width:14},
+    {header:'Work Desc',                   key:'workDesc',       width:36},
+    {header:'Failure Desc',                key:'failureDesc',    width:30},
+    {header:'Update / What was Complete?', key:'whatComplete',   width:36},
+    {header:'Highlight',                   key:'highlight',      width:10}
+  ];
+  ws.getRow(1).eachCell(c => {
+    c.font = {bold:true, color:{argb:'FFFFFFFF'}};
+    c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF002060'}};
+  });
+  DATA.workOrders.forEach(w => {
+    const prog = w.progress || 'scheduled';
+    const colors = PROGRESS_COLOR[prog] || PROGRESS_COLOR.scheduled;
+    const row = ws.addRow({
+      wo: w.wo, asset: w.asset, assetDesc: w.assetDesc, team: w.team, status: w.status,
+      progress: PROGRESS_OPTIONS.find(o => o.value === prog).label,
+      scheduledStart: w.scheduledStart, workDesc: w.workDesc, failureDesc: w.failureDesc,
+      whatComplete: w.whatComplete, highlight: w.highlight ? 'Ya' : ''
+    });
+    row.eachCell(c => {
+      c.alignment = {vertical:'top', wrapText:true};
+      c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF'+colors.tint}};
+    });
+    const progCell = row.getCell('progress');
+    progCell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF'+colors.strong}};
+    progCell.font = {bold:true, color:{argb:'FFFFFFFF'}};
+  });
+  ws.views = [{state:'frozen', ySplit:1}];
+  wb.xlsx.writeBuffer().then(buffer => {
+    const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const dateStr = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = "weekly-report-eic7-snapshot-" + dateStr + ".xlsx";
+    a.click();
+    URL.revokeObjectURL(url);
+  });
+}
+
+function render(){
+  const hasData = DATA.workOrders.length > 0;
+  document.getElementById('noDataCard').style.display = hasData ? 'none' : 'block';
+  document.getElementById('kpiCard').style.display = hasData ? 'block' : 'none';
+  document.getElementById('tableCard').style.display = hasData ? 'block' : 'none';
+  document.getElementById('recCard').style.display = hasData ? 'block' : 'none';
+  if(!hasData) return;
+
+  document.getElementById('periodLabel').textContent = DATA.period || '-';
+  document.getElementById('recNotesView').textContent = DATA.recNotes || '-';
+  document.getElementById('generatedAtNote').textContent = DATA.generatedAt ? ('Snapshot dibuat: ' + DATA.generatedAt.slice(0,16).replace('T',' ')) : '';
+
+  const comp = DATA.workOrders.filter(w => classify(w.status)==='COMP').length;
+  const out = DATA.workOrders.filter(w => classify(w.status)==='OUT').length;
+  const can = DATA.workOrders.filter(w => classify(w.status)==='CAN').length;
+  document.getElementById('kpiTotal').textContent = DATA.workOrders.length;
+  document.getElementById('kpiComp').textContent = comp;
+  document.getElementById('kpiOut').textContent = out;
+  document.getElementById('kpiCan').textContent = can;
+
+  renderFilterBar();
+  renderRsFilterBar();
+  renderProgFilterBar();
+  renderTable();
+}
+
+render();
+</script>
+</body>
+</html>
