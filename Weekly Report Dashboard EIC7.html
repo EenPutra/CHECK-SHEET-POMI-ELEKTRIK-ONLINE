@@ -89,6 +89,17 @@
   .prog-need_access{background:#6d4fc2;}
   .prog-done{background:var(--green);}
   .prog-done_note{background:#0f5c33;}
+  .pie-group{width:230px;text-align:center;}
+  .pie-title{font-weight:700;color:var(--navy);font-size:14px;margin-top:2px;}
+  .donut{width:170px;height:170px;border-radius:50%;margin:10px auto 0;position:relative;}
+  .donut-hole{position:absolute;inset:30px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px var(--border);}
+  .donut-hole .num{font-size:22px;font-weight:700;color:var(--navy);line-height:1.1;}
+  .donut-hole .lbl{font-size:9px;color:var(--grey);text-transform:uppercase;letter-spacing:.4px;margin-top:2px;}
+  .pie-legend{margin-top:12px;text-align:left;font-size:11.5px;}
+  .pie-legend-item{display:flex;align-items:center;gap:6px;padding:2px 0;}
+  .pie-legend-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .pie-legend-item .plabel{flex:1;color:var(--grey);}
+  .pie-legend-item b{color:var(--navy);}
 </style>
 </head>
 <body>
@@ -206,6 +217,18 @@
       <span class="rs-stat s-inprogress"><span class="rs-dot rs-inprogress"></span><b id="rsInprogress">0</b><span style="color:var(--grey);">In Progress</span></span>
       <span class="rs-stat s-notaccessed"><span class="rs-dot rs-notaccessed"></span><b id="rsNotaccessed">0</b><span style="color:var(--grey);">Belum Diakses</span></span>
     </div>
+  </div>
+
+  <div class="card" id="recapCard" style="display:none;">
+    <h2>Rekap Progress Pengerjaan</h2>
+    <table style="max-width:520px;">
+      <thead><tr><th>Progress</th><th style="text-align:right;">Jumlah</th><th style="text-align:right;">Persentase</th></tr></thead>
+      <tbody id="recapTableBody"></tbody>
+    </table>
+
+    <h2 style="margin-top:24px;">Perbandingan per Work Group</h2>
+    <div class="row" id="pieRow" style="gap:24px;align-items:flex-start;"></div>
+    <div class="footer-note" id="pieUnclassifiedNote"></div>
   </div>
 
   <div class="card" id="tableCard" style="display:none;">
@@ -416,6 +439,97 @@ document.getElementById('exportExcelBtn').addEventListener('click', function(){
   exportExcel();
 });
 
+// ── Rekap tabel & pie chart per Work Group (dari kolom Team) ──
+const WORK_GROUPS = [
+  {key:'E7',   label:'E7'},
+  {key:'C7',   label:'C7'},
+  {key:'FIRE', label:'Fire Protection'}
+];
+const PIE_SLICES = [
+  {key:'done',          label:'Done',          color:PROGRESS_COLOR.done.strong},
+  {key:'inprogress',    label:'In Progress',    color:PROGRESS_COLOR.inprogress.strong},
+  {key:'need_material', label:'Need Material',  color:PROGRESS_COLOR.need_material.strong},
+  {key:'need_access',   label:'Need Access',    color:PROGRESS_COLOR.need_access.strong},
+  {key:'other',         label:'Lainnya',        color:PROGRESS_COLOR.scheduled.strong}
+];
+
+function classifyGroup(team){
+  const t = (team||'').toUpperCase();
+  if(t.indexOf('FIRE') !== -1) return 'FIRE';
+  if(/(^|[^A-Z0-9])C7([^A-Z0-9]|$)/.test(t)) return 'C7';
+  if(/(^|[^A-Z0-9])E7([^A-Z0-9]|$)/.test(t)) return 'E7';
+  return null;
+}
+
+function computeGroupStats(groupKey){
+  const list = DATA.workOrders.filter(w => classifyGroup(w.team) === groupKey);
+  const c = {done:0, inprogress:0, need_material:0, need_access:0, other:0};
+  list.forEach(w => {
+    const p = w.progress || 'scheduled';
+    if(c[p] !== undefined) c[p]++; else c.other++;
+  });
+  return {total:list.length, c:c};
+}
+
+function buildConicGradient(c, total){
+  if(total <= 0) return null;
+  let acc = 0;
+  const stops = [];
+  PIE_SLICES.forEach(slice => {
+    const val = c[slice.key] || 0;
+    if(val <= 0) return;
+    const start = acc/total*360;
+    acc += val;
+    const end = acc/total*360;
+    stops.push('#'+slice.color+' '+start.toFixed(2)+'deg '+end.toFixed(2)+'deg');
+  });
+  return 'conic-gradient(' + stops.join(', ') + ')';
+}
+
+function renderRecapTable(){
+  const tbody = document.getElementById('recapTableBody');
+  if(!tbody) return;
+  const counts = {};
+  PROGRESS_OPTIONS.forEach(o => counts[o.value] = 0);
+  DATA.workOrders.forEach(w => { const p = w.progress || 'scheduled'; counts[p] = (counts[p]||0) + 1; });
+  const total = DATA.workOrders.length;
+  let rows = PROGRESS_OPTIONS.map(o => {
+    const val = counts[o.value] || 0;
+    const pct = total > 0 ? (val/total*100).toFixed(1) : '0.0';
+    return `<tr><td><span class="prog-pill prog-${o.value}" style="padding:2px 8px;">${o.label}</span></td><td style="text-align:right;"><b>${val}</b></td><td style="text-align:right;color:var(--grey);">${pct}%</td></tr>`;
+  }).join('');
+  rows += `<tr style="border-top:2px solid var(--navy);"><td><b>Total</b></td><td style="text-align:right;"><b>${total}</b></td><td style="text-align:right;"><b>100%</b></td></tr>`;
+  tbody.innerHTML = rows;
+}
+
+function renderGroupPies(){
+  const pieRow = document.getElementById('pieRow');
+  if(!pieRow) return;
+  pieRow.innerHTML = WORK_GROUPS.map(g => {
+    const stats = computeGroupStats(g.key);
+    const grad = buildConicGradient(stats.c, stats.total);
+    const donutBg = grad || '#eef2f6';
+    const legendHtml = PIE_SLICES.map(slice => {
+      const val = stats.c[slice.key] || 0;
+      const pct = stats.total > 0 ? Math.round(val/stats.total*100) : 0;
+      return `<div class="pie-legend-item"><span class="pie-legend-dot" style="background:#${slice.color};"></span><span class="plabel">${slice.label}</span><b>${val}</b><span style="color:var(--grey);width:34px;text-align:right;">${pct}%</span></div>`;
+    }).join('');
+    return `
+      <div class="pie-group">
+        <div class="pie-title">${g.label}</div>
+        <div class="donut" style="background:${donutBg};">
+          <div class="donut-hole"><div class="num">${stats.total}</div><div class="lbl">Total WO</div></div>
+        </div>
+        <div class="pie-legend">${legendHtml}</div>
+      </div>`;
+  }).join('');
+  const unclassified = DATA.workOrders.filter(w => !classifyGroup(w.team)).length;
+  const note = document.getElementById('pieUnclassifiedNote');
+  if(note) note.textContent = unclassified > 0
+    ? unclassified + ' WO belum termasuk grup E7 / C7 / Fire Protection (isi kolom Team dengan salah satu kata kunci tsb agar terhitung).'
+    : '';
+}
+
 function exportExcel(){
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Work Orders');
@@ -612,6 +726,7 @@ function render(){
   const hasData = DATA.workOrders.length > 0;
   document.getElementById('noDataCard').style.display = hasData ? 'none' : 'block';
   document.getElementById('kpiCard').style.display = hasData ? 'block' : 'none';
+  document.getElementById('recapCard').style.display = hasData ? 'block' : 'none';
   document.getElementById('tableCard').style.display = hasData ? 'block' : 'none';
   document.getElementById('recCard').style.display = hasData ? 'block' : 'none';
   if(!hasData) return;
@@ -627,6 +742,8 @@ function render(){
   renderFilterBar();
   renderRsFilterBar();
   renderProgFilterBar();
+  renderRecapTable();
+  renderGroupPies();
   renderTable();
 }
 
@@ -728,6 +845,8 @@ function setProgress(idx, value){
   DATA.workOrders[idx].progress = value;
   saveDraft();
   renderProgFilterBar();
+  renderRecapTable();
+  renderGroupPies();
   renderTable();
 }
 
