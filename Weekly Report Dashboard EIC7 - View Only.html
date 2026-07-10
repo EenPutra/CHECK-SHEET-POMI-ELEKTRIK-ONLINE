@@ -27,6 +27,8 @@
   .btn{background:var(--teal);color:#fff;border:none;padding:9px 16px;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;}
   .btn:hover{opacity:.9;}
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:8px;}
+  .file-btn{position:relative;overflow:hidden;display:inline-block;}
+  .file-btn input[type=file]{position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer;}
   input[type=text], input[type=date]{width:100%;padding:7px 9px;border:1px solid var(--border);border-radius:6px;font-family:inherit;font-size:13px;}
   table{width:100%;border-collapse:collapse;font-size:12.5px;}
   th{background:var(--navy);color:#fff;text-align:left;padding:8px 10px;position:sticky;top:0;}
@@ -86,6 +88,15 @@
 
   <div class="readonly-banner" id="snapshotBanner">
     &#128274; Ini adalah snapshot read-only. Untuk mengubah data, hubungi pemegang tool utama (Weekly Report Dashboard EIC7.html).
+  </div>
+
+  <div class="card" id="importCard">
+    <h2>Buka Snapshot Data</h2>
+    <div class="toolbar">
+      <span class="file-btn btn">Buka file .json<input type="file" id="jsonInput" accept=".json"></span>
+      <span class="footer-note" id="sourceInfo"></span>
+    </div>
+    <div class="footer-note">Untuk melihat laporan ini di browser / perangkat lain, buka file HTML ini lalu import file .json hasil "Export Data" dari Weekly Report Dashboard EIC7.html. Bisa juga drag &amp; drop file .json ke halaman ini.</div>
   </div>
 
   <div class="card" id="kpiCard" style="display:none;">
@@ -165,7 +176,7 @@
 </script>
 
 <script>
-const DATA = JSON.parse(document.getElementById('data-snapshot').textContent);
+let DATA = JSON.parse(document.getElementById('data-snapshot').textContent);
 let activeFilter = "ALL";
 let activeRsFilter = "ALL";
 let activeProgFilter = "ALL";
@@ -399,6 +410,34 @@ function renderTable(){
   }
   updateSortArrows();
 }
+
+function loadJsonFile(file){
+  const reader = new FileReader();
+  reader.onload = function(evt){
+    try{
+      DATA = JSON.parse(evt.target.result);
+      activeFilter = 'ALL'; activeRsFilter = 'ALL'; activeProgFilter = 'ALL';
+      searchTerm = ''; dateFilterFrom = ''; dateFilterTo = ''; sortKey = null; sortDir = 1; openIdx = -1;
+      document.getElementById('searchBox').value = '';
+      document.getElementById('dateFromFilter').value = '';
+      document.getElementById('dateToFilter').value = '';
+      document.getElementById('sourceInfo').textContent = 'Menampilkan: ' + file.name;
+      render();
+    }catch(err){ alert('File JSON tidak valid: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+document.getElementById('jsonInput').addEventListener('change', function(e){
+  const file = e.target.files[0];
+  if(!file) return;
+  loadJsonFile(file);
+});
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', function(e){
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if(file && file.name.match(/\.json$/i)) loadJsonFile(file);
+});
 
 document.getElementById('searchBox').addEventListener('input', function(e){
   searchTerm = e.target.value.toLowerCase();
