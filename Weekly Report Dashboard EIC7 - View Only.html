@@ -463,6 +463,11 @@ document.getElementById('exportExcelBtn').addEventListener('click', function(){
   exportExcel();
 });
 
+function woCellValue(wo){
+  const s = String(wo||'').trim();
+  return /^\d+$/.test(s) ? Number(s) : s;
+}
+
 function exportExcel(){
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet('Work Orders');
@@ -487,7 +492,7 @@ function exportExcel(){
     const prog = w.progress || 'scheduled';
     const colors = PROGRESS_COLOR[prog] || PROGRESS_COLOR.scheduled;
     const row = ws.addRow({
-      wo: w.wo, asset: w.asset, assetDesc: w.assetDesc, team: w.team, status: w.status,
+      wo: woCellValue(w.wo), asset: w.asset, assetDesc: w.assetDesc, team: w.team, status: w.status,
       progress: PROGRESS_OPTIONS.find(o => o.value === prog).label,
       scheduledStart: w.scheduledStart, workDesc: w.workDesc, failureDesc: w.failureDesc,
       whatComplete: w.whatComplete, highlight: w.highlight ? 'Ya' : ''
@@ -496,6 +501,8 @@ function exportExcel(){
       c.alignment = {vertical:'top', wrapText:true};
       c.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF'+colors.tint}};
     });
+    const woCell = row.getCell('wo');
+    if(typeof woCell.value === 'number') woCell.numFmt = '0';
     const progCell = row.getCell('progress');
     progCell.fill = {type:'pattern', pattern:'solid', fgColor:{argb:'FF'+colors.strong}};
     progCell.font = {bold:true, color:{argb:'FFFFFFFF'}};
