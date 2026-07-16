@@ -1,0 +1,1154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HV Motor — 6 Monthly PM Check Sheet</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1e3a5f;--navy2:#0f2744;--blue:#2563eb;--sky:#7dd3fc;--sky2:#bfdbfe;
+  --bg:#f8fbff;--bg2:#f0f7ff;--surf:#ffffff;--bdr:#bfdbfe;--bdr2:#dbeafe;
+  --ok:#16a34a;--ng:#dc2626;--na:#f59e0b;
+  --ok-bg:#dcfce7;--ng-bg:#fee2e2;--na-bg:#fef3c7;
+  --idle:#e5e7eb;--idle-txt:#9ca3af;
+  --txt:#0f172a;--txt2:#1e3a5f;--txt3:#3b82f6;--txt4:#64748b;
+  --mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:100vh}
+.topbar{position:sticky;top:0;z-index:100;background:var(--navy2);height:52px;
+  display:flex;align-items:center;padding:0 20px;gap:12px;border-bottom:2px solid var(--blue)}
+.tb-logo{font-family:var(--raj);font-size:18px;font-weight:700;letter-spacing:2px;color:#fff}
+.tb-logo em{color:var(--sky);font-style:normal}
+.tb-sep{width:1px;height:26px;background:rgba(255,255,255,0.15);flex-shrink:0}
+.tb-sub{font-size:11px;color:var(--sky);font-family:var(--mono);letter-spacing:1px;white-space:nowrap}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:#4ade80;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.tb-time{font-family:var(--mono);font-size:12px;color:var(--sky)}
+.btn{padding:6px 14px;border-radius:5px;border:none;cursor:pointer;font-family:var(--raj);
+  font-size:13px;font-weight:600;letter-spacing:1px;transition:all .15s;
+  display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.btn-draft{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)}
+.btn-draft:hover{background:rgba(255,255,255,0.2)}
+.btn-pdf{background:var(--blue);color:#fff}.btn-pdf:hover{background:#1d4ed8}
+.btn-submit{background:#16a34a;color:#fff}.btn-submit:hover{background:#15803d}
+.btn-sm{padding:4px 10px;font-size:12px}
+.hero{background:var(--navy);padding:24px 20px 20px;color:#fff}
+.hero-eyebrow{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:3px;
+  text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--sky)}
+.hero-title{font-family:var(--raj);font-size:clamp(28px,6vw,52px);font-weight:700;line-height:1;color:#fff;letter-spacing:1px}
+.hero-title em{color:var(--sky);font-style:normal}
+.hero-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-top:8px;font-weight:300}
+.hero-stats{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.hstat{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+  border-radius:8px;padding:10px 16px;text-align:center;min-width:72px}
+.hstat-n{font-family:var(--raj);font-size:26px;font-weight:700;color:#fff;line-height:1;display:block}
+.hstat-n.ok{color:#4ade80}.hstat-n.ng{color:#f87171}.hstat-n.na{color:#fbbf24}.hstat-n.pend{color:var(--sky)}
+.hstat-l{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;display:block}
+.wrap{max-width:1100px;margin:0 auto;padding:20px 16px 80px}
+.panel{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 6px rgba(30,58,95,0.06)}
+.sec-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--navy);cursor:pointer;user-select:none}
+.sec-hdr-icon{width:28px;height:28px;border-radius:6px;background:rgba(37,99,235,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.sec-hdr-title{font-family:var(--raj);font-size:15px;font-weight:700;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.sec-hdr-arrow{color:rgba(255,255,255,0.4);font-size:14px;transition:transform .2s;margin-left:auto}
+.sec-hdr.open .sec-hdr-arrow{transform:rotate(180deg)}
+.wo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf label{font-size:10px;color:var(--txt4);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.mf input,.mf select{border:1.5px solid var(--bdr);border-radius:5px;padding:7px 10px;
+  font-family:var(--sans);font-size:13px;background:var(--bg2);color:var(--txt);transition:border-color .18s;width:100%}
+.mf input:focus,.mf select:focus{outline:none;border-color:var(--blue);background:#fff}
+.mf input[readonly]{background:#f1f5f9;color:var(--txt2)}
+.mf input[type=date]{font-family:var(--mono)}
+.mf-wide{grid-column:1/-1}
+.ss-wrap{position:relative}
+.ss-input{width:100%;border:1.5px solid var(--bdr);border-radius:5px;padding:7px 10px;
+  font-family:var(--sans);font-size:13px;background:var(--bg2);color:var(--txt);transition:border-color .18s}
+.ss-input:focus{outline:none;border-color:var(--blue);background:#fff}
+.ss-drop{position:absolute;top:100%;left:0;right:0;background:#fff;border:1.5px solid var(--blue);
+  border-top:none;border-radius:0 0 6px 6px;max-height:240px;overflow-y:auto;z-index:200;display:none;
+  box-shadow:0 4px 16px rgba(30,58,95,0.15)}
+.ss-drop.open{display:block}
+.ss-item{padding:8px 10px;cursor:pointer;font-size:12px;border-bottom:1px solid var(--bdr2)}
+.ss-item:last-child{border-bottom:none}
+.ss-item:hover{background:var(--bg2)}
+.ss-item strong{color:var(--navy);font-family:var(--mono);font-size:11px}
+.ss-item small{color:var(--txt4);display:block;font-size:10px;margin-top:1px}
+.ss-empty{padding:10px;text-align:center;color:var(--txt4);font-size:12px}
+.md-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;padding:16px}
+.md-field{display:flex;flex-direction:column;gap:3px}
+.md-label{font-size:9.5px;color:var(--txt4);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.md-input{border:1.5px solid var(--bdr);border-radius:5px;padding:7px 10px;
+  font-family:var(--mono);font-size:13px;background:var(--bg2);color:var(--txt);transition:border-color .18s;width:100%}
+.md-input:focus{outline:none;border-color:var(--blue);background:#fff}
+.md-input[readonly]{background:#f1f5f9;color:var(--txt2)}
+.tbl-wrap{overflow-x:auto}
+.ct{width:100%;border-collapse:collapse;font-size:12px;min-width:700px}
+.ct th{background:var(--navy);color:var(--sky2);padding:8px 10px;text-align:center;
+  font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;
+  white-space:nowrap;border-right:1px solid rgba(255,255,255,0.08)}
+.ct th.tl{text-align:left}
+.ct th:last-child{border-right:none}
+.ct td{padding:7px 10px;border-bottom:1px solid var(--bdr2);background:var(--surf);vertical-align:middle;border-right:1px solid var(--bdr2)}
+.ct td:last-child{border-right:none}
+.ct tr:last-child td{border-bottom:none}
+.ct tr:hover td{background:#fafcff}
+.ct td.no{font-family:var(--mono);font-size:11px;color:var(--txt4);text-align:center;width:36px}
+.ct td.comp{font-size:11px;font-weight:600;color:var(--navy);width:120px;vertical-align:top;padding-top:10px}
+.ct td.task{font-size:11px;color:var(--txt);line-height:1.5}
+.ct td.crit{font-size:10px;color:var(--txt4);font-style:italic;width:150px}
+.ct td.res{width:90px;text-align:center}
+.ct td.rmk{width:160px}
+.r-sel{font-size:11px;padding:4px 6px;border-radius:4px;border:1.5px solid var(--bdr);
+  background:var(--bg2);color:var(--txt);font-family:var(--mono);width:76px;transition:border-color .15s}
+.r-sel:focus{outline:none;border-color:var(--blue)}
+.r-sel.ok{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
+.r-sel.ng{background:var(--ng-bg);border-color:var(--ng);color:var(--ng)}
+.r-sel.na{background:var(--na-bg);border-color:var(--na);color:#92400e}
+.rmk-inp{font-size:11px;padding:4px 6px;border-radius:4px;border:1.5px solid var(--bdr);
+  background:var(--bg2);color:var(--txt);font-family:var(--sans);width:100%;transition:border-color .15s}
+.rmk-inp:focus{outline:none;border-color:var(--blue);background:#fff}
+.notice{padding:10px 16px;border-radius:6px;font-size:13px;margin:12px 0;display:none}
+.notice.ok{background:#dcfce7;border:1px solid #86efac;color:#15803d;display:block}
+.notice.err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;display:block}
+.notice.info{background:#dbeafe;border:1px solid #93c5fd;color:#1e40af;display:block}
+.actions{display:flex;flex-wrap:wrap;gap:12px;justify-content:flex-end;padding:20px 0 10px;border-top:1px solid var(--bdr2);margin-top:4px}
+.footer{background:var(--navy2);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:20px}
+.footer span{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px}
+@media(max-width:640px){.tb-sub,.tb-sep{display:none}.wo-grid,.md-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:420px){.topbar{padding:0 12px}.wrap{padding:12px 10px 60px}.wo-grid,.md-grid{grid-template-columns:1fr}}
+/* PHOTO GALLERY */
+.photo-upload-area{padding:14px 16px;border-bottom:1px solid var(--bdr2)}
+.photo-drop{border:2px dashed var(--bdr);border-radius:8px;padding:22px 16px;text-align:center;
+  cursor:pointer;transition:border-color .18s,background .18s;background:var(--bg2)}
+.photo-drop:hover{border-color:var(--blue);background:#eff6ff}
+.photo-drop input{display:none}
+.photo-drop-txt{color:var(--txt4);font-size:13px;pointer-events:none}
+.photo-drop-txt strong{color:var(--blue)}
+.photo-grid{display:flex;flex-wrap:wrap;gap:12px;padding:16px}
+.photo-item{flex:0 0 calc(50% - 6px);border:1px solid var(--bdr);border-radius:8px;
+  overflow:hidden;background:var(--surf);display:flex;flex-direction:column;min-width:0}
+.photo-img-wrap{display:flex;align-items:center;justify-content:center;background:#f1f5f9;padding:6px;min-height:80px}
+.photo-img-wrap img{max-width:100%;height:auto;max-height:220px;display:block;object-fit:contain;border-radius:4px}
+.photo-ctrl{display:flex;align-items:center;gap:5px;padding:7px 10px 4px;flex-wrap:wrap}
+.p-btn{padding:3px 9px;border-radius:4px;border:1.5px solid var(--bdr);background:var(--bg2);
+  font-size:11px;cursor:pointer;color:var(--txt4);font-family:var(--mono);transition:all .15s;white-space:nowrap}
+.p-btn:hover{border-color:var(--blue);color:var(--blue)}
+.p-btn.del:hover{border-color:#dc2626;color:#dc2626}
+.photo-cap{width:100%;border:0;border-top:1px solid var(--bdr2);padding:7px 10px;
+  font-size:12px;color:var(--txt);background:transparent;font-family:var(--sans)}
+.photo-cap:focus{outline:none;background:var(--bg2)}
+.photo-cap::placeholder{color:var(--txt4)}
+.photo-empty{padding:28px;text-align:center;color:var(--txt4);font-size:13px}
+/* CONCLUSION */
+.conc-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:16px}
+.mf textarea{border:1.5px solid var(--bdr);border-radius:5px;padding:8px 10px;
+  font-family:var(--sans);font-size:13px;background:var(--bg2);color:var(--txt);
+  resize:vertical;min-height:80px;width:100%;transition:border-color .18s}
+.mf textarea:focus{outline:none;border-color:var(--blue);background:#fff}
+@media(max-width:640px){.photo-item{flex:0 0 100%}.conc-grid{grid-template-columns:1fr}}
+
+/* ── PRINT / SAVE AS PDF ──────────────────────── */
+@media print{
+  @page{size:A4 portrait;margin:12mm 15mm}
+  *,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  .topbar,.actions,.footer,.notice,
+  .photo-drop,.photo-ctrl,.sec-hdr-arrow,
+  .live-dot,.hero-stats,.ss-drop{display:none!important}
+  .print-header{display:flex!important}
+  body{background:#fff!important;font-size:11px}
+  .hero{padding:14px 20px 12px}
+  .wrap{padding:10px 0 0;max-width:100%}
+  .sec-body{display:block!important}
+  .panel{box-shadow:none!important;border:1px solid #bfdbfe;margin-bottom:10px;break-inside:avoid;page-break-inside:avoid}
+  .sec-hdr{cursor:default;padding:8px 14px}
+  .mf input,.mf select,.mf textarea,
+  .md-input,.ss-input,.photo-cap{
+    background:transparent!important;
+    border:none!important;
+    border-bottom:1px solid #dbeafe!important;
+    border-radius:0!important;
+    padding:2px 0!important;
+    color:#0f172a!important;
+    font-size:11px!important}
+  .mf input[readonly],.md-input[readonly]{color:#1e3a5f!important}
+  .mf select,.md-input{-webkit-appearance:none;appearance:none}
+  .r-sel{border:none!important;border-radius:3px!important;padding:2px 4px!important;font-size:10px!important;-webkit-appearance:none;appearance:none}
+  .r-sel.ok{background:var(--ok-bg)!important;color:var(--ok)!important}
+  .r-sel.ng{background:var(--ng-bg)!important;color:var(--ng)!important}
+  .r-sel.na{background:var(--na-bg)!important;color:#92400e!important}
+  .rmk-inp{background:transparent!important;border:none!important;border-bottom:1px solid #dbeafe!important;border-radius:0!important;padding:2px 0!important;font-size:10px!important}
+  .tbl-wrap{overflow:visible}
+  .ct{min-width:unset;width:100%}
+  .ct th,.ct td{font-size:10px!important;padding:5px 7px!important}
+  .photo-item{flex:0 0 calc(50% - 4px);break-inside:avoid;page-break-inside:avoid}
+  .photo-img-wrap img{max-height:150px}
+  .photo-cap{border-top:1px solid #dbeafe!important;padding:4px 6px!important;font-size:11px!important}
+  .photo-grid{gap:8px;padding:10px}
+  .conc-grid{grid-template-columns:1fr 1fr}
+  .mf textarea{border:none!important;border-bottom:1px solid #dbeafe!important;border-radius:0!important;padding:2px 0!important;resize:none!important;min-height:unset!important;font-size:11px!important}
+  .wo-grid{gap:8px;padding:10px}
+  .md-grid{gap:8px;padding:10px}
+}
+.print-header{display:none;font-family:var(--mono);font-size:10px;color:var(--txt4);
+  padding:4px 0 8px;border-bottom:2px solid var(--navy);margin-bottom:8px;
+  justify-content:space-between;align-items:center}
+.print-header strong{font-size:13px;color:var(--navy);font-family:var(--raj);letter-spacing:1px}
+.btn-back{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:1px;text-decoration:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);transition:background .15s;white-space:nowrap;cursor:pointer;flex-shrink:0}
+.btn-back:hover{background:rgba(255,255,255,0.2);color:#fff}
+</style>
+</head>
+<body>
+
+<!-- print-only header strip (hidden on screen, visible when printing) -->
+<div class="print-header" id="print-header">
+  <div><strong>POMI — HV MOTOR 6 MONTHLY PM CHECK SHEET</strong><br>
+    <span id="ph-tag">—</span> · <span id="ph-desc">—</span></div>
+  <div style="text-align:right">Date: <span id="ph-date">—</span><br>
+    WO: <span id="ph-wo">—</span></div>
+</div>
+
+<div class="topbar">
+  <div class="live-dot"></div>
+  <span class="tb-logo">HV MOTOR <em>6M</em></span>
+  <div class="tb-sep"></div>
+  <span class="tb-sub">6 MONTHLY PM CHECK SHEET · POMI UNIT 7</span>
+  <div class="tb-right">
+    <a class="btn-back" href="index.html" title="Back to Portal">&#8592; Portal</a>
+    <span class="tb-time" id="clock">--:--:--</span>
+    <button class="btn btn-draft btn-sm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn btn-pdf btn-sm" onclick="togglePrintOptions()">🖨️ Print / PDF</button>
+    <button class="btn btn-submit btn-sm" onclick="submitToDb()">🗄️ Submit</button>
+  </div>
+</div>
+
+<!-- Print options popup -->
+<div id="print-options" style="position:fixed;right:16px;top:72px;background:#fff;border:1px solid #ddd;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.08);display:none;z-index:120">
+  <div style="font-weight:700;margin-bottom:6px">Print / Export Options</div>
+  <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
+    <label><input type="checkbox" class="prt-opt" value="workInfo" checked> Work Info</label>
+    <label><input type="checkbox" class="prt-opt" value="basic" checked> Basic Motor Data</label>
+    <label><input type="checkbox" class="prt-opt" value="checkItems" checked> Check Items</label>
+    <label><input type="checkbox" class="prt-opt" value="photos" checked> Photo Documentation</label>
+    <label><input type="checkbox" class="prt-opt" value="conclusion" checked> Conclusion & Notes</label>
+  </div>
+  <div style="display:flex;gap:8px;justify-content:flex-end">
+    <button class="btn" onclick="printSelected()">Print Selected</button>
+    <button class="btn btn-pdf" onclick="exportSelectedPDF()">Export Selected PDF</button>
+    <button class="btn" onclick="togglePrintOptions(true)">Close</button>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="hero-eyebrow">Preventive Maintenance — 6 Monthly HV AC Motor &amp; Switchgear</div>
+  <div class="hero-title">HV MOTOR <em>6 MONTHLY PM</em></div>
+  <div class="hero-sub">POMI Unit 7 · Maintenance Check Sheet · Work Completion Report</div>
+  <div class="hero-stats">
+    <div class="hstat"><span class="hstat-n" id="h-total">0</span><span class="hstat-l">Total</span></div>
+    <div class="hstat"><span class="hstat-n ok" id="h-ok">0</span><span class="hstat-l">OK</span></div>
+    <div class="hstat"><span class="hstat-n ng" id="h-ng">0</span><span class="hstat-l">NG</span></div>
+    <div class="hstat"><span class="hstat-n na" id="h-na">0</span><span class="hstat-l">N/A</span></div>
+    <div class="hstat"><span class="hstat-n pend" id="h-pend">0</span><span class="hstat-l">Pending</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📋</div>
+    <div class="sec-hdr-title">Work Completion Report</div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid">
+      <div class="mf mf-wide">
+        <label>Plant Tag No.</label>
+        <div class="ss-wrap">
+          <input type="text" class="ss-input" id="tag-search" placeholder="Search or type plant tag no..." autocomplete="off"
+            oninput="filterTags()" onfocus="openDrop()" onblur="closeDrop()">
+          <div class="ss-drop" id="ss-drop"></div>
+        </div>
+      </div>
+      <div class="mf mf-wide">
+        <label>Tag Description</label>
+        <input type="text" id="tag-desc" placeholder="Enter tag description">
+      </div>
+      <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
+      <div class="mf"><label>Done By</label><input type="text" id="done-by" placeholder="Full name"></div>
+      <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
+      <div class="mf"><label>Maintenance Purpose</label>
+        <input type="text" id="maint-purpose" value="6 MONTHLY HIGH VOLTAGE AC MOTOR AND SWITCHGEAR MAINTENANCE">
+      </div>
+      <div class="mf"><label>Location</label><input type="text" id="location" placeholder="Enter location"></div>
+      <div class="mf"><label>Compartment</label><input type="text" id="compartment" placeholder="Enter compartment"></div>
+      <div class="mf"><label>Acknowledge Date</label><input type="date" id="ack-date"></div>
+      <div class="mf"><label>Acknowledge By</label><input type="text" id="ack-by" placeholder="Full name"></div>
+      <div class="mf"><label>Signature</label><input type="text" id="ack-sign" placeholder="Sign or initial"></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">⚡</div>
+    <div class="sec-hdr-title">Basic Motor Data</div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="md-grid">
+      <div class="md-field"><span class="md-label">Rated Voltage (V)</span>
+        <input class="md-input" id="m-v" type="text" placeholder="Enter rated voltage"></div>
+      <div class="md-field"><span class="md-label">Rated Power (kW)</span>
+        <input class="md-input" id="m-pwr" type="text" placeholder="Enter rated power"></div>
+      <div class="md-field"><span class="md-label">Service Factor</span>
+        <input class="md-input" id="m-sf" type="text" placeholder="Enter service factor"></div>
+      <div class="md-field"><span class="md-label">Mounting</span>
+        <select class="md-input" id="m-mount">
+          <option value="">— Select —</option>
+          <option>Horizontal</option><option>Vertical</option>
+        </select>
+      </div>
+      <div class="md-field"><span class="md-label">Serial No.</span>
+        <input class="md-input" id="m-sn" type="text" placeholder="Serial Number"></div>
+      <div class="md-field"><span class="md-label">Manufacture</span>
+        <input class="md-input" id="m-mfr" type="text" placeholder="Enter manufacturer"></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">✅</div>
+    <div class="sec-hdr-title">Check Items</div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+      <table class="ct">
+        <thead>
+          <tr>
+            <th style="width:36px">No.</th>
+            <th class="tl" style="width:120px">Component</th>
+            <th class="tl">Check Items / Point</th>
+            <th class="tl" style="width:150px">Criteria</th>
+            <th style="width:88px">Result</th>
+            <th class="tl" style="width:160px">Remark</th>
+          </tr>
+        </thead>
+        <tbody id="check-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── PANEL: PHOTO DOCUMENTATION ──────────────── -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📷</div>
+    <div class="sec-hdr-title">Photo Documentation</div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="photo-upload-area">
+      <div class="photo-drop" onclick="document.getElementById('photo-input').click()"
+           ondragover="event.preventDefault();this.style.borderColor='var(--blue)'"
+           ondragleave="this.style.borderColor=''"
+           ondrop="event.preventDefault();this.style.borderColor='';onAddPhotos({files:event.dataTransfer.files})">
+        <input type="file" id="photo-input" accept="image/*" multiple onchange="onAddPhotos(this)">
+        <div class="photo-drop-txt">
+          <div style="font-size:24px;margin-bottom:6px">📷</div>
+          <strong>Klik untuk tambah foto</strong> atau drag &amp; drop di sini<br>
+          <span style="font-size:11px">Mendukung JPG, PNG, HEIC · Tidak terbatas jumlah foto</span>
+        </div>
+      </div>
+    </div>
+    <div class="photo-grid" id="photo-grid">
+      <div class="photo-empty" id="photo-empty">Belum ada foto. Klik area di atas untuk menambahkan.</div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PANEL: CONCLUSION ────────────────────────── -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📝</div>
+    <div class="sec-hdr-title">Conclusion &amp; Notes</div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="conc-grid">
+      <div class="mf" style="grid-column:1/-1">
+        <label>Overall Findings / Defects Found</label>
+        <textarea id="findings" rows="3" placeholder="Describe all defects, abnormalities, or findings observed..."></textarea>
+      </div>
+      <div class="mf" style="grid-column:1/-1">
+        <label>Corrective Actions Taken</label>
+        <textarea id="actions-taken" rows="3" placeholder="Describe all corrective actions performed during this maintenance..."></textarea>
+      </div>
+      <div class="mf">
+        <label>Overall Result</label>
+        <select id="overall-result">
+          <option value="">— Select —</option>
+          <option value="GOOD">GOOD</option>
+          <option value="ACCEPTABLE">ACCEPTABLE</option>
+          <option value="NEED ACTION">NEED ACTION</option>
+          <option value="FAILED">FAILED</option>
+        </select>
+      </div>
+      <div class="mf">
+        <label>Next PM Date</label>
+        <input type="date" id="next-pm">
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notice" id="notice"></div>
+
+<div class="actions">
+  <button class="btn" style="background:var(--navy);color:#fff" onclick="resetForm()">🔄 Reset</button>
+  <button class="btn btn-draft" onclick="saveDraft()">💾 Save Draft</button>
+  <button class="btn btn-pdf" onclick="printPage()">🖨️ Print / Save PDF</button>
+  <button class="btn btn-submit" style="font-size:14px;padding:8px 24px" onclick="submitToDb()">🗄️ Submit to Database</button>
+</div>
+
+</div>
+
+<div class="footer">
+  <span>POMI — HV MOTOR 6 MONTHLY PM CHECK SHEET</span>
+  <span id="doc-id-display"></span>
+  <span>Rev. 1.0 · 2026</span>
+</div>
+
+<script>
+const HV_MOTORS=[
+  {"tag":"7EB-HV-001","desc":"HV Motor 1 — Main Boiler Feed Pump"},
+  {"tag":"7EB-HV-002","desc":"HV Motor 2 — Induced Draft Fan"}
+];
+
+// ═══════════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════════
+const resultState = {};
+
+// ═══════════════════════════════════════════════════
+//  CLOCK
+// ═══════════════════════════════════════════════════
+(function tick(){
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB');
+  setTimeout(tick, 1000);
+})();
+
+// ═══════════════════════════════════════════════════
+//  SECTION TOGGLE
+// ═══════════════════════════════════════════════════
+function toggleSec(hdr){
+  hdr.classList.toggle('open');
+  const body = hdr.nextElementSibling;
+  body.style.display = body.style.display === 'none' ? '' : 'none';
+}
+
+// ═══════════════════════════════════════════════════
+//  SEARCHABLE TAG DROPDOWN
+// ═══════════════════════════════════════════════════
+let dropTimer = null;
+
+function filterTags(){
+  const q = document.getElementById('tag-search').value.toUpperCase().trim();
+  const filtered = q.length >= 1
+    ? HV_MOTORS.filter(m => m.tag.toUpperCase().includes(q) || m.desc.toUpperCase().includes(q)).slice(0, 60)
+    : HV_MOTORS.slice(0, 80);
+  renderDrop(filtered);
+  document.getElementById('ss-drop').classList.add('open');
+}
+
+function renderDrop(list){
+  const drop = document.getElementById('ss-drop');
+  if(!list.length){ drop.innerHTML = '<div class="ss-empty">No results found</div>'; return; }
+  drop.innerHTML = list.map(m =>
+    `<div class="ss-item" onmousedown="selectTag('${m.tag.replace(/'/g,"\\'")}')">`+
+    `<strong>${m.tag}</strong><small>${m.desc||'—'}</small></div>`
+  ).join('');
+}
+
+function openDrop(){
+  filterTags();
+  document.getElementById('ss-drop').classList.add('open');
+}
+
+function closeDrop(){
+  dropTimer = setTimeout(() => {
+    document.getElementById('ss-drop').classList.remove('open');
+  }, 200);
+}
+
+function selectTag(tag){
+  clearTimeout(dropTimer);
+  const m = HV_MOTORS.find(x => x.tag === tag);
+  if(!m) return;
+  // Only set the tag search value; do NOT auto-fill description or motor fields.
+  document.getElementById('tag-search').value = m.tag;
+  document.getElementById('ss-drop').classList.remove('open');
+}
+
+// ═══════════════════════════════════════════════════
+//  BUILD CHECK TABLE — 6 Monthly HV Motor & Switchgear PM
+//  (source: "6 monthly HV motor.xlsx" — List of Tasks for Work Order)
+// ═══════════════════════════════════════════════════
+const CHECKS = [
+  {no:1,  comp:'Cooling System',      task:'Cleaning mess of air filter with service water and drying',              crit:'Filter mesh clean, no residue',                id:'c1'},
+  {no:2,  comp:'',                    task:'Cleaning air box of filter with vacuum cleaner',                          crit:'No dust / debris inside air box',              id:'c2'},
+  {no:3,  comp:'Motor Body',          task:'Cleaning of motor casing',                                                crit:'Casing clean, no oil / dust build-up',         id:'c3'},
+  {no:4,  comp:'Bearing',             task:'Check the bearings lubricant level in operational bearing',              crit:'Lubricant level adequate, no contamination',   id:'c4'},
+  {no:5,  comp:'Grounding',           task:'Check the grounding cable mounting bolts are tight and secure',          crit:'Bolts tight, cable terminated securely',       id:'c5'},
+  {no:6,  comp:'Electrical Parameter',task:'Check operational Motor parameter',                                       crit:'Voltage / current within nameplate rating',    id:'c6'},
+  {no:7,  comp:'RTD / Temperature',   task:'Bearing temperature RTD inspections',                                     crit:'Reading within normal operating range',        id:'c7'},
+  {no:8,  comp:'Bearing',             task:'Bearing vibrations probe and abnormal noise inspections',                crit:'No abnormal vibration / noise',                id:'c8'},
+  {no:9,  comp:'RTD / Temperature',   task:'Stator temperature RTD inspections',                                      crit:'Reading within normal operating range',        id:'c9'},
+  {no:10, comp:'Switchgear',          task:'Check breaker in operational conditions',                                 crit:'Breaker operates normally, no fault indication',id:'c10'},
+  {no:11, comp:'Switchgear',          task:'Check protection relay',                                                  crit:'Settings correct, no alarm / trip flag',       id:'c11'},
+];
+
+function mkSel(id){
+  return `<select class="r-sel" id="res-${id}" onchange="onResChange(this,'${id}')">
+    <option value="">—</option><option value="OK">OK</option>
+    <option value="NG">NG</option><option value="N/A">N/A</option>
+  </select>`;
+}
+function mkRmk(id,ph='Remark...'){
+  return `<input class="rmk-inp" id="rmk-${id}" type="text" placeholder="${ph}">`;
+}
+
+function buildTable(){
+  const tbody = document.getElementById('check-tbody');
+  tbody.innerHTML = CHECKS.map(chk => `<tr>
+      <td class="no">${chk.no}</td>
+      <td class="comp">${chk.comp}</td>
+      <td class="task">${chk.task}</td>
+      <td class="crit">${chk.crit}</td>
+      <td class="res">${mkSel(chk.id)}</td>
+      <td class="rmk">${mkRmk(chk.id)}</td>
+    </tr>`).join('');
+}
+
+// ═══════════════════════════════════════════════════
+//  RESULT CHANGE + STATS
+// ═══════════════════════════════════════════════════
+function onResChange(sel, id){
+  const v = sel.value;
+  resultState[id] = v;
+  sel.className = 'r-sel' + (v==='OK'?' ok':v==='NG'?' ng':v==='N/A'?' na':'');
+  updateStats();
+}
+
+function updateStats(){
+  const sels = document.querySelectorAll('.r-sel');
+  let total=0,ok=0,ng=0,na=0,pend=0;
+  sels.forEach(s => {
+    total++;
+    if(s.value==='OK') ok++;
+    else if(s.value==='NG') ng++;
+    else if(s.value==='N/A') na++;
+    else pend++;
+  });
+  document.getElementById('h-total').textContent = total;
+  document.getElementById('h-ok').textContent    = ok;
+  document.getElementById('h-ng').textContent    = ng;
+  document.getElementById('h-na').textContent    = na;
+  document.getElementById('h-pend').textContent  = pend;
+}
+
+// ═══════════════════════════════════════════════════
+//  NOTICE
+// ═══════════════════════════════════════════════════
+function showNote(msg, t){
+  const n = document.getElementById('notice');
+  n.textContent = msg; n.className = 'notice ' + t;
+  setTimeout(() => n.className = 'notice', 5000);
+}
+
+// ═══════════════════════════════════════════════════
+//  DRAFT (localStorage)
+// ═══════════════════════════════════════════════════
+function saveDraft(){
+  const d = {_tag: document.getElementById('tag-search').value, _st: {...resultState}};
+  document.querySelectorAll('input,select,textarea').forEach(el => {
+    if(el.id && el.value && el.id !== 'photo-input') d['f_'+el.id] = el.value;
+  });
+  try{
+    d._photoMeta = PHOTOS.map(p => ({caption:p.caption}));
+    localStorage.setItem('hv_motor_6m_draft', JSON.stringify(d));
+    try{ localStorage.setItem('hv_motor_6m_photos', JSON.stringify(PHOTOS.map(p=>({src:p.src,caption:p.caption})))); }catch(e){}
+    showNote('💾 Draft tersimpan.', 'ok');
+  }catch(e){ showNote('❌ Gagal simpan draft: '+e.message, 'err'); }
+}
+
+function loadDraft(){
+  try{
+    const raw = localStorage.getItem('hv_motor_6m_draft');
+    if(!raw) return;
+    const d = JSON.parse(raw);
+    if(d._tag) document.getElementById('tag-search').value = d._tag;
+    document.querySelectorAll('input,select,textarea').forEach(el => {
+      if(el.id && d['f_'+el.id] !== undefined) el.value = d['f_'+el.id];
+    });
+    if(d._st) Object.entries(d._st).forEach(([id,val]) => {
+      resultState[id] = val;
+      const sel = document.getElementById('res-'+id);
+      if(sel){ sel.value = val; onResChange(sel, id); }
+    });
+    try{
+      const rawP = localStorage.getItem('hv_motor_6m_photos');
+      if(rawP){ PHOTOS = JSON.parse(rawP); renderPhotos(); }
+    }catch(e){}
+    updateStats();
+  }catch(e){}
+}
+
+function resetForm(){
+  if(!confirm('Reset semua data? Tindakan ini tidak dapat dibatalkan.')) return;
+  document.querySelectorAll('input,select,textarea').forEach(el => { if(el.type !== 'file') el.value = ''; });
+  Object.keys(resultState).forEach(k => delete resultState[k]);
+  document.querySelectorAll('.r-sel').forEach(s => { s.value=''; s.className='r-sel'; });
+  PHOTOS = []; renderPhotos();
+  updateStats();
+}
+
+// ═══════════════════════════════════════════════════
+//  FIREBASE SUBMIT
+// ═══════════════════════════════════════════════════
+async function submitToDb(){
+  const tag    = document.getElementById('tag-search').value.trim();
+  const date   = document.getElementById('wo-date').value;
+  const doneBy = document.getElementById('done-by').value.trim();
+  if(!tag)    { showNote('❌ Isi Plant Tag No. terlebih dahulu.', 'err'); return; }
+  if(!date)   { showNote('❌ Isi tanggal terlebih dahulu.', 'err'); return; }
+  if(!doneBy) { showNote('❌ Isi nama Done By terlebih dahulu.', 'err'); return; }
+
+  const gv = id => { const e=document.getElementById(id); return e?e.value.trim():''; };
+
+  const items = {};
+  document.querySelectorAll('.r-sel').forEach(sel => {
+    const id = sel.id.replace('res-','');
+    items[id] = { result: sel.value, remark: gv('rmk-'+id) };
+  });
+  const vals = Object.values(items);
+  const countOk = vals.filter(x=>x.result==='OK').length;
+  const countNg = vals.filter(x=>x.result==='NG').length;
+  const countNa = vals.filter(x=>x.result==='N/A').length;
+
+  const data = {
+    type:'hv_motor_6monthly_pm', assetTag:tag, assetName:gv('tag-desc'),
+    executionDate:date, doneBy, woNumber:gv('wo-no'),
+    maintPurpose:gv('maint-purpose'), location:gv('location'),
+    compartment:gv('compartment'), ackDate:gv('ack-date'), ackBy:gv('ack-by'), ackSignature:gv('ack-sign'),
+    motorData:{
+      sn: gv('m-sn'), v:gv('m-v'), power:gv('m-pwr'), sf:gv('m-sf'), mounting:gv('m-mount'), manufacturer:gv('m-mfr')
+    },
+    checkItems:items, countOk, countNg, countNa,
+    overallStatus: gv('overall-result') || (countNg>0?'NG':'OK'),
+    findings: gv('findings'),
+    actionsTaken: gv('actions-taken'),
+    overallResult: gv('overall-result'),
+    nextPmDate: gv('next-pm'),
+    photoCount: PHOTOS.length,
+    photoCaptions: PHOTOS.map(p=>p.caption),
+    createdAt: new Date().toISOString(),
+    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+  };
+
+  try{
+    showNote('⏳ Menyimpan ke database...', 'info');
+    const ref = await db.collection('hv_motor_6monthly_pm').add(data);
+    showNote('✅ Data berhasil disimpan. ID: '+ref.id, 'ok');
+    document.getElementById('doc-id-display').textContent = 'DOC: '+ref.id;
+  }catch(e){
+    showNote('❌ Gagal simpan: '+e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+//  PDF GENERATION
+// ═══════════════════════════════════════════════════
+async function generatePDF(selectedSections){
+  showNote('⏳ Membuat PDF, harap tunggu...', 'info');
+  await new Promise(r => setTimeout(r, 200));
+  const {jsPDF} = window.jspdf;
+  const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+  const W=210, H=297, M=13, CW=184; let y=M;
+  const NAVY=[30,58,95], BLUE=[37,99,235], SKY=[125,211,252], LT=[240,247,255],
+        OKC=[22,163,74], NGC=[220,38,38], NAC=[180,120,0], GR=[100,116,139], WH=[255,255,255];
+
+  const gv = id => { const e=document.getElementById(id); return e?e.value.trim():''; };
+  const tag = document.getElementById('tag-search').value.trim();
+  const selSections = (Array.isArray(selectedSections) && selectedSections.length) ? selectedSections : null;
+  const include = s => !selSections || selSections.includes(s);
+
+  function ckY(n){ if(y+n > H-M-12){ pdf.addPage(); y=M; } }
+
+  // ── Cover header ──
+  pdf.setFillColor(...NAVY); pdf.rect(0,0,W,44,'F');
+  pdf.setFillColor(...BLUE); pdf.rect(0,42,W,2,'F');
+  pdf.setTextColor(...WH); pdf.setFont('helvetica','bold'); pdf.setFontSize(20);
+  pdf.text('HV MOTOR — 6 MONTHLY PM', M, 18);
+  pdf.setFontSize(11); pdf.setTextColor(...SKY);
+  pdf.text('PM Check Sheet — Work Completion Report', M, 27);
+  pdf.setFontSize(8); pdf.setFont('helvetica','normal'); pdf.setTextColor(...SKY);
+  pdf.text('Generated: '+new Date().toLocaleString('en-GB'), M, 36);
+  pdf.text('POMI — Unit 7 Electrical Maintenance', W-M, 36, {align:'right'});
+  y = 50;
+
+  // ── Work info box ──
+  if(include('workInfo')){
+    pdf.setFillColor(...LT); pdf.setDrawColor(...SKY); pdf.setLineWidth(0.3);
+    pdf.roundedRect(M, y, CW, 42, 2, 2, 'FD');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(...NAVY);
+    pdf.text(tag||'—', M+4, y+9);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...GR);
+    const desc = gv('tag-desc'); pdf.text(desc.slice(0,70), M+4, y+16);
+
+    const wiFields = [
+      ['Date', gv('wo-date')], ['Done By', gv('done-by')], ['WO No.', gv('wo-no')],
+      ['Location', gv('location')], ['Compartment', gv('compartment')], ['Signature', gv('ack-sign')]
+    ];
+    const wiCw = (CW-8)/3, wiRh = 10, wiY0 = y+22;
+    wiFields.forEach((f,i) => {
+      const col=i%3, row=Math.floor(i/3), x=M+4+col*wiCw, yy=wiY0+row*wiRh;
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(6); pdf.setTextColor(...GR); pdf.text(f[0].toUpperCase(),x,yy);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...NAVY); pdf.text(String(f[1]||'—').slice(0,26),x,yy+5);
+    });
+    y += 46;
+  }
+
+  // ── Basic Motor Data ──
+  if(include('basic')){
+    ckY(28);
+    pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(...WH);
+    pdf.text('BASIC MOTOR DATA', M+3, y+5.5);
+    y += 10;
+    const mdF = [
+      ['Serial No.', gv('m-sn')], ['Rated Voltage', gv('m-v')], ['Rated Power', gv('m-pwr')],
+      ['Service Factor', gv('m-sf')], ['Mounting', gv('m-mount')], ['Manufacture', gv('m-mfr')]
+    ];
+    const cw3 = CW/3; const rh = 9;
+    mdF.forEach((f,i) => {
+      const col=i%3, row=Math.floor(i/3), x=M+col*cw3, yy=y+row*rh;
+      pdf.setFillColor(col%2===0?248:244, 250, 255); pdf.rect(x,yy,cw3,rh,'F');
+      pdf.setDrawColor(...SKY); pdf.setLineWidth(0.1); pdf.rect(x,yy,cw3,rh,'D');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(6); pdf.setTextColor(...GR); pdf.text(f[0].toUpperCase(),x+2,yy+3.5);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(...NAVY); pdf.text(String(f[1]||'—'),x+2,yy+7.5);
+    });
+    y += Math.ceil(mdF.length/3)*rh + 6;
+  }
+
+  // ── Check Items ──
+  if(include('checkItems')){
+    ckY(16);
+    pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(...WH);
+    pdf.text('CHECK ITEMS', M+3, y+5.5);
+    y += 10;
+
+    const tableBody = CHECKS.map(chk => {
+      const sel = document.getElementById('res-'+chk.id);
+      const res = sel ? sel.value : '';
+      const rmk = document.getElementById('rmk-'+chk.id);
+      return [chk.no, chk.comp||'—', chk.task, res||'—', rmk?rmk.value.trim():'—'];
+    });
+
+    pdf.autoTable({
+      startY:y,
+      head:[['No.','Component','Check Item','Result','Remark']],
+      body:tableBody,
+      styles:{fontSize:8,cellPadding:3,overflow:'linebreak'},
+      headStyles:{fillColor:NAVY,textColor:WH,fontStyle:'bold'},
+      columnStyles:{0:{cellWidth:9,halign:'center'},1:{cellWidth:32},2:{cellWidth:CW-9-32-16-30},3:{cellWidth:16,halign:'center'},4:{cellWidth:30}},
+      didParseCell: d => {
+        if(d.section==='body'&&d.column.index===3){
+          const v=d.cell.raw;
+          if(v==='OK') d.cell.styles.textColor=OKC;
+          else if(v==='NG') d.cell.styles.textColor=NGC;
+          else if(v==='N/A') d.cell.styles.textColor=NAC;
+          else d.cell.styles.textColor=GR;
+          d.cell.styles.fontStyle='bold';
+        }
+      },
+      alternateRowStyles:{fillColor:[248,250,255]},
+      margin:{left:M,right:M}
+    });
+    y = pdf.lastAutoTable.finalY + 6;
+  }
+
+  // ── Photo Documentation ──
+  if(include('photos') && PHOTOS.length > 0){
+    ckY(20);
+    pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(...WH);
+    pdf.text('PHOTO DOCUMENTATION ('+PHOTOS.length+' foto)', M+3, y+5.5);
+    y += 10;
+
+    const imgInfoArr = await Promise.all(PHOTOS.map(p => new Promise(res => {
+      const im = new Image();
+      im.onload = () => res({src:p.src, nw:im.naturalWidth, nh:im.naturalHeight, caption:p.caption||''});
+      im.onerror = () => res(null);
+      im.src = p.src;
+    })));
+    const validImgs = imgInfoArr.filter(Boolean);
+
+    function fitImg(nw,nh,maxW,maxH){
+      const scale = Math.min(maxW/nw, maxH/nh);
+      return {w:nw*scale, h:nh*scale};
+    }
+
+    const COL_W = (CW - 5) / 2;
+    const MAX_H = 85;
+    const CAP_H = 10;
+
+    for(let i=0; i<validImgs.length; i+=2){
+      const p1 = validImgs[i];
+      const p2 = validImgs[i+1] || null;
+
+      const f1 = fitImg(p1.nw, p1.nh, COL_W, MAX_H);
+      const f2 = p2 ? fitImg(p2.nw, p2.nh, COL_W, MAX_H) : null;
+      const rowImgH = Math.max(f1.h, f2 ? f2.h : 0);
+      const rowTotalH = rowImgH + CAP_H + 4;
+
+      ckY(rowTotalH);
+
+      pdf.setFillColor(246,248,252); pdf.setDrawColor(220,230,245); pdf.setLineWidth(0.2);
+      pdf.roundedRect(M, y, COL_W, rowImgH+2, 1, 1, 'FD');
+
+      const x1off = (COL_W - f1.w) / 2;
+      const y1off = (rowImgH - f1.h) / 2;
+      try{ pdf.addImage(p1.src, 'JPEG', M + x1off, y + 1 + y1off, f1.w, f1.h); }catch(e){}
+
+      pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(...GR);
+      const cap1 = p1.caption || ('Foto '+(i+1));
+      pdf.text(cap1, M + COL_W/2, y + rowImgH + 7, {align:'center', maxWidth:COL_W});
+
+      if(f2 && p2){
+        const x2 = M + COL_W + 5;
+        pdf.setFillColor(246,248,252); pdf.setDrawColor(220,230,245);
+        pdf.roundedRect(x2, y, COL_W, rowImgH+2, 1, 1, 'FD');
+        const x2off = (COL_W - f2.w) / 2;
+        const y2off = (rowImgH - f2.h) / 2;
+        try{ pdf.addImage(p2.src, 'JPEG', x2 + x2off, y + 1 + y2off, f2.w, f2.h); }catch(e){}
+        const cap2 = p2.caption || ('Foto '+(i+2));
+        pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(...GR);
+        pdf.text(cap2, x2 + COL_W/2, y + rowImgH + 7, {align:'center', maxWidth:COL_W});
+      }
+
+      y += rowTotalH;
+    }
+    y += 4;
+  }
+
+  // ── Conclusion & Notes ──
+  const findings    = gv('findings');
+  const actionsTaken = gv('actions-taken');
+  const overallRes  = gv('overall-result');
+  const nextPm      = gv('next-pm');
+  if(include('conclusion') && (findings || actionsTaken || overallRes || nextPm)){
+    ckY(20);
+    pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(...WH);
+    pdf.text('CONCLUSION & NOTES', M+3, y+5.5);
+    y += 10;
+
+    pdf.autoTable({
+      startY:y,
+      body:[
+        [{content:'Overall Findings', styles:{fontStyle:'bold',fillColor:[240,247,255]}},
+         findings||'—'],
+        [{content:'Corrective Actions', styles:{fontStyle:'bold',fillColor:[240,247,255]}},
+         actionsTaken||'—'],
+        [{content:'Overall Result', styles:{fontStyle:'bold',fillColor:[240,247,255]}},
+         {content:overallRes||'—',
+          styles:{textColor: overallRes==='GOOD'?OKC:overallRes==='FAILED'?NGC:overallRes==='NEED ACTION'?NAC:NAVY,
+                  fontStyle:'bold'}}],
+        [{content:'Next PM Date', styles:{fontStyle:'bold',fillColor:[240,247,255]}},
+         nextPm||'—'],
+      ],
+      columnStyles:{0:{cellWidth:44},1:{cellWidth:CW-44}},
+      styles:{fontSize:9,cellPadding:4,overflow:'linebreak'},
+      alternateRowStyles:{fillColor:[248,250,255]},
+      margin:{left:M,right:M}
+    });
+    y = pdf.lastAutoTable.finalY + 6;
+  }
+
+  // ── Signature section ──
+  ckY(34);
+  pdf.setFillColor(...LT); pdf.setDrawColor(...SKY); pdf.setLineWidth(0.2);
+  pdf.roundedRect(M,y,CW,30,2,2,'FD');
+  const half=CW/2;
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(...GR);
+  pdf.text('DONE BY', M+4, y+7);
+  pdf.text('ACKNOWLEDGE BY', M+half+4, y+7);
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(11); pdf.setTextColor(...NAVY);
+  pdf.text(gv('done-by')||'____________________', M+4, y+16);
+  pdf.text(gv('ack-by')||'____________________', M+half+4, y+16);
+  pdf.setFontSize(8); pdf.setTextColor(...GR);
+  pdf.text('Date: '+(gv('wo-date')||'—'), M+4, y+24);
+  pdf.text('Date: '+(gv('ack-date')||'—'), M+half+4, y+24);
+  y += 36;
+
+  // ── Page footer on all pages ──
+  const pages = pdf.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    pdf.setPage(p);
+    pdf.setFillColor(...NAVY); pdf.rect(0,H-10,W,10,'F');
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(...SKY);
+    pdf.text('POMI — HV Motor 6 Monthly PM Check Sheet', M, H-4);
+    pdf.text('Page '+p+' of '+pages, W-M, H-4, {align:'right'});
+  }
+
+  const safeTag = tag.replace(/[^A-Za-z0-9_-]/g,'_') || 'UNKNOWN';
+  const dateStr = gv('wo-date').replace(/-/g,'') || new Date().toISOString().slice(0,10).replace(/-/g,'');
+  pdf.save('HV_Motor_6MonthlyPM_'+safeTag+'_'+dateStr+'.pdf');
+  showNote('✅ PDF berhasil dibuat.', 'ok');
+}
+
+// ═══════════════════════════════════════════════════
+//  EXIF ORIENTATION HELPERS
+// ═══════════════════════════════════════════════════
+function getExifOrientation(ab){
+  const v=new DataView(ab);
+  if(v.byteLength<2||v.getUint16(0,false)!==0xFFD8)return 1;
+  let off=2;
+  while(off+4<=v.byteLength){
+    const mk=v.getUint16(off,false);off+=2;
+    if(mk===0xFFE1){
+      if(off+10>v.byteLength)return 1;
+      if(v.getUint32(off+2,false)!==0x45786966)return 1;
+      const le=v.getUint16(off+8,false)===0x4949;
+      const ifdOff=off+8+v.getUint32(off+12,le);
+      if(ifdOff+2>v.byteLength)return 1;
+      const n=v.getUint16(ifdOff,le);
+      for(let i=0;i<n;i++){
+        const t=ifdOff+2+i*12;
+        if(t+10>v.byteLength)break;
+        if(v.getUint16(t,le)===0x0112)return v.getUint16(t+8,le);
+      }
+      return 1;
+    }
+    if((mk&0xFF00)!==0xFF00)break;
+    if(off+2>v.byteLength)break;
+    off+=v.getUint16(off,false);
+  }
+  return 1;
+}
+function normalizeImgOrientation(dataUrl){
+  return new Promise(res=>{
+    let orientation=1;
+    try{
+      const b64=dataUrl.split(',')[1],bin=atob(b64),ab=new Uint8Array(bin.length);
+      for(let i=0;i<bin.length;i++)ab[i]=bin.charCodeAt(i);
+      orientation=getExifOrientation(ab.buffer);
+    }catch(e){}
+    if(orientation===1){res(dataUrl);return;}
+    const img=new Image();
+    img.onload=()=>{
+      const W=img.naturalWidth,H=img.naturalHeight;
+      const cv=document.createElement('canvas'),ctx=cv.getContext('2d');
+      if(orientation>=5&&orientation<=8){cv.width=H;cv.height=W;}
+      else{cv.width=W;cv.height=H;}
+      switch(orientation){
+        case 2:ctx.transform(-1,0,0,1,W,0);break;
+        case 3:ctx.transform(-1,0,0,-1,W,H);break;
+        case 4:ctx.transform(1,0,0,-1,0,H);break;
+        case 5:ctx.transform(0,1,1,0,0,0);break;
+        case 6:ctx.transform(0,1,-1,0,H,0);break;
+        case 7:ctx.transform(0,-1,-1,0,H,W);break;
+        case 8:ctx.transform(0,-1,1,0,0,W);break;
+      }
+      ctx.drawImage(img,0,0);
+      res(cv.toDataURL('image/jpeg',0.92));
+    };
+    img.onerror=()=>res(dataUrl);
+    img.src=dataUrl;
+  });
+}
+
+// ═══════════════════════════════════════════════════
+//  PHOTO GALLERY
+// ═══════════════════════════════════════════════════
+let PHOTOS = []; // [{src, caption}]
+
+function onAddPhotos(inp){
+  const files = Array.from(inp.files||[]); if(!files.length) return;
+  let pending = 0;
+  files.forEach(f => {
+    if(f.size > 20*1024*1024){showNote('File terlalu besar (maks 20 MB): '+f.name,'err');return;}
+    pending++;
+    const r = new FileReader();
+    r.onload = async e => {
+      const fixed = await normalizeImgOrientation(e.target.result);
+      PHOTOS.push({src:fixed, caption:''});
+      pending--;
+      if(pending===0) renderPhotos();
+    };
+    r.readAsDataURL(f);
+  });
+  inp.value = '';
+}
+
+function renderPhotos(){
+  const grid = document.getElementById('photo-grid');
+  if(!PHOTOS.length){
+    grid.innerHTML = '<div class="photo-empty" id="photo-empty">Belum ada foto. Klik area di atas untuk menambahkan.</div>';
+    return;
+  }
+  grid.innerHTML = PHOTOS.map((p,i) => `
+    <div class="photo-item" id="photo-item-${i}">
+      <div class="photo-img-wrap">
+        <img src="${p.src}" alt="photo ${i+1}">
+      </div>
+      <div class="photo-ctrl">
+        <span style="font-size:10px;color:var(--txt4);font-family:var(--mono)">Foto ${i+1}</span>
+        <button class="p-btn" onclick="rotatePhoto(${i},-90)" title="Putar kiri">↺</button>
+        <button class="p-btn" onclick="rotatePhoto(${i},90)" title="Putar kanan">↻</button>
+        <button class="p-btn del" onclick="removePhoto(${i})" title="Hapus">✕ Hapus</button>
+      </div>
+      <input class="photo-cap" type="text" placeholder="Caption / keterangan foto ${i+1}..."
+        value="${p.caption.replace(/"/g,'&quot;')}" oninput="PHOTOS[${i}].caption=this.value">
+    </div>
+  `).join('');
+}
+
+function rotatePhoto(idx, deg){
+  const img = new Image();
+  img.onload = () => {
+    const W=img.naturalWidth, H=img.naturalHeight;
+    const norm = ((deg%360)+360)%360;
+    const swap = norm===90||norm===270;
+    const cv = document.createElement('canvas');
+    cv.width = swap?H:W; cv.height = swap?W:H;
+    const ctx = cv.getContext('2d');
+    ctx.translate(cv.width/2, cv.height/2);
+    ctx.rotate(deg*Math.PI/180);
+    ctx.drawImage(img, -W/2, -H/2);
+    PHOTOS[idx].src = cv.toDataURL('image/jpeg', 0.92);
+    renderPhotos();
+  };
+  img.src = PHOTOS[idx].src;
+}
+
+function removePhoto(idx){
+  if(!confirm('Hapus foto ini?')) return;
+  PHOTOS.splice(idx,1);
+  renderPhotos();
+}
+
+// ═══════════════════════════════════════════════════
+//  PRINT / SAVE AS PDF
+// ═══════════════════════════════════════════════════
+function printPage(){
+  const tag  = document.getElementById('tag-search')?.value  || '—';
+  const desc = document.getElementById('tag-desc')?.value    || '—';
+  const date = document.getElementById('wo-date')?.value     || '—';
+  const wo   = document.getElementById('wo-no')?.value       || '—';
+  document.getElementById('ph-tag').textContent  = tag;
+  document.getElementById('ph-desc').textContent = desc;
+  document.getElementById('ph-date').textContent = date;
+  document.getElementById('ph-wo').textContent   = wo;
+  document.querySelectorAll('.sec-hdr').forEach(h => h.classList.add('open'));
+  document.querySelectorAll('.sec-body').forEach(b => b.style.display = 'block');
+
+  const MAX_PX  = 560;
+  const QUALITY = 0.45;
+
+  const imgs     = Array.from(document.querySelectorAll('.photo-img-wrap img'));
+  const origSrcs = imgs.map(el => el.src);
+
+  function compressDataUrl(src){
+    return new Promise(resolve => {
+      const im = new Image();
+      im.onload = () => {
+        const W = im.naturalWidth, H = im.naturalHeight;
+        const scale = Math.min(1, MAX_PX / Math.max(W, H));
+        const cv  = document.createElement('canvas');
+        cv.width  = Math.round(W * scale);
+        cv.height = Math.round(H * scale);
+        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+        resolve(cv.toDataURL('image/jpeg', QUALITY));
+      };
+      im.onerror = () => resolve(src);
+      im.src = src;
+    });
+  }
+
+  if(!imgs.length){
+    window.print();
+    return;
+  }
+
+  Promise.all(origSrcs.map(compressDataUrl)).then(compressed => {
+    const totalKB = compressed.reduce((s, d) => s + Math.round(d.length * 0.75 / 1024), 0);
+    if(totalKB > 4000){
+      const ok = confirm(`Estimasi ukuran foto: ~${Math.round(totalKB/1024)} MB.\nFile PDF mungkin besar. Lanjut cetak?`);
+      if(!ok) return;
+    }
+
+    imgs.forEach((el, i) => { el.src = compressed[i]; });
+
+    const restore = () => {
+      imgs.forEach((el, i) => { el.src = origSrcs[i]; });
+      window.removeEventListener('afterprint', restore);
+    };
+    window.addEventListener('afterprint', restore);
+
+    window.print();
+  });
+}
+
+// Print options helpers
+function togglePrintOptions(close){
+  const el = document.getElementById('print-options');
+  if(!el) return;
+  if(close) { el.style.display = 'none'; return; }
+  el.style.display = (el.style.display==='none' || !el.style.display) ? 'block' : 'none';
+}
+function getSelectedPrintOptions(){
+  return Array.from(document.querySelectorAll('.prt-opt:checked')).map(i=>i.value);
+}
+function printSelected(){
+  const sel = getSelectedPrintOptions();
+  const panelMap = {workInfo:'Work Completion Report', basic:'Basic Motor Data', checkItems:'Check Items', photos:'Photo Documentation', conclusion:'Conclusion & Notes'};
+  const panels = Array.from(document.querySelectorAll('.panel'));
+  const hidden = [];
+  panels.forEach(p=>{
+    const title = p.querySelector('.sec-hdr-title')?.textContent?.trim();
+    const keep = Object.keys(panelMap).some(k=> sel.includes(k) && panelMap[k]===title);
+    if(!keep){ p.dataset._oldDisplay = p.style.display || ''; p.style.display = 'none'; hidden.push(p); }
+  });
+  togglePrintOptions(true);
+  const restore = () => { hidden.forEach(p=>{ p.style.display = p.dataset._oldDisplay || ''; delete p.dataset._oldDisplay; }); window.removeEventListener('afterprint', restore); };
+  window.addEventListener('afterprint', restore);
+  printPage();
+}
+async function exportSelectedPDF(){
+  const sel = getSelectedPrintOptions();
+  togglePrintOptions(true);
+  await generatePDF(sel);
+}
+
+// ═══════════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════════
+buildTable();
+loadDraft();
+updateStats();
+</script>
+</body>
+</html>
