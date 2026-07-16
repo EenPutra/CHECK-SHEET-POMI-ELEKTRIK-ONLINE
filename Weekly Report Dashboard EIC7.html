@@ -116,6 +116,15 @@
   .exec-filter-count{color:var(--grey);font-size:11px;}
   #execFilterBtn, #execFilterBtnJa{background:#fff;color:var(--navy);font-weight:normal;display:flex;justify-content:space-between;align-items:center;}
   #execFilterBtn:after, #execFilterBtnJa:after{content:"\25BE";color:var(--grey);margin-left:6px;}
+  .exec-chart-legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:14px;}
+  .exec-chart-legend-item{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--grey);}
+  .exec-chart-legend-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+  .exec-chart{display:flex;align-items:flex-end;gap:20px;overflow-x:auto;padding:10px 6px 4px;border-bottom:2px solid var(--border);min-height:230px;}
+  .exec-chart-col{display:flex;flex-direction:column;align-items:center;flex:0 0 auto;width:56px;}
+  .exec-chart-total{font-size:11px;font-weight:700;color:var(--navy);margin-bottom:4px;}
+  .exec-chart-bar{width:36px;display:flex;flex-direction:column-reverse;border-radius:4px 4px 0 0;overflow:hidden;box-shadow:inset 0 0 0 1px var(--border);background:var(--light);}
+  .exec-chart-seg{width:100%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:9.5px;font-weight:700;line-height:1;}
+  .exec-chart-name{font-size:10.5px;color:var(--grey);margin-top:6px;text-align:center;word-break:break-word;max-width:64px;}
 </style>
 </head>
 <body>
@@ -316,10 +325,9 @@
 
     <div id="execRecapWrap" style="display:none;">
       <h2 style="margin-top:24px;">Rekap per Eksekutor</h2>
-      <table style="max-width:420px;">
-        <thead><tr><th>Eksekutor</th><th style="text-align:right;">Jumlah WO</th></tr></thead>
-        <tbody id="execRecapTableBody"></tbody>
-      </table>
+      <div class="footer-note" style="margin-bottom:10px;">Tinggi bar = jumlah WO per eksekutor, dibagi warna per status progress. Arahkan kursor ke tiap segmen untuk detail.</div>
+      <div class="exec-chart-legend" id="execChartLegend"></div>
+      <div class="exec-chart" id="execChart"></div>
     </div>
   </div>
 
@@ -447,10 +455,9 @@
 
     <div id="execRecapWrapJa" style="display:none;">
       <h2 style="margin-top:24px;">Rekap per Eksekutor</h2>
-      <table style="max-width:420px;">
-        <thead><tr><th>Eksekutor</th><th style="text-align:right;">Jumlah WO</th></tr></thead>
-        <tbody id="execRecapTableBodyJa"></tbody>
-      </table>
+      <div class="footer-note" style="margin-bottom:10px;">Tinggi bar = jumlah WO per eksekutor, dibagi warna per status progress. Arahkan kursor ke tiap segmen untuk detail.</div>
+      <div class="exec-chart-legend" id="execChartLegendJa"></div>
+      <div class="exec-chart" id="execChartJa"></div>
     </div>
   </div>
 
@@ -1105,16 +1112,54 @@ function initSheet(key, suffix, seedData){
     updateExecFilterBtnLabel();
   }
 
-  function renderExecRecap(){
+  function renderExecChart(){
     const wrap = $('execRecapWrap');
-    const tbody = $('execRecapTableBody');
-    if(!wrap || !tbody) return;
-    const counts = {};
-    DATA.workOrders.forEach(w => parsePicNames(w.pic).forEach(n => { counts[n] = (counts[n]||0)+1; }));
-    const names = Object.keys(counts).sort((a,b) => counts[b]-counts[a] || a.localeCompare(b));
+    const legendEl = $('execChartLegend');
+    const chartEl = $('execChart');
+    if(!wrap || !legendEl || !chartEl) return;
+
+    const perExec = {};
+    DATA.workOrders.forEach(w => {
+      const p = w.progress || 'scheduled';
+      parsePicNames(w.pic).forEach(n => {
+        if(!perExec[n]) perExec[n] = {};
+        perExec[n][p] = (perExec[n][p]||0) + 1;
+      });
+    });
+    const names = Object.keys(perExec).sort((a,b) => {
+      const totalA = Object.values(perExec[a]).reduce((s,v)=>s+v,0);
+      const totalB = Object.values(perExec[b]).reduce((s,v)=>s+v,0);
+      return totalB - totalA || a.localeCompare(b);
+    });
     if(names.length === 0){ wrap.style.display = 'none'; return; }
     wrap.style.display = '';
-    tbody.innerHTML = names.map(n => `<tr><td>${escapeHtml(n)}</td><td style="text-align:right;"><b>${counts[n]}</b></td></tr>`).join('');
+
+    legendEl.innerHTML = PROGRESS_OPTIONS.map(o => {
+      const color = (PROGRESS_COLOR[o.value]||PROGRESS_COLOR.scheduled).strong;
+      return `<div class="exec-chart-legend-item"><span class="exec-chart-legend-dot" style="background:#${color};"></span>${o.label}</div>`;
+    }).join('');
+
+    const MAX_BAR_PX = 180;
+    const maxTotal = Math.max(...names.map(n => Object.values(perExec[n]).reduce((s,v)=>s+v,0)));
+    chartEl.innerHTML = names.map(n => {
+      const counts = perExec[n];
+      const total = Object.values(counts).reduce((s,v)=>s+v,0);
+      const barHeight = maxTotal > 0 ? Math.max(6, Math.round(total/maxTotal*MAX_BAR_PX)) : 0;
+      const segs = PROGRESS_OPTIONS.map(o => {
+        const val = counts[o.value] || 0;
+        if(val <= 0) return '';
+        const segH = total > 0 ? (val/total*barHeight) : 0;
+        const color = (PROGRESS_COLOR[o.value]||PROGRESS_COLOR.scheduled).strong;
+        const label = segH >= 14 ? `<span>${val}</span>` : '';
+        return `<div class="exec-chart-seg" style="height:${segH}px;background:#${color};" title="${escapeHtml(n)} — ${o.label}: ${val}">${label}</div>`;
+      }).join('');
+      return `
+        <div class="exec-chart-col">
+          <div class="exec-chart-total">${total}</div>
+          <div class="exec-chart-bar" style="height:${barHeight}px;">${segs}</div>
+          <div class="exec-chart-name" title="${escapeHtml(n)}">${escapeHtml(n)}</div>
+        </div>`;
+    }).join('');
   }
 
   function setSort(sk){
@@ -1209,7 +1254,7 @@ function initSheet(key, suffix, seedData){
     renderExecFilterOptions();
     renderRecapTable();
     renderGroupPies();
-    renderExecRecap();
+    renderExecChart();
     renderTable();
   }
 
