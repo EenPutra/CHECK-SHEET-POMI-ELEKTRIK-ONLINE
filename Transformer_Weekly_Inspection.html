@@ -181,6 +181,14 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;wi
 }
 @media print{
   @page{size:A4 portrait;margin:12mm 15mm}
+  /* Force universal, pre-installed fonts for print — Rajdhani/Barlow/Share Tech
+     Mono are Google web fonts that load inconsistently across browsers'
+     print engines (esp. Safari), so Chrome/Edge/Safari can each fall back
+     differently and produce different-looking PDFs. Overriding the same
+     custom properties every rule already references via var(--sans) etc.
+     keeps the mono/heading/body distinction while making the actual font
+     identical (and independent of web font loading) on any browser or OS. */
+  :root{--sans:Arial,Helvetica,'Liberation Sans',sans-serif;--raj:Arial,Helvetica,'Liberation Sans',sans-serif;--mono:'Courier New',Courier,monospace;}
   *,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   .topbar,.tr,.ldot,.action-row,.btn-row,.stats,#pdf-modal-overlay{display:none!important}
   .print-header{display:flex!important}
