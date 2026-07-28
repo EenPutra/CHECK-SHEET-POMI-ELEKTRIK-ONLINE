@@ -571,6 +571,45 @@ function findCol(headers, names){
   return -1;
 }
 
+// Fallback parser untuk file "Weekly plan WO" / "Daily Plan Activity" (mis. export dari
+// SharePoint planner) yang TIDAK punya baris header teks — kolomnya selalu tetap:
+// B=WO, C=Asset, D=Asset Desc, E=Failure Desc, F=Work Desc, G=Team, H=Priority,
+// I=Scheduled Start, J=Status, K=PIC. Dipakai saat pencarian header (HEADER_MAP) gagal
+// menemukan kolom "Work Order".
+function looksLikeWoNumber(v){
+  return /^\d{6,}$/.test(String(v||"").trim());
+}
+// Sebagian baris di file "Daily Plan Activity" punya format kolom tanggal yang salah
+// (mis. diformat sebagai "jam saja" walau isinya tanggal+jam) — ambil nilai TANGGAL MENTAH
+// (raw:true, cellDates:true jadi objek Date) supaya tanggal aslinya tidak hilang saat dibaca.
+function excelSerialToISO(v){
+  if(v instanceof Date && !isNaN(v.getTime())){
+    return v.getUTCFullYear() + '-' + String(v.getUTCMonth()+1).padStart(2,'0') + '-' + String(v.getUTCDate()).padStart(2,'0');
+  }
+  return "";
+}
+function parseDailyPlanRows(rows, rawRows){
+  const out = [];
+  for(let r = 0; r < rows.length; r++){
+    const row = rows[r];
+    if(!row || !looksLikeWoNumber(row[1])) continue;
+    const rawRow = (rawRows && rawRows[r]) || [];
+    out.push({
+      wo: String(row[1]).trim(),
+      asset: row[2] || "",
+      assetDesc: row[3] || "",
+      failureDesc: row[4] || "",
+      workDesc: row[5] || "",
+      team: row[6] || "",
+      priority: row[7] || "",
+      scheduledStart: excelSerialToISO(rawRow[8]) || row[8] || "",
+      status: row[9] || "",
+      pic: (row[10] || "").toString().replace(/,\s*$/, "").trim()
+    });
+  }
+  return out;
+}
+
 const PROGRESS_COLOR = {
   scheduled:     {strong:"8A94A6", tint:"E9EBEF"},
   inprogress:    {strong:"1C7293", tint:"DCEBF0"},
@@ -809,46 +848,82 @@ function initSheet(key, suffix, seedData){
       DATA.workOrders.forEach(w => existingByWo[w.wo] = w);
 
       let addedCount = 0, updatedCount = 0;
-      for(let r = 1; r < rows.length; r++){
-        const row = rows[r];
-        if(!row || row.length === 0) continue;
-        const woNum = (colIdx.wo>=0 ? row[colIdx.wo] : "") || "";
-        if(!woNum) continue;
-        const woStr = String(woNum);
-        const sourceFields = {
-          asset: colIdx.asset>=0 ? (row[colIdx.asset]||"") : "",
-          assetDesc: colIdx.assetDesc>=0 ? (row[colIdx.assetDesc]||"") : "",
-          locDesc: colIdx.locDesc>=0 ? (row[colIdx.locDesc]||"") : "",
-          failureDesc: colIdx.failureDesc>=0 ? (row[colIdx.failureDesc]||"") : "",
-          workDesc: colIdx.workDesc>=0 ? (row[colIdx.workDesc]||"") : "",
-          team: colIdx.team>=0 ? (row[colIdx.team]||"") : "",
-          workType: colIdx.workType>=0 ? (row[colIdx.workType]||"") : "",
-          priority: colIdx.priority>=0 ? (row[colIdx.priority]||"") : "",
-          scheduledStart: colIdx.scheduledStart>=0 ? (row[colIdx.scheduledStart]||"") : "",
-          status: colIdx.status>=0 ? (row[colIdx.status]||"") : ""
-        };
-        if(colIdx.originator>=0) sourceFields.pic = row[colIdx.originator]||"";
-        const existing = existingByWo[woStr];
-        if(existing){
-          // WO sudah ada — perbarui field dari sumber, JANGAN timpa update/highlight/foto/progress yang sudah diisi user
-          Object.assign(existing, sourceFields);
-          updatedCount++;
-        } else {
-          const entry = Object.assign({
-            wo: woStr,
-            pic: '',
-            whatComplete: colIdx.whatComplete>=0 ? (row[colIdx.whatComplete]||"") : "",
-            highlight: false,
-            photos: [],
-            progress: "scheduled"
-          }, sourceFields);
-          DATA.workOrders.push(entry);
-          existingByWo[woStr] = entry;
-          addedCount++;
+      let usedDailyPlanFormat = false;
+
+      if(colIdx.wo === -1){
+        // Header "Work Order" tidak ketemu — coba format "Daily Plan Activity" (kolom tetap, tanpa header teks)
+        const rawRows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true});
+        const dailyPlanRows = parseDailyPlanRows(rows, rawRows);
+        if(dailyPlanRows.length){
+          usedDailyPlanFormat = true;
+          dailyPlanRows.forEach(sourceFields => {
+            const woStr = sourceFields.wo;
+            const fields = {
+              asset: sourceFields.asset, assetDesc: sourceFields.assetDesc,
+              failureDesc: sourceFields.failureDesc, workDesc: sourceFields.workDesc,
+              team: sourceFields.team, priority: sourceFields.priority,
+              scheduledStart: sourceFields.scheduledStart, status: sourceFields.status,
+              pic: sourceFields.pic
+            };
+            const existing = existingByWo[woStr];
+            if(existing){
+              Object.assign(existing, fields);
+              updatedCount++;
+            } else {
+              const entry = Object.assign({
+                wo: woStr, whatComplete: '', highlight: false, photos: [], progress: "scheduled"
+              }, fields);
+              DATA.workOrders.push(entry);
+              existingByWo[woStr] = entry;
+              addedCount++;
+            }
+          });
+        }
+      }
+
+      if(!usedDailyPlanFormat){
+        for(let r = 1; r < rows.length; r++){
+          const row = rows[r];
+          if(!row || row.length === 0) continue;
+          const woNum = (colIdx.wo>=0 ? row[colIdx.wo] : "") || "";
+          if(!woNum) continue;
+          const woStr = String(woNum);
+          const sourceFields = {
+            asset: colIdx.asset>=0 ? (row[colIdx.asset]||"") : "",
+            assetDesc: colIdx.assetDesc>=0 ? (row[colIdx.assetDesc]||"") : "",
+            locDesc: colIdx.locDesc>=0 ? (row[colIdx.locDesc]||"") : "",
+            failureDesc: colIdx.failureDesc>=0 ? (row[colIdx.failureDesc]||"") : "",
+            workDesc: colIdx.workDesc>=0 ? (row[colIdx.workDesc]||"") : "",
+            team: colIdx.team>=0 ? (row[colIdx.team]||"") : "",
+            workType: colIdx.workType>=0 ? (row[colIdx.workType]||"") : "",
+            priority: colIdx.priority>=0 ? (row[colIdx.priority]||"") : "",
+            scheduledStart: colIdx.scheduledStart>=0 ? (row[colIdx.scheduledStart]||"") : "",
+            status: colIdx.status>=0 ? (row[colIdx.status]||"") : ""
+          };
+          if(colIdx.originator>=0) sourceFields.pic = row[colIdx.originator]||"";
+          const existing = existingByWo[woStr];
+          if(existing){
+            // WO sudah ada — perbarui field dari sumber, JANGAN timpa update/highlight/foto/progress yang sudah diisi user
+            Object.assign(existing, sourceFields);
+            updatedCount++;
+          } else {
+            const entry = Object.assign({
+              wo: woStr,
+              pic: '',
+              whatComplete: colIdx.whatComplete>=0 ? (row[colIdx.whatComplete]||"") : "",
+              highlight: false,
+              photos: [],
+              progress: "scheduled"
+            }, sourceFields);
+            DATA.workOrders.push(entry);
+            existingByWo[woStr] = entry;
+            addedCount++;
+          }
         }
       }
       $('sourceInfo').textContent = 'Sumber: ' + file.name + ' — sheet "' + targetSheetName + '"' +
         (usedFallback ? ' (tidak ada sheet cocok dgn tanggal hari ini, pakai sheet terakhir)' : '') +
+        (usedDailyPlanFormat ? ' (format Daily Plan Activity)' : '') +
         ' · ' + addedCount + ' baru, ' + updatedCount + ' diperbarui, total ' + DATA.workOrders.length + ' WO';
       saveDraft();
       render();
