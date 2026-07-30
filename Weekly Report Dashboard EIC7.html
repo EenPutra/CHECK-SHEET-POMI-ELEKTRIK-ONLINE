@@ -148,7 +148,8 @@
   .prog-need_access{background:#6d4fc2;}
   .prog-done{background:var(--green);}
   .prog-done_note{background:#0f5c33;}
-  .pie-group{width:230px;text-align:center;}
+  .pie-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;}
+  .pie-group{width:100%;text-align:center;}
   .pie-title{font-weight:700;color:var(--navy);font-size:14px;margin-top:2px;}
   .donut{width:170px;height:170px;border-radius:50%;margin:10px auto 0;position:relative;}
   .donut-hole{position:absolute;inset:30px;background:#fff;border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px var(--border);}
@@ -419,7 +420,7 @@
     </table>
 
     <h2 style="margin-top:24px;">Perbandingan per Work Group</h2>
-    <div class="row" id="pieRow" style="gap:24px;align-items:flex-start;"></div>
+    <div class="pie-grid" id="pieRow"></div>
     <div class="footer-note" id="pieUnclassifiedNote"></div>
 
     <div id="execRecapWrap" style="display:none;">
@@ -562,7 +563,7 @@
     </table>
 
     <h2 style="margin-top:24px;">Perbandingan per Work Group</h2>
-    <div class="row" id="pieRowJa" style="gap:24px;align-items:flex-start;"></div>
+    <div class="pie-grid" id="pieRowJa"></div>
     <div class="footer-note" id="pieUnclassifiedNoteJa"></div>
 
     <div id="execRecapWrapJa" style="display:none;">
