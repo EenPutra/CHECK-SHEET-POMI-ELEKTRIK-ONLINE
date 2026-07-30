@@ -79,7 +79,7 @@
   .file-btn input[type=file]{position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer;}
 
   /* ── Table ── */
-  .table-scroll{overflow:auto;-webkit-overflow-scrolling:touch;max-height:min(70vh,760px);border:1px solid var(--border);border-radius:var(--radius-sm);}
+  .table-scroll{overflow:auto;-webkit-overflow-scrolling:touch;max-height:min(140vh,1520px);border:1px solid var(--border);border-radius:var(--radius-sm);}
   .table-scroll table{min-width:920px;}
   table{width:100%;border-collapse:collapse;font-size:12px;}
   th{background:var(--navy);color:#fff;text-align:left;padding:8px 10px;position:sticky;top:0;font-size:10.5px;text-transform:uppercase;letter-spacing:.35px;font-weight:700;}
@@ -1004,8 +1004,15 @@ function initSheet(key, suffix, seedData){
     el.style.color = isErr ? 'var(--red)' : 'var(--grey)';
   }
 
-  async function pushToCloud(){
+  async function pushToCloud(force){
     if(!cloudMetaRef) throw new Error('Firebase tidak tersedia di halaman ini.');
+    const existing = await cloudWoRef.get();
+    if(!force && DATA.workOrders.length === 0 && !existing.empty){
+      const err = new Error('Data lokal kosong, tapi cloud punya ' + existing.size + ' Work Order. Push dibatalkan untuk mencegah kehilangan data.');
+      err.code = 'EMPTY_WOULD_WIPE';
+      err.existingCount = existing.size;
+      throw err;
+    }
     const ops = [{ ref: cloudMetaRef, type:'set', data:{
       period: DATA.period || '', recNotes: DATA.recNotes || '',
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
@@ -1018,7 +1025,6 @@ function initSheet(key, suffix, seedData){
       delete clean._open;
       ops.push({ ref: cloudWoRef.doc(id), type:'set', data: clean });
     });
-    const existing = await cloudWoRef.get();
     existing.forEach(d => { if(!currentIds.has(d.id)) ops.push({ ref: cloudWoRef.doc(d.id), type:'delete' }); });
     for(let i=0; i<ops.length; i+=400){
       const batch = db.batch();
@@ -2013,6 +2019,36 @@ initSheet('ja', 'Ja', JA_SEED_DATA);
 reconcileCrossSync();
 
 // ── Update ke Cloud / Ambil Update Terbaru — berlaku untuk KEDUA sheet sekaligus ──
+async function pushOneSheetSafely(sheet, label){
+  try{
+    await sheet.pushToCloud();
+    sheet.setCloudInfo('✓ Berhasil diupload ke cloud: ' + new Date().toLocaleString('id-ID'));
+  }catch(e){
+    if(e.code === 'EMPTY_WOULD_WIPE'){
+      const proceed = confirm(
+        'PERINGATAN — ' + label + ':\n' +
+        'Data lokal di layar ini KOSONG, padahal cloud saat ini punya ' + e.existingCount + ' Work Order.\n\n' +
+        'Kalau lanjut, SEMUA data cloud untuk sheet ini akan DIHAPUS.\n' +
+        'Kemungkinan Anda belum import/ambil data di sheet ini — sebaiknya klik Batal, lalu klik "Ambil Update Terbaru" dulu.\n\n' +
+        'Tetap lanjutkan menimpa dengan KOSONG?'
+      );
+      if(!proceed){ sheet.setCloudInfo('Dibatalkan (data lokal kosong).', true); return; }
+      try{
+        await sheet.pushToCloud(true);
+        sheet.setCloudInfo('✓ Berhasil diupload ke cloud: ' + new Date().toLocaleString('id-ID'));
+      }catch(e2){
+        console.error('Gagal upload ke cloud (' + label + '):', e2);
+        sheet.setCloudInfo('Gagal upload ke cloud.', true);
+        throw e2;
+      }
+      return;
+    }
+    console.error('Gagal upload ke cloud (' + label + '):', e);
+    sheet.setCloudInfo('Gagal upload ke cloud.', true);
+    throw e;
+  }
+}
+
 async function handleCloudPushAllClick(){
   const pw = prompt('Masukkan password untuk publish data ke cloud (Weekly Report & Job Arrangement):');
   if(pw == null) return;
@@ -2023,15 +2059,10 @@ async function handleCloudPushAllClick(){
   const origs = btns.map(b => b.textContent);
   btns.forEach(b => { b.disabled = true; b.textContent = 'Mengupload...'; });
   try{
-    await Promise.all([Sheets.report.pushToCloud(), Sheets.ja.pushToCloud()]);
-    const now = new Date().toLocaleString('id-ID');
-    Sheets.report.setCloudInfo('✓ Berhasil diupload ke cloud: ' + now);
-    Sheets.ja.setCloudInfo('✓ Berhasil diupload ke cloud: ' + now);
+    await pushOneSheetSafely(Sheets.report, 'Weekly Report');
+    await pushOneSheetSafely(Sheets.ja, 'Weekly Job Arrangement');
   }catch(e){
-    console.error('Gagal upload ke cloud:', e);
-    alert('Gagal upload ke cloud: ' + e.message);
-    Sheets.report.setCloudInfo('Gagal upload ke cloud.', true);
-    Sheets.ja.setCloudInfo('Gagal upload ke cloud.', true);
+    alert('Sebagian upload gagal: ' + e.message);
   }finally{
     btns.forEach((b,i) => { b.disabled = false; b.textContent = origs[i]; });
   }
