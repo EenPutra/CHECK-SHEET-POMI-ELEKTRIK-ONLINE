@@ -357,8 +357,8 @@
       <b>4.</b> Klik satu baris WO untuk buka detail &rarr; isi/edit kolom <b>Update (What was Complete?)</b>, centang <b>Highlight untuk laporan</b> jika WO tsb perlu ditampilkan di PPT, dan upload foto evidence bila ada.<br>
       <b>5.</b> Isi catatan <b>Rekomendasi &amp; Rencana Tindak Lanjut</b> di bagian bawah bila ingin menambahkan poin manual.<br>
       <b>6.</b> Klik <b>Export Data (.json)</b> &rarr; upload file hasil export ini ke chat Claude, lalu minta: <i>"buatkan laporan PPT minggu ini dari data ini"</i>. Foto ikut tersimpan di dalam file JSON, jadi cukup 1 file yang diupload.<br>
-      <b>7.</b> Kalau data sudah siap dibagikan ke semua orang, klik <b>&#128274; Update ke Cloud</b> &amp; masukkan password &mdash; baru setelah itu data terupload &amp; bisa dibaca perangkat lain. Perangkat lain klik <b>&#8681; Ambil Update Terbaru</b> untuk memuat data hasil update terakhir.<br>
-      <span class="footer-note">Data tersimpan otomatis di browser ini (draft) selama tidak clear cache. Sinkron online <b>tidak otomatis/real-time</b> &mdash; hanya terjadi saat seseorang klik "Update ke Cloud" (perlu password), dan perangkat lain harus klik "Ambil Update Terbaru" untuk melihatnya.</span>
+      <b>7.</b> Kalau data sudah siap dibagikan ke semua orang, klik <b>&#128274; Update ke Cloud</b> &amp; masukkan password &mdash; baru setelah itu data terupload &amp; bisa dibaca perangkat lain. Perangkat lain klik <b>&#8681; Ambil Update Terbaru</b> untuk memuat data hasil update terakhir. Kedua tombol ini otomatis berlaku untuk <b>Weekly Report &amp; Weekly Job Arrangement sekaligus</b>, tidak peduli sheet mana yang sedang dibuka saat mengklik.<br>
+      <span class="footer-note">Data tersimpan otomatis di browser ini (draft) selama tidak clear cache. Sinkron online <b>tidak otomatis/real-time</b> &mdash; hanya terjadi saat seseorang klik "Update ke Cloud" (perlu password), dan perangkat lain harus klik "Ambil Update Terbaru" untuk melihatnya. Sekali klik akan menyinkronkan kedua sheet bersamaan.</span>
     </div>
   </div>
 
@@ -1060,47 +1060,9 @@ function initSheet(key, suffix, seedData){
     }).catch(e => { console.error(e); setCloudInfo('Gagal cek status cloud.', true); });
   }
 
-  async function handleCloudPushClick(){
-    const pw = prompt('Masukkan password untuk publish data ke cloud:');
-    if(pw == null) return;
-    const hash = await sha256Hex(pw);
-    if(hash !== UPDATE_PASSWORD_HASH){ alert('Password salah.'); return; }
-    const btn = $('cloudPushBtn');
-    const orig = btn.textContent;
-    btn.disabled = true; btn.textContent = 'Mengupload...';
-    try{
-      await pushToCloud();
-      setCloudInfo('✓ Berhasil diupload ke cloud: ' + new Date().toLocaleString('id-ID'));
-    }catch(e){
-      console.error('Gagal upload ke cloud:', e);
-      alert('Gagal upload ke cloud: ' + e.message);
-      setCloudInfo('Gagal upload ke cloud.', true);
-    }finally{
-      btn.disabled = false; btn.textContent = orig;
-    }
-  }
-
-  async function handleCloudPullClick(){
-    if(DATA.workOrders.length > 0 && !confirm('Ambil data terbaru dari cloud?\nData di layar ini yang belum di-"Update ke Cloud" akan diganti.')) return;
-    const btn = $('cloudPullBtn');
-    const orig = btn.textContent;
-    btn.disabled = true; btn.textContent = 'Mengambil...';
-    try{
-      const got = await pullFromCloud();
-      if(!got){
-        alert('Belum ada data yang pernah di-upload ke cloud untuk sheet ini.');
-      } else {
-        activeFilter = 'ALL'; activeRsFilter = 'ALL'; searchTerm = ''; lastOpenIdx = -1;
-        render();
-        setCloudInfo('✓ Data terbaru diambil: ' + new Date().toLocaleString('id-ID'));
-      }
-    }catch(e){
-      console.error('Gagal mengambil data dari cloud:', e);
-      alert('Gagal mengambil data dari cloud: ' + e.message);
-      setCloudInfo('Gagal mengambil data dari cloud.', true);
-    }finally{
-      btn.disabled = false; btn.textContent = orig;
-    }
+  function afterPull(){
+    activeFilter = 'ALL'; activeRsFilter = 'ALL'; searchTerm = ''; lastOpenIdx = -1;
+    render();
   }
 
   function loadExcelFile(file){
@@ -1990,8 +1952,6 @@ function initSheet(key, suffix, seedData){
 
   $('saveWeekBtn').addEventListener('click', saveWeek);
   $('newWeekBtn').addEventListener('click', newWeek);
-  $('cloudPushBtn').addEventListener('click', handleCloudPushClick);
-  $('cloudPullBtn').addEventListener('click', handleCloudPullClick);
 
   // Ekspos fungsi yang dipanggil lewat onclick="" (string HTML) / kode luar
   window['setFilter'+suffix] = setFilter;
@@ -2022,7 +1982,12 @@ function initSheet(key, suffix, seedData){
     handlePasteImage,
     getData: () => DATA,
     applyIncomingUpdate,
-    saveAndRerender: () => { saveDraft(); render(); }
+    saveAndRerender: () => { saveDraft(); render(); },
+    pushToCloud,
+    pullFromCloud,
+    setCloudInfo,
+    afterPull,
+    hasData: () => DATA.workOrders.length > 0
   };
 
   loadDraft();
@@ -2034,6 +1999,65 @@ function initSheet(key, suffix, seedData){
 initSheet('report', '', null);
 initSheet('ja', 'Ja', JA_SEED_DATA);
 reconcileCrossSync();
+
+// ── Update ke Cloud / Ambil Update Terbaru — berlaku untuk KEDUA sheet sekaligus ──
+async function handleCloudPushAllClick(){
+  const pw = prompt('Masukkan password untuk publish data ke cloud (Weekly Report & Job Arrangement):');
+  if(pw == null) return;
+  const hash = await sha256Hex(pw);
+  if(hash !== UPDATE_PASSWORD_HASH){ alert('Password salah.'); return; }
+
+  const btns = ['cloudPushBtn', 'cloudPushBtnJa'].map(id => document.getElementById(id)).filter(Boolean);
+  const origs = btns.map(b => b.textContent);
+  btns.forEach(b => { b.disabled = true; b.textContent = 'Mengupload...'; });
+  try{
+    await Promise.all([Sheets.report.pushToCloud(), Sheets.ja.pushToCloud()]);
+    const now = new Date().toLocaleString('id-ID');
+    Sheets.report.setCloudInfo('✓ Berhasil diupload ke cloud: ' + now);
+    Sheets.ja.setCloudInfo('✓ Berhasil diupload ke cloud: ' + now);
+  }catch(e){
+    console.error('Gagal upload ke cloud:', e);
+    alert('Gagal upload ke cloud: ' + e.message);
+    Sheets.report.setCloudInfo('Gagal upload ke cloud.', true);
+    Sheets.ja.setCloudInfo('Gagal upload ke cloud.', true);
+  }finally{
+    btns.forEach((b,i) => { b.disabled = false; b.textContent = origs[i]; });
+  }
+}
+
+async function handleCloudPullAllClick(){
+  const anyData = Sheets.report.hasData() || Sheets.ja.hasData();
+  if(anyData && !confirm('Ambil data terbaru dari cloud untuk Weekly Report & Weekly Job Arrangement?\nData di layar yang belum di-"Update ke Cloud" akan diganti.')) return;
+
+  const btns = ['cloudPullBtn', 'cloudPullBtnJa'].map(id => document.getElementById(id)).filter(Boolean);
+  const origs = btns.map(b => b.textContent);
+  btns.forEach(b => { b.disabled = true; b.textContent = 'Mengambil...'; });
+  try{
+    const [gotReport, gotJa] = await Promise.all([Sheets.report.pullFromCloud(), Sheets.ja.pullFromCloud()]);
+    if(gotReport) Sheets.report.afterPull();
+    if(gotJa) Sheets.ja.afterPull();
+    const now = new Date().toLocaleString('id-ID');
+    Sheets.report.setCloudInfo(gotReport ? ('✓ Data terbaru diambil: ' + now) : 'Belum ada data yang pernah di-upload ke cloud untuk sheet ini.');
+    Sheets.ja.setCloudInfo(gotJa ? ('✓ Data terbaru diambil: ' + now) : 'Belum ada data yang pernah di-upload ke cloud untuk sheet ini.');
+    if(!gotReport && !gotJa) alert('Belum ada data yang pernah di-upload ke cloud untuk kedua sheet.');
+  }catch(e){
+    console.error('Gagal mengambil data dari cloud:', e);
+    alert('Gagal mengambil data dari cloud: ' + e.message);
+    Sheets.report.setCloudInfo('Gagal mengambil data dari cloud.', true);
+    Sheets.ja.setCloudInfo('Gagal mengambil data dari cloud.', true);
+  }finally{
+    btns.forEach((b,i) => { b.disabled = false; b.textContent = origs[i]; });
+  }
+}
+
+['cloudPushBtn', 'cloudPushBtnJa'].forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('click', handleCloudPushAllClick);
+});
+['cloudPullBtn', 'cloudPullBtnJa'].forEach(id => {
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('click', handleCloudPullAllClick);
+});
 
 // Drag-and-drop Excel/JSON di mana saja pada halaman — routing ke sheet yang sedang aktif
 let dragCounter = 0;
