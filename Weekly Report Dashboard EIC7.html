@@ -5,6 +5,9 @@
 <title>Weekly Report Dashboard - EIC7</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <style>
   :root{
     --navy:#002060; --teal:#1C7293; --teal-dark:#21295C; --light:#F2F6F9;
@@ -249,6 +252,7 @@
     <div class="sub">Tool input data mingguan: Excel WO &rarr; update &amp; foto &rarr; export untuk dibuatkan PPT oleh Claude</div>
   </div>
   <div class="toolbar">
+    <span class="footer-note" id="cloudStatus" style="color:#cfe0f0;">&#9729; Menyambungkan online&hellip;</span>
     <button class="btn secondary" onclick="document.getElementById('helpCard').scrollIntoView({behavior:'smooth'})">Cara Pakai</button>
   </div>
 </header>
@@ -264,7 +268,7 @@
       <b>4.</b> Klik satu baris WO untuk buka detail &rarr; isi/edit kolom <b>Update (What was Complete?)</b>, centang <b>Highlight untuk laporan</b> jika WO tsb perlu ditampilkan di PPT, dan upload foto evidence bila ada.<br>
       <b>5.</b> Isi catatan <b>Rekomendasi &amp; Rencana Tindak Lanjut</b> di bagian bawah bila ingin menambahkan poin manual.<br>
       <b>6.</b> Klik <b>Export Data (.json)</b> &rarr; upload file hasil export ini ke chat Claude, lalu minta: <i>"buatkan laporan PPT minggu ini dari data ini"</i>. Foto ikut tersimpan di dalam file JSON, jadi cukup 1 file yang diupload.<br>
-      <span class="footer-note">Data tersimpan otomatis di browser ini (draft) selama tidak clear cache, per sheet masing-masing. Selalu Export ke .json setiap selesai kerja agar tidak hilang &amp; bisa dipakai lintas perangkat.</span>
+      <span class="footer-note">Data tersimpan otomatis di browser ini (draft), <b>dan otomatis tersinkron online (Firebase)</b> ke semua orang yang membuka dashboard ini &mdash; update dari siapa saja akan muncul otomatis di layar orang lain dalam beberapa detik. Export ke .json tetap berguna untuk backup / minta Claude buatkan PPT.</span>
     </div>
   </div>
 
@@ -811,8 +815,27 @@ function initSheet(key, suffix, seedData){
   let searchTerm = "", dateFilterFrom = "", dateFilterTo = "";
   let lastOpenIdx = -1, sortKey = null, sortDir = 1, currentWeekId = null;
 
-  function saveDraft(){
+  // ── Sinkronisasi online (Firebase Firestore) ──
+  // Struktur: weekly_dashboard/{DB_NAME} (meta: period, recNotes)
+  //           weekly_dashboard/{DB_NAME}/workOrders/{woDocId} (1 dokumen per WO)
+  const cloudMetaRef = (typeof db !== 'undefined') ? db.collection('weekly_dashboard').doc(DB_NAME) : null;
+  const cloudWoRef = cloudMetaRef ? cloudMetaRef.collection('workOrders') : null;
+  let lastKnownRemoteIds = new Set();
+  let cloudPushTimer = null;
+  let cloudInitDone = false;
+
+  function woDocId(wo){
+    let id = String(wo == null ? '' : wo).trim().replace(/[\/\.\s#\[\]\*]+/g,'_');
+    if(!id || /^__.*__$/.test(id)) id = 'wo_' + id;
+    return id.slice(0,300);
+  }
+
+  function persistLocal(){
     try{ localStorage.setItem(LS_KEY, JSON.stringify(DATA)); }catch(e){ /* storage full - ignore */ }
+  }
+  function saveDraft(){
+    persistLocal();
+    queueCloudPush();
   }
   function loadDraft(){
     const raw = localStorage.getItem(LS_KEY);
@@ -827,8 +850,128 @@ function initSheet(key, suffix, seedData){
     if(seedData && seedData.length){
       DATA = { period: "", recNotes: "", workOrders: JSON.parse(JSON.stringify(seedData)) };
       $('sourceInfo').textContent = "Data awal dari PDF Plan Weekly Planning EIC-7 (" + DATA.workOrders.length + " WO) — silakan cek & sesuaikan.";
-      saveDraft();
+      persistLocal();
     }
+  }
+
+  function queueCloudPush(){
+    if(!cloudMetaRef || !cloudInitDone) return;
+    clearTimeout(cloudPushTimer);
+    cloudPushTimer = setTimeout(pushToCloud, 900);
+  }
+
+  async function pushToCloud(){
+    if(!cloudMetaRef) return;
+    try{
+      const ops = [{ ref: cloudMetaRef, type:'set', data:{
+        period: DATA.period || '', recNotes: DATA.recNotes || '',
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }}];
+      const currentIds = new Set();
+      DATA.workOrders.forEach(w => {
+        const id = woDocId(w.wo);
+        currentIds.add(id);
+        const clean = Object.assign({}, w);
+        delete clean._open;
+        ops.push({ ref: cloudWoRef.doc(id), type:'set', data: clean });
+      });
+      lastKnownRemoteIds.forEach(id => { if(!currentIds.has(id)) ops.push({ ref: cloudWoRef.doc(id), type:'delete' }); });
+      for(let i=0; i<ops.length; i+=400){
+        const batch = db.batch();
+        ops.slice(i, i+400).forEach(op => op.type==='set' ? batch.set(op.ref, op.data) : batch.delete(op.ref));
+        await batch.commit();
+      }
+      lastKnownRemoteIds = currentIds;
+      setCloudStatus('ok');
+    }catch(e){
+      console.error('Sinkronisasi online gagal:', e);
+      setCloudStatus('err');
+    }
+  }
+
+  function setCloudStatus(state){
+    const el = document.getElementById('cloudStatus');
+    if(!el) return;
+    if(state==='ok') el.innerHTML = '&#9729; Tersambung online';
+    else if(state==='err') el.innerHTML = '&#9888; Gagal sinkron online (draft lokal tetap aman)';
+    else el.innerHTML = '&#9729; Menyambungkan online&hellip;';
+    el.style.color = state==='err' ? '#ffd9d9' : '#cfe0f0';
+  }
+
+  function applyRemoteMeta(remote){
+    if(document.activeElement !== $('periodInput') && (remote.period||'') !== DATA.period){
+      DATA.period = remote.period || '';
+      $('periodInput').value = DATA.period;
+    }
+    if(document.activeElement !== $('recNotes') && (remote.recNotes||'') !== DATA.recNotes){
+      DATA.recNotes = remote.recNotes || '';
+      $('recNotes').value = DATA.recNotes;
+    }
+    persistLocal();
+  }
+
+  function applyRemoteWorkOrders(docs){
+    const remoteMap = {};
+    docs.forEach(d => remoteMap[d.id] = d.data());
+    const remoteIds = new Set(Object.keys(remoteMap));
+    let changed = false;
+
+    remoteIds.forEach(id => {
+      const remoteWO = remoteMap[id];
+      const local = DATA.workOrders.find(w => woDocId(w.wo) === id);
+      if(!local){
+        DATA.workOrders.push(remoteWO);
+        changed = true;
+      } else if(JSON.stringify(Object.assign({}, local, {_open:undefined})) !== JSON.stringify(remoteWO)){
+        const wasOpen = local._open;
+        Object.assign(local, remoteWO);
+        if(wasOpen) local._open = wasOpen;
+        changed = true;
+      }
+    });
+    const toRemove = DATA.workOrders.filter(w => lastKnownRemoteIds.has(woDocId(w.wo)) && !remoteIds.has(woDocId(w.wo))).map(w => w.wo);
+    toRemove.forEach(wo => {
+      const i = DATA.workOrders.findIndex(w => w.wo === wo);
+      if(i>=0){ DATA.workOrders.splice(i,1); changed = true; }
+    });
+
+    lastKnownRemoteIds = remoteIds;
+    if(changed){
+      persistLocal();
+      render();
+    }
+  }
+
+  function setupCloudSync(){
+    if(!cloudMetaRef){ setCloudStatus('err'); cloudInitDone = true; return; }
+    Promise.all([cloudMetaRef.get(), cloudWoRef.get()]).then(([metaSnap, woSnap]) => {
+      if(metaSnap.exists || !woSnap.empty){
+        applyRemoteMeta(metaSnap.exists ? metaSnap.data() : {});
+        const remoteIds = new Set();
+        woSnap.forEach(d => { remoteIds.add(d.id); DATA.workOrders = DATA.workOrders.filter(w => woDocId(w.wo) !== d.id); DATA.workOrders.push(d.data()); });
+        lastKnownRemoteIds = remoteIds;
+        persistLocal();
+        render();
+        setCloudStatus('ok');
+        cloudInitDone = true;
+      } else {
+        // Belum ada data online sama sekali — kirim draft lokal saat ini sebagai data awal
+        cloudInitDone = true;
+        pushToCloud();
+      }
+      cloudMetaRef.onSnapshot(snap => {
+        if(snap.metadata.hasPendingWrites || !snap.exists) return;
+        applyRemoteMeta(snap.data());
+      }, e => { console.error(e); setCloudStatus('err'); });
+      cloudWoRef.onSnapshot(snap => {
+        if(snap.metadata.hasPendingWrites) return;
+        applyRemoteWorkOrders(snap.docs);
+      }, e => { console.error(e); setCloudStatus('err'); });
+    }).catch(e => {
+      console.error('Gagal memuat data online:', e);
+      cloudInitDone = true;
+      setCloudStatus('err');
+    });
   }
 
   function loadExcelFile(file){
@@ -1754,6 +1897,7 @@ function initSheet(key, suffix, seedData){
   loadDraft();
   render();
   renderHistory();
+  setupCloudSync();
 }
 
 initSheet('report', '', null);
