@@ -252,7 +252,6 @@
     <div class="sub">Tool input data mingguan: Excel WO &rarr; update &amp; foto &rarr; export untuk dibuatkan PPT oleh Claude</div>
   </div>
   <div class="toolbar">
-    <span class="footer-note" id="cloudStatus" style="color:#cfe0f0;">&#9729; Menyambungkan online&hellip;</span>
     <button class="btn secondary" onclick="document.getElementById('helpCard').scrollIntoView({behavior:'smooth'})">Cara Pakai</button>
   </div>
 </header>
@@ -268,7 +267,8 @@
       <b>4.</b> Klik satu baris WO untuk buka detail &rarr; isi/edit kolom <b>Update (What was Complete?)</b>, centang <b>Highlight untuk laporan</b> jika WO tsb perlu ditampilkan di PPT, dan upload foto evidence bila ada.<br>
       <b>5.</b> Isi catatan <b>Rekomendasi &amp; Rencana Tindak Lanjut</b> di bagian bawah bila ingin menambahkan poin manual.<br>
       <b>6.</b> Klik <b>Export Data (.json)</b> &rarr; upload file hasil export ini ke chat Claude, lalu minta: <i>"buatkan laporan PPT minggu ini dari data ini"</i>. Foto ikut tersimpan di dalam file JSON, jadi cukup 1 file yang diupload.<br>
-      <span class="footer-note">Data tersimpan otomatis di browser ini (draft), <b>dan otomatis tersinkron online (Firebase)</b> ke semua orang yang membuka dashboard ini &mdash; update dari siapa saja akan muncul otomatis di layar orang lain dalam beberapa detik. Export ke .json tetap berguna untuk backup / minta Claude buatkan PPT.</span>
+      <b>7.</b> Kalau data sudah siap dibagikan ke semua orang, klik <b>&#128274; Update ke Cloud</b> &amp; masukkan password &mdash; baru setelah itu data terupload &amp; bisa dibaca perangkat lain. Perangkat lain klik <b>&#8681; Ambil Update Terbaru</b> untuk memuat data hasil update terakhir.<br>
+      <span class="footer-note">Data tersimpan otomatis di browser ini (draft) selama tidak clear cache. Sinkron online <b>tidak otomatis/real-time</b> &mdash; hanya terjadi saat seseorang klik "Update ke Cloud" (perlu password), dan perangkat lain harus klik "Ambil Update Terbaru" untuk melihatnya.</span>
     </div>
   </div>
 
@@ -291,6 +291,11 @@
       <button class="btn" id="exportExcelBtn" style="background:#217346;">&#128202; Export Excel (.xlsx)</button>
       <button class="btn danger" id="clearBtn">Clear Draft</button>
       <span class="footer-note" id="sourceInfo"></span>
+    </div>
+    <div class="toolbar" style="border-top:1px dashed var(--border);padding-top:10px;margin-top:2px;">
+      <button class="btn" id="cloudPushBtn" style="background:#5c2d91;">&#128274; Update ke Cloud</button>
+      <button class="btn secondary" id="cloudPullBtn">&#8681; Ambil Update Terbaru</button>
+      <span class="footer-note" id="cloudInfo"></span>
     </div>
     <div class="row" style="max-width:420px;">
       <div style="flex:1;">
@@ -422,6 +427,11 @@
       <button class="btn danger" id="clearBtnJa">Clear Draft</button>
       <span class="footer-note" id="sourceInfoJa"></span>
     </div>
+    <div class="toolbar" style="border-top:1px dashed var(--border);padding-top:10px;margin-top:2px;">
+      <button class="btn" id="cloudPushBtnJa" style="background:#5c2d91;">&#128274; Update ke Cloud</button>
+      <button class="btn secondary" id="cloudPullBtnJa">&#8681; Ambil Update Terbaru</button>
+      <span class="footer-note" id="cloudInfoJa"></span>
+    </div>
     <div class="row" style="max-width:420px;">
       <div style="flex:1;">
         <label>Periode Laporan</label>
@@ -542,6 +552,14 @@
 // ══════════════════════════════════════════════════════════════════
 //  Konstanta & util murni — dipakai bersama oleh kedua sheet
 // ══════════════════════════════════════════════════════════════════
+
+// Password gerbang tombol "Update ke Cloud" (disimpan sebagai hash SHA-256, bukan teks polos)
+const UPDATE_PASSWORD_HASH = '4b5961aea9f6ff5ae160c619f6cef7daf906af1bdd42877473ebd4da00417120';
+async function sha256Hex(text){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
 const PROGRESS_OPTIONS = [
   {value:"scheduled",      label:"Scheduled"},
   {value:"inprogress",     label:"In Progress"},
@@ -815,14 +833,15 @@ function initSheet(key, suffix, seedData){
   let searchTerm = "", dateFilterFrom = "", dateFilterTo = "";
   let lastOpenIdx = -1, sortKey = null, sortDir = 1, currentWeekId = null;
 
-  // ── Sinkronisasi online (Firebase Firestore) ──
-  // Struktur: weekly_dashboard/{DB_NAME} (meta: period, recNotes)
-  //           weekly_dashboard/{DB_NAME}/workOrders/{woDocId} (1 dokumen per WO)
+  // ── Sinkronisasi online manual (Firebase Firestore) ──
+  // Tidak real-time. Data hanya terkirim ke cloud saat tombol "Update ke Cloud"
+  // diklik (perlu password), dan perangkat lain hanya melihatnya setelah klik
+  // "Ambil Update Terbaru". Struktur:
+  //   weekly_dashboard/{DB_NAME}                        (meta: period, recNotes, updatedAt)
+  //   weekly_dashboard/{DB_NAME}/workOrders/{woDocId}    (1 dokumen per WO)
   const cloudMetaRef = (typeof db !== 'undefined') ? db.collection('weekly_dashboard').doc(DB_NAME) : null;
   const cloudWoRef = cloudMetaRef ? cloudMetaRef.collection('workOrders') : null;
-  let lastKnownRemoteIds = new Set();
-  let cloudPushTimer = null;
-  let cloudInitDone = false;
+  const CLOUD_TS_KEY = LS_KEY + '_cloudTs';
 
   function woDocId(wo){
     let id = String(wo == null ? '' : wo).trim().replace(/[\/\.\s#\[\]\*]+/g,'_');
@@ -835,7 +854,6 @@ function initSheet(key, suffix, seedData){
   }
   function saveDraft(){
     persistLocal();
-    queueCloudPush();
   }
   function loadDraft(){
     const raw = localStorage.getItem(LS_KEY);
@@ -854,124 +872,112 @@ function initSheet(key, suffix, seedData){
     }
   }
 
-  function queueCloudPush(){
-    if(!cloudMetaRef || !cloudInitDone) return;
-    clearTimeout(cloudPushTimer);
-    cloudPushTimer = setTimeout(pushToCloud, 900);
+  function setCloudInfo(text, isErr){
+    const el = $('cloudInfo');
+    if(!el) return;
+    el.textContent = text;
+    el.style.color = isErr ? 'var(--red)' : 'var(--grey)';
   }
 
   async function pushToCloud(){
-    if(!cloudMetaRef) return;
-    try{
-      const ops = [{ ref: cloudMetaRef, type:'set', data:{
-        period: DATA.period || '', recNotes: DATA.recNotes || '',
-        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-      }}];
-      const currentIds = new Set();
-      DATA.workOrders.forEach(w => {
-        const id = woDocId(w.wo);
-        currentIds.add(id);
-        const clean = Object.assign({}, w);
-        delete clean._open;
-        ops.push({ ref: cloudWoRef.doc(id), type:'set', data: clean });
-      });
-      lastKnownRemoteIds.forEach(id => { if(!currentIds.has(id)) ops.push({ ref: cloudWoRef.doc(id), type:'delete' }); });
-      for(let i=0; i<ops.length; i+=400){
-        const batch = db.batch();
-        ops.slice(i, i+400).forEach(op => op.type==='set' ? batch.set(op.ref, op.data) : batch.delete(op.ref));
-        await batch.commit();
-      }
-      lastKnownRemoteIds = currentIds;
-      setCloudStatus('ok');
-    }catch(e){
-      console.error('Sinkronisasi online gagal:', e);
-      setCloudStatus('err');
+    if(!cloudMetaRef) throw new Error('Firebase tidak tersedia di halaman ini.');
+    const ops = [{ ref: cloudMetaRef, type:'set', data:{
+      period: DATA.period || '', recNotes: DATA.recNotes || '',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    }}];
+    const currentIds = new Set();
+    DATA.workOrders.forEach(w => {
+      const id = woDocId(w.wo);
+      currentIds.add(id);
+      const clean = Object.assign({}, w);
+      delete clean._open;
+      ops.push({ ref: cloudWoRef.doc(id), type:'set', data: clean });
+    });
+    const existing = await cloudWoRef.get();
+    existing.forEach(d => { if(!currentIds.has(d.id)) ops.push({ ref: cloudWoRef.doc(d.id), type:'delete' }); });
+    for(let i=0; i<ops.length; i+=400){
+      const batch = db.batch();
+      ops.slice(i, i+400).forEach(op => op.type==='set' ? batch.set(op.ref, op.data) : batch.delete(op.ref));
+      await batch.commit();
     }
+    try{ localStorage.setItem(CLOUD_TS_KEY, String(Date.now())); }catch(e){}
   }
 
-  function setCloudStatus(state){
-    const el = document.getElementById('cloudStatus');
-    if(!el) return;
-    if(state==='ok') el.innerHTML = '&#9729; Tersambung online';
-    else if(state==='err') el.innerHTML = '&#9888; Gagal sinkron online (draft lokal tetap aman)';
-    else el.innerHTML = '&#9729; Menyambungkan online&hellip;';
-    el.style.color = state==='err' ? '#ffd9d9' : '#cfe0f0';
-  }
-
-  function applyRemoteMeta(remote){
-    if(document.activeElement !== $('periodInput') && (remote.period||'') !== DATA.period){
-      DATA.period = remote.period || '';
-      $('periodInput').value = DATA.period;
-    }
-    if(document.activeElement !== $('recNotes') && (remote.recNotes||'') !== DATA.recNotes){
-      DATA.recNotes = remote.recNotes || '';
-      $('recNotes').value = DATA.recNotes;
-    }
+  async function pullFromCloud(){
+    if(!cloudMetaRef) throw new Error('Firebase tidak tersedia di halaman ini.');
+    const [metaSnap, woSnap] = await Promise.all([cloudMetaRef.get(), cloudWoRef.get()]);
+    if(!metaSnap.exists && woSnap.empty) return false;
+    const meta = metaSnap.exists ? metaSnap.data() : {};
+    DATA.period = meta.period || '';
+    DATA.recNotes = meta.recNotes || '';
+    DATA.workOrders = [];
+    woSnap.forEach(d => DATA.workOrders.push(d.data()));
+    $('periodInput').value = DATA.period;
+    $('recNotes').value = DATA.recNotes;
     persistLocal();
+    const ts = (meta.updatedAt && meta.updatedAt.toMillis) ? meta.updatedAt.toMillis() : Date.now();
+    try{ localStorage.setItem(CLOUD_TS_KEY, String(ts)); }catch(e){}
+    return true;
   }
 
-  function applyRemoteWorkOrders(docs){
-    const remoteMap = {};
-    docs.forEach(d => remoteMap[d.id] = d.data());
-    const remoteIds = new Set(Object.keys(remoteMap));
-    let changed = false;
-
-    remoteIds.forEach(id => {
-      const remoteWO = remoteMap[id];
-      const local = DATA.workOrders.find(w => woDocId(w.wo) === id);
-      if(!local){
-        DATA.workOrders.push(remoteWO);
-        changed = true;
-      } else if(JSON.stringify(Object.assign({}, local, {_open:undefined})) !== JSON.stringify(remoteWO)){
-        const wasOpen = local._open;
-        Object.assign(local, remoteWO);
-        if(wasOpen) local._open = wasOpen;
-        changed = true;
+  function checkForNewerCloudUpdate(){
+    if(!cloudMetaRef) return;
+    cloudMetaRef.get().then(snap => {
+      if(!snap.exists){ setCloudInfo('Belum pernah ada data yang diupload ke cloud untuk sheet ini.'); return; }
+      const data = snap.data();
+      const remoteMs = (data.updatedAt && data.updatedAt.toMillis) ? data.updatedAt.toMillis() : 0;
+      const localMs = parseInt(localStorage.getItem(CLOUD_TS_KEY) || '0', 10);
+      if(remoteMs > localMs + 2000){
+        setCloudInfo('☁ Ada update lebih baru di cloud (' + new Date(remoteMs).toLocaleString('id-ID') + ') — klik "Ambil Update Terbaru".');
+      } else if(localMs > 0){
+        setCloudInfo('Data sudah sesuai dengan update cloud terakhir (' + new Date(localMs).toLocaleString('id-ID') + ').');
+      } else {
+        setCloudInfo('');
       }
-    });
-    const toRemove = DATA.workOrders.filter(w => lastKnownRemoteIds.has(woDocId(w.wo)) && !remoteIds.has(woDocId(w.wo))).map(w => w.wo);
-    toRemove.forEach(wo => {
-      const i = DATA.workOrders.findIndex(w => w.wo === wo);
-      if(i>=0){ DATA.workOrders.splice(i,1); changed = true; }
-    });
+    }).catch(e => { console.error(e); setCloudInfo('Gagal cek status cloud.', true); });
+  }
 
-    lastKnownRemoteIds = remoteIds;
-    if(changed){
-      persistLocal();
-      render();
+  async function handleCloudPushClick(){
+    const pw = prompt('Masukkan password untuk publish data ke cloud:');
+    if(pw == null) return;
+    const hash = await sha256Hex(pw);
+    if(hash !== UPDATE_PASSWORD_HASH){ alert('Password salah.'); return; }
+    const btn = $('cloudPushBtn');
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Mengupload...';
+    try{
+      await pushToCloud();
+      setCloudInfo('✓ Berhasil diupload ke cloud: ' + new Date().toLocaleString('id-ID'));
+    }catch(e){
+      console.error('Gagal upload ke cloud:', e);
+      alert('Gagal upload ke cloud: ' + e.message);
+      setCloudInfo('Gagal upload ke cloud.', true);
+    }finally{
+      btn.disabled = false; btn.textContent = orig;
     }
   }
 
-  function setupCloudSync(){
-    if(!cloudMetaRef){ setCloudStatus('err'); cloudInitDone = true; return; }
-    Promise.all([cloudMetaRef.get(), cloudWoRef.get()]).then(([metaSnap, woSnap]) => {
-      if(metaSnap.exists || !woSnap.empty){
-        applyRemoteMeta(metaSnap.exists ? metaSnap.data() : {});
-        const remoteIds = new Set();
-        woSnap.forEach(d => { remoteIds.add(d.id); DATA.workOrders = DATA.workOrders.filter(w => woDocId(w.wo) !== d.id); DATA.workOrders.push(d.data()); });
-        lastKnownRemoteIds = remoteIds;
-        persistLocal();
-        render();
-        setCloudStatus('ok');
-        cloudInitDone = true;
+  async function handleCloudPullClick(){
+    if(DATA.workOrders.length > 0 && !confirm('Ambil data terbaru dari cloud?\nData di layar ini yang belum di-"Update ke Cloud" akan diganti.')) return;
+    const btn = $('cloudPullBtn');
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Mengambil...';
+    try{
+      const got = await pullFromCloud();
+      if(!got){
+        alert('Belum ada data yang pernah di-upload ke cloud untuk sheet ini.');
       } else {
-        // Belum ada data online sama sekali — kirim draft lokal saat ini sebagai data awal
-        cloudInitDone = true;
-        pushToCloud();
+        activeFilter = 'ALL'; activeRsFilter = 'ALL'; searchTerm = ''; lastOpenIdx = -1;
+        render();
+        setCloudInfo('✓ Data terbaru diambil: ' + new Date().toLocaleString('id-ID'));
       }
-      cloudMetaRef.onSnapshot(snap => {
-        if(snap.metadata.hasPendingWrites || !snap.exists) return;
-        applyRemoteMeta(snap.data());
-      }, e => { console.error(e); setCloudStatus('err'); });
-      cloudWoRef.onSnapshot(snap => {
-        if(snap.metadata.hasPendingWrites) return;
-        applyRemoteWorkOrders(snap.docs);
-      }, e => { console.error(e); setCloudStatus('err'); });
-    }).catch(e => {
-      console.error('Gagal memuat data online:', e);
-      cloudInitDone = true;
-      setCloudStatus('err');
-    });
+    }catch(e){
+      console.error('Gagal mengambil data dari cloud:', e);
+      alert('Gagal mengambil data dari cloud: ' + e.message);
+      setCloudInfo('Gagal mengambil data dari cloud.', true);
+    }finally{
+      btn.disabled = false; btn.textContent = orig;
+    }
   }
 
   function loadExcelFile(file){
@@ -1861,6 +1867,8 @@ function initSheet(key, suffix, seedData){
 
   $('saveWeekBtn').addEventListener('click', saveWeek);
   $('newWeekBtn').addEventListener('click', newWeek);
+  $('cloudPushBtn').addEventListener('click', handleCloudPushClick);
+  $('cloudPullBtn').addEventListener('click', handleCloudPullClick);
 
   // Ekspos fungsi yang dipanggil lewat onclick="" (string HTML) / kode luar
   window['setFilter'+suffix] = setFilter;
@@ -1897,7 +1905,7 @@ function initSheet(key, suffix, seedData){
   loadDraft();
   render();
   renderHistory();
-  setupCloudSync();
+  checkForNewerCloudUpdate();
 }
 
 initSheet('report', '', null);
