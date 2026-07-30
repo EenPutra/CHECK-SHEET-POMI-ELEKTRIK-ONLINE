@@ -358,7 +358,7 @@
       <b>5.</b> Isi catatan <b>Rekomendasi &amp; Rencana Tindak Lanjut</b> di bagian bawah bila ingin menambahkan poin manual.<br>
       <b>6.</b> Klik <b>Export Data (.json)</b> &rarr; upload file hasil export ini ke chat Claude, lalu minta: <i>"buatkan laporan PPT minggu ini dari data ini"</i>. Foto ikut tersimpan di dalam file JSON, jadi cukup 1 file yang diupload.<br>
       <b>7.</b> Kalau data sudah siap dibagikan ke semua orang, klik <b>&#128274; Update ke Cloud</b> &amp; masukkan password &mdash; baru setelah itu data terupload &amp; bisa dibaca perangkat lain. Perangkat lain klik <b>&#8681; Ambil Update Terbaru</b> untuk memuat data hasil update terakhir. Kedua tombol ini otomatis berlaku untuk <b>Weekly Report &amp; Weekly Job Arrangement sekaligus</b>, tidak peduli sheet mana yang sedang dibuka saat mengklik.<br>
-      <span class="footer-note">Data tersimpan otomatis di browser ini (draft) selama tidak clear cache. Sinkron online <b>tidak otomatis/real-time</b> &mdash; hanya terjadi saat seseorang klik "Update ke Cloud" (perlu password), dan perangkat lain harus klik "Ambil Update Terbaru" untuk melihatnya. Sekali klik akan menyinkronkan kedua sheet bersamaan.</span>
+      <span class="footer-note">Data tersimpan otomatis di browser ini (draft) selama tidak clear cache. Upload ke cloud <b>tidak otomatis</b> &mdash; hanya terjadi saat seseorang klik "Update ke Cloud" (perlu password), dan sekali klik menyinkronkan kedua sheet bersamaan. Sebaliknya, <b>mengambil</b> update terbaru dari cloud terjadi otomatis tiap 15 menit di halaman yang sedang terbuka (selain lewat tombol manual) &mdash; kecuali kalau ada perubahan lokal yang belum di-upload, supaya tidak ada yang tertimpa.</span>
     </div>
   </div>
 
@@ -955,6 +955,7 @@ function initSheet(key, suffix, seedData){
   let execFilterValues = new Set();
   let searchTerm = "", dateFilterFrom = "", dateFilterTo = "";
   let lastOpenIdx = -1, sortKey = null, sortDir = 1, currentWeekId = null;
+  let dirty = false;
 
   // ── Sinkronisasi online manual (Firebase Firestore) ──
   // Tidak real-time. Data hanya terkirim ke cloud saat tombol "Update ke Cloud"
@@ -977,6 +978,7 @@ function initSheet(key, suffix, seedData){
   }
   function saveDraft(){
     persistLocal();
+    dirty = true;
   }
   function loadDraft(){
     const raw = localStorage.getItem(LS_KEY);
@@ -1024,6 +1026,7 @@ function initSheet(key, suffix, seedData){
       await batch.commit();
     }
     try{ localStorage.setItem(CLOUD_TS_KEY, String(Date.now())); }catch(e){}
+    dirty = false;
   }
 
   async function pullFromCloud(){
@@ -1040,24 +1043,31 @@ function initSheet(key, suffix, seedData){
     persistLocal();
     const ts = (meta.updatedAt && meta.updatedAt.toMillis) ? meta.updatedAt.toMillis() : Date.now();
     try{ localStorage.setItem(CLOUD_TS_KEY, String(ts)); }catch(e){}
+    dirty = false;
     return true;
   }
 
-  function checkForNewerCloudUpdate(){
-    if(!cloudMetaRef) return;
-    cloudMetaRef.get().then(snap => {
-      if(!snap.exists){ setCloudInfo('Belum pernah ada data yang diupload ke cloud untuk sheet ini.'); return; }
+  async function checkForNewerCloudUpdate(){
+    if(!cloudMetaRef) return false;
+    try{
+      const snap = await cloudMetaRef.get();
+      if(!snap.exists){ setCloudInfo('Belum pernah ada data yang diupload ke cloud untuk sheet ini.'); return false; }
       const data = snap.data();
       const remoteMs = (data.updatedAt && data.updatedAt.toMillis) ? data.updatedAt.toMillis() : 0;
       const localMs = parseInt(localStorage.getItem(CLOUD_TS_KEY) || '0', 10);
-      if(remoteMs > localMs + 2000){
+      const isNewer = remoteMs > localMs + 2000;
+      if(isNewer){
         setCloudInfo('☁ Ada update lebih baru di cloud (' + new Date(remoteMs).toLocaleString('id-ID') + ') — klik "Ambil Update Terbaru".');
       } else if(localMs > 0){
         setCloudInfo('Data sudah sesuai dengan update cloud terakhir (' + new Date(localMs).toLocaleString('id-ID') + ').');
       } else {
         setCloudInfo('');
       }
-    }).catch(e => { console.error(e); setCloudInfo('Gagal cek status cloud.', true); });
+      return isNewer;
+    }catch(e){
+      console.error(e); setCloudInfo('Gagal cek status cloud.', true);
+      return false;
+    }
   }
 
   function afterPull(){
@@ -1987,7 +1997,9 @@ function initSheet(key, suffix, seedData){
     pullFromCloud,
     setCloudInfo,
     afterPull,
-    hasData: () => DATA.workOrders.length > 0
+    hasData: () => DATA.workOrders.length > 0,
+    isDirty: () => dirty,
+    checkForNewerCloudUpdate
   };
 
   loadDraft();
@@ -2058,6 +2070,28 @@ async function handleCloudPullAllClick(){
   const el = document.getElementById(id);
   if(el) el.addEventListener('click', handleCloudPullAllClick);
 });
+
+// ── Auto-ambil update dari cloud tiap 15 menit (tanpa perlu klik tombol) ──
+// Aman terhadap perubahan yang belum di-upload: sheet yang sedang ada
+// perubahan lokal (belum "Update ke Cloud") dilewati, tidak ditimpa otomatis.
+const AUTO_REFRESH_MS = 15 * 60 * 1000;
+async function autoRefreshSheet(key){
+  const sheet = Sheets[key];
+  if(!sheet || sheet.isDirty()) return;
+  try{
+    const isNewer = await sheet.checkForNewerCloudUpdate();
+    if(!isNewer) return;
+    if(sheet.isDirty()) return; // bisa berubah selama pengecekan async di atas
+    const got = await sheet.pullFromCloud();
+    if(got){
+      sheet.afterPull();
+      sheet.setCloudInfo('🔄 Auto-update dari cloud: ' + new Date().toLocaleString('id-ID'));
+    }
+  }catch(e){
+    console.error('Auto-update gagal untuk ' + key + ':', e);
+  }
+}
+setInterval(() => { autoRefreshSheet('report'); autoRefreshSheet('ja'); }, AUTO_REFRESH_MS);
 
 // Drag-and-drop Excel/JSON di mana saja pada halaman — routing ke sheet yang sedang aktif
 let dragCounter = 0;
