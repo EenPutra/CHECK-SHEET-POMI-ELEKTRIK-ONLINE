@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -1354,29 +1355,96 @@ function loadDraft(){
 /* ══════════════════════════════════════════════════
    SUBMIT TO FIRESTORE
 ══════════════════════════════════════════════════ */
-function submitToDb(){
+async function submitToDb(){
   const woNo=document.getElementById('wo-no').value.trim();
   const tagNo=document.getElementById('tag-no').value.trim();
   if(!woNo||!tagNo){showNotice('WO Number dan Tag Number wajib diisi','err');return;}
 
-  const data={
-    ...collectFormData(),
-    photoCount:PHOTOS.length,
-    photoCaptions:PHOTOS.map(p=>p.caption),
-    submittedAt:firebase.firestore.FieldValue.serverTimestamp(),
-    // Stats
-    statTotal:parseInt(document.getElementById('h-total').textContent)||0,
-    statOK:parseInt(document.getElementById('h-ok').textContent)||0,
-    statNG:parseInt(document.getElementById('h-ng').textContent)||0,
-    statNA:parseInt(document.getElementById('h-na').textContent)||0,
+  const gv=id=>{const e=document.getElementById(id);return e&&e.value.trim()?e.value.trim():'—'};
+
+  const base=DB.collectCheckSheetData('hoist',tagNo,document.getElementById('tag-desc')?.value.trim()||'Hoist Inspection & Maintenance','PERIODIC');
+  base.checkedBy=base.checkedBy||document.getElementById('done-by')?.value.trim()||'';
+  base.findings=base.findings||document.getElementById('concl-finding')?.value.trim()||'';
+  base.recommendations=base.recommendations||document.getElementById('concl-action')?.value.trim()||'';
+  base.location=gv('location'); base.ackDate=gv('ack-date'); base.ackBy=gv('ack-by'); base.ackSignature=gv('ack-sign');
+  base.maintPurpose=gv('maint-purpose'); base.nextPmDate=gv('next-maint'); base.overallStatus=gv('equip-status')||base.overallStatus;
+  base.photoCount=PHOTOS.length; base.photoCaptions=PHOTOS.map(p=>p.caption);
+
+  const sels=[...document.querySelectorAll('.r-sel')];
+  base.countOk=sels.filter(s=>s.value==='OK').length;
+  base.countNg=sels.filter(s=>s.value==='NG').length;
+  base.countNa=sels.filter(s=>s.value==='N/A').length;
+  if(!document.getElementById('equip-status').value) base.overallStatus=base.countNg>0?'NG':'OK';
+
+  function itemSheet(title,items,prefix){
+    return{title,columns:['Result','Remark'],rows:items.map((it,i)=>({no:String(i+1),desc:it.task,crit:it.crit,
+      values:{Result:gv(prefix+'_'+(i+1)),Remark:gv(prefix+'_'+(i+1)+'_rmk')}}))};
+  }
+
+  base.sheets={
+    sBrake:itemSheet('Brake System — Linings, Pawls, Ratchets, Coils',BRAKE_ITEMS,'brk'),
+    sBrakeMeas:{title:'Brake Pad / Shoe Thickness',columns:['Value'],rows:[
+      {no:'',desc:'Brake Pad Thickness (mm)',values:{Value:gv('bp-pad')}},
+      {no:'',desc:'Brake Shoe Thickness (mm)',values:{Value:gv('bp-shoe')}},
+      {no:'',desc:'Air Gap / Clearance (mm)',values:{Value:gv('bp-gap')}},
+    ]},
+    sTransformer:{title:'Transformer Winding Resistance (Ω)',columns:['h1-h2','x1-x2','x3-x4'],rows:[
+      {no:'',desc:'Resistance (Ω)',values:{'h1-h2':gv('tr-h1h2'),'x1-x2':gv('tr-x1x2'),'x3-x4':gv('tr-x3x4')}},
+    ]},
+    sContactor:{title:'Contactor Resistance (mΩ)',columns:['T1 (mΩ)','T2 (mΩ)','T3 (mΩ)','COIL (Ω)'],rows:[
+      {no:'',desc:'Hoist Up',values:{'T1 (mΩ)':gv('ct-up-t1'),'T2 (mΩ)':gv('ct-up-t2'),'T3 (mΩ)':gv('ct-up-t3'),'COIL (Ω)':gv('ct-up-c')}},
+      {no:'',desc:'Hoist Down',values:{'T1 (mΩ)':gv('ct-dn-t1'),'T2 (mΩ)':gv('ct-dn-t2'),'T3 (mΩ)':gv('ct-dn-t3'),'COIL (Ω)':gv('ct-dn-c')}},
+      {no:'',desc:'Travel Left',values:{'T1 (mΩ)':gv('ct-tl-t1'),'T2 (mΩ)':gv('ct-tl-t2'),'T3 (mΩ)':gv('ct-tl-t3'),'COIL (Ω)':gv('ct-tl-c')}},
+      {no:'',desc:'Travel Right',values:{'T1 (mΩ)':gv('ct-tr-t1'),'T2 (mΩ)':gv('ct-tr-t2'),'T3 (mΩ)':gv('ct-tr-t3'),'COIL (Ω)':gv('ct-tr-c')}},
+      {no:'',desc:'Trolley',values:{'T1 (mΩ)':gv('ct-rl-t1'),'T2 (mΩ)':gv('ct-rl-t2'),'T3 (mΩ)':gv('ct-rl-t3'),'COIL (Ω)':gv('ct-rl-c')}},
+    ]},
+    sOtherElec:{title:'Other Electrical Measurements',columns:['Value'],rows:[
+      {no:'',desc:'Resistor Box Resistance (Ω)',values:{Value:gv('m-res-box')}},
+      {no:'',desc:'Overload Setting (A)',values:{Value:gv('m-ol-set')}},
+      {no:'',desc:'Disconnect Switch Resistance (mΩ)',values:{Value:gv('m-ds-res')}},
+    ]},
+    sPendant:{title:'Pendant Switch Resistance (Ω)',columns:['Up','Down','Forward','Reverse','Travel Left','Travel Right'],rows:[
+      {no:'',desc:'Resistance (Ω)',values:{Up:gv('pb-up'),Down:gv('pb-dn'),Forward:gv('pb-fw'),Reverse:gv('pb-rv'),'Travel Left':gv('pb-tl'),'Travel Right':gv('pb-tr')}},
+    ]},
+    sEstop:{title:'E-Stop & Start/Stop Button Resistance',columns:['Resistance (Ω)','Spec (Ω)'],rows:[
+      {no:'',desc:'E-Stop',values:{'Resistance (Ω)':gv('m-estop'),'Spec (Ω)':'—'}},
+      {no:'',desc:'Start',values:{'Resistance (Ω)':gv('m-start'),'Spec (Ω)':'0.3'}},
+      {no:'',desc:'Stop',values:{'Resistance (Ω)':gv('m-stop'),'Spec (Ω)':'0.2'}},
+    ]},
+    sMotorCurrent:{title:'Motor Current (A) — Per Direction',columns:['R (A)','S (A)','T (A)'],rows:[
+      {no:'',desc:'Up',values:{'R (A)':gv('cur-up-r'),'S (A)':gv('cur-up-s'),'T (A)':gv('cur-up-t')}},
+      {no:'',desc:'Down',values:{'R (A)':gv('cur-dn-r'),'S (A)':gv('cur-dn-s'),'T (A)':gv('cur-dn-t')}},
+      {no:'',desc:'Travel Left',values:{'R (A)':gv('cur-tl-r'),'S (A)':gv('cur-tl-s'),'T (A)':gv('cur-tl-t')}},
+      {no:'',desc:'Travel Right',values:{'R (A)':gv('cur-tr-r'),'S (A)':gv('cur-tr-s'),'T (A)':gv('cur-tr-t')}},
+      {no:'',desc:'Forward (Trolley)',values:{'R (A)':gv('cur-fw-r'),'S (A)':gv('cur-fw-s'),'T (A)':gv('cur-fw-t')}},
+      {no:'',desc:'Reverse (Trolley)',values:{'R (A)':gv('cur-rv-r'),'S (A)':gv('cur-rv-s'),'T (A)':gv('cur-rv-t')}},
+    ]},
+    sWindingIns:{title:'Motor Winding & Insulation Resistance',columns:['Spec','Hoist Low Spd','Hoist High Spd','Travel','Trolley'],rows:[
+      {no:'',desc:'T1 – T2 (Ω)',values:{Spec:'≈1.1',"Hoist Low Spd":gv('mw-ls-t12'),"Hoist High Spd":gv('mw-hs-t12'),Travel:gv('mw-tv-t12'),Trolley:gv('mw-tr-t12')}},
+      {no:'',desc:'T2 – T3 (Ω)',values:{Spec:'≈1.2',"Hoist Low Spd":gv('mw-ls-t23'),"Hoist High Spd":gv('mw-hs-t23'),Travel:gv('mw-tv-t23'),Trolley:gv('mw-tr-t23')}},
+      {no:'',desc:'T3 – T1 (Ω)',values:{Spec:'≈1.2',"Hoist Low Spd":gv('mw-ls-t31'),"Hoist High Spd":gv('mw-hs-t31'),Travel:gv('mw-tv-t31'),Trolley:gv('mw-tr-t31')}},
+      {no:'',desc:'A Phase – Earth (MΩ)',values:{Spec:'≥2000',"Hoist Low Spd":gv('mi-ls-a'),"Hoist High Spd":gv('mi-hs-a'),Travel:gv('mi-tv-a'),Trolley:gv('mi-tr-a')}},
+      {no:'',desc:'B Phase – Earth (MΩ)',values:{Spec:'≥2000',"Hoist Low Spd":gv('mi-ls-b'),"Hoist High Spd":gv('mi-hs-b'),Travel:gv('mi-tv-b'),Trolley:gv('mi-tr-b')}},
+      {no:'',desc:'C Phase – Earth (MΩ)',values:{Spec:'≥2000',"Hoist Low Spd":gv('mi-ls-c'),"Hoist High Spd":gv('mi-hs-c'),Travel:gv('mi-tv-c'),Trolley:gv('mi-tr-c')}},
+    ]},
+    sBrakeWinding:{title:'Brake Winding Resistance & Insulation',columns:['Spec','Measured','Unit'],rows:[
+      {no:'',desc:'T1 – T2 Winding',values:{Spec:'≈13.7',Measured:gv('brk-t12'),Unit:'Ω'}},
+      {no:'',desc:'T1/T2 – Earth Insulation',values:{Spec:'≥2000',Measured:gv('brk-earth'),Unit:'MΩ'}},
+    ]},
+    sLimitSwitch:{title:'Limit Switch Resistance',columns:['Resistance (Ω)'],rows:[
+      {no:'',desc:'Limit Switch — Up',values:{'Resistance (Ω)':gv('ls-up')}},
+      {no:'',desc:'Limit Switch — Down',values:{'Resistance (Ω)':gv('ls-dn')}},
+    ]},
+    sElec:itemSheet('Electrical Component Inspection',ELEC_ITEMS,'elc'),
+    sPanel:itemSheet('Panel & Mechanical Inspection',PANEL_ITEMS,'pnl'),
   };
 
-  // Remove file input ref
-  delete data['photo-file-input'];
-
-  db.collection('hoist_pm').add(data)
-    .then(()=>showNotice('Data berhasil disimpan ke database!','ok'))
-    .catch(e=>showNotice('Gagal submit: '+e.message,'err'));
+  try{
+    const id=await DB.save(base);
+    showNotice('Data berhasil disimpan ke database! ID: '+id,'ok');
+  }catch(e){
+    showNotice('Gagal submit: '+e.message,'err');
+  }
 }
 
 /* ── NOTICE ─────────────────────────────────────── */

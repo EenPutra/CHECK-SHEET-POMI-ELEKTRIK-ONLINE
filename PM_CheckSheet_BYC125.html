@@ -850,8 +850,68 @@ function printPage(){
   });
 }
 
+function rv(id){var t=resultState[id];return t==='ok'?'OK':t==='ng'?'NG':t==='na'?'N/A':'—';}
+function rmkList(tbodyId){return [...document.querySelectorAll('#'+tbodyId+' input[placeholder="Remark..."]')].map(el=>el.value.trim()||'—');}
+
 async function submitToDb(){
   const data=DB.collectCheckSheetData('byc125','7EB-BYC-125 A/B','Battery Charger Unit 125 A/B','2 YEARLY');
+
+  const rmkA=rmkList('tbody-a'),rmkA2=rmkList('tbody-a2'),rmkB=rmkList('tbody-b');
+  const rowsA=[
+    ['1','Check Top Cover/Plate for Corrosion Damage — Replace / Repair / Repaint if Required','r1a','r1b'],
+    ['2','Check All Cable Entry Conduits are Connected Securely and Sealed Properly','r2a','r2b'],
+    ['3','Check & Clean / Replace the Air Filters','r3a','r3b'],
+    ['4','Check for Any Alarms / Errors Light ON and Reset with Reason & Action','r4a','r4b'],
+    ['5','Check Cooling Fans to Satisfy Running at >=90% Design Speed','r5a','r5b'],
+    ['6','Check Temperature of Transformers & Inductors','r6a','r6b'],
+    ['7','Check Temperature of SCRs','r7a','r7b'],
+    ['8','Check Float DC Output Voltage Characteristic','r8a','r8b'],
+    ['9','Operate and Record Voltage Mon. Switch (Volt AC)','r9a','r9b'],
+  ];
+  const rowsA2=[
+    ['10','Thoroughly Clean All Accumulated Dust / Dirt / Foreign Particles','r10a','r10b'],
+    ['11','Check for Damage to Paint Finish, Be Touched Up to Avoid Corrosion','r11a','r11b'],
+    ['13','Inspect All Wires & Connections for Sign of Burnt, Loose, Frayed or Broken','r13a','r13b'],
+    ['14','Inspect All Transformers, Inductors, SCRs/IGBTs & Control Boards for Sign of Burnt','r14a','r14b'],
+    ['15','Check All Transformer & Inductors Winding Insulation (500VDC test, >=5 MOhm)','r15a','r15b'],
+    ['16','Test All SCRs/IGBTs Overheat Protection Sensor/Switch (+/-5% Deviation)','r16a','r16b'],
+    ['17','Inspect Snubber Networks (Across the Thyristor) for Loose Connection or Crack Joints','r17a','r17b'],
+    ['18','Re-torque All High Current Connections and Secure Any Loose Connections','r18a','r18b'],
+    ['19','Ensure All Cable Entry Conduits are Connected Securely and Sealed Properly','r19a','r19b'],
+    ['20','Set Float DC Output Voltage to Satisfy 127VDC Nominal (126.0 ~ 127.5 VDC)','r20a','r20b'],
+  ];
+  const rowsB=[
+    ['21','Ensure Air Conditioning Unit to Satisfy Room Temperature (<=20 C)','r21','room-temp','degC'],
+    ['22','Measure the Relative Humidity (<60% RH)','r22','humidity','% RH'],
+    ['23','Measure the Audible Noise (<=60 dB(A) at <=1.5 meters)','r23','noise','dB(A)'],
+    ['24','BYC Room: Set Air Conditioning Unit to Satisfy Room Temperature (<=20 C)','r24','',''],
+    ['25','BYC Room: Ensure Audible Noise <=60 dB(A) at <=1.5 Meters','r25','',''],
+  ];
+
+  data.sheets={
+    sA:{title:'A — Battery Charger Cabinet (1/2-Yearly)',columns:['Side A','Side B','Remark'],rows:rowsA.map((r,i)=>({no:r[0],desc:r[1],values:{'Side A':rv(r[2]),'Side B':rv(r[3]),Remark:rmkA[i]}}))},
+    sMeas:{title:'Measurements — Side A / Side B',columns:['Side A','Side B'],rows:[
+      {no:'',desc:'Cooling Fan 1 RPM',crit:'>1500 RPM',values:{'Side A':gv('fan1a-rpm')||'—','Side B':gv('fan1b-rpm')||'—'}},
+      {no:'',desc:'Cooling Fan 2 RPM',crit:'>1500 RPM',values:{'Side A':gv('fan2a-rpm')||'—','Side B':gv('fan2b-rpm')||'—'}},
+      {no:'',desc:'Transformer Temperature',crit:'<80°C',values:{'Side A':gv('tx-temp-a')||'—','Side B':gv('tx-temp-b')||'—'}},
+      {no:'',desc:'Inductor Temperature',crit:'<80°C',values:{'Side A':gv('ind-temp-a')||'—','Side B':gv('ind-temp-b')||'—'}},
+      {no:'',desc:'SCR Temperature',crit:'<100°C',values:{'Side A':gv('scr-temp-a')||'—','Side B':gv('scr-temp-b')||'—'}},
+      {no:'',desc:'Voltage In',crit:'380-415 VAC',values:{'Side A':gv('vin-a')||'—','Side B':gv('vin-b')||'—'}},
+      {no:'',desc:'Current In',crit:'Nameplate',values:{'Side A':gv('iin-a')||'—','Side B':gv('iin-b')||'—'}},
+      {no:'',desc:'Voltage Out',crit:'126.0-127.5 VDC',values:{'Side A':gv('vout-a')||'—','Side B':gv('vout-b')||'—'}},
+      {no:'',desc:'Current Out',crit:'Nameplate',values:{'Side A':gv('iout-a')||'—','Side B':gv('iout-b')||'—'}},
+      {no:'',desc:'Float Voltage',crit:'126.0-127.5 VDC',values:{'Side A':gv('vfloat-a')||'—','Side B':gv('vfloat-b')||'—'}},
+      {no:'',desc:'Equalize Voltage',crit:'130-135 VDC',values:{'Side A':gv('veq-a')||'—','Side B':gv('veq-b')||'—'}},
+      {no:'',desc:'R-S Phase Voltage',crit:'380-415 VAC',values:{'Side A':gv('vrs-a')||'—','Side B':gv('vrs-b')||'—'}},
+      {no:'',desc:'S-T Phase Voltage',crit:'380-415 VAC',values:{'Side A':gv('vst-a')||'—','Side B':gv('vst-b')||'—'}},
+      {no:'',desc:'R-T Phase Voltage',crit:'380-415 VAC',values:{'Side A':gv('vrt-a')||'—','Side B':gv('vrt-b')||'—'}},
+      {no:'',desc:'Transformer Insulation Resistance',crit:'>=5 MOhm',values:{'Side A':gv('tx-ins-a')||'—','Side B':gv('tx-ins-b')||'—'}},
+      {no:'',desc:'Inductor Insulation Resistance',crit:'>=5 MOhm',values:{'Side A':gv('ind-ins-a')||'—','Side B':gv('ind-ins-b')||'—'}},
+    ]},
+    sA2:{title:'A2 — 2-Yearly Deep Inspection',columns:['Side A','Side B','Remark'],rows:rowsA2.map((r,i)=>({no:r[0],desc:r[1],values:{'Side A':rv(r[2]),'Side B':rv(r[3]),Remark:rmkA2[i]}}))},
+    sB:{title:'B — Room / Cubicle',columns:['Result','Measurement','Remark'],rows:rowsB.map((r,i)=>({no:r[0],desc:r[1],values:{Result:rv(r[2]),Measurement:r[3]?((gv(r[3])||'—')+(gv(r[3])?' '+r[4]:'')):'—',Remark:rmkB[i]}}))},
+  };
+
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
   try{

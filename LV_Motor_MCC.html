@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -818,59 +819,69 @@ function resetForm(){
 // ═══════════════════════════════════════════════════
 async function submitToDb(){
   const tag    = document.getElementById('tag-search').value.trim();
-  const date   = document.getElementById('wo-date').value;
   const doneBy = document.getElementById('done-by').value.trim();
   if(!tag)    { showNote('❌ Isi Plant Tag No. terlebih dahulu.', 'err'); return; }
-  if(!date)   { showNote('❌ Isi tanggal terlebih dahulu.', 'err'); return; }
+  if(!document.getElementById('wo-date').value) { showNote('❌ Isi tanggal terlebih dahulu.', 'err'); return; }
   if(!doneBy) { showNote('❌ Isi nama Done By terlebih dahulu.', 'err'); return; }
 
   const gv = id => { const e=document.getElementById(id); return e?e.value.trim():''; };
-  const gn = id => { const e=document.getElementById(id); return e&&e.value?parseFloat(e.value):null; };
 
-  const items = {};
-  document.querySelectorAll('.r-sel').forEach(sel => {
-    const id = sel.id.replace('res-','');
-    items[id] = { result: sel.value, remark: gv('rmk-'+id) };
+  const base = DB.collectCheckSheetData('lvmcc', tag, gv('tag-desc')||'LV Motor MCC PM', 'PERIODIC');
+  base.checkedBy = base.checkedBy || doneBy;
+  base.recommendations = base.recommendations || gv('actions-taken');
+  base.maintPurpose = gv('maint-purpose'); base.location = gv('location');
+  base.compartment = gv('compartment'); base.ackDate = gv('ack-date'); base.ackBy = gv('ack-by');
+  base.photoCount = PHOTOS.length; base.photoCaptions = PHOTOS.map(p=>p.caption);
+  base.olData = {
+    heaterCode: document.getElementById('ol-code').textContent,
+    ratingPlug: document.getElementById('ol-plug').textContent,
+    olSetting:  document.getElementById('ol-setting').textContent,
+    size: olSize
+  };
+
+  const sels = [...document.querySelectorAll('.r-sel')];
+  base.countOk = sels.filter(s=>s.value==='OK').length;
+  base.countNg = sels.filter(s=>s.value==='NG').length;
+  base.countNa = sels.filter(s=>s.value==='N/A').length;
+  base.overallStatus = gv('overall-result') || (base.countNg>0?'NG':'OK');
+
+  const sCheckRows=[];
+  CHECKS.filter(chk=>!chk.special).forEach(chk=>{
+    chk.crit.forEach(cr=>{
+      sCheckRows.push({no:String(chk.no),desc:chk.crit.length>1?chk.task+' — '+cr.lbl:chk.task,crit:cr.lbl,section:chk.comp,
+        values:{Result:gv('res-'+cr.id)||'—',Remark:gv('rmk-'+cr.id)||'—'}});
+    });
   });
-  const vals = Object.values(items);
-  const countOk = vals.filter(x=>x.result==='OK').length;
-  const countNg = vals.filter(x=>x.result==='NG').length;
-  const countNa = vals.filter(x=>x.result==='N/A').length;
 
-  const data = {
-    type:'lv_motor_mcc', assetTag:tag, assetName:gv('tag-desc'),
-    executionDate:date, doneBy, woNumber:gv('wo-no'),
-    maintPurpose:gv('maint-purpose'), location:gv('location'),
-    compartment:gv('compartment'), ackDate:gv('ack-date'), ackBy:gv('ack-by'),
-    motorData:{
-      v:gv('m-v'), a:gv('m-a'), power:gv('m-pwr'), rpm:gv('m-rpm'), sf:gv('m-sf'),
-      insulClass:gv('m-ins'), mounting:gv('m-mount'), frameSize:gv('m-frame'), manufacturer:gv('m-mfr')
-    },
-    olData:{
-      heaterCode: document.getElementById('ol-code').textContent,
-      ratingPlug: document.getElementById('ol-plug').textContent,
-      olSetting:  document.getElementById('ol-setting').textContent,
-      size: olSize
-    },
-    megger:{ min1:gn('meg-1min'), min10:gn('meg-10min') },
-    resistance:{ t12:gn('res-t12'), t13:gn('res-t13'), t23:gn('res-t23') },
-    checkItems:items, countOk, countNg, countNa,
-    overallStatus: gv('overall-result') || (countNg>0?'NG':'OK'),
-    findings: gv('findings'),
-    actionsTaken: gv('actions-taken'),
-    overallResult: gv('overall-result'),
-    nextPmDate: gv('next-pm'),
-    photoCount: PHOTOS.length,
-    photoCaptions: PHOTOS.map(p=>p.caption),
-    createdAt: new Date().toISOString(),
-    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+  base.sheets = {
+    sCheck:{title:'Check Items',columns:['Result','Remark'],rows:sCheckRows},
+    sMegger:{title:'Item 11 — Megger Test (500 Vdc, Phase to Ground)',columns:['Value (MΩ)','Result','Remark'],rows:[
+      {no:'',desc:'1 minute reading',values:{'Value (MΩ)':gv('meg-1min')||'—',Result:gv('res-c11')||'—',Remark:gv('rmk-c11')||'—'}},
+      {no:'',desc:'10 minute reading',values:{'Value (MΩ)':gv('meg-10min')||'—',Result:'—',Remark:'—'}},
+    ]},
+    sResistance:{title:'Item 12 — Three Phase Resistance',columns:['Resistance (Ω)','Result','Remark'],rows:[
+      {no:'',desc:'T1 – T2',values:{'Resistance (Ω)':gv('res-t12')||'—',Result:gv('res-c12a')||'—',Remark:gv('rmk-c12a')||'—'}},
+      {no:'',desc:'T1 – T3',values:{'Resistance (Ω)':gv('res-t13')||'—',Result:gv('res-c12b')||'—',Remark:gv('rmk-c12b')||'—'}},
+      {no:'',desc:'T2 – T3',values:{'Resistance (Ω)':gv('res-t23')||'—',Result:gv('res-c12c')||'—',Remark:gv('rmk-c12c')||'—'}},
+    ]},
+    sMotor:{title:'Basic Motor Data',columns:['Value'],rows:[
+      {no:'',desc:'Voltage',values:{Value:gv('m-v')||'—'}},
+      {no:'',desc:'Full Load Ampere',values:{Value:gv('m-a')||'—'}},
+      {no:'',desc:'Power',values:{Value:gv('m-pwr')||'—'}},
+      {no:'',desc:'RPM',values:{Value:gv('m-rpm')||'—'}},
+      {no:'',desc:'Service Factor',values:{Value:gv('m-sf')||'—'}},
+      {no:'',desc:'Insulation Class',values:{Value:gv('m-ins')||'—'}},
+      {no:'',desc:'Mounting',values:{Value:gv('m-mount')||'—'}},
+      {no:'',desc:'Frame Size',values:{Value:gv('m-frame')||'—'}},
+      {no:'',desc:'Manufacturer',values:{Value:gv('m-mfr')||'—'}},
+    ]},
   };
 
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    const ref = await db.collection('lv_motor_mcc').add(data);
-    showNote('✅ Data berhasil disimpan. ID: '+ref.id, 'ok');
-    document.getElementById('doc-id-display').textContent = 'DOC: '+ref.id;
+    const id = await DB.save(base);
+    showNote('✅ Data berhasil disimpan. ID: '+id, 'ok');
+    document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
     showNote('❌ Gagal simpan: '+e.message, 'err');
   }

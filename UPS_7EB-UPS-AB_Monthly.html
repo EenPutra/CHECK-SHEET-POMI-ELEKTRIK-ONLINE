@@ -1010,6 +1010,49 @@ function printPage(){
 async function submitToDb(){
   if(typeof DB==='undefined'){showNote('⚠️ DB helper tidak tersedia.','err');return;}
   const data=DB.collectCheckSheetData('ups','7EB-UPS-A/B','1 Monthly PM UPS','PERIODIC');
+
+  const sFanRows=[];
+  FANS.forEach(c=>{
+    c.fans.forEach((fn,fi)=>{
+      sFanRows.push({no:'',desc:`${c.cab} (${c.desc}) — ${fn}`,section:c.cab+' — '+c.desc,values:{
+        'UPS-A RPM':fv(`fan_${c.id}_f${fi}_a`)||'—','UPS-B RPM':fv(`fan_${c.id}_f${fi}_b`)||'—',
+        'UPS-A Status':getT(`fanst_${c.id}_f${fi}_a`),'UPS-B Status':getT(`fanst_${c.id}_f${fi}_b`)}});
+    });
+  });
+
+  const sElecRows=[];
+  ELEC_GROUPS.forEach(g=>{
+    g.rows.forEach(r=>{
+      sElecRows.push({no:'',desc:(r.sub?r.sub+' — ':'')+r.param+(r.unit?' ('+r.unit+')':''),crit:r.spec,section:g.title,
+        values:{'UPS-A':fv(r.idA)||'—','UPS-B':fv(r.idB)||'—'}});
+    });
+  });
+
+  const sVisualRows=VISUAL.map(c=>({no:'',desc:c.label,crit:c.sub,
+    values:{'UPS-A':getT(c.id+'_a'),'UPS-B':getT(c.id+'_b')}}));
+  sVisualRows.push({no:'',desc:'Alarm / Error Notes',values:{'UPS-A':fv('vc-note')||'—','UPS-B':'—'}});
+
+  let curCab='';
+  const sTempRows=TEMP_ROWS.map(r=>{curCab=r.cab||curCab;return {no:'',desc:r.comp,section:curCab,
+    values:{'UPS-A (°C)':fv(r.idA)||'—','UPS-B (°C)':fv(r.idB)||'—'}};});
+  curCab='';
+  const sCondRows=COND_ROWS.map(r=>{curCab=r.cab||curCab;return {no:'',desc:r.comp,section:curCab,
+    values:{'UPS-A':getT(r.idA),'UPS-B':getT(r.idB)}};});
+
+  data.sheets={
+    sFans:{title:'A — Cooling Fans',columns:['UPS-A RPM','UPS-B RPM','UPS-A Status','UPS-B Status'],rows:sFanRows},
+    sElec:{title:'B — Electrical Measurements',columns:['UPS-A','UPS-B'],rows:sElecRows},
+    sVisual:{title:'C — Visual & Functional',columns:['UPS-A','UPS-B'],rows:sVisualRows},
+    sTemp:{title:'D — Temperature',columns:['UPS-A (°C)','UPS-B (°C)'],rows:sTempRows},
+    sCond:{title:'E — Component Condition',columns:['UPS-A','UPS-B'],rows:sCondRows},
+    sEnv:{title:'F — Environmental',columns:['Value'],rows:[
+      {no:'',desc:'Room Temperature',crit:'≤ 20 °C',values:{Value:fv('env-temp')?(fv('env-temp')+' °C'):'—'}},
+      {no:'',desc:'Relative Humidity',crit:'Record value',values:{Value:fv('env-rh')?(fv('env-rh')+' %'):'—'}},
+      {no:'',desc:'Audible Noise',crit:'< 65 dB(A) @ ≤1.5 m',values:{Value:fv('env-noise')?(fv('env-noise')+' dB(A)'):'—'}},
+      {no:'',desc:'AC Unit (Room Cooling)',crit:'Operating',values:{Value:getT('env-ac')}},
+    ]},
+  };
+
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
   try{const id=await DB.save(data);DB.showSubmitResult(true,'Data berhasil disimpan! ID: '+id);}

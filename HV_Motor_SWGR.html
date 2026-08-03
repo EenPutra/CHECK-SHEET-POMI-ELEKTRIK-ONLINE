@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -996,82 +997,82 @@ function resetForm(){
 // ═══════════════════════════════════════════════════
 async function submitToDb(){
   const tag    = document.getElementById('tag-search').value.trim();
-  const date   = document.getElementById('wo-date').value;
   const doneBy = document.getElementById('done-by').value.trim();
   if(!tag)    { showNote('❌ Isi Plant Tag No. terlebih dahulu.', 'err'); return; }
-  if(!date)   { showNote('❌ Isi tanggal terlebih dahulu.', 'err'); return; }
+  if(!document.getElementById('wo-date').value) { showNote('❌ Isi tanggal terlebih dahulu.', 'err'); return; }
   if(!doneBy) { showNote('❌ Isi nama Done By terlebih dahulu.', 'err'); return; }
 
   const gv = id => { const e=document.getElementById(id); return e?e.value.trim():''; };
   const gn = id => { const e=document.getElementById(id); return e&&e.value?parseFloat(e.value):null; };
 
-  const items = {};
-  document.querySelectorAll('.r-sel').forEach(sel => {
-    const id = sel.id.replace('res-','');
-    items[id] = { result: sel.value, remark: gv('rmk-'+id) };
-  });
-  const vals = Object.values(items);
-  const countOk = vals.filter(x=>x.result==='OK').length;
-  const countNg = vals.filter(x=>x.result==='NG').length;
-  const countNa = vals.filter(x=>x.result==='N/A').length;
+  const base = DB.collectCheckSheetData('hvswgr', tag, gv('tag-desc')||'HV Motor SWGR PM', 'YEARLY');
+  base.checkedBy = base.checkedBy || doneBy;
+  base.recommendations = base.recommendations || gv('actions-taken');
+  base.maintPurpose = gv('maint-purpose'); base.location = gv('location');
+  base.compartment = gv('compartment'); base.ackDate = gv('ack-date');
+  base.ackBy = gv('ack-by'); base.ackSignature = gv('ack-sign');
+  base.photoCount = PHOTOS.length; base.photoCaptions = PHOTOS.map(p=>p.caption);
+  base.trendPhotoCount = TREND_PHOTOS.length;
+  base.olData = {
+    heaterCode: document.getElementById('ol-code').textContent,
+    ratingPlug: document.getElementById('ol-plug').textContent,
+    olSetting:  document.getElementById('ol-setting').textContent,
+    size: olSize
+  };
 
-  const data = {
-    type:'hv_motor_swgr', assetTag:tag, assetName:gv('tag-desc'),
-    executionDate:date, doneBy, woNumber:gv('wo-no'),
-    maintPurpose:gv('maint-purpose'), location:gv('location'),
-    compartment:gv('compartment'), ackDate:gv('ack-date'), ackBy:gv('ack-by'), ackSignature:gv('ack-sign'),
-    motorData:{
-      sn: gv('m-sn'), v:gv('m-v'), power:gv('m-pwr'), sf:gv('m-sf'), mounting:gv('m-mount'), manufacturer:gv('m-mfr')
-    },
-    olData:{
-      heaterCode: document.getElementById('ol-code').textContent,
-      ratingPlug: document.getElementById('ol-plug').textContent,
-      olSetting:  document.getElementById('ol-setting').textContent,
-      size: olSize
-    },
-    megger:{
-      '15s': gn('meg-15s'),
-      '30s': gn('meg-30s'),
-      '45s': gn('meg-45s'),
-      '1m': gn('meg-1m'),
-      '2m': gn('meg-2m'),
-      '3m': gn('meg-3m'),
-      '4m': gn('meg-4m'),
-      '5m': gn('meg-5m'),
-      '6m': gn('meg-6m'),
-      '7m': gn('meg-7m'),
-      '8m': gn('meg-8m'),
-      '9m': gn('meg-9m'),
-      '10m': gn('meg-10m')
-    },
-    pi: gv('pi-val'),
-    dar: gv('dar-val'),
-    resistance:{ t12:gn('res-t12'), t13:gn('res-t13'), t23:gn('res-t23') },
-    rtdValues: Array.from(document.querySelectorAll('.rtd-input')).map(el => el.value.trim()).filter(v => v !== ''),
-    motorProtection:{
-      starts: gv('mpr-1'), emergencyStarts: gv('mpr-2'), starterOps: gv('mpr-3'), runningHours: gv('mpr-4'), lastTripCause: gv('mpr-5'), lastTripTime: gv('mpr-6')
-    },
-    dcsReadings:{
-      stator1: gv('dcs-stator-1'), stator2: gv('dcs-stator-2'), stator3: gv('dcs-stator-3'), bearing1: gv('dcs-bearing-1'), bearing2: gv('dcs-bearing-2')
-    },
-    trendPhotoCount: TREND_PHOTOS.length,
-    checkItems:items, countOk, countNg, countNa,
-    overallStatus: gv('overall-result') || (countNg>0?'NG':'OK'),
-    findings: gv('findings'),
-    actionsTaken: gv('actions-taken'),
-    overallResult: gv('overall-result'),
-    nextPmDate: gv('next-pm'),
-    photoCount: PHOTOS.length,
-    photoCaptions: PHOTOS.map(p=>p.caption),
-    createdAt: new Date().toISOString(),
-    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+  const sels = [...document.querySelectorAll('.r-sel')];
+  base.countOk = sels.filter(s=>s.value==='OK').length;
+  base.countNg = sels.filter(s=>s.value==='NG').length;
+  base.countNa = sels.filter(s=>s.value==='N/A').length;
+  base.overallStatus = gv('overall-result') || (base.countNg>0?'NG':'OK');
+
+  const MEG_POINTS=[['15s','meg-15s'],['30s','meg-30s'],['45s','meg-45s'],['1m','meg-1m'],['2m','meg-2m'],['3m','meg-3m'],['4m','meg-4m'],['5m','meg-5m'],['6m','meg-6m'],['7m','meg-7m'],['8m','meg-8m'],['9m','meg-9m'],['10m','meg-10m']];
+  const rtdVals = Array.from(document.querySelectorAll('.rtd-input')).map(el => el.value.trim()).filter(v => v !== '');
+
+  base.sheets = {
+    sCheck:{title:'Check Items',columns:['Result','Remark'],rows:CHECKS.filter(chk=>!chk.special).map(chk=>({no:String(chk.no),desc:chk.task.replace(/<br>/g,' '),section:chk.comp,
+      values:{Result:gv('res-'+chk.crit[0].id)||'—',Remark:gv('rmk-'+chk.crit[0].id)||'—'}}))},
+    sMegger:{title:'Item 16 — Insulation Resistance Trend (Megger)',columns:['Value (MΩ)'],rows:MEG_POINTS.map(([lbl,id])=>({no:'',desc:lbl,values:{'Value (MΩ)':gv(id)||'—'}}))},
+    sPiDar:{title:'Item 17 — PI / DAR',columns:['Value'],rows:[
+      {no:'',desc:'PI (10m / 1m)',values:{Value:gv('pi-val')||'—'}},
+      {no:'',desc:'DAR (1m / 30s)',values:{Value:gv('dar-val')||'—'}},
+    ]},
+    sResistance:{title:'Item 18 — Three Phase Resistance',columns:['Resistance (Ω)','Result','Remark'],rows:[
+      {no:'',desc:'T1 – T2',values:{'Resistance (Ω)':gv('res-t12')||'—',Result:gv('res-c12a')||'—',Remark:gv('rmk-c12a')||'—'}},
+      {no:'',desc:'T1 – T3',values:{'Resistance (Ω)':gv('res-t13')||'—',Result:gv('res-c12b')||'—',Remark:gv('rmk-c12b')||'—'}},
+      {no:'',desc:'T2 – T3',values:{'Resistance (Ω)':gv('res-t23')||'—',Result:gv('res-c12c')||'—',Remark:gv('rmk-c12c')||'—'}},
+    ]},
+    sRTD:{title:'Item 20 — RTD Values (Winding & Bearing)',columns:['Value'],rows:rtdVals.length?rtdVals.map((v,i)=>({no:String(i+1),desc:'RTD '+(i+1),values:{Value:v}})):[{no:'',desc:'No RTD values recorded',values:{Value:'—'}}]},
+    sMotorProtection:{title:'Item 21 — Motor Protection Relay',columns:['Value'],rows:[
+      {no:'1',desc:'Number of motor starts',values:{Value:gv('mpr-1')||'—'}},
+      {no:'2',desc:'Number of emergency starts',values:{Value:gv('mpr-2')||'—'}},
+      {no:'3',desc:'Starter operations',values:{Value:gv('mpr-3')||'—'}},
+      {no:'4',desc:'Running hours',values:{Value:gv('mpr-4')||'—'}},
+      {no:'5',desc:'Cause of last trip',values:{Value:gv('mpr-5')||'—'}},
+      {no:'6',desc:'Time of last trip',values:{Value:gv('mpr-6')||'—'}},
+    ]},
+    sDcs:{title:'Item 22 — DCS Readings',columns:['Value'],rows:[
+      {no:'1',desc:'Stator RTD 1',values:{Value:gv('dcs-stator-1')||'—'}},
+      {no:'2',desc:'Stator RTD 2',values:{Value:gv('dcs-stator-2')||'—'}},
+      {no:'3',desc:'Stator RTD 3',values:{Value:gv('dcs-stator-3')||'—'}},
+      {no:'4',desc:'Bearing DE',values:{Value:gv('dcs-bearing-1')||'—'}},
+      {no:'5',desc:'Bearing NDE',values:{Value:gv('dcs-bearing-2')||'—'}},
+    ]},
+    sMotor:{title:'Basic Motor Data',columns:['Value'],rows:[
+      {no:'',desc:'Serial Number',values:{Value:gv('m-sn')||'—'}},
+      {no:'',desc:'Voltage',values:{Value:gv('m-v')||'—'}},
+      {no:'',desc:'Power',values:{Value:gv('m-pwr')||'—'}},
+      {no:'',desc:'Service Factor',values:{Value:gv('m-sf')||'—'}},
+      {no:'',desc:'Mounting',values:{Value:gv('m-mount')||'—'}},
+      {no:'',desc:'Manufacturer',values:{Value:gv('m-mfr')||'—'}},
+    ]},
   };
 
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    const ref = await db.collection('hv_motor_swgr').add(data);
-    showNote('✅ Data berhasil disimpan. ID: '+ref.id, 'ok');
-    document.getElementById('doc-id-display').textContent = 'DOC: '+ref.id;
+    const id = await DB.save(base);
+    showNote('✅ Data berhasil disimpan. ID: '+id, 'ok');
+    document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
     showNote('❌ Gagal simpan: '+e.message, 'err');
   }

@@ -1215,6 +1215,69 @@ function printPage(){
 
 async function submitToDb(){
   const data=DB.collectCheckSheetData('dry-trafo','DRY-XFMR-USST','Dry Transformer USST','2 YEARLY');
+  data.checkedBy=data.checkedBy||document.getElementById('done-by')?.value.trim()||'';
+  data.reviewedBy=data.reviewedBy||document.getElementById('ack-by')?.value.trim()||'';
+  data.findings=data.findings||document.getElementById('comments')?.value.trim()||'';
+  data.recommendations=data.recommendations||document.getElementById('actions')?.value.trim()||'';
+
+  const rmk=[...document.querySelectorAll('.remark-inp')].map(el=>el.value.trim()||'—');
+
+  data.sheets={
+    s1_5:{title:'Items 1–5 — De-energized Inspection',columns:['Result','Remark'],rows:[
+      {no:'1',desc:'Cleaning XFMR and all accessories by vacuum cleaner (de-energized)',crit:'Clean all surfaces',values:{Result:gT('tog-1'),Remark:rmk[0]}},
+      {no:'2',desc:'Check all bolts connection for tightness',crit:'Per torque table',values:{Result:gT('tog-2'),Remark:rmk[1]}},
+      {no:'3',desc:'Check insulation winding for sign of deterioration or overheating',crit:'No deterioration / No overheating',values:{Result:gT('tog-3'),Remark:rmk[2]}},
+      {no:'4',desc:'Inspect all parts for any sign of corrosion or damage',crit:'No corrosion / No damage',values:{Result:gT('tog-4'),Remark:rmk[3]}},
+      {no:'5',desc:'Check the fans and ensure that can be operated properly',crit:'All fans OK',values:{Result:gT('tog-5'),Remark:rmk[4]}},
+    ]},
+    s6:{title:'Item 6 — Insulation Resistance & PI Test',columns:['1 min (MΩ)','10 min (MΩ)','PI Value','Result'],rows:[
+      {no:'1',desc:'HV (jumper together) – Ground',crit:'PI ≥ 1.5',values:{'1 min (MΩ)':v('hv-gnd-1m')||'—','10 min (MΩ)':v('hv-gnd-10m')||'—','PI Value':v('pi-hv-gnd')||'—',Result:gT('tog-6gnd1')}},
+      {no:'2',desc:'LV (jumper together) – Ground',crit:'PI ≥ 1.5',values:{'1 min (MΩ)':v('lv-gnd-1m')||'—','10 min (MΩ)':v('lv-gnd-10m')||'—','PI Value':v('pi-lv-gnd')||'—',Result:gT('tog-6gnd2')}},
+    ]},
+    s6res:{title:'Item 6 — Winding Temp & Resistance',columns:['Value'],rows:[
+      {no:'',desc:'Winding Temperature During Megger Test',values:{Value:v('winding-temp')?(v('winding-temp')+'°C'):'—'}},
+      {no:'',desc:'Winding Resistance H1-H2 (Ω)',values:{Value:v('wr-h1h2')||'—'}},
+      {no:'',desc:'Winding Resistance H1-H3 (Ω)',values:{Value:v('wr-h1h3')||'—'}},
+      {no:'',desc:'Winding Resistance H2-H3 (Ω)',values:{Value:v('wr-h2h3')||'—'}},
+      {no:'',desc:'Winding Resistance X1-X2 (Ω)',values:{Value:v('wr-x1x2')||'—'}},
+      {no:'',desc:'Winding Resistance X1-X3 (Ω)',values:{Value:v('wr-x1x3')||'—'}},
+      {no:'',desc:'Winding Resistance X2-X3 (Ω)',values:{Value:v('wr-x2x3')||'—'}},
+    ]},
+    s7:{title:'Item 7 — Reconnection & Bolt Tightness',columns:['Result','Remark'],rows:[
+      {no:'',desc:'Reconnect HV side — check all bolts for tightness',crit:'Torque: 16 lbft',values:{Result:gT('tog-7hv'),Remark:rmk[5]}},
+      {no:'',desc:'Reconnect LV side — check all bolts for tightness',crit:'Torque: 30 lbft',values:{Result:gT('tog-7lv'),Remark:rmk[6]}},
+    ]},
+    s8:{title:'Item 8 — TC Type K Sensor Calibration',columns:['Actual Reading (°C)','Deviation','Result'],rows:[
+      {no:'',desc:'TC Sensor — Phase R (Primary)',values:{'Actual Reading (°C)':v('tc-r-pri')||'—',Deviation:v('tc-r-dev')||'—',Result:gT('tog-8r')}},
+      {no:'',desc:'TC Sensor — Phase S (Primary)',values:{'Actual Reading (°C)':v('tc-s-pri')||'—',Deviation:v('tc-s-dev')||'—',Result:gT('tog-8s')}},
+      {no:'',desc:'TC Sensor — Phase T (Primary)',values:{'Actual Reading (°C)':v('tc-t-pri')||'—',Deviation:v('tc-t-dev')||'—',Result:gT('tog-8t')}},
+    ]},
+    s9:{title:'Item 9 — ETM Energize & Indicating Lamps',columns:['Result','Remark'],rows:[
+      {no:'',desc:'All indicating lamps functional',crit:'All lamps OK',values:{Result:gT('tog-9lamp'),Remark:rmk[7]}},
+      {no:'',desc:'Display temperature reading (record)',crit:'Record value',values:{Result:(v('etm-disp-temp')?v('etm-disp-temp')+'°C':'—'),Remark:rmk[8]}},
+      {no:'',desc:'Test alarm function',crit:'Alarm activated',values:{Result:gT('tog-9alarm'),Remark:rmk[9]}},
+      {no:'',desc:'No blown fuses',crit:'All fuses intact',values:{Result:gT('tog-9fuse'),Remark:rmk[10]}},
+      {no:'',desc:'No looseness on connection',crit:'All connections tight',values:{Result:gT('tog-9conn'),Remark:rmk[11]}},
+      {no:'',desc:'No corrosion or damage on ETM',crit:'No corrosion/damage',values:{Result:gT('tog-9corr'),Remark:rmk[12]}},
+    ]},
+    s10:{title:'Item 10 — ETM Temperature Settings',columns:['Standard Value','Actual Reading','Result'],rows:[
+      {no:'',desc:'FAN Setting',values:{'Standard Value':'140°C','Actual Reading':(v('etm-fan')?v('etm-fan')+'°C':'—'),Result:gT('tog-fan')}},
+      {no:'',desc:'ALARM Setting',values:{'Standard Value':'150°C','Actual Reading':(v('etm-alarm')?v('etm-alarm')+'°C':'—'),Result:gT('tog-alarm')}},
+      {no:'',desc:'TRIP Setting',values:{'Standard Value':'200°C','Actual Reading':(v('etm-trip')?v('etm-trip')+'°C':'—'),Result:gT('tog-trip')}},
+    ]},
+    s11:{title:'Item 11 — Fan Operation Test',columns:['Test Duration','Result','Remark'],rows:[
+      {no:'',desc:'Fan 1 — Manual operation test',values:{'Test Duration':'1 min → 10 min',Result:gT('tog-11f1'),Remark:rmk[13]}},
+      {no:'',desc:'Fan 2 — Manual operation test',values:{'Test Duration':'1 min → 10 min',Result:gT('tog-11f2'),Remark:rmk[14]}},
+      {no:'',desc:'Fan 3 — Manual operation test',values:{'Test Duration':'1 min → 10 min',Result:gT('tog-11f3'),Remark:rmk[15]}},
+      {no:'',desc:'Heater — Manual operation test',values:{'Test Duration':'Operation check',Result:gT('tog-11htr'),Remark:rmk[16]}},
+    ]},
+    s12:{title:'Item 12 — Max. Temperature Record',columns:['Value'],rows:[
+      {no:'',desc:'Max. Temp Before Cleaning',values:{Value:v('temp-before')||'—'}},
+      {no:'',desc:'Max. Temp After Cleaning',values:{Value:v('temp-after')||'—'}},
+      {no:'',desc:'Result',values:{Value:gT('tog-12temp')}},
+    ]},
+  };
+
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
   try{

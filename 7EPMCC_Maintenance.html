@@ -934,6 +934,21 @@ function printPage(){
 
 async function submitToDb(){
   const data=DB.collectCheckSheetData('mcc','7EP-MCC','MCC Switchboard PM','4 YEARLY');
+  const iv=id=>{const e=document.getElementById(id);return e&&e.value.trim()?e.value.trim():'—'};
+  data.checkedBy=data.checkedBy||document.getElementById('done-by')?.value.trim()||'';
+  data.reviewedBy=data.reviewedBy||document.getElementById('ack-by')?.value.trim()||'';
+  data.findings=data.findings||document.getElementById('comments')?.value.trim()||'';
+  data.recommendations=data.recommendations||document.getElementById('actions')?.value.trim()||'';
+
+  data.sheets={
+    check:{
+      title:'MCC Switchboard — Check Items',
+      columns:['Result','Remark'],
+      rows:ITEMS.map(item=>({no:item.no,desc:item.desc,crit:item.crit,
+        values:{Result:ST['item_'+item.no]||'—',Remark:iv('rmk_'+item.no)}}))
+    }
+  };
+
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
   try{

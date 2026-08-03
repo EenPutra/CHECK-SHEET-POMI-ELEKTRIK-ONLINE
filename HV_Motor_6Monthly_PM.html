@@ -8,6 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -628,49 +629,45 @@ function resetForm(){
 // ═══════════════════════════════════════════════════
 async function submitToDb(){
   const tag    = document.getElementById('tag-search').value.trim();
-  const date   = document.getElementById('wo-date').value;
   const doneBy = document.getElementById('done-by').value.trim();
   if(!tag)    { showNote('❌ Isi Plant Tag No. terlebih dahulu.', 'err'); return; }
-  if(!date)   { showNote('❌ Isi tanggal terlebih dahulu.', 'err'); return; }
+  if(!document.getElementById('wo-date').value) { showNote('❌ Isi tanggal terlebih dahulu.', 'err'); return; }
   if(!doneBy) { showNote('❌ Isi nama Done By terlebih dahulu.', 'err'); return; }
 
   const gv = id => { const e=document.getElementById(id); return e?e.value.trim():''; };
 
-  const items = {};
-  document.querySelectorAll('.r-sel').forEach(sel => {
-    const id = sel.id.replace('res-','');
-    items[id] = { result: sel.value, remark: gv('rmk-'+id) };
-  });
-  const vals = Object.values(items);
-  const countOk = vals.filter(x=>x.result==='OK').length;
-  const countNg = vals.filter(x=>x.result==='NG').length;
-  const countNa = vals.filter(x=>x.result==='N/A').length;
+  const base = DB.collectCheckSheetData('hv6m', tag, gv('tag-desc')||'HV Motor 6-Monthly PM', '6 MONTHLY');
+  base.checkedBy = base.checkedBy || doneBy;
+  base.recommendations = base.recommendations || gv('actions-taken');
+  base.maintPurpose = gv('maint-purpose'); base.location = gv('location');
+  base.compartment = gv('compartment'); base.ackDate = gv('ack-date');
+  base.ackBy = gv('ack-by'); base.ackSignature = gv('ack-sign');
+  base.photoCount = PHOTOS.length; base.photoCaptions = PHOTOS.map(p=>p.caption);
 
-  const data = {
-    type:'hv_motor_6monthly_pm', assetTag:tag, assetName:gv('tag-desc'),
-    executionDate:date, doneBy, woNumber:gv('wo-no'),
-    maintPurpose:gv('maint-purpose'), location:gv('location'),
-    compartment:gv('compartment'), ackDate:gv('ack-date'), ackBy:gv('ack-by'), ackSignature:gv('ack-sign'),
-    motorData:{
-      sn: gv('m-sn'), v:gv('m-v'), power:gv('m-pwr'), sf:gv('m-sf'), mounting:gv('m-mount'), manufacturer:gv('m-mfr')
-    },
-    checkItems:items, countOk, countNg, countNa,
-    overallStatus: gv('overall-result') || (countNg>0?'NG':'OK'),
-    findings: gv('findings'),
-    actionsTaken: gv('actions-taken'),
-    overallResult: gv('overall-result'),
-    nextPmDate: gv('next-pm'),
-    photoCount: PHOTOS.length,
-    photoCaptions: PHOTOS.map(p=>p.caption),
-    createdAt: new Date().toISOString(),
-    submittedAt: firebase.firestore.FieldValue.serverTimestamp()
+  const sels = [...document.querySelectorAll('.r-sel')];
+  base.countOk = sels.filter(s=>s.value==='OK').length;
+  base.countNg = sels.filter(s=>s.value==='NG').length;
+  base.countNa = sels.filter(s=>s.value==='N/A').length;
+  base.overallStatus = gv('overall-result') || (base.countNg>0?'NG':'OK');
+
+  base.sheets = {
+    sCheck:{title:'Check Items',columns:['Result','Remark'],rows:CHECKS.map(chk=>({no:String(chk.no),desc:chk.task,crit:chk.crit,section:chk.comp,
+      values:{Result:gv('res-'+chk.id)||'—',Remark:gv('rmk-'+chk.id)||'—'}}))},
+    sMotor:{title:'Basic Motor Data',columns:['Value'],rows:[
+      {no:'',desc:'Serial Number',values:{Value:gv('m-sn')||'—'}},
+      {no:'',desc:'Voltage',values:{Value:gv('m-v')||'—'}},
+      {no:'',desc:'Power',values:{Value:gv('m-pwr')||'—'}},
+      {no:'',desc:'Service Factor',values:{Value:gv('m-sf')||'—'}},
+      {no:'',desc:'Mounting',values:{Value:gv('m-mount')||'—'}},
+      {no:'',desc:'Manufacturer',values:{Value:gv('m-mfr')||'—'}},
+    ]},
   };
 
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    const ref = await db.collection('hv_motor_6monthly_pm').add(data);
-    showNote('✅ Data berhasil disimpan. ID: '+ref.id, 'ok');
-    document.getElementById('doc-id-display').textContent = 'DOC: '+ref.id;
+    const id = await DB.save(base);
+    showNote('✅ Data berhasil disimpan. ID: '+id, 'ok');
+    document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
     showNote('❌ Gagal simpan: '+e.message, 'err');
   }

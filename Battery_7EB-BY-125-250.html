@@ -852,8 +852,48 @@ setTimeout(async()=>{
   if(d)showNote('📂 Data terakhir dimuat dari database.','ok');
 },800);
 
+function voltageSheetRows(batId,racks){
+  return racks.map(rack=>({no:rack.name,desc:'',crit:'',values:{
+    'Cell Range 1':rack.rows[0],
+    'V/cell 1':getInpVal(batId+'_cv_'+rack.id+'_0')+' V',
+    'Cell Range 2':rack.rows[1],
+    'V/cell 2':getInpVal(batId+'_cv_'+rack.id+'_1')+' V',
+    'Total Voltage':getInpVal(batId+'_tv_'+rack.id)+' V',
+  }}));
+}
 async function submitToDb(){
   const data=DB.collectCheckSheetData('battery','7EB-BY-125/250','Battery Inspection & Maintenance','PERIODIC');
+
+  const voltCols=['Cell Range 1','V/cell 1','Cell Range 2','V/cell 2','Total Voltage'];
+  data.sheets={
+    sA:{title:'A — 7EB-BY-250 (250 VDC Battery)',columns:['Result'],rows:[
+      {no:'1',desc:'Under Warranty',values:{Result:getTogVal('chk-250-warranty')}},
+      {no:'2',desc:'Check Electrolyte Level',values:{Result:getTogVal('chk-250-electrolyte')}},
+      {no:'3',desc:'Cleaning & Check Voltage',values:{Result:getTogVal('chk-250-cleaning')}},
+    ]},
+    sA2:{title:'A — 7EB-BY-250 Rack Voltage Readings',columns:voltCols,rows:voltageSheetRows('by250',[
+      {name:'Rack 1',id:'r1',rows:['101 ~ 125 + 176 ~ 200','126 ~ 175']},
+      {name:'Rack 2',id:'r2',rows:['1 ~ 25 + 76 ~ 100','26 ~ 75']},
+      {name:'Rack 3',id:'r3',rows:['1 ~ 25 + 76 ~ 100','26 ~ 75']},
+      {name:'Rack 4',id:'r4',rows:['101 ~ 125 + 176 ~ 200','126 ~ 175']},
+    ])},
+    sB:{title:'B — 7EB-BY-125 (125 VDC Battery)',columns:['Result'],rows:[
+      {no:'1',desc:'Under Warranty',values:{Result:getTogVal('chk-125-warranty')}},
+      {no:'2',desc:'Check Electrolyte Level',values:{Result:getTogVal('chk-125-electrolyte')}},
+      {no:'3',desc:'Cleaning & Check Voltage',values:{Result:getTogVal('chk-125-cleaning')}},
+    ]},
+    sB2:{title:'B — 7EB-BY-125 Rack Voltage Readings',columns:voltCols,rows:voltageSheetRows('by125',[
+      {name:'Rack 1',id:'r1',rows:['1 – 46','47 – 92']},
+    ])},
+    sC:{title:'C — Notes & Site Conditions',columns:['Value'],rows:[
+      {no:'1',desc:'Room Temperature',values:{Value:v('room-temp')?(v('room-temp')+' °C'):'—'}},
+      {no:'2',desc:'Ventilation Fan 420A',values:{Value:getTogVal('fan-420a')}},
+      {no:'3',desc:'Ventilation Fan 420B',values:{Value:getTogVal('fan-420b')}},
+      {no:'4',desc:'Note 3',values:{Value:v('note3')||'—'}},
+      {no:'5',desc:'Note 4',values:{Value:v('note4')||'—'}},
+    ]},
+  };
+
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
   try{

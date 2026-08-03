@@ -857,23 +857,17 @@ function collectSheetData(tbId, columns, pfx) {
   return rows;
 }
 
-function collectGISData(tbId, pfx) {
+function collectGISPanel(tbId, pfx) {
   const tb = document.getElementById(tbId);
   if (!tb) return [];
-  const rows = [];
-  tb.querySelectorAll('tr').forEach((tr, i) => {
-    const tds = tr.querySelectorAll('td');
-    const vals = {};
-    for (let j = 0; j < tds.length; j += 2) {
-      if (j + 1 < tds.length) {
-        const tag = tds[j].textContent.trim();
-        const inp = tds[j + 1].querySelector('.mi');
-        if (inp && inp.value) vals[tag] = inp.value;
-      }
-    }
-    if (Object.keys(vals).length > 0) rows.push({ no: i + 1, values: vals });
+  return GTAGS.map((tags, i) => {
+    const values = {};
+    tags.forEach((tag, ti) => {
+      const el = document.getElementById(pfx + '_' + tag);
+      values['Phase ' + 'ABC'[ti]] = el && el.value ? el.value + ' MPa' : '—';
+    });
+    return { no: i + 1, desc: tags.join(' / '), crit: 'Alarm ≥0.45 · Trip ≤0.40 MPa', values };
   });
-  return rows;
 }
 
 async function submitToDb(){
@@ -909,7 +903,8 @@ async function submitToDb(){
   data.sheets.s3 = { title: 'USST', columns: s3cols, rows: collectSheetData('tb-s3', s3cols, 's3'), remark: vv('rmk-s3') };
   data.sheets.s4 = { title: 'Common SST', columns: s4cols, rows: collectSheetData('tb-s4', s4cols, 's4'), remark: vv('rmk-s4') };
   data.sheets.s5 = { title: 'SST CHCB/WH', columns: s5cols, rows: collectSheetData('tb-s5', s5cols, 's5'), remark: vv('rmk-s5') };
-  data.sheets.gis = { title: 'GIS SF₆', rows: collectGISData('tb-gis', 'gis'), remark: vv('gis-rmk') };
+  data.sheets.gis150 = { title: 'GIS SF₆ — 150 kV', columns: ['Phase A','Phase B','Phase C'], rows: collectGISPanel('tb-g150', 'g150') };
+  data.sheets.gis500 = { title: 'GIS SF₆ — 500 kV', columns: ['Phase A','Phase B','Phase C'], rows: collectGISPanel('tb-g500', 'g500'), remark: vv('gis-rmk') };
 
   data.items = [];
   data.measurements = [];
