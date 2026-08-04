@@ -1,0 +1,1465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DMH Conveyor — Motor &amp; Safety Device PM Check Sheet</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1e3a5f;--navy2:#0f2744;--blue:#2563eb;--sky:#7dd3fc;--sky2:#bfdbfe;
+  --bg:#f8fbff;--bg2:#f0f7ff;--surf:#ffffff;--bdr:#bfdbfe;--bdr2:#dbeafe;
+  --ok:#16a34a;--ok2:#15803d;--ok-bg:#dcfce7;--ok-ring:#bbf7d0;
+  --ng:#dc2626;--ng2:#b91c1c;--ng-bg:#fee2e2;--ng-ring:#fecaca;
+  --amber:#d97706;--amber-bg:#fef3c7;
+  --idle:#e5e7eb;--idle-txt:#9ca3af;
+  --txt:#0f172a;--txt2:#1e3a5f;--txt3:#3b82f6;--txt4:#64748b;
+  --mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:100vh}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:100;background:var(--navy2);height:52px;
+  display:flex;align-items:center;padding:0 20px;gap:12px;
+  border-bottom:2px solid var(--blue)}
+.tb-logo{font-family:var(--raj);font-size:20px;font-weight:700;letter-spacing:3px;color:#fff}
+.tb-logo em{color:var(--sky);font-style:normal}
+.tb-sep{width:1px;height:26px;background:rgba(255,255,255,0.15);flex-shrink:0}
+.tb-sub{font-size:11px;color:var(--sky);font-family:var(--mono);letter-spacing:1px;white-space:nowrap}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--sky);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.tb-time{font-family:var(--mono);font-size:12px;color:var(--sky);white-space:nowrap}
+.btn{padding:6px 14px;border-radius:5px;border:none;cursor:pointer;
+  font-family:var(--raj);font-size:13px;font-weight:600;letter-spacing:1px;
+  transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.btn-draft{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)}
+.btn-draft:hover{background:rgba(255,255,255,0.2)}
+.btn-pdf{background:var(--blue);color:#fff}
+.btn-pdf:hover{background:#1d4ed8;transform:translateY(-1px)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-back{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:1px;text-decoration:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);transition:background .15s;white-space:nowrap;cursor:pointer;flex-shrink:0}
+.btn-back:hover{background:rgba(255,255,255,0.2);color:#fff}
+
+/* HERO */
+.hero{background:var(--navy);padding:24px 20px 20px;color:#fff}
+.hero-eyebrow{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--sky)}
+.hero-title{font-family:var(--raj);font-size:clamp(24px,5vw,44px);font-weight:700;line-height:1;color:#fff;letter-spacing:1px}
+.hero-title em{color:var(--sky);font-style:normal}
+.hero-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-top:8px;font-weight:300}
+.hero-stats{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.hstat{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);
+  border-radius:8px;padding:10px 16px;text-align:center;min-width:72px}
+.hstat-n{font-family:var(--raj);font-size:26px;font-weight:700;color:#fff;line-height:1;display:block}
+.hstat-n.ok{color:#4ade80}
+.hstat-n.ng{color:#f87171}
+.hstat-n.pend{color:var(--sky)}
+.hstat-l{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;display:block}
+
+/* SELECTOR BAR */
+.sel-bar{background:var(--navy2);padding:14px 20px;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-end;border-bottom:2px solid var(--blue)}
+.sel-field{display:flex;flex-direction:column;gap:5px}
+.sel-field label{font-size:10px;color:var(--sky);font-weight:600;letter-spacing:1.5px;text-transform:uppercase;font-family:var(--mono)}
+.sel-field select{border:1.5px solid rgba(255,255,255,0.2);border-radius:6px;padding:8px 12px;
+  font-family:var(--raj);font-size:14px;font-weight:600;background:rgba(255,255,255,0.08);color:#fff;min-width:200px}
+.sel-field select:focus{outline:none;border-color:var(--sky)}
+.sel-field select option{color:#0f172a}
+.pm-hint{font-family:var(--mono);font-size:10.5px;color:rgba(255,255,255,0.45);max-width:520px;line-height:1.5}
+
+/* WRAP */
+.wrap{max-width:1300px;margin:0 auto;padding:20px 16px 80px}
+
+/* PANEL */
+.panel{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;
+  margin-bottom:16px;overflow:hidden;box-shadow:0 1px 6px rgba(30,58,95,0.06)}
+.panel.pm-hidden{display:none}
+
+/* WO PANEL */
+.wo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;padding:16px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf label{font-size:10px;color:var(--txt4);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.mf input,.mf select,.mf textarea{border:1.5px solid var(--bdr);border-radius:5px;padding:7px 10px;
+  font-family:var(--sans);font-size:13px;background:var(--bg2);color:var(--txt);
+  transition:border-color .18s;width:100%}
+.mf input:focus,.mf select:focus,.mf textarea:focus{outline:none;border-color:var(--blue);background:#fff}
+.mf input[type=date]{font-family:var(--mono)}
+.mf textarea{resize:vertical;min-height:80px}
+
+/* SECTION HEADER */
+.sec-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;
+  background:var(--navy);cursor:pointer;user-select:none}
+.sec-hdr-icon{width:28px;height:28px;border-radius:6px;background:rgba(37,99,235,0.3);
+  display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.sec-hdr-title{font-family:var(--raj);font-size:15px;font-weight:700;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.sec-hdr-sub{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:1px;margin-left:4px}
+.sec-hdr-cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.4);
+  padding:2px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:10px}
+.sec-hdr-arrow{color:rgba(255,255,255,0.4);font-size:14px;transition:transform .2s;margin-left:6px}
+.sec-hdr.open .sec-hdr-arrow{transform:rotate(180deg)}
+
+/* SUBSECTION LABEL */
+.subsec{padding:9px 16px;background:rgba(37,99,235,0.06);font-family:var(--raj);font-size:12.5px;
+  font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--navy);border-top:1px solid var(--bdr2);border-bottom:1px solid var(--bdr2)}
+.subnote{padding:6px 16px 12px;font-size:11px;color:var(--txt4);font-style:italic;background:var(--bg2)}
+
+/* TABLE WRAPPER */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl-wrap::-webkit-scrollbar{height:4px}
+.tbl-wrap::-webkit-scrollbar-track{background:var(--bg2)}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--sky2);border-radius:2px}
+
+/* CHECK TABLE */
+.ct{width:100%;border-collapse:collapse;font-size:12px}
+.ct th{background:var(--navy);color:var(--sky2);padding:6px 8px;text-align:center;
+  font-family:var(--mono);font-size:9px;letter-spacing:.8px;text-transform:uppercase;
+  white-space:nowrap;border-right:1px solid rgba(255,255,255,0.08)}
+.ct th.tl{text-align:left}
+.ct th:last-child{border-right:none}
+.ct td{padding:6px 8px;border-bottom:1px solid var(--bdr2);background:var(--surf);
+  vertical-align:middle;text-align:center;border-right:1px solid var(--bdr2)}
+.ct td:last-child{border-right:none}
+.ct tr:last-child td{border-bottom:none}
+.ct tr:hover td{background:var(--bg2)}
+.ct td.lbl{text-align:left;color:var(--txt);font-size:11.5px;min-width:190px}
+.ct td.no{font-family:var(--mono);font-size:11px;color:var(--txt4);min-width:24px}
+.ct td.ref{font-family:var(--mono);font-size:9.5px;color:var(--txt3);min-width:110px;white-space:pre-line}
+.ct td.na{font-family:var(--mono);color:var(--txt4);background:var(--bg2)}
+.ct tr.pos-row td{background:var(--amber-bg);font-family:var(--mono);font-size:9.5px;color:var(--amber);font-weight:600}
+.ct tr.ref-sub td{background:rgba(37,99,235,0.05);font-family:var(--mono);font-size:10px;color:var(--navy)}
+.ct td.single{text-align:left}
+
+/* MEAS INPUT */
+.mi{width:70px;font-size:11px;padding:3px 4px;border-radius:3px;font-family:var(--mono);
+  text-align:center;border:1.5px solid var(--bdr);background:var(--bg2);color:var(--txt);
+  transition:border-color .15s}
+.mi:focus{outline:none;border-color:var(--blue);background:#fff}
+
+/* OK/NG BUTTONS */
+.tog{display:inline-flex;gap:3px;justify-content:center}
+.rb{font-size:10px;padding:4px 8px;border-radius:4px;cursor:pointer;font-weight:700;
+  letter-spacing:.5px;border:none;transition:all .15s;font-family:var(--mono)}
+.rb.ok-idle{background:var(--idle);color:var(--idle-txt)}
+.rb.ng-idle{background:var(--idle);color:var(--idle-txt)}
+.rb.ok-act{background:var(--ok);color:#fff;box-shadow:0 0 0 2px var(--ok-ring)}
+.rb.ng-act{background:var(--ng);color:#fff;box-shadow:0 0 0 2px var(--ng-ring)}
+.rb:hover{opacity:0.85;transform:translateY(-1px)}
+
+/* NOTICE */
+.notice{padding:10px 16px;border-radius:6px;font-size:13px;display:none;margin:12px 0 0}
+.notice.ok{background:#dcfce7;border:1px solid #86efac;color:#15803d;display:block}
+.notice.err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;display:block}
+.notice.info{background:#dbeafe;border:1px solid #93c5fd;color:#1e40af;display:block}
+
+/* FOOTER */
+.footer{background:var(--navy2);padding:16px 20px;display:flex;align-items:center;
+  justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:20px}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px}
+
+/* PHOTO / FILE EVIDENCE */
+.evd-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px}
+.btn-add-evd{display:flex;align-items:center;gap:8px;padding:10px 16px;border-radius:6px;
+  border:1.5px dashed var(--blue);background:var(--bg2);color:var(--blue);
+  font-family:var(--raj);font-size:13px;font-weight:700;letter-spacing:1px;cursor:pointer;
+  transition:all .2s;text-transform:uppercase}
+.btn-add-evd:hover{background:#dbeafe;border-style:solid}
+.evd-count{font-family:var(--mono);font-size:11px;color:var(--txt4)}
+.evd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;padding:0 16px 16px}
+.evd-card{background:var(--bg2);border:1.5px solid var(--bdr2);border-radius:8px;overflow:hidden;
+  display:flex;flex-direction:column;transition:border-color .2s}
+.evd-card:hover{border-color:var(--blue)}
+.evd-thumb{position:relative;aspect-ratio:4/3;background:#fff;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.evd-thumb img{width:100%;height:100%;object-fit:cover}
+.evd-thumb .evd-doc-ico{font-size:40px}
+.evd-order{position:absolute;top:5px;left:5px;background:var(--navy);color:#fff;font-family:var(--mono);
+  font-size:11px;font-weight:700;border-radius:10px;padding:2px 8px}
+.evd-del{position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:50%;
+  background:rgba(220,38,38,0.9);color:#fff;border:none;cursor:pointer;font-size:12px;
+  display:flex;align-items:center;justify-content:center}
+.evd-move{position:absolute;bottom:5px;right:5px;display:flex;gap:3px}
+.evd-move button{width:20px;height:20px;border-radius:4px;border:none;background:rgba(15,23,42,0.65);
+  color:#fff;cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center}
+.evd-body{padding:8px 10px;display:flex;flex-direction:column;gap:6px}
+.evd-name{font-size:10px;color:var(--txt4);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.evd-cap{border:1.5px solid var(--bdr);border-radius:5px;padding:6px 8px;font-family:var(--sans);
+  font-size:12px;background:#fff;color:var(--txt);width:100%;resize:vertical;min-height:38px}
+.evd-cap:focus{outline:none;border-color:var(--blue)}
+.evd-empty{padding:0 16px 16px;font-size:12px;color:var(--txt4);font-style:italic}
+
+/* RESPONSIVE */
+@media(max-width:640px){
+  .tb-sub{display:none}
+  .tb-sep{display:none}
+  .hero-stats .hstat{min-width:60px;padding:8px 10px}
+  .hstat-n{font-size:20px}
+  .btn-draft{display:none}
+  .sel-field select{min-width:150px}
+}
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="live-dot"></div>
+  <span class="tb-logo">DMH <em>PM</em></span>
+  <div class="tb-sep"></div>
+  <span class="tb-sub" id="tb-unit-label">DMH A1-1 · MOTOR &amp; SAFETY DEVICE PM</span>
+  <div class="tb-right">
+    <a class="btn-back" href="index.html" title="Back to Portal">&#8592; Portal</a>
+    <span class="tb-time" id="clock">--:--:--</span>
+    <button class="btn btn-draft btn-sm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📥 Download PDF</button>
+    <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero">
+  <div class="hero-eyebrow">Preventive Maintenance Check Sheet</div>
+  <div class="hero-title">DMH <em>CONVEYOR</em> SYSTEM</div>
+  <div class="hero-sub">Belt Feeder · Travelling · Cable Reel · Rail Clamp — Motor &amp; Safety Device PM</div>
+  <div class="hero-stats">
+    <div class="hstat"><span class="hstat-n" id="h-total">0</span><span class="hstat-l">Total</span></div>
+    <div class="hstat"><span class="hstat-n ok" id="h-ok">0</span><span class="hstat-l">OK</span></div>
+    <div class="hstat"><span class="hstat-n ng" id="h-ng">0</span><span class="hstat-l">NG</span></div>
+    <div class="hstat"><span class="hstat-n pend" id="h-pend">0</span><span class="hstat-l">Pending</span></div>
+  </div>
+</div>
+
+<!-- UNIT + PM SELECTOR -->
+<div class="sel-bar">
+  <div class="sel-field">
+    <label>DMH Unit</label>
+    <select id="sel-unit" onchange="onUnitChange()">
+      <option value="A">DMH A1-1</option>
+      <option value="B">DMH A1-2</option>
+      <option value="C">DMH A1-3</option>
+      <option value="D">DMH A1-4</option>
+      <option value="E">DMH A2-1</option>
+      <option value="F">DMH A2-2</option>
+      <option value="G">DMH A2-3</option>
+      <option value="H">DMH A2-4</option>
+    </select>
+  </div>
+  <div class="sel-field">
+    <label>PM Period to Execute</label>
+    <select id="sel-pm" onchange="onPmChange()">
+      <option value="3M">3 Monthly</option>
+      <option value="6M">6 Monthly</option>
+      <option value="1Y">1 Yearly</option>
+      <option value="2Y">2 Yearly</option>
+      <option value="3Y">3 Yearly</option>
+    </select>
+  </div>
+  <div class="pm-hint">Setiap PM period yang lebih besar mencakup seluruh item PM di bawahnya —
+    misal pilih <b>1 Yearly</b> akan menampilkan check sheet 3 Monthly + 6 Monthly + 1 Yearly sekaligus.</div>
+</div>
+
+<div class="wrap">
+
+<!-- DB NOTICE (auto-load) -->
+<div id="notice" class="notice"></div>
+
+<!-- WORK ORDER -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📋</div>
+    <div><div class="sec-hdr-title">Work Order Information</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid">
+      <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
+      <div class="mf"><label>Time</label><input type="time" id="wo-time"></div>
+      <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
+      <div class="mf"><label>Checked By</label><input type="text" id="checked-by" placeholder="Full name"></div>
+      <div class="mf"><label>Reviewed By</label><input type="text" id="reviewed-by" placeholder="Supervisor name"></div>
+      <div class="mf"><label>Shift</label>
+        <select id="shift"><option>Shift 1 (07:00–15:00)</option><option>Shift 2 (15:00–23:00)</option><option>Shift 3 (23:00–07:00)</option><option>Normal Hours</option></select>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 3 MONTHLY ═══════════ -->
+<div class="panel" data-pm="3M">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">⚡</div>
+    <div>
+      <div class="sec-hdr-title">3 Monthly — Safety Devices &amp; Limit Switches</div>
+      <span class="sec-hdr-sub">PM of electrical part at DMH system</span>
+    </div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+
+    <div class="subsec">Basic Motor Data (Reference)</div>
+    <div class="tbl-wrap">
+    <table class="ct" id="tbl-basic">
+      <thead><tr>
+        <th class="tl" style="width:28px">No</th><th class="tl" style="min-width:140px">Item</th>
+        <th id="th-basic-bf"></th><th id="th-basic-t1"></th><th id="th-basic-t2"></th><th id="th-basic-t3"></th>
+        <th id="th-basic-crc"></th><th id="th-basic-crp"></th><th id="th-basic-rc1"></th><th id="th-basic-rc2"></th>
+      </tr></thead>
+      <tbody id="tbody-basic"></tbody>
+    </table>
+    </div>
+
+    <div class="subsec">Circuit Breaker and Motor Starter or Inverter</div>
+    <div class="tbl-wrap">
+    <table class="ct" id="tbl-cb">
+      <thead><tr>
+        <th class="tl" style="width:28px">No</th><th class="tl" style="min-width:220px">Details Instruction</th><th style="min-width:120px">Criteria</th>
+        <th id="th-cb-bf"></th><th id="th-cb-t1"></th><th id="th-cb-t2"></th><th id="th-cb-t3"></th>
+        <th id="th-cb-crc"></th><th id="th-cb-crp"></th><th id="th-cb-rc1"></th><th id="th-cb-rc2"></th>
+      </tr></thead>
+      <tbody id="tbody-cb"></tbody>
+    </table>
+    </div>
+
+    <div class="subsec">Limit Switch — Belt Feeder &amp; Local Control Panel</div>
+    <div class="tbl-wrap">
+    <table class="ct" id="tbl-lsA">
+      <thead>
+        <tr>
+          <th class="tl" style="width:28px" rowspan="3">No</th><th class="tl" style="min-width:210px" rowspan="3">Details Instruction</th><th style="min-width:100px" rowspan="3">Criteria</th>
+          <th colspan="6">Belt Feeder</th><th colspan="2">Local Control Panel</th>
+        </tr>
+        <tr>
+          <th colspan="2">Pull Cord Switch</th><th colspan="2">Belt Alignment Switch</th><th>Chute Plug Switch</th><th>Belt Slip Detector</th>
+          <th>Belt Feeder</th><th>DMH</th>
+        </tr>
+        <tr>
+          <th id="th-lsA-pc1"></th><th id="th-lsA-pc2"></th><th id="th-lsA-al1"></th><th id="th-lsA-al2"></th><th id="th-lsA-cp"></th><th id="th-lsA-sd"></th>
+          <th id="th-lsA-pbf"></th><th id="th-lsA-pdmh"></th>
+        </tr>
+      </thead>
+      <tbody id="tbody-lsA"></tbody>
+    </table>
+    </div>
+
+    <div class="subsec">Limit Switch — Cable Reel Control &amp; Power</div>
+    <div class="tbl-wrap">
+    <table class="ct" id="tbl-lsB">
+      <thead>
+        <tr>
+          <th class="tl" style="width:28px" rowspan="3">No</th><th class="tl" style="min-width:210px" rowspan="3">Details Instruction</th><th style="min-width:100px" rowspan="3">Criteria</th>
+          <th colspan="4">Cable Reel Control</th><th colspan="4">Cable Reel Power</th>
+        </tr>
+        <tr>
+          <th colspan="2">Direction</th><th colspan="2">Over Tention</th>
+          <th colspan="2">Direction</th><th colspan="2">Over Tention</th>
+        </tr>
+        <tr>
+          <th id="th-lsB-ccd1"></th><th id="th-lsB-ccd2"></th><th id="th-lsB-cco1"></th><th id="th-lsB-cco2"></th>
+          <th id="th-lsB-cpd1"></th><th id="th-lsB-cpd2"></th><th id="th-lsB-cpo1"></th><th id="th-lsB-cpo2"></th>
+        </tr>
+      </thead>
+      <tbody id="tbody-lsB"></tbody>
+    </table>
+    </div>
+
+    <div class="subsec">Limit Switch — DMH Position &amp; Travel</div>
+    <div class="tbl-wrap">
+    <table class="ct" id="tbl-lsC">
+      <thead>
+        <tr>
+          <th class="tl" style="width:28px" rowspan="3">No</th><th class="tl" style="min-width:210px" rowspan="3">Details Instruction</th><th style="min-width:100px" rowspan="3">Criteria</th>
+          <th colspan="2">DMH Position</th><th colspan="5">DMH Travel</th>
+        </tr>
+        <tr>
+          <th>Detection</th><th>Collection</th><th colspan="2">Hopper Anchor</th><th>Anti Collision</th><th>Hpr End LS (West)</th><th>Hpr End LS (East)</th>
+        </tr>
+        <tr>
+          <th id="th-lsC-det"></th><th id="th-lsC-col"></th><th id="th-lsC-a1"></th><th id="th-lsC-a2"></th>
+          <th id="th-lsC-ac"></th><th id="th-lsC-w"></th><th id="th-lsC-e"></th>
+        </tr>
+      </thead>
+      <tbody id="tbody-lsC"></tbody>
+    </table>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════ 6 MONTHLY ═══════════ -->
+<div class="panel" data-pm="6M">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🛢️</div>
+    <div>
+      <div class="sec-hdr-title">6 Monthly — Electric Motor PM &amp; Lubrication</div>
+      <span class="sec-hdr-sub">JP-DMH-MTR-6M</span>
+    </div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct" id="tbl-mtr6">
+      <thead><tr>
+        <th class="tl" style="width:28px">No</th><th class="tl" style="min-width:220px">Details Instruction</th><th style="min-width:120px">Criteria</th>
+        <th id="th-mtr6-bf"></th><th id="th-mtr6-t1"></th><th id="th-mtr6-t2"></th><th id="th-mtr6-t3"></th>
+        <th id="th-mtr6-crc"></th><th id="th-mtr6-crp"></th><th id="th-mtr6-rc1"></th><th id="th-mtr6-rc2"></th>
+      </tr></thead>
+      <tbody id="tbody-mtr6"></tbody>
+    </table>
+    </div>
+    <div class="subnote">Note: Grease specification — Shell Alvania EP2 or Almagard NLGI 02 (inject using grease gun).</div>
+  </div>
+</div>
+
+<!-- ═══════════ 1 YEARLY ═══════════ -->
+<div class="panel" data-pm="1Y">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🔧</div>
+    <div>
+      <div class="sec-hdr-title">1 Yearly — Electric Motor PM &amp; Bearing Lubrication</div>
+      <span class="sec-hdr-sub">JP-DMH-MTR-1Y</span>
+    </div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct" id="tbl-mtr1y">
+      <thead><tr>
+        <th class="tl" style="width:28px">No</th><th class="tl" style="min-width:220px">Details Instruction</th><th style="min-width:150px">Criteria</th>
+        <th id="th-mtr1y-bf"></th><th id="th-mtr1y-t1"></th><th id="th-mtr1y-t2"></th><th id="th-mtr1y-t3"></th>
+        <th id="th-mtr1y-crc"></th><th id="th-mtr1y-crp"></th><th id="th-mtr1y-rc1"></th><th id="th-mtr1y-rc2"></th>
+      </tr></thead>
+      <tbody id="tbody-mtr1y"></tbody>
+    </table>
+    </div>
+
+    <div class="subsec" id="th-xfmr-title">Belt Feeder Isolation Transformer 40 kVA / 416V / 380V</div>
+    <div class="tbl-wrap">
+    <table class="ct" id="tbl-xfmr">
+      <thead><tr>
+        <th class="tl" style="width:28px">No</th><th class="tl" style="min-width:220px">Details Instruction</th><th style="min-width:150px">Criteria</th>
+        <th>H1-H2</th><th>H2-H3</th><th>H3-H1</th><th>X1-X2</th><th>X2-X3</th><th>X3-X1</th>
+        <th>H1/H2/H3 to GND</th><th>X1/X2/X3 to GND</th>
+      </tr></thead>
+      <tbody id="tbody-xfmr"></tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 2 YEARLY ═══════════ -->
+<div class="panel" data-pm="2Y">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🔌</div>
+    <div>
+      <div class="sec-hdr-title">2 Yearly — Cable Reel Cleaning &amp; Brush Inspection</div>
+      <span class="sec-hdr-sub">JP-DMH-CR-2Y</span>
+    </div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct" id="tbl-cr2y">
+      <thead><tr>
+        <th class="tl" style="width:28px">No</th><th class="tl" style="min-width:260px">Details Instruction</th><th style="min-width:150px">Criteria</th>
+        <th id="th-cr2y-crc"></th><th id="th-cr2y-crp"></th>
+      </tr></thead>
+      <tbody id="tbody-cr2y"></tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ 3 YEARLY ═══════════ -->
+<div class="panel" data-pm="3Y">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🛠️</div>
+    <div>
+      <div class="sec-hdr-title">3 Yearly — Motor Winding, Termination Box &amp; Bearing Inspection</div>
+      <span class="sec-hdr-sub">JP-DMH-MTR-3Y</span>
+    </div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+    <table class="ct" id="tbl-mtr3y">
+      <thead><tr>
+        <th class="tl" style="width:28px">No</th><th class="tl" style="min-width:220px">Details Instruction</th><th style="min-width:100px">Criteria</th>
+        <th id="th-mtr3y-bf"></th><th id="th-mtr3y-t1"></th><th id="th-mtr3y-t2"></th><th id="th-mtr3y-t3"></th>
+        <th id="th-mtr3y-crc"></th><th id="th-mtr3y-crp"></th><th id="th-mtr3y-rc1"></th><th id="th-mtr3y-rc2"></th>
+      </tr></thead>
+      <tbody id="tbody-mtr3y"></tbody>
+    </table>
+    </div>
+  </div>
+</div>
+
+<!-- PHOTO / FILE EVIDENCE -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📷</div>
+    <div>
+      <div class="sec-hdr-title">Photo &amp; File Evidence</div>
+      <span class="sec-hdr-sub">Foto akan tersusun 3 kolom di PDF sesuai urutan &amp; keterangan</span>
+    </div>
+    <span class="sec-hdr-cnt" id="evd-cnt">0 file</span>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="evd-bar">
+      <input type="file" id="evd-input" multiple accept="image/*,.pdf" style="display:none" onchange="handleEvdFiles(this.files)">
+      <button class="btn-add-evd" onclick="document.getElementById('evd-input').click()">➕ Add Photo / PDF</button>
+      <span class="evd-count">Mendukung JPG, PNG, PDF · Bisa upload banyak sekaligus · Foto otomatis dikompres</span>
+    </div>
+    <div class="evd-empty" id="evd-empty">Belum ada foto atau file dilampirkan.</div>
+    <div class="evd-grid" id="evd-grid"></div>
+  </div>
+</div>
+
+<!-- FINDINGS -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📝</div>
+    <div><div class="sec-hdr-title">Findings &amp; Conclusion</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid" style="padding-bottom:0">
+      <div class="mf">
+        <label>Overall Condition</label>
+        <select id="overall">
+          <option>✅ GOOD — Normal Operation</option>
+          <option>⚠️ FAIR — Requires Monitoring</option>
+          <option>🔧 POOR — Maintenance Required</option>
+          <option>🛑 CRITICAL — Must Shutdown</option>
+        </select>
+      </div>
+      <div class="mf"><label>Next PM Due</label><input type="date" id="next-pm"></div>
+    </div>
+    <div class="wo-grid" style="grid-template-columns:1fr 1fr;padding-top:0">
+      <div class="mf"><label>Findings / Observations</label>
+        <textarea id="findings" placeholder="Catat semua temuan, abnormalitas, atau observasi…"></textarea>
+      </div>
+      <div class="mf"><label>Corrective Actions / Recommendations</label>
+        <textarea id="recommendations" placeholder="Tindakan yang diambil dan rekomendasi tindak lanjut…"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ACTION ROW -->
+<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
+  <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
+  <button class="btn btn-draft" style="background:var(--navy);color:#fff" onclick="saveDraft()">💾 Save Draft</button>
+  <button class="btn btn-pdf" onclick="generatePDF()">📥 Download PDF</button>
+  <button class="btn" style="background:#16a34a;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">&#128202; Submit to Database</button>
+</div>
+
+</div><!-- /wrap -->
+
+<footer class="footer">
+  <div class="footer-l">DMH CONVEYOR SYSTEM · MOTOR &amp; SAFETY DEVICE PM CHECK SHEET</div>
+  <div class="footer-r" id="fdate">—</div>
+</footer>
+
+<script>
+// ══════════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════════
+const UNITS={A:'DMH A1-1',B:'DMH A1-2',C:'DMH A1-3',D:'DMH A1-4',E:'DMH A2-1',F:'DMH A2-2',G:'DMH A2-3',H:'DMH A2-4'};
+const COLS8=['bf','t1','t2','t3','crc','crp','rc1','rc2'];
+const COL_LABEL={bf:'BELT FEEDER',t1:'TRAVELLING #1',t2:'TRAVELLING #2',t3:'TRAVELLING #3',crc:'CABLE REEL CTR',crp:'CABLE REEL PWR',rc1:'RAIL CLAMP #1',rc2:'RAIL CLAMP #2'};
+function mainTag(col,L){
+  if(col==='bf')return 'CCH-FDR-100'+L+'-M';
+  const idx={t1:'1',t2:'2',t3:'3',crc:'4',crp:'5',rc1:'6',rc2:'7'}[col];
+  return 'CCH-HPR-100'+L+idx+'-M';
+}
+const RATED_V={bf:'380 V',t1:'380 V',t2:'380 V',t3:'380 V',crc:'380 V',crp:'380 V',rc1:'380 V',rc2:'380 V'};
+const RATED_P={bf:'40 HP',t1:'10 HP',t2:'10 HP',t3:'10 HP',crc:'1.5 HP',crp:'1.5 HP',rc1:'1.5 HP',rc2:'1.5 HP'};
+const FLA={bf:'60.5 A',t1:'17.1 A',t2:'17.1 A',t3:'17.1 A',crc:'2.5 A',crp:'2.5 A',rc1:'2.5 A',rc2:'2.5 A'};
+const SPEED={bf:'1475',t1:'1345',t2:'1345',t3:'1345',crc:'1425',crp:'1425',rc1:'1425',rc2:'1425'};
+const SFAC={bf:'1.0',t1:'1.0',t2:'1.0',t3:'1.0',crc:'1.15',crp:'1.15',rc1:'1.15',rc2:'1.15'};
+const BKR={bf:'OMRON',t1:'30 A',t2:'30 A',t3:'30 A',crc:'7 A',crp:'7 A',rc1:'7 A',rc2:'7 A'};
+const PLUG={bf:'3G3RX-A4300-V1',t1:'20 A',t2:'20 A',t3:'20 A',crc:'7 A',crp:'7 A',rc1:'7 A',rc2:'7 A'};
+const OLTYPE={bf:'400V/3PH/30KW',t1:'C163B',t2:'C163B',t3:'C163B',crc:'C592A',crp:'C592A',rc1:'C592A',rc2:'C592A'};
+const OLRANGE={bf:'—',t1:'13.3-15.4 A',t2:'13.3-15.4 A',t3:'13.3-15.4 A',crc:'4.96-5.49 A',crp:'4.96-5.49 A',rc1:'4.96-5.49 A',rc2:'4.96-5.49 A'};
+const OLSET={bf:'—',t1:'100%',t2:'100%',t3:'100%',crc:'100%',crp:'100%',rc1:'100%',rc2:'100%'};
+
+const PM_ORDER=['3M','6M','1Y','2Y','3Y'];
+const PM_LABEL={'3M':'3 Monthly','6M':'6 Monthly','1Y':'1 Yearly','2Y':'2 Yearly','3Y':'3 Yearly'};
+
+// ══════════════════════════════════════════════════
+//  CLOCK
+// ══════════════════════════════════════════════════
+function tick(){
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('id-ID');
+  document.getElementById('fdate').textContent=n.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(tick,1000);tick();
+
+function toggleSec(hdr){
+  hdr.classList.toggle('open');
+  const body=hdr.nextElementSibling;
+  body.style.display=hdr.classList.contains('open')?'':'none';
+}
+
+// ══════════════════════════════════════════════════
+//  TOGGLE STATE
+// ══════════════════════════════════════════════════
+const ST={};
+function setBtn(id,val,btn){
+  const par=btn.closest('.tog');
+  par.querySelectorAll('.rb').forEach(b=>{b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle');});
+  if(ST[id]===val){delete ST[id];}
+  else{btn.className='rb '+(val==='OK'?'ok-act':'ng-act');ST[id]=val;}
+  updateStats();
+}
+function mkTog(id){
+  return `<div class="tog">
+    <button class="rb ok-idle" data-v="OK" onclick="setBtn('${id}','OK',this)">✓ OK</button>
+    <button class="rb ng-idle" data-v="NG" onclick="setBtn('${id}','NG',this)">✗ NG</button>
+  </div>`;
+}
+function mkInp(id,w){
+  return `<input class="mi" type="text" id="${id}" placeholder="—" style="width:${w||70}px">`;
+}
+function updateStats(){
+  const vals=Object.values(ST);
+  const ok=vals.filter(v=>v==='OK').length;
+  const ng=vals.filter(v=>v==='NG').length;
+  const tot=document.querySelectorAll('.panel:not(.pm-hidden) .tog').length;
+  document.getElementById('h-total').textContent=tot;
+  document.getElementById('h-ok').textContent=ok;
+  document.getElementById('h-ng').textContent=ng;
+  document.getElementById('h-pend').textContent=Math.max(tot-ok-ng,0);
+}
+
+// ══════════════════════════════════════════════════
+//  BUILD: BASIC MOTOR DATA (reference, read-only)
+// ══════════════════════════════════════════════════
+function buildBasic(){
+  const tb=document.getElementById('tbody-basic');
+  const rows=[
+    ['1','Rated Voltage',RATED_V],['2','Rated Power',RATED_P],['3','Full Load Ampere',FLA],
+    ['4','Speed',SPEED],['5','Service Factor',SFAC],
+  ];
+  tb.innerHTML=rows.map(([no,desc,ref])=>{
+    let h=`<td class="no">${no}</td><td class="lbl">${desc}</td>`;
+    COLS8.forEach(c=>{h+=`<td class="ref">${ref[c]}</td>`;});
+    return `<tr>${h}</tr>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  BUILD: CIRCUIT BREAKER / MOTOR STARTER (3M)
+// ══════════════════════════════════════════════════
+function buildCB(){
+  const tb=document.getElementById('tbody-cb');
+  let h='';
+  function row(no,desc,crit,fn){
+    h+=`<tr><td class="no">${no}</td><td class="lbl">${desc}</td><td class="ref">${crit}</td>`;
+    COLS8.forEach(c=>{h+=`<td>${fn(c)}</td>`;});
+    h+='</tr>';
+  }
+  row('1','Visually inspect panel for any obvious signs of damage','No sign of damage',c=>mkTog('cb_1_'+c));
+  row('2','Remove accumulated dust and dirt using a soft brush or vacuum cleaner','No dust or dirty',c=>mkTog('cb_2_'+c));
+  row('3','Inspect all wiring checking for any deterioration in the insulation and tighten all connections.','No deterioration in insulation\nTightness',c=>mkTog('cb_3_'+c));
+  row('4a','Disconnect the coil of motor contactor and check the contact — dress the contact faces with a fine file if beads formed due to arcing.','Dressing the contact',c=>c==='bf'?'<span class="na">----</span>':mkTog('cb_4a_'+c));
+  row('4b','If contact still defective after dressing, replace the contact.','Replace the contact',c=>c==='bf'?'<span class="na">----</span>':mkTog('cb_4b_'+c));
+  row('5','Operate each magnetic device by hand to ensure that moving parts operate freely.','Moving parts operate freely',c=>mkTog('cb_5_'+c));
+  h+=`<tr class="ref-sub"><td class="no">6</td><td class="lbl" rowspan="5" style="vertical-align:top">Check motor overload setting and compare with motor full load amps.</td><td class="ref">Bkr capacity</td>`;
+  COLS8.forEach(c=>h+=`<td class="ref">${BKR[c]}</td>`);h+='</tr>';
+  h+=`<tr class="ref-sub"><td class="no"></td><td class="ref">Rating Plug</td>`;COLS8.forEach(c=>h+=`<td class="ref">${PLUG[c]}</td>`);h+='</tr>';
+  h+=`<tr class="ref-sub"><td class="no"></td><td class="ref">OL type</td>`;COLS8.forEach(c=>h+=`<td class="ref">${OLTYPE[c]}</td>`);h+='</tr>';
+  h+=`<tr class="ref-sub"><td class="no"></td><td class="ref">OL range</td>`;COLS8.forEach(c=>h+=`<td class="ref">${OLRANGE[c]}</td>`);h+='</tr>';
+  h+=`<tr class="ref-sub"><td class="no"></td><td class="ref">OL setting</td>`;COLS8.forEach(c=>h+=`<td class="ref">${OLSET[c]}</td>`);h+='</tr>';
+  row('7','Check all indicating lights and replace as required','',c=>mkTog('cb_7_'+c));
+  tb.innerHTML=h;
+}
+
+// ══════════════════════════════════════════════════
+//  BUILD: LIMIT SWITCH MINI-TABLES (shared 4-item pattern)
+// ══════════════════════════════════════════════════
+const LS_ITEMS=[
+  ['1','Cleaning termination box or local panel','Clean'],
+  ['2','Check cable termination (termination seal, conduit, cable connection and dust).','No looseness\nClean'],
+  ['3','Retighten of cable termination.','No looseness'],
+  ['4','Function test limit switch',''],
+];
+function buildLS(tbodyId,groupKey,cols,posRef,naMap){
+  const tb=document.getElementById(tbodyId);
+  let h='';
+  if(posRef){
+    h+=`<tr class="pos-row"><td colspan="3">Position Reference</td>`;
+    cols.forEach(c=>{h+=`<td>${posRef[c]||''}</td>`;});
+    h+='</tr>';
+  }
+  LS_ITEMS.forEach(([no,desc,crit])=>{
+    h+=`<tr><td class="no">${no}</td><td class="lbl">${desc}</td><td class="ref">${crit}</td>`;
+    cols.forEach(c=>{
+      const na=(naMap&&naMap[c]||[]).includes(no);
+      h+=na?'<td class="na">===</td>':`<td>${mkTog(groupKey+'_'+no+'_'+c)}</td>`;
+    });
+    h+='</tr>';
+  });
+  tb.innerHTML=h;
+}
+
+// ══════════════════════════════════════════════════
+//  BUILD: 6 MONTHLY
+// ══════════════════════════════════════════════════
+function buildMtr6(){
+  const tb=document.getElementById('tbody-mtr6');
+  let h='';
+  function rowSingle(no,desc){
+    h+=`<tr><td class="no">${no}</td><td class="lbl single" colspan="10">${desc} &nbsp; ${mkTog('mtr6_'+no)}</td></tr>`;
+  }
+  function row(no,desc,crit){
+    h+=`<tr><td class="no">${no}</td><td class="lbl">${desc}</td><td class="ref">${crit}</td>`;
+    COLS8.forEach(c=>{h+=`<td>${mkTog('mtr6_'+no+'_'+c)}</td>`;});
+    h+='</tr>';
+  }
+  rowSingle('1','Ensure PTW already issue &amp; equipment has isolate or safe for access.');
+  row('2','Cleaning motor body, air screen &amp; fin cooler.','Clean');
+  row('3','Check motor termination (termination seal, conduit, cable connection and dust).','No looseness\nClean');
+  row('4','Cleaning termination and re-tighten the cable connection.','No looseness');
+  row('5','Adding the lubricant to motor bearing.','Use grease +- 20gr each bearing');
+  row('6','Cleaning old grease &amp; dust at the shaft bearing.','Clean');
+  rowSingle('7','Put back all part to normal condition.');
+  rowSingle('8','Record the PM result into maximo database.');
+  rowSingle('9','Inform to supervisor &amp; raise new WO if any defect found.');
+  tb.innerHTML=h;
+}
+
+// ══════════════════════════════════════════════════
+//  BUILD: 1 YEARLY + ISOLATION TRANSFORMER
+// ══════════════════════════════════════════════════
+function buildMtr1y(){
+  const tb=document.getElementById('tbody-mtr1y');
+  let h='';
+  function rowSingle(no,desc){
+    h+=`<tr><td class="no">${no}</td><td class="lbl single" colspan="10">${desc} &nbsp; ${mkTog('mtr1y_'+no)}</td></tr>`;
+  }
+  function row(no,desc,crit,fn){
+    h+=`<tr><td class="no">${no}</td><td class="lbl">${desc}</td><td class="ref" style="white-space:pre-line">${crit}</td>`;
+    COLS8.forEach(c=>{h+=`<td>${fn(c)}</td>`;});
+    h+='</tr>';
+  }
+  rowSingle('1','Perform all activities PM in 6 monthly periods.');
+  ['T1-T2','T1-T3','T2-T3'].forEach((lbl,i)=>{
+    h+=`<tr><td class="no">${i===0?'2':''}</td><td class="lbl">${i===0?'Check resistance of motor winding &amp; temperature sensor if any.':''}</td><td class="ref">${i===0?'Measured resistance should be within 5% of each other.':''} — ${lbl}</td>`;
+    COLS8.forEach(c=>{h+=`<td>${mkInp('mtr1y_2_'+lbl.replace(/-/g,'')+'_'+c,58)}<span style="font-size:8px;color:var(--txt4);display:block">Ω</span></td>`;});
+    h+='</tr>';
+  });
+  row('3','Check the motor winding each phase (use megger).','Min. insulation resistance not less than 1.5 megaohms — T1/T2/T3-GROUND',c=>mkInp('mtr1y_3_'+c,58)+'<span style="font-size:8px;color:var(--txt4);display:block">MΩ</span>');
+  row('4','Check motor termination, retighten cable connection &amp; check seal bearing.','No looseness\nClean\nNo leak',c=>mkTog('mtr1y_4_'+c));
+  row('5','Replace old grease with new one.','Open drain plug, inject grease until old grease comes out.',c=>mkTog('mtr1y_5_'+c));
+  row('6','Check motor support bolt, retighten if necessary, check any corrosion, etc.','No looseness\nNo dirty or corroded',c=>mkTog('mtr1y_6_'+c));
+  rowSingle('7','Perform housekeeping after the job complete (make sure equipment has ready).');
+  row('8','Monitor the motor during running test.','',c=>mkTog('mtr1y_8_'+c));
+  tb.innerHTML=h;
+
+  const xf=document.getElementById('tbody-xfmr');
+  const XCOLS=['h1h2','h2h3','h3h1','x1x2','x2x3','x3x1','gh','gx'];
+  let xh='';
+  xh+=`<tr><td class="no">1</td><td class="lbl single" colspan="10">Open cover, cleaning and inspect inside transformer — No sign of damage / No dust or dirty &nbsp; ${mkTog('xfmr_1')}</td></tr>`;
+  xh+=`<tr><td class="no">2</td><td class="lbl single" colspan="10">Check cable termination (termination seal, conduit, cable connection and dust) — No looseness / Clean &nbsp; ${mkTog('xfmr_2')}</td></tr>`;
+  xh+=`<tr><td class="no">3</td><td class="lbl">Measure resistance of HV &amp; LV winding</td><td class="ref">Within 5% of each other</td>`;
+  XCOLS.forEach(c=>{xh+=(c==='gh'||c==='gx')?'<td class="na">===</td>':`<td>${mkInp('xfmr_3_'+c,54)}</td>`;});
+  xh+='</tr>';
+  xh+=`<tr><td class="no">4</td><td class="lbl">Measure insulation resistance of HV &amp; LV winding by megger 500 vdc</td><td class="ref">Min. 1.5 megaohms</td>`;
+  XCOLS.forEach(c=>{xh+=(c==='gh'||c==='gx')?`<td>${mkInp('xfmr_4_'+c,54)}</td>`:'<td class="na">===</td>';});
+  xh+='</tr>';
+  xf.innerHTML=xh;
+}
+
+// ══════════════════════════════════════════════════
+//  BUILD: 2 YEARLY (Cable Reel only)
+// ══════════════════════════════════════════════════
+function buildCr2y(){
+  const tb=document.getElementById('tbody-cr2y');
+  let h='';
+  function rowSingle(no,desc){
+    h+=`<tr><td class="no">${no}</td><td class="lbl single" colspan="4">${desc} &nbsp; ${mkTog('cr2y_'+no)}</td></tr>`;
+  }
+  function row(no,desc,crit){
+    h+=`<tr><td class="no">${no}</td><td class="lbl">${desc}</td><td class="ref">${crit}</td>`;
+    ['crc','crp'].forEach(c=>{h+=`<td>${mkTog('cr2y_'+no+'_'+c)}</td>`;});
+    h+='</tr>';
+  }
+  rowSingle('1','Make sure PTW already issue &amp; equipment have safe to access.');
+  rowSingle('2','Perform PM activities of 6 &amp; 12 monthly periods.');
+  row('3','Open cable reel cover &amp; cleaning inside.','No sign of damage\nNo dust or dirty');
+  row('4','Retighten of cable termination.','No looseness');
+  row('5','Brush cleaning, slip ring inspection (replace part if already worn out).','No sign of damage\nNo dust or dirty');
+  h+=`<tr><td class="no">6</td><td class="lbl single" colspan="4">Details instruction see JP attachment.</td></tr>`;
+  rowSingle('7','Inform to supervisor if any defect found &amp; raise new WO for history record.');
+  tb.innerHTML=h;
+}
+
+// ══════════════════════════════════════════════════
+//  BUILD: 3 YEARLY
+// ══════════════════════════════════════════════════
+function buildMtr3y(){
+  const tb=document.getElementById('tbody-mtr3y');
+  let h='';
+  function rowSingle(no,desc){
+    h+=`<tr><td class="no">${no}</td><td class="lbl single" colspan="10">${desc} &nbsp; ${mkTog('mtr3y_'+no)}</td></tr>`;
+  }
+  function row(no,desc){
+    h+=`<tr><td class="no">${no}</td><td class="lbl" colspan="2">${desc}</td>`;
+    COLS8.forEach(c=>{h+=`<td>${mkTog('mtr3y_'+no+'_'+c)}</td>`;});
+    h+='</tr>';
+  }
+  rowSingle('1','Make sure PTW already issue &amp; equipment have safe to access.');
+  rowSingle('2','Perform PM activities of 6 monthly, 1 yearly &amp; 2 yearly periods.');
+  row('3','Lubricate all traverse motor bearing (any 3 motors each DMH).');
+  row('4','Open box termination then disconnect the cable connection.');
+  row('5','Dismantling motor (for stator &amp; rotor inspection).');
+  row('6','Inspect the bearing motor and replace if it already broken.');
+  row('7','Re-assemble motor &amp; running test before install to motor mounting / support.');
+  rowSingle('8','Record PM activity into maximo data base for history data.');
+  h+=`<tr><td class="no">9</td><td class="lbl single" colspan="10">Details see JP attachment.</td></tr>`;
+  tb.innerHTML=h;
+}
+
+// ══════════════════════════════════════════════════
+//  TAG LABEL RENDERING (updates on unit change)
+// ══════════════════════════════════════════════════
+function renderTagLabels(){
+  const L=document.getElementById('sel-unit').value;
+  document.getElementById('tb-unit-label').textContent=UNITS[L]+' · MOTOR & SAFETY DEVICE PM';
+
+  ['basic','cb','mtr6','mtr1y','mtr3y'].forEach(pfx=>{
+    COLS8.forEach(c=>{
+      const el=document.getElementById('th-'+pfx+'-'+c);
+      if(el)el.innerHTML=COL_LABEL[c]+'<br>'+mainTag(c,L);
+    });
+  });
+  ['crc','crp'].forEach(c=>{
+    const el=document.getElementById('th-cr2y-'+c);
+    if(el)el.innerHTML=COL_LABEL[c]+'<br>'+mainTag(c,L);
+  });
+  document.getElementById('th-xfmr-title').innerHTML='Belt Feeder Isolation Transformer 40 kVA / 416V / 380V &nbsp;—&nbsp; '+mainTag('bf',L);
+
+  const lsA={pc1:'CCH-HS-121'+L,pc2:'CCH-HS-122'+L,al1:'CCH-ZSH-121'+L,al2:'CCH-ZSH-122'+L,cp:'CCH-YSH-121'+L,sd:'CCH-SSH-121'+L,pbf:'CCH-CAB-120'+L,pdmh:'CCH-CAB-130'+L};
+  Object.entries(lsA).forEach(([k,v])=>{const el=document.getElementById('th-lsA-'+k);if(el)el.textContent=v;});
+  const lsB={ccd1:'CCH-ZS-135'+L+'C',ccd2:'CCH-ZS-138'+L+'C',cco1:'CCH-ZS-136'+L+'C',cco2:'CCH-ZS-137'+L+'C',cpd1:'CCH-ZS-135'+L+'P',cpd2:'CCH-ZS-138'+L+'P',cpo1:'CCH-ZS-136'+L+'P',cpo2:'CCH-ZS-137'+L+'P'};
+  Object.entries(lsB).forEach(([k,v])=>{const el=document.getElementById('th-lsB-'+k);if(el)el.textContent=v;});
+  const lsC={det:'CCH-ZS-139'+L,col:'CCH-ZS-140'+L,a1:'CCH-ZS-131'+L,a2:'CCH-ZS-132'+L,ac:'CCH-ZSH-134'+L,w:'CCH-ZSH-131'+L,e:'CCH-ZSH-132'+L};
+  Object.entries(lsC).forEach(([k,v])=>{const el=document.getElementById('th-lsC-'+k);if(el)el.textContent=v;});
+}
+
+// ══════════════════════════════════════════════════
+//  PM CASCADE FILTER
+// ══════════════════════════════════════════════════
+function applyPmFilter(){
+  const sel=document.getElementById('sel-pm').value;
+  const selIdx=PM_ORDER.indexOf(sel);
+  document.querySelectorAll('.panel[data-pm]').forEach(p=>{
+    const lvl=p.dataset.pm;
+    p.classList.toggle('pm-hidden', PM_ORDER.indexOf(lvl)>selIdx);
+  });
+  updateStats();
+}
+function onPmChange(){ applyPmFilter(); }
+
+// ══════════════════════════════════════════════════
+//  UNIT SWITCHING (per-unit draft isolation)
+// ══════════════════════════════════════════════════
+let currentUnit=null;
+function collectAllFieldValues(){
+  const d={};
+  document.querySelectorAll('input[type=text],input[type=date],input[type=time],input[type=number],select,textarea:not(.evd-cap)').forEach((el,i)=>{
+    if(el.id==='sel-unit')return;
+    d['f'+i]=el.value;
+  });
+  d._st=ST;
+  d._pm=document.getElementById('sel-pm').value;
+  d._attach=ATTACH.map(a=>({type:a.type,name:a.name,caption:a.caption,dataUrl:a.type==='image'?a.dataUrl:null}));
+  return d;
+}
+function applyAllFieldValues(d){
+  document.querySelectorAll('input[type=text],input[type=date],input[type=time],input[type=number],select,textarea:not(.evd-cap)').forEach((el,i)=>{
+    if(el.id==='sel-unit')return;
+    el.value=(d&&d['f'+i]!==undefined)?d['f'+i]:'';
+  });
+  Object.keys(ST).forEach(k=>delete ST[k]);
+  document.querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
+  if(d&&d._st){
+    Object.entries(d._st).forEach(([id,val])=>{
+      ST[id]=val;
+      const btn=document.querySelector(`.tog .rb[data-v="${val}"][onclick*="'${id}'"]`);
+      if(btn)btn.className='rb '+(val==='OK'?'ok-act':'ng-act');
+    });
+  }
+  if(d&&d._pm)document.getElementById('sel-pm').value=d._pm;
+  ATTACH=(d&&d._attach)?d._attach.map((a,i)=>({...a,id:'evd_'+i})):[];
+  renderEvdGrid();
+  applyPmFilter();
+}
+function unitDraftKey(L){return 'dmh_draft_'+L;}
+function onUnitChange(){
+  const newL=document.getElementById('sel-unit').value;
+  if(currentUnit && currentUnit!==newL){
+    try{localStorage.setItem(unitDraftKey(currentUnit),JSON.stringify(collectAllFieldValues()));}catch(e){}
+  }
+  currentUnit=newL;
+  let raw=null;
+  try{raw=localStorage.getItem(unitDraftKey(newL));}catch(e){}
+  if(raw){
+    try{applyAllFieldValues(JSON.parse(raw));}catch(e){applyAllFieldValues(null);}
+  }else{
+    applyAllFieldValues(null);
+  }
+  renderTagLabels();
+  showNote('📂 Beralih ke '+UNITS[newL]+'.','info');
+}
+
+// ══════════════════════════════════════════════════
+//  PHOTO / FILE EVIDENCE
+// ══════════════════════════════════════════════════
+let ATTACH=[];
+const EVD_MAX_PX=1000,EVD_QUALITY=0.65;
+function compressImageFile(file){
+  return new Promise(resolve=>{
+    const reader=new FileReader();
+    reader.onload=e=>{
+      const img=new Image();
+      img.onload=()=>{
+        const scale=Math.min(1,EVD_MAX_PX/Math.max(img.naturalWidth,img.naturalHeight));
+        const cv=document.createElement('canvas');
+        cv.width=Math.round(img.naturalWidth*scale);
+        cv.height=Math.round(img.naturalHeight*scale);
+        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+        resolve(cv.toDataURL('image/jpeg',EVD_QUALITY));
+      };
+      img.onerror=()=>resolve(e.target.result);
+      img.src=e.target.result;
+    };
+    reader.onerror=()=>resolve(null);
+    reader.readAsDataURL(file);
+  });
+}
+function handleEvdFiles(fileList){
+  Array.from(fileList).forEach(async file=>{
+    const isImg=file.type.startsWith('image/');
+    const isPdf=file.type==='application/pdf'||/\.pdf$/i.test(file.name);
+    if(!isImg&&!isPdf){showNote('❌ '+file.name+' bukan image atau PDF.','err');return;}
+    if(file.size>15*1024*1024){showNote('❌ '+file.name+' terlalu besar (maks 15MB).','err');return;}
+    const entry={id:'evd_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),type:isImg?'image':'pdf',name:file.name,caption:'',dataUrl:null};
+    if(isImg){
+      entry.dataUrl=await compressImageFile(file);
+    }
+    ATTACH.push(entry);
+    renderEvdGrid();
+  });
+  document.getElementById('evd-input').value='';
+}
+function renderEvdGrid(){
+  const grid=document.getElementById('evd-grid');
+  const empty=document.getElementById('evd-empty');
+  const cnt=document.getElementById('evd-cnt');
+  cnt.textContent=ATTACH.length+' file';
+  empty.style.display=ATTACH.length?'none':'block';
+  grid.innerHTML=ATTACH.map((a,i)=>`
+    <div class="evd-card">
+      <div class="evd-thumb">
+        ${a.type==='image'&&a.dataUrl?`<img src="${a.dataUrl}" alt="${a.name}">`:`<div class="evd-doc-ico">📄</div>`}
+        <span class="evd-order">#${i+1}</span>
+        <button class="evd-del" onclick="removeEvd(${i})" title="Remove">✕</button>
+        <div class="evd-move">
+          <button onclick="moveEvd(${i},-1)" title="Move up">▲</button>
+          <button onclick="moveEvd(${i},1)" title="Move down">▼</button>
+        </div>
+      </div>
+      <div class="evd-body">
+        <div class="evd-name">${a.name}</div>
+        <textarea class="evd-cap" placeholder="Keterangan foto/file ini…" oninput="ATTACH[${i}].caption=this.value">${a.caption}</textarea>
+      </div>
+    </div>
+  `).join('');
+}
+function moveEvd(i,dir){
+  const j=i+dir;
+  if(j<0||j>=ATTACH.length)return;
+  [ATTACH[i],ATTACH[j]]=[ATTACH[j],ATTACH[i]];
+  renderEvdGrid();
+}
+function removeEvd(i){
+  ATTACH.splice(i,1);
+  renderEvdGrid();
+}
+
+// ══════════════════════════════════════════════════
+//  DRAFT / RESET
+// ══════════════════════════════════════════════════
+function saveDraft(){
+  try{
+    localStorage.setItem(unitDraftKey(document.getElementById('sel-unit').value),JSON.stringify(collectAllFieldValues()));
+    showNote('💾 Draft tersimpan untuk '+UNITS[document.getElementById('sel-unit').value]+'.','ok');
+  }catch(e){showNote('❌ Gagal menyimpan: '+e.message,'err');}
+}
+function loadDraft(){
+  const L=document.getElementById('sel-unit').value;
+  currentUnit=L;
+  let raw=null;
+  try{raw=localStorage.getItem(unitDraftKey(L));}catch(e){}
+  if(raw){try{applyAllFieldValues(JSON.parse(raw));}catch(e){}}
+  renderTagLabels();
+  applyPmFilter();
+}
+function resetForm(){
+  if(!confirm('Reset semua data pada unit ini? Tindakan ini tidak dapat dibatalkan.'))return;
+  applyAllFieldValues(null);
+  document.getElementById('sel-pm').value='3M';
+  applyPmFilter();
+  updateStats();
+  showNote('🔄 Form direset.','info');
+}
+function showNote(msg,t){
+  const n=document.getElementById('notice');
+  n.textContent=msg;n.className='notice '+t;
+  setTimeout(()=>n.className='notice',4000);
+}
+
+// ══════════════════════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════════════════════
+const v=id=>{const e=document.getElementById(id);return e&&e.value.trim()?e.value.trim():'—'};
+const tv=id=>ST[id]||'—';
+
+// ══════════════════════════════════════════════════
+//  SUBMIT TO DATABASE
+// ══════════════════════════════════════════════════
+async function submitToDb(){
+  const L=document.getElementById('sel-unit').value;
+  const pm=document.getElementById('sel-pm').value;
+  const assetTag=UNITS[L];
+  const base=DB.collectCheckSheetData('dmh',assetTag,'DMH Conveyor Motor & Safety Device PM',PM_LABEL[pm]);
+  if(!base.executionDate){showNote('❌ Isi tanggal eksekusi terlebih dahulu.','err');return;}
+  if(!base.checkedBy){showNote('❌ Isi nama teknisi terlebih dahulu.','err');return;}
+
+  const selIdx=PM_ORDER.indexOf(pm);
+  const sheets={};
+
+  if(selIdx>=0){
+    sheets.sBasic={title:'Basic Motor Data (Reference)',columns:COLS8.map(c=>mainTag(c,L)),rows:[
+      {no:'1',desc:'Rated Voltage',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),RATED_V[c]]))},
+      {no:'2',desc:'Rated Power',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),RATED_P[c]]))},
+      {no:'3',desc:'Full Load Ampere',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),FLA[c]]))},
+      {no:'4',desc:'Speed',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),SPEED[c]]))},
+      {no:'5',desc:'Service Factor',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),SFAC[c]]))},
+    ]};
+    sheets.sCB={title:'3M — Circuit Breaker and Motor Starter or Inverter',columns:COLS8.map(c=>mainTag(c,L)),rows:[
+      {no:'1',desc:'Visually inspect panel for damage',crit:'No sign of damage',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('cb_1_'+c)]))},
+      {no:'2',desc:'Remove accumulated dust and dirt',crit:'No dust or dirty',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('cb_2_'+c)]))},
+      {no:'3',desc:'Inspect all wiring / tighten connections',crit:'No deterioration / Tightness',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('cb_3_'+c)]))},
+      {no:'4a',desc:'Dressing the contact',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),c==='bf'?'----':tv('cb_4a_'+c)]))},
+      {no:'4b',desc:'Replace the contact',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),c==='bf'?'----':tv('cb_4b_'+c)]))},
+      {no:'5',desc:'Operate each magnetic device by hand',crit:'Moving parts operate freely',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('cb_5_'+c)]))},
+      {no:'7',desc:'Check all indicating lights',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('cb_7_'+c)]))},
+    ]};
+
+    function lsRows(groupKey,cols,naMap){
+      return LS_ITEMS.map(([no,desc,crit])=>({no,desc,crit,values:Object.fromEntries(cols.map(c=>{
+        const na=(naMap&&naMap[c]||[]).includes(no);
+        return [c,na?'===':tv(groupKey+'_'+no+'_'+c)];
+      }))}));
+    }
+    sheets.sLsA={title:'3M — Limit Switch: Belt Feeder & Local Control Panel',columns:['pc1','pc2','al1','al2','cp','sd','pbf','pdmh'],
+      rows:lsRows('lsA',['pc1','pc2','al1','al2','cp','sd','pbf','pdmh'],{pbf:['4'],pdmh:['4']})};
+    sheets.sLsB={title:'3M — Limit Switch: Cable Reel Control & Power',columns:['ccd1','ccd2','cco1','cco2','cpd1','cpd2','cpo1','cpo2'],
+      rows:lsRows('lsB',['ccd1','ccd2','cco1','cco2','cpd1','cpd2','cpo1','cpo2'],{})};
+    sheets.sLsC={title:'3M — Limit Switch: DMH Position & Travel',columns:['det','col','a1','a2','ac','w','e'],
+      rows:lsRows('lsC',['det','col','a1','a2','ac','w','e'],{})};
+  }
+  if(selIdx>=1){
+    sheets.sMtr6={title:'6M — Electric Motor PM & Lubrication',columns:COLS8.map(c=>mainTag(c,L)),rows:[
+      {no:'1',desc:'Ensure PTW issue & equipment safe for access',values:{[mainTag('bf',L)]:tv('mtr6_1')}},
+      {no:'2',desc:'Cleaning motor body, air screen & fin cooler',crit:'Clean',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr6_2_'+c)]))},
+      {no:'3',desc:'Check motor termination',crit:'No looseness/Clean',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr6_3_'+c)]))},
+      {no:'4',desc:'Cleaning termination & re-tighten cable',crit:'No looseness',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr6_4_'+c)]))},
+      {no:'5',desc:'Adding lubricant to motor bearing',crit:'+-20gr each bearing',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr6_5_'+c)]))},
+      {no:'6',desc:'Cleaning old grease & dust at shaft bearing',crit:'Clean',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr6_6_'+c)]))},
+      {no:'7',desc:'Put back all part to normal condition',values:{[mainTag('bf',L)]:tv('mtr6_7')}},
+      {no:'8',desc:'Record PM result into maximo database',values:{[mainTag('bf',L)]:tv('mtr6_8')}},
+      {no:'9',desc:'Inform supervisor & raise new WO if defect found',values:{[mainTag('bf',L)]:tv('mtr6_9')}},
+    ]};
+  }
+  if(selIdx>=2){
+    sheets.sMtr1y={title:'1Y — Electric Motor PM & Bearing Lubrication',columns:COLS8.map(c=>mainTag(c,L)),rows:[
+      {no:'1',desc:'Perform all activities PM in 6 monthly periods',values:{[mainTag('bf',L)]:tv('mtr1y_1')}},
+      {no:'2a',desc:'Winding resistance T1-T2',crit:'Within 5% of each other',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),v('mtr1y_2_T1T2_'+c)]))},
+      {no:'2b',desc:'Winding resistance T1-T3',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),v('mtr1y_2_T1T3_'+c)]))},
+      {no:'2c',desc:'Winding resistance T2-T3',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),v('mtr1y_2_T2T3_'+c)]))},
+      {no:'3',desc:'Motor winding megger (MΩ)',crit:'Min. 1.5 megaohms',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),v('mtr1y_3_'+c)]))},
+      {no:'4',desc:'Motor termination / seal bearing check',crit:'No looseness/Clean/No leak',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr1y_4_'+c)]))},
+      {no:'5',desc:'Replace old grease with new one',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr1y_5_'+c)]))},
+      {no:'6',desc:'Check motor support bolt / corrosion',crit:'No looseness/No corrosion',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr1y_6_'+c)]))},
+      {no:'7',desc:'Perform housekeeping after job complete',values:{[mainTag('bf',L)]:tv('mtr1y_7')}},
+      {no:'8',desc:'Monitor the motor during running test',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr1y_8_'+c)]))},
+    ]};
+    const XCOLS=['H1-H2','H2-H3','H3-H1','X1-X2','X2-X3','X3-X1','H-GND','X-GND'];
+    const xids=['h1h2','h2h3','h3h1','x1x2','x2x3','x3x1','gh','gx'];
+    sheets.sXfmr={title:'1Y — Belt Feeder Isolation Transformer '+mainTag('bf',L),columns:XCOLS,rows:[
+      {no:'1',desc:'Open cover, cleaning & inspect inside',crit:'No sign of damage/No dust',values:{[XCOLS[0]]:tv('xfmr_1')}},
+      {no:'2',desc:'Check cable termination',crit:'No looseness/Clean',values:{[XCOLS[0]]:tv('xfmr_2')}},
+      {no:'3',desc:'Measure resistance of HV & LV winding',crit:'Within 5%',values:Object.fromEntries(XCOLS.map((lbl,i)=>[lbl,(xids[i]==='gh'||xids[i]==='gx')?'===':v('xfmr_3_'+xids[i])]))},
+      {no:'4',desc:'Insulation resistance megger 500vdc',crit:'Min. 1.5 megaohms',values:Object.fromEntries(XCOLS.map((lbl,i)=>[lbl,(xids[i]==='gh'||xids[i]==='gx')?v('xfmr_4_'+xids[i]):'===']))},
+    ]};
+  }
+  if(selIdx>=3){
+    sheets.sCr2y={title:'2Y — Cable Reel Cleaning & Brush Inspection',columns:[mainTag('crc',L),mainTag('crp',L)],rows:[
+      {no:'1',desc:'Make sure PTW issue & safe access',values:{[mainTag('crc',L)]:tv('cr2y_1')}},
+      {no:'2',desc:'Perform PM activities of 6 & 12 monthly periods',values:{[mainTag('crc',L)]:tv('cr2y_2')}},
+      {no:'3',desc:'Open cable reel cover & cleaning inside',crit:'No sign of damage/No dust',values:{[mainTag('crc',L)]:tv('cr2y_3_crc'),[mainTag('crp',L)]:tv('cr2y_3_crp')}},
+      {no:'4',desc:'Retighten of cable termination',crit:'No looseness',values:{[mainTag('crc',L)]:tv('cr2y_4_crc'),[mainTag('crp',L)]:tv('cr2y_4_crp')}},
+      {no:'5',desc:'Brush cleaning, slip ring inspection',crit:'No sign of damage/No dust',values:{[mainTag('crc',L)]:tv('cr2y_5_crc'),[mainTag('crp',L)]:tv('cr2y_5_crp')}},
+      {no:'7',desc:'Inform supervisor if defect found & raise WO',values:{[mainTag('crc',L)]:tv('cr2y_7')}},
+    ]};
+  }
+  if(selIdx>=4){
+    sheets.sMtr3y={title:'3Y — Motor Winding, Termination Box & Bearing Inspection',columns:COLS8.map(c=>mainTag(c,L)),rows:[
+      {no:'1',desc:'Make sure PTW issue & safe access',values:{[mainTag('bf',L)]:tv('mtr3y_1')}},
+      {no:'2',desc:'Perform PM activities of 6M, 1Y & 2Y periods',values:{[mainTag('bf',L)]:tv('mtr3y_2')}},
+      {no:'3',desc:'Lubricate all traverse motor bearing (any 3 motors)',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr3y_3_'+c)]))},
+      {no:'4',desc:'Open box termination, disconnect cable',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr3y_4_'+c)]))},
+      {no:'5',desc:'Dismantling motor (stator & rotor inspection)',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr3y_5_'+c)]))},
+      {no:'6',desc:'Inspect bearing motor, replace if broken',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr3y_6_'+c)]))},
+      {no:'7',desc:'Re-assemble motor & running test before install',values:Object.fromEntries(COLS8.map(c=>[mainTag(c,L),tv('mtr3y_7_'+c)]))},
+      {no:'8',desc:'Record PM activity into maximo database',values:{[mainTag('bf',L)]:tv('mtr3y_8')}},
+    ]};
+  }
+
+  base.sheets=sheets;
+  base.pmPeriod=PM_LABEL[pm];
+  base.dmhUnit=assetTag;
+  base.photoCount=ATTACH.filter(a=>a.type==='image').length;
+  base.fileCount=ATTACH.filter(a=>a.type==='pdf').length;
+  base.attachments=ATTACH.map((a,i)=>({order:i+1,type:a.type,name:a.name,caption:a.caption}));
+
+  const allSels=[...document.querySelectorAll('.panel:not(.pm-hidden) .tog')].map(t=>t.querySelector('.rb'));
+  base.countOk=[...document.querySelectorAll('.panel:not(.pm-hidden) .rb.ok-act')].length;
+  base.countNg=[...document.querySelectorAll('.panel:not(.pm-hidden) .rb.ng-act')].length;
+  base.countNa=0;
+  base.overallStatus=v('overall')!=='—'?v('overall'):(base.countNg>0?'NG':'OK');
+
+  try{
+    const id=await DB.save(base);
+    showNote('✅ Data berhasil disimpan ke database! ID: '+id,'ok');
+  }catch(e){
+    showNote('❌ Gagal menyimpan: '+e.message,'err');
+  }
+}
+
+// ══════════════════════════════════════════════════
+//  PDF EXPORT — mirrors the Excel check sheet layout
+// ══════════════════════════════════════════════════
+async function generatePDF(){
+  showNote('⏳ Membuat PDF…','info');
+  await new Promise(r=>setTimeout(r,150));
+  const{jsPDF}=window.jspdf||{};
+  if(!jsPDF){showNote('❌ jsPDF gagal dimuat. Pastikan koneksi internet aktif.','err');return;}
+  const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=297,H=210,M=8;let y=M;
+  const NAVY=[30,58,95],BLUE=[37,99,235],SKY=[125,211,252],LT=[240,247,255],
+        OK=[22,163,74],NG=[220,38,38],AMBER=[217,119,6],AMBERBG=[254,243,199],GRAY=[100,116,139];
+  const L=document.getElementById('sel-unit').value;
+  const pm=document.getElementById('sel-pm').value;
+  const selIdx=PM_ORDER.indexOf(pm);
+
+  function nPage(){pdf.addPage();y=M;miniHdr();}
+  function ckY(n){if(y+n>H-M)nPage();}
+  function miniHdr(){
+    pdf.setFillColor(...NAVY);pdf.rect(0,0,W,7,'F');
+    pdf.setTextColor(...SKY);pdf.setFont('helvetica','bold');pdf.setFontSize(7);
+    pdf.text('DMH CONVEYOR — '+UNITS[L]+' — '+PM_LABEL[pm]+' PM',M,4.8);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(6);
+    pdf.text(`Date: ${v('wo-date')}  By: ${v('checked-by')}`,W-M,4.8,{align:'right'});
+    y=10;
+  }
+  function secBar(title){
+    ckY(9);
+    pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,6,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8);
+    pdf.text('» '+title,M+2,y+4.3);
+    y+=8;
+  }
+  const baseStyle={font:'helvetica',fontSize:6.3,cellPadding:1.3,textColor:[15,23,42],lineColor:SKY,lineWidth:0.15};
+  const headStyle={fillColor:NAVY,textColor:SKY,fontStyle:'bold',fontSize:6,halign:'center'};
+  function fitTable(opts){
+    pdf.autoTable({startY:y,theme:'grid',styles:baseStyle,headStyles:headStyle,margin:{left:M,right:M},
+      didParseCell:d=>{
+        const t=(d.cell.text||[]).join('');
+        if(t==='OK'){d.cell.styles.textColor=OK;d.cell.styles.fontStyle='bold';}
+        if(t==='NG'){d.cell.styles.textColor=NG;d.cell.styles.fontStyle='bold';}
+      },...opts});
+    y=pdf.lastAutoTable.finalY+3;
+  }
+
+  // COVER
+  pdf.setFillColor(...NAVY);pdf.rect(0,0,W,26,'F');
+  pdf.setFillColor(...BLUE);pdf.rect(0,24.5,W,1.5,'F');
+  pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(15);
+  pdf.text('DMH CONVEYOR SYSTEM — PM CHECK SHEET',M,12);
+  pdf.setFontSize(9);pdf.setTextColor(...SKY);
+  pdf.text(UNITS[L]+' — '+PM_LABEL[pm]+' Preventive Maintenance',M,19);
+  pdf.setFontSize(7);pdf.setFont('helvetica','normal');
+  pdf.text('Generated: '+new Date().toLocaleString('en-GB'),W-M,19,{align:'right'});
+  y=30;
+
+  pdf.setFillColor(...LT);pdf.setDrawColor(...SKY);pdf.setLineWidth(0.25);
+  pdf.roundedRect(M,y,W-M*2,12,1.5,1.5,'FD');
+  function ib(lbl,val,x){
+    pdf.setFont('helvetica','bold');pdf.setFontSize(5.5);pdf.setTextColor(...GRAY);pdf.text(lbl.toUpperCase(),x,y+4);
+    pdf.setFont('helvetica','normal');pdf.setFontSize(8);pdf.setTextColor(...NAVY);pdf.text((val||'—').slice(0,30),x,y+9);
+  }
+  const cx=[M+3,70,120,175,225,260];
+  ib('WO No.',v('wo-no'),cx[0]);ib('Date',v('wo-date'),cx[1]);ib('Checked By',v('checked-by'),cx[2]);
+  ib('Reviewed By',v('reviewed-by'),cx[3]);ib('Shift',v('shift').split('(')[0].trim(),cx[4]);
+  y+=16;
+
+  const tag=c=>mainTag(c,L);
+
+  if(selIdx>=0){
+    secBar('3 Monthly — Basic Motor Data (Reference)');
+    fitTable({head:[['No','Item',...COLS8.map(c=>COL_LABEL[c]+'\n'+tag(c))]],
+      body:[
+        ['1','Rated Voltage',...COLS8.map(c=>RATED_V[c])],
+        ['2','Rated Power',...COLS8.map(c=>RATED_P[c])],
+        ['3','Full Load Ampere',...COLS8.map(c=>FLA[c])],
+        ['4','Speed',...COLS8.map(c=>SPEED[c])],
+        ['5','Service Factor',...COLS8.map(c=>SFAC[c])],
+      ],columnStyles:{0:{cellWidth:8,halign:'center'},1:{cellWidth:32}}});
+
+    secBar('3 Monthly — Circuit Breaker and Motor Starter or Inverter');
+    fitTable({head:[['No','Details Instruction','Criteria',...COLS8.map(c=>COL_LABEL[c]+'\n'+tag(c))]],
+      body:[
+        ['1','Visually inspect panel for damage','No sign of damage',...COLS8.map(c=>tv('cb_1_'+c))],
+        ['2','Remove accumulated dust and dirt','No dust or dirty',...COLS8.map(c=>tv('cb_2_'+c))],
+        ['3','Inspect wiring / tighten connections','No deterioration / Tightness',...COLS8.map(c=>tv('cb_3_'+c))],
+        ['4a','Dressing the contact','----',...COLS8.map(c=>c==='bf'?'----':tv('cb_4a_'+c))],
+        ['4b','Replace the contact','----',...COLS8.map(c=>c==='bf'?'----':tv('cb_4b_'+c))],
+        ['5','Operate magnetic device by hand','Moving parts operate freely',...COLS8.map(c=>tv('cb_5_'+c))],
+        ['6','Bkr capacity','ref',...COLS8.map(c=>BKR[c])],
+        ['','Rating Plug','ref',...COLS8.map(c=>PLUG[c])],
+        ['','OL type','ref',...COLS8.map(c=>OLTYPE[c])],
+        ['','OL range','ref',...COLS8.map(c=>OLRANGE[c])],
+        ['','OL setting','ref',...COLS8.map(c=>OLSET[c])],
+        ['7','Check indicating lights, replace as required','',...COLS8.map(c=>tv('cb_7_'+c))],
+      ],columnStyles:{0:{cellWidth:7,halign:'center'},1:{cellWidth:48},2:{cellWidth:22}}});
+
+    function lsBody(groupKey,cols,naMap){
+      return LS_ITEMS.map(([no,desc,crit])=>[no,desc,crit.replace('\n',' / '),...cols.map(c=>{
+        const na=(naMap&&naMap[c]||[]).includes(no);
+        return na?'===':tv(groupKey+'_'+no+'_'+c);
+      })]);
+    }
+    ckY(10);
+    secBar('3 Monthly — Limit Switch: Belt Feeder & Local Control Panel');
+    fitTable({head:[
+        [{content:'No',rowSpan:2},{content:'Details Instruction',rowSpan:2},{content:'Criteria',rowSpan:2},{content:'Pull Cord Sw.',colSpan:2},{content:'Belt Align. Sw.',colSpan:2},'Chute Plug Sw.','Belt Slip Det.','Belt Feeder Panel','DMH Panel'],
+        ['CCH-HS-121'+L,'CCH-HS-122'+L,'CCH-ZSH-121'+L,'CCH-ZSH-122'+L,'CCH-YSH-121'+L,'CCH-SSH-121'+L,'CCH-CAB-120'+L,'CCH-CAB-130'+L],
+      ],body:lsBody('lsA',['pc1','pc2','al1','al2','cp','sd','pbf','pdmh'],{pbf:['4'],pdmh:['4']}),
+      columnStyles:{0:{cellWidth:7,halign:'center'},1:{cellWidth:44},2:{cellWidth:22}}});
+
+    ckY(10);
+    secBar('3 Monthly — Limit Switch: Cable Reel Control & Power');
+    fitTable({head:[
+        [{content:'No',rowSpan:2},{content:'Details Instruction',rowSpan:2},{content:'Criteria',rowSpan:2},{content:'Direction',colSpan:2},{content:'Over Tention',colSpan:2},{content:'Direction',colSpan:2},{content:'Over Tention',colSpan:2}],
+        ['CCH-ZS-135'+L+'C','CCH-ZS-138'+L+'C','CCH-ZS-136'+L+'C','CCH-ZS-137'+L+'C','CCH-ZS-135'+L+'P','CCH-ZS-138'+L+'P','CCH-ZS-136'+L+'P','CCH-ZS-137'+L+'P'],
+      ],body:lsBody('lsB',['ccd1','ccd2','cco1','cco2','cpd1','cpd2','cpo1','cpo2'],{}),
+      columnStyles:{0:{cellWidth:7,halign:'center'},1:{cellWidth:44},2:{cellWidth:22}}});
+
+    ckY(10);
+    secBar('3 Monthly — Limit Switch: DMH Position & Travel');
+    fitTable({head:[
+        [{content:'No',rowSpan:2},{content:'Details Instruction',rowSpan:2},{content:'Criteria',rowSpan:2},'Detection','Collection',{content:'Hopper Anchor',colSpan:2},'Anti Collision','Hpr End LS (W)','Hpr End LS (E)'],
+        ['CCH-ZS-139'+L,'CCH-ZS-140'+L,'CCH-ZS-131'+L,'CCH-ZS-132'+L,'CCH-ZSH-134'+L,'CCH-ZSH-131'+L,'CCH-ZSH-132'+L],
+      ],body:LS_ITEMS.map(([no,desc,crit])=>[no,desc,crit.replace('\n',' / '),...['det','col','a1','a2','ac','w','e'].map(c=>tv('lsC_'+no+'_'+c))]),
+      columnStyles:{0:{cellWidth:7,halign:'center'},1:{cellWidth:44},2:{cellWidth:22}}});
+  }
+
+  if(selIdx>=1){
+    nPage();
+    secBar('6 Monthly — Electric Motor PM & Lubrication (JP-DMH-MTR-6M)');
+    fitTable({head:[['No','Details Instruction','Criteria',...COLS8.map(c=>COL_LABEL[c]+'\n'+tag(c))]],
+      body:[
+        ['1','Ensure PTW issue & equipment safe for access','',tv('mtr6_1'),'','','','','','',''],
+        ['2','Cleaning motor body, air screen & fin cooler','Clean',...COLS8.map(c=>tv('mtr6_2_'+c))],
+        ['3','Check motor termination','No looseness/Clean',...COLS8.map(c=>tv('mtr6_3_'+c))],
+        ['4','Cleaning termination & re-tighten cable','No looseness',...COLS8.map(c=>tv('mtr6_4_'+c))],
+        ['5','Adding lubricant to motor bearing','+-20gr each bearing',...COLS8.map(c=>tv('mtr6_5_'+c))],
+        ['6','Cleaning old grease & dust at shaft bearing','Clean',...COLS8.map(c=>tv('mtr6_6_'+c))],
+        ['7','Put back all part to normal condition','',tv('mtr6_7'),'','','','','','',''],
+        ['8','Record PM result into maximo database','',tv('mtr6_8'),'','','','','','',''],
+        ['9','Inform supervisor & raise new WO if defect','',tv('mtr6_9'),'','','','','','',''],
+      ],columnStyles:{0:{cellWidth:7,halign:'center'},1:{cellWidth:48},2:{cellWidth:24}}});
+    pdf.setFont('helvetica','italic');pdf.setFontSize(6.5);pdf.setTextColor(...GRAY);
+    pdf.text('Note: Grease specification — Shell Alvania EP2 or Almagard NLGI 02 (inject using grease gun).',M,y);
+    y+=5;
+  }
+
+  if(selIdx>=2){
+    ckY(40);
+    secBar('1 Yearly — Electric Motor PM & Bearing Lubrication (JP-DMH-MTR-1Y)');
+    fitTable({head:[['No','Details Instruction','Criteria',...COLS8.map(c=>COL_LABEL[c]+'\n'+tag(c))]],
+      body:[
+        ['1','Perform all activities PM in 6 monthly periods','',tv('mtr1y_1'),'','','','','','',''],
+        ['2a','Winding resistance T1-T2','Within 5%',...COLS8.map(c=>v('mtr1y_2_T1T2_'+c))],
+        ['2b','Winding resistance T1-T3','Within 5%',...COLS8.map(c=>v('mtr1y_2_T1T3_'+c))],
+        ['2c','Winding resistance T2-T3','Within 5%',...COLS8.map(c=>v('mtr1y_2_T2T3_'+c))],
+        ['3','Motor winding megger (MΩ)','Min. 1.5 megaohms',...COLS8.map(c=>v('mtr1y_3_'+c))],
+        ['4','Motor termination / seal bearing','No looseness/Clean/No leak',...COLS8.map(c=>tv('mtr1y_4_'+c))],
+        ['5','Replace old grease with new one','',...COLS8.map(c=>tv('mtr1y_5_'+c))],
+        ['6','Check motor support bolt / corrosion','No looseness/No corrosion',...COLS8.map(c=>tv('mtr1y_6_'+c))],
+        ['7','Perform housekeeping after job complete','',tv('mtr1y_7'),'','','','','','',''],
+        ['8','Monitor the motor during running test','',...COLS8.map(c=>tv('mtr1y_8_'+c))],
+      ],columnStyles:{0:{cellWidth:7,halign:'center'},1:{cellWidth:46},2:{cellWidth:26}}});
+
+    ckY(24);
+    secBar('1 Yearly — Belt Feeder Isolation Transformer '+tag('bf'));
+    const XCOLS=['H1-H2','H2-H3','H3-H1','X1-X2','X2-X3','X3-X1','H-GND','X-GND'];
+    const xids=['h1h2','h2h3','h3h1','x1x2','x2x3','x3x1','gh','gx'];
+    fitTable({head:[['No','Details Instruction','Criteria',...XCOLS]],
+      body:[
+        ['1','Open cover, cleaning & inspect inside','No sign of damage/No dust',v('xfmr_1'),'','','','','','',''],
+        ['2','Check cable termination','No looseness/Clean',v('xfmr_2'),'','','','','','',''],
+        ['3','Measure resistance HV & LV winding','Within 5%',...xids.map(id=>(id==='gh'||id==='gx')?'===':v('xfmr_3_'+id))],
+        ['4','Insulation resistance megger 500vdc','Min. 1.5 megaohms',...xids.map(id=>(id==='gh'||id==='gx')?v('xfmr_4_'+id):'===')],
+      ],columnStyles:{0:{cellWidth:7,halign:'center'},1:{cellWidth:48},2:{cellWidth:26}}});
+  }
+
+  if(selIdx>=3){
+    ckY(30);
+    secBar('2 Yearly — Cable Reel Cleaning & Brush Inspection (JP-DMH-CR-2Y)');
+    fitTable({head:[['No','Details Instruction','Criteria',tag('crc'),tag('crp')]],
+      body:[
+        ['1','Make sure PTW issue & safe access','',tv('cr2y_1'),''],
+        ['2','Perform PM activities of 6 & 12 monthly periods','',tv('cr2y_2'),''],
+        ['3','Open cable reel cover & cleaning inside','No sign of damage/No dust',tv('cr2y_3_crc'),tv('cr2y_3_crp')],
+        ['4','Retighten of cable termination','No looseness',tv('cr2y_4_crc'),tv('cr2y_4_crp')],
+        ['5','Brush cleaning, slip ring inspection','No sign of damage/No dust',tv('cr2y_5_crc'),tv('cr2y_5_crp')],
+        ['6','Details instruction see JP attachment','','',''],
+        ['7','Inform supervisor if defect found & raise WO','',tv('cr2y_7'),''],
+      ],columnStyles:{0:{cellWidth:8,halign:'center'},1:{cellWidth:70},2:{cellWidth:40}}});
+  }
+
+  if(selIdx>=4){
+    ckY(40);
+    secBar('3 Yearly — Motor Winding, Termination Box & Bearing Inspection (JP-DMH-MTR-3Y)');
+    fitTable({head:[['No','Details Instruction',...COLS8.map(c=>COL_LABEL[c]+'\n'+tag(c))]],
+      body:[
+        ['1','Make sure PTW issue & safe access',tv('mtr3y_1'),'','','','','','',''],
+        ['2','Perform PM activities of 6M, 1Y & 2Y periods',tv('mtr3y_2'),'','','','','','',''],
+        ['3','Lubricate all traverse motor bearing (any 3 motors)',...COLS8.map(c=>tv('mtr3y_3_'+c))],
+        ['4','Open box termination, disconnect cable',...COLS8.map(c=>tv('mtr3y_4_'+c))],
+        ['5','Dismantling motor (stator & rotor inspection)',...COLS8.map(c=>tv('mtr3y_5_'+c))],
+        ['6','Inspect bearing motor, replace if broken',...COLS8.map(c=>tv('mtr3y_6_'+c))],
+        ['7','Re-assemble motor & running test before install',...COLS8.map(c=>tv('mtr3y_7_'+c))],
+        ['8','Record PM activity into maximo database',tv('mtr3y_8'),'','','','','','',''],
+        ['9','Details see JP attachment','','','','','','','',''],
+      ],columnStyles:{0:{cellWidth:7,halign:'center'},1:{cellWidth:66}}});
+  }
+
+  // Photo & File Evidence
+  const imgAttach=ATTACH.filter(a=>a.type==='image');
+  const pdfAttach=ATTACH.filter(a=>a.type==='pdf');
+  if(imgAttach.length){
+    nPage();
+    secBar('Photo Evidence ('+imgAttach.length+' foto)');
+    const COLS=3,GAP=4;
+    const PW=(W-M*2-GAP*(COLS-1))/COLS,PH=PW*0.72;
+    let col=0,rowY=y;
+    imgAttach.forEach((a,i)=>{
+      if(col>=COLS){col=0;rowY+=PH+13;}
+      if(rowY+PH+13>H-M){nPage();col=0;rowY=y;}
+      const px=M+col*(PW+GAP);
+      pdf.setDrawColor(...SKY);pdf.setLineWidth(0.2);pdf.rect(px,rowY,PW,PH);
+      try{pdf.addImage(a.dataUrl,'JPEG',px,rowY,PW,PH);}catch(e){}
+      pdf.setFont('helvetica','bold');pdf.setFontSize(6.5);pdf.setTextColor(...NAVY);
+      pdf.text('#'+(ATTACH.indexOf(a)+1)+'  '+a.name.slice(0,28),px,rowY+PH+3.5);
+      if(a.caption){
+        pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(...GRAY);
+        const lines=pdf.splitTextToSize(a.caption,PW);
+        pdf.text(lines.slice(0,2),px,rowY+PH+7);
+      }
+      col++;
+    });
+    y=rowY+PH+14;
+  }
+  if(pdfAttach.length){
+    ckY(14);
+    secBar('Attached PDF / Document Files ('+pdfAttach.length+')');
+    pdf.autoTable({startY:y,head:[['No','File Name','Caption']],
+      body:pdfAttach.map(a=>[String(ATTACH.indexOf(a)+1),a.name,a.caption||'—']),
+      theme:'grid',styles:baseStyle,headStyles:headStyle,margin:{left:M,right:M},
+      columnStyles:{0:{cellWidth:10,halign:'center'},1:{cellWidth:70}}});
+    y=pdf.lastAutoTable.finalY+5;
+  }
+
+  // Findings
+  ckY(30);
+  secBar('Findings & Conclusion');
+  pdf.autoTable({startY:y,body:[
+    ['Overall Condition',v('overall').replace(/[✅⚠️🔧🛑]/g,'').trim()],
+    ['Next PM Due',v('next-pm')],
+    ['Findings',v('findings')],
+    ['Corrective Actions',v('recommendations')],
+  ],theme:'grid',styles:{font:'helvetica',fontSize:8,cellPadding:2.5,textColor:[15,23,42],lineColor:SKY,lineWidth:0.15},
+  columnStyles:{0:{cellWidth:40,fontStyle:'bold',fillColor:LT,textColor:NAVY}},margin:{left:M,right:M}});
+  y=pdf.lastAutoTable.finalY+5;
+
+  const pages=pdf.internal.getNumberOfPages();
+  for(let pg=1;pg<=pages;pg++){
+    pdf.setPage(pg);pdf.setFont('helvetica','normal');pdf.setFontSize(6);pdf.setTextColor(150);
+    pdf.text(`Page ${pg}/${pages}`,W-M,H-4,{align:'right'});
+    pdf.text('DMH Conveyor System — Motor & Safety Device PM Check Sheet',M,H-4);
+  }
+
+  const fn=`DMH_${UNITS[L].replace(/\s+/g,'')}_${pm}_${(v('wo-date')!=='—'?v('wo-date'):new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
+  pdf.save(fn);
+  showNote('✅ PDF tersimpan: '+fn,'ok');
+}
+
+// ══════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════
+buildBasic();
+buildCB();
+buildLS('tbody-lsA','lsA',['pc1','pc2','al1','al2','cp','sd','pbf','pdmh'],
+  {pc1:'1031 - 1041',pc2:'1041 - 1042',al1:'1031 - 1051',al2:'1051 - 1052',cp:'1031 - 1101',sd:'1031 - 1341'},
+  {pbf:['4'],pdmh:['4']});
+buildLS('tbody-lsB','lsB',['ccd1','ccd2','cco1','cco2','cpd1','cpd2','cpo1','cpo2'],
+  {ccd1:'LS2-A/CSW (10-13)',ccd2:'LS2-A/ CW (11-14)',cco1:'OTE B (19,20-21)',cco2:'OTW B (26,27-28)',
+   cpd1:'LS2-A/CSW (4-7)',cpd2:'LS2-A/ CW (5-8)',cpo1:'OTE A (15,16-17,18)',cpo2:'OTW A (22,23-24,25)'},{});
+buildLS('tbody-lsC','lsC',['det','col','a1','a2','ac','w','e'],
+  {det:'RLS-A (3-6)',col:'RLS-B (9-12)',a1:'ANCHOR LS1 (29-30)',a2:'ANCHOR LS2 (31-32)',w:'WOTLS (25-26)',e:'EOTLS (18-19)'},{});
+buildMtr6();
+buildMtr1y();
+buildCr2y();
+buildMtr3y();
+renderTagLabels();
+loadDraft();
+renderEvdGrid();
+document.getElementById('wo-date').value=document.getElementById('wo-date').value||new Date().toISOString().slice(0,10);
+updateStats();
+
+// Auto-load last submission for this unit's tag from database
+setTimeout(async()=>{
+  try{
+    const L=document.getElementById('sel-unit').value;
+    const d=await DB.loadLastSubmission(UNITS[L]);
+    if(d)showNote('📂 Data terakhir dimuat dari database.','ok');
+  }catch(e){}
+},800);
+</script>
+</body>
+</html>
