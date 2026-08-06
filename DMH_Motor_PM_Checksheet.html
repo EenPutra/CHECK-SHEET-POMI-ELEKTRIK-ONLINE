@@ -252,7 +252,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   </div>
   <div class="sel-field">
     <label>PM Period to Execute</label>
-    <select id="sel-pm" onchange="onPmChange()">
+    <select id="sel-pm" onchange="onPmChange()" oninput="onPmChange()">
       <option value="3M">3 Monthly</option>
       <option value="6M">6 Monthly</option>
       <option value="1Y">1 Yearly</option>
@@ -864,11 +864,28 @@ function applyPmFilter(){
   const selIdx=PM_ORDER.indexOf(sel);
   document.querySelectorAll('.panel[data-pm]').forEach(p=>{
     const lvl=p.dataset.pm;
-    p.classList.toggle('pm-hidden', PM_ORDER.indexOf(lvl)>selIdx);
+    const hide=PM_ORDER.indexOf(lvl)>selIdx;
+    p.classList.toggle('pm-hidden',hide);
+    if(!hide){
+      // Sections revealed by the cascade should always show expanded,
+      // even if they were manually collapsed on a previous visit.
+      const hdr=p.querySelector('.sec-hdr');
+      const body=p.querySelector('.sec-body');
+      if(hdr&&body&&!hdr.classList.contains('open')){
+        hdr.classList.add('open');
+        body.style.display='';
+      }
+    }
   });
   updateStats();
 }
-function onPmChange(){ applyPmFilter(); }
+function onPmChange(){
+  applyPmFilter();
+  // Self-heal: re-apply shortly after in case the dropdown's value hadn't
+  // fully committed yet at the moment this handler ran (seen intermittently
+  // on some browsers), so the cascade never gets stuck on a stale selection.
+  setTimeout(applyPmFilter,60);
+}
 
 // ══════════════════════════════════════════════════
 //  UNIT SWITCHING (per-unit draft isolation)
@@ -1451,6 +1468,11 @@ loadDraft();
 renderEvdGrid();
 document.getElementById('wo-date').value=document.getElementById('wo-date').value||new Date().toISOString().slice(0,10);
 updateStats();
+
+// Redundant listener alongside the inline onchange/oninput attributes, in
+// case something (an extension, an odd event-order edge case) ever stops
+// the inline handler from firing for a given interaction.
+document.getElementById('sel-pm').addEventListener('change',onPmChange);
 
 // Auto-load last submission for this unit's tag from database
 setTimeout(async()=>{
