@@ -421,42 +421,67 @@ function getPct(baseId, n){
 }
 
 // PDF
+async function imgToDataUrl(src){
+  return new Promise(res=>{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=()=>{
+      try{const cv=document.createElement('canvas');cv.width=img.naturalWidth;cv.height=img.naturalHeight;
+        cv.getContext('2d').drawImage(img,0,0);res({url:cv.toDataURL('image/png'),w:img.naturalWidth,h:img.naturalHeight});}
+      catch{res(null);}
+    };
+    img.onerror=()=>res(null);
+    img.src=src+'?'+Date.now();
+  });
+}
+
 async function generatePDF(selSet){
   if(!selSet)selSet=new Set(PDF_SHEETS.map(s=>s.key));
   note('⏳ Generating PDF…','info');await new Promise(r=>setTimeout(r,200));
   if(!window.jspdf||!window.jspdf.jsPDF){note('❌ jsPDF library tidak tersedia.','err');return;}
+  const logoImg=await imgToDataUrl('LOGO POMI.png');
   const{jsPDF}=window.jspdf;
   const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
-  const BASE_FONT='times';
+  const BASE_FONT='helvetica';
   const sanitizeText = s => s ? String(s).replace(/[^\x20-\x7E]/g,'') : '';
-  const W=297,H=210,M=11;let y=M;let firstPage=true;
+  const W=297,H=210,M=11;let y=M;let firstPage=true;let headerDrawn=false;
   const DARK=[44,62,48],STL=[74,94,82],RED=[192,57,43],OK=[39,174,96],NA=[142,68,173],LT=[240,245,241];
   function nPage(){pdf.addPage();y=M;pgHdr();}
   function ck(n){if(y+n>H-M)nPage();}
   function pgHdr(){pdf.setFillColor(...DARK);pdf.rect(0,0,W,9,'F');pdf.setTextColor(168,212,184);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7.5);pdf.text(sanitizeText('COMMON SST CHCB/WAREHOUSE/CUCB - UNIT '+vv('unit-sel')),M,6.5);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(6.5);pdf.setTextColor(100,150,120);pdf.text(sanitizeText(`WO: ${vv('wo-no')||' - '}  Date: ${vv('wo-date')||' - '}  By: ${vv('checked-by')||' - '}`),W-M,6.5,{align:'right'});y=13;}
-  function ensurePage(){if(!firstPage){nPage();}else{firstPage=false;pgHdr();}}
+  function ensurePage(){if(!firstPage){nPage();return;}firstPage=false;if(!headerDrawn){headerDrawn=true;pgHdr();}}
 
-  // Cover
+  // ── LETTERHEAD: POMI logo + title (page 1 only) ──
   if(selSet.has('cover')){
-    firstPage=false;
-    pdf.setFillColor(...DARK);pdf.rect(0,0,W,44,'F');pdf.setFillColor(...RED);pdf.rect(0,42,W,2,'F');
-    pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(20);pdf.text(sanitizeText('COMMON SST — CHCB/WAREHOUSE/CUCB'),M,15);
-    pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(12);pdf.setTextColor(168,212,184);pdf.text(sanitizeText('UNIT '+vv('unit-sel')+' - 3-MONTHLY PM'),M,25);
-    pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(8);pdf.setTextColor(100,150,120);pdf.text(sanitizeText('Generated: '+new Date().toLocaleString('en-GB')),M,35);pdf.text(sanitizeText('PLTU Maintenance Dept.'),W-M,35,{align:'right'});
-    y=50;
-    pdf.setFillColor(244,248,245);pdf.setDrawColor(180,200,185);pdf.setLineWidth(0.25);pdf.roundedRect(M,y,W-M*2,28,2,2,'FD');
-    function ib(l,v,x,yy){pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(6.5);pdf.setTextColor(120,160,135);pdf.text(sanitizeText(l.toUpperCase()),x,yy);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(9.5);pdf.setTextColor(...DARK);pdf.text(sanitizeText(trunc(v||' - ',28)),x,yy+5.5);}
-    const cx=[M+3,62,115,165,215];
-    ib('WO',vv('wo-no'),cx[0],y+7);ib('Date',vv('wo-date'),cx[1],y+7);ib('Unit',vv('unit-sel'),cx[2],y+7);ib('Type',vv('itype'),cx[3],y+7);
-    ib('Checked By',vv('checked-by'),cx[0],y+19);ib('NIK',vv('nik'),cx[1],y+19);ib('Reviewed By',vv('reviewed-by'),cx[2],y+19);ib('Shift',vv('shift').split(' ')[0],cx[3],y+19);
-    y+=34;
+    headerDrawn=true;
+    const logoH=16,logoW=logoImg?logoH*(logoImg.w/logoImg.h):32;
+    if(logoImg)pdf.addImage(logoImg.url,'PNG',M,y,logoW,logoH);
+    const titleX=M+logoW+6,titleY=y+logoH/2-1;
+    pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(15);pdf.setTextColor(...DARK);
+    pdf.text(sanitizeText('COMMON SST — CHCB/WAREHOUSE/CUCB'),titleX,titleY);
+    pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(9);pdf.setTextColor(...STL);
+    pdf.text(sanitizeText('UNIT '+vv('unit-sel')+' - 3-MONTHLY PM'),titleX,titleY+6);
+    const tw=pdf.getTextWidth(sanitizeText('COMMON SST — CHCB/WAREHOUSE/CUCB'));
+    pdf.setDrawColor(...STL);pdf.setLineWidth(0.35);pdf.line(titleX,titleY+8,titleX+Math.max(tw,80),titleY+8);
+    y+=logoH+4;
+    pdf.setDrawColor(...DARK);pdf.setLineWidth(0.8);pdf.line(M,y,W-M,y);
+    y+=5;
+
+    // WO / inspector info bar
+    pdf.setFillColor(244,248,245);pdf.setDrawColor(180,200,185);pdf.setLineWidth(0.25);pdf.roundedRect(M,y,W-M*2,16,2,2,'FD');
+    function ib(l,v,x,yy){pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(6.5);pdf.setTextColor(120,160,135);pdf.text(sanitizeText(l.toUpperCase()),x,yy);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(9);pdf.setTextColor(...DARK);pdf.text(sanitizeText(trunc(v||' - ',24)),x,yy+5.5);}
+    const cx=[M+3,60,105,145,190,232];
+    ib('WO',vv('wo-no'),cx[0],y+6);ib('Date',vv('wo-date'),cx[1],y+6);ib('Unit',vv('unit-sel'),cx[2],y+6);ib('Type',vv('itype'),cx[3],y+6);ib('Checked By',vv('checked-by'),cx[4],y+6);ib('Shift',vv('shift').split(' ')[0],cx[5],y+6);
+    y+=16+4;
+
     const to=parseInt(document.getElementById('cnt-t').textContent)||0;
     const oc=parseInt(document.getElementById('cnt-ok').textContent)||0;
     const nc=parseInt(document.getElementById('cnt-ng').textContent)||0;
-    [[M,'TOTAL',String(to),STL],[M+36,'OK/NORMAL',String(oc),OK],[M+72,'NG/ISSUE',String(nc),RED]].forEach(([x,l,v,cl])=>{
-      pdf.setFillColor(...cl,.06);pdf.setDrawColor(...cl);pdf.setLineWidth(0.35);pdf.roundedRect(x,y,30,11,2,2,'FD');
-      pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(6);pdf.setTextColor(...cl);pdf.text(sanitizeText(l),x+2,y+4.5);pdf.setFontSize(11);pdf.text(sanitizeText(v),x+2,y+10);
-    });y+=17;
+    [[M,'TOTAL',String(to),STL],[M+34,'OK/NORMAL',String(oc),OK],[M+68,'NG/ISSUE',String(nc),RED]].forEach(([x,l,v,cl])=>{
+      pdf.setFillColor(...cl,.06);pdf.setDrawColor(...cl);pdf.setLineWidth(0.35);pdf.roundedRect(x,y,30,9,1.5,1.5,'FD');
+      pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(5.5);pdf.setTextColor(...cl);pdf.text(sanitizeText(l),x+2,y+3.8);pdf.setFontSize(9.5);pdf.text(sanitizeText(v),x+2,y+8);
+    });
+    y+=13;
   }
 
   function drawTbl(title,tbId,hdrs,cws){
@@ -519,7 +544,7 @@ async function generatePDF(selSet){
 }
 
 // PDF MODAL
-const PDF_SHEETS=[{"key": "cover", "label": "Cover & Header", "icon": "📋", "desc": "Cover page + WO info + stats"}, {"key": "main", "label": "SST CHCB Sheet", "icon": "🏗️", "desc": "Common SST CHCB/Warehouse/CUCB"}, {"key": "photos", "label": "Evidence Photos", "icon": "📷", "desc": "Uploaded inspection photos"}, {"key": "findings", "label": "Findings & Sign-off", "icon": "✍️", "desc": "Conclusion, actions & signatures"}];
+const PDF_SHEETS=[{"key": "cover", "label": "Letterhead & Header", "icon": "📋", "desc": "POMI logo, WO info & stats band"}, {"key": "main", "label": "SST CHCB Sheet", "icon": "🏗️", "desc": "Common SST CHCB/Warehouse/CUCB"}, {"key": "photos", "label": "Evidence Photos", "icon": "📷", "desc": "Uploaded inspection photos"}, {"key": "findings", "label": "Findings & Sign-off", "icon": "✍️", "desc": "Conclusion, actions & signatures"}];
 let _pdfSel=new Set(PDF_SHEETS.map(s=>s.key));
 
 function openPdfModal(){_pdfSel=new Set(PDF_SHEETS.map(s=>s.key));renderPdfModal();document.getElementById('pdf-modal-overlay').style.display='flex';}
