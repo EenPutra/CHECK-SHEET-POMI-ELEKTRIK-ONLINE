@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transformer AT (No DGA) Weekly Inspection — Unit 7/8</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#e8ece9;--bg2:#dde3de;--panel:rgba(255,255,255,0.80);--pb:rgba(180,200,185,0.55);--steel:#4a5e52;--sl:#6b8474;--red:#c0392b;--ok:#27ae60;--warn:#f39c12;--na:#8e44ad;--text:#1a2620;--t2:#3d5248;--t3:#7a9485;--sh:0 4px 24px rgba(30,60,40,0.10);--mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
+  --topbar-h:52px;--tabbar-h:42px;
+  --sticky-th:#edf1ee;--sticky-td:#f2f5f2;--sticky-td-mr:#ecf0ec;--sticky-shdr:#e0e7e1;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:100vh;background-image:radial-gradient(ellipse at 18% 12%,rgba(180,210,190,.4) 0%,transparent 55%),radial-gradient(ellipse at 82% 80%,rgba(160,195,170,.28) 0%,transparent 50%),url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='%234a5e52' fill-opacity='0.04'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/svg%3E");}
+.topbar{background:linear-gradient(90deg,#2c3e30,#3d5248 60%,#2c3e30);color:#c8dcd0;padding:0 28px;display:flex;align-items:center;gap:16px;height:52px;border-bottom:2px solid #27ae6033;position:sticky;top:0;z-index:100}
+.tl{font-family:var(--raj);font-size:20px;font-weight:700;letter-spacing:3px;color:#a8d4b8}
+.tsep{width:1px;height:26px;background:#4a6a54}.tsub{font-size:12px;color:#7aaa8a;letter-spacing:1px}.tr{margin-left:auto;display:flex;align-items:center;gap:10px}
+.ldot{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:blink 2s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.tclock{font-family:var(--mono);font-size:12px;color:#7aaa8a}
+.wrap{max-width:1340px;margin:0 auto;padding:28px 20px 80px}
+.ph{display:flex;align-items:flex-end;gap:20px;margin-bottom:24px;flex-wrap:wrap}
+.ph-title{font-family:var(--raj);font-size:36px;font-weight:700;color:var(--steel);line-height:1;letter-spacing:1px}
+.ph-title span{color:var(--red)}.ph-sub{font-size:12px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:4px}
+.badge{display:inline-block;padding:3px 10px;border-radius:3px;font-family:var(--mono);font-size:11px;letter-spacing:1px;background:#27ae6018;color:var(--ok);border:1px solid #27ae6035}
+.stats{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
+.sc{padding:8px 16px;border-radius:7px;font-family:var(--raj);font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px;border:1.5px solid}
+.sc span{font-size:18px;font-weight:700}.sc.t{background:#f0f4f1;border-color:#b4c8bc;color:var(--steel)}.sc.ok{background:#e8f8ee;border-color:#27ae6028;color:var(--ok)}.sc.ng{background:#fdecea;border-color:#c0392b28;color:var(--red)}
+.panel{background:var(--panel);border:1px solid var(--pb);border-radius:12px;padding:20px 24px;margin-bottom:18px;box-shadow:var(--sh);backdrop-filter:blur(8px);animation:fadeUp .45s ease both}
+.panel.top{border-radius:0 0 12px 12px;border-top:none}
+.slbl{font-family:var(--raj);font-size:12px;font-weight:600;letter-spacing:3px;text-transform:uppercase;color:var(--t3);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.slbl::after{content:'';flex:1;height:1px;background:var(--pb)}
+.tabbar{background:var(--panel);border:1px solid var(--pb);border-top:none;padding:0 24px;overflow-x:auto;display:flex;white-space:nowrap;position:sticky;top:var(--topbar-h);z-index:95;box-shadow:0 2px 8px rgba(44,62,48,0.08)}
+.tbtn{padding:10px 18px;border:none;background:transparent;cursor:pointer;font-family:var(--raj);font-size:13px;font-weight:600;color:var(--t3);letter-spacing:1px;border-bottom:3px solid transparent;margin-bottom:-1px;transition:all .18s;display:inline-block}
+.tbtn:hover{color:var(--steel)}.tbtn.on{color:var(--steel);border-bottom-color:var(--steel)}
+.tpane{display:none}.tpane.on{display:block}
+.mg4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px}
+.mg2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf label{font-size:11px;color:var(--t3);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.mf input,.mf select,.mf textarea{border:1.5px solid var(--pb);border-radius:6px;padding:7px 10px;font-family:var(--sans);font-size:13px;background:#f4f8f5;color:var(--text);transition:border-color .18s;width:100%}
+.mf input[type=date]{font-family:var(--mono)}.mf input:focus,.mf select:focus,.mf textarea:focus{outline:none;border-color:var(--sl);background:#fff}.mf textarea{resize:vertical;min-height:56px}
+.btn{padding:8px 20px;border-radius:6px;border:none;cursor:pointer;font-family:var(--raj);font-size:14px;font-weight:600;letter-spacing:1px;transition:all .15s;display:inline-flex;align-items:center;gap:5px}
+.bp{background:var(--steel);color:#fff}.bp:hover{background:var(--sl);transform:translateY(-1px)}
+.br{background:#c0392b;color:#fff}.br:hover{background:#a93226;transform:translateY(-1px)}
+.bo{background:transparent;border:1.5px solid var(--pb);color:var(--steel)}.bo:hover{background:var(--bg2)}.bsm{padding:5px 12px;font-size:12px}
+.ct{width:100%;border-collapse:separate;border-spacing:0;font-size:12.5px}
+.ct th{font-family:var(--raj);font-size:10.5px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--t3);padding:8px 10px;text-align:left;border-bottom:2px solid var(--pb);background:var(--sticky-th)}
+.ct th.ctr{text-align:center}.ct td{padding:6px 9px;border-bottom:1px solid rgba(180,200,185,.28);vertical-align:middle}
+.ct tr:last-child td{border-bottom:none}.ct tr:hover td{background:rgba(74,94,82,.025)}
+.shdr td{background:rgba(74,94,82,.08)!important;font-family:var(--raj);font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--steel);padding:6px 10px!important}
+.mr td{background:rgba(244,248,245,.65)}
+.tno{font-family:var(--mono);font-size:11px;color:var(--t3);white-space:nowrap}
+.tdesc{color:var(--text);line-height:1.45}.crit{display:block;font-family:var(--mono);font-size:10px;color:var(--ok);margin-top:1px}
+.nac{font-family:var(--mono);font-size:11px;color:var(--na);font-weight:700;text-align:center;display:block}
+.rc{display:flex;gap:3px;justify-content:center;align-items:center}
+.rb{border:1.5px solid;border-radius:4px;cursor:pointer;background:transparent;font-family:var(--mono);font-size:10px;font-weight:700;padding:3px 7px;transition:all .12s;letter-spacing:.5px;white-space:nowrap}
+.rb.ok{color:var(--ok);border-color:rgba(39,174,96,.35)}.rb.ng{color:var(--red);border-color:rgba(192,57,43,.35)}
+.rb.ok.a{background:rgba(39,174,96,.14);border-color:var(--ok)}.rb.ng.a{background:rgba(192,57,43,.14);border-color:var(--red)}
+.lc{display:flex;gap:3px}
+.lb{border:1.5px solid var(--pb);border-radius:3px;cursor:pointer;background:transparent;font-family:var(--mono);font-size:10px;padding:2px 6px;transition:all .12s;color:var(--t3);white-space:nowrap}
+.lb.leak.a{background:rgba(192,57,43,.14);border-color:var(--red);color:var(--red);font-weight:700}
+.lb.noleak.a{background:rgba(39,174,96,.14);border-color:var(--ok);color:var(--ok);font-weight:700}
+.lb.clean.a{background:rgba(39,174,96,.14);border-color:var(--ok);color:var(--ok);font-weight:700}
+.lb.dirty.a{background:rgba(243,156,18,.14);border-color:var(--warn);color:var(--warn);font-weight:700}
+.lb.noise.a{background:rgba(243,156,18,.14);border-color:var(--warn);color:var(--warn);font-weight:700}
+.lb.normal.a{background:rgba(39,174,96,.14);border-color:var(--ok);color:var(--ok);font-weight:700}
+.mi{border:1.5px solid var(--pb);border-radius:5px;padding:4px 6px;font-family:var(--mono);font-size:11.5px;background:#f4f8f5;color:var(--text);transition:border-color .18s;width:100%;min-width:62px}
+.mi:focus{outline:none;border-color:var(--sl);background:#fff}.mu{font-size:9.5px;color:var(--t3);white-space:nowrap;font-family:var(--mono);display:block;margin-top:1px}
+.m3{display:grid;grid-template-columns:repeat(3,minmax(48px,1fr));gap:4px;align-items:start}.m3c{display:flex;flex-direction:column;align-items:center;gap:1px}.m3lbl{font-family:var(--mono);font-size:9px;color:var(--t3);font-weight:700;line-height:1}.m3 .mi{min-width:0;width:100%;padding:4px 3px;text-align:center}.m3 .mu{font-size:8.5px;margin-top:0}
+/* pct input group — no labels */
+.pct-grp{display:flex;flex-direction:column;gap:3px;align-items:center}
+.pct-inp{border:1.5px solid var(--pb);border-radius:4px;padding:3px 4px;font-family:var(--mono);font-size:11px;background:#f4f8f5;color:var(--text);width:50px;text-align:center;transition:border-color .18s}
+.pct-inp:focus{outline:none;border-color:var(--sl);background:#fff}
+.pct-u{font-size:8.5px;color:var(--t3);font-family:var(--mono)}
+.giswrap{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.gisttl{font-family:var(--raj);font-size:13px;font-weight:700;color:var(--steel);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
+.gt{width:100%;border-collapse:separate;border-spacing:0;font-size:11.5px}
+.gt th{font-family:var(--mono);font-size:9.5px;color:var(--t3);padding:6px 8px;text-align:center;border-bottom:2px solid var(--pb);background:rgba(74,94,82,.04)}
+.gt td{padding:4px 7px;border-bottom:1px solid rgba(180,200,185,.22);text-align:center;vertical-align:middle}
+.gt .tgl{font-family:var(--mono);font-size:10.5px;color:var(--steel);text-align:left;padding-left:8px}
+.pg2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.pd{border:2px dashed var(--pb);border-radius:8px;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;background:rgba(74,94,82,.025);position:relative;overflow:hidden}
+.pd:hover{border-color:var(--sl);background:rgba(74,94,82,.06)}.pd input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.pd img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:6px}
+.pd .delbtn{position:absolute;top:5px;right:5px;background:rgba(192,57,43,.85);border:none;color:#fff;width:21px;height:21px;border-radius:50%;cursor:pointer;font-size:13px;display:none;align-items:center;justify-content:center;z-index:5}
+.pd.hp .delbtn{display:flex}.phi{font-size:24px;margin-bottom:5px;pointer-events:none}.pht{font-size:10.5px;color:var(--t3);text-align:center;pointer-events:none}
+.pcap{margin-top:6px}.pcap input{width:100%;border:1.5px solid var(--pb);border-radius:5px;padding:5px 8px;font-size:12px;background:#f4f8f5;color:var(--text)}
+.pbtl{font-family:var(--raj);font-size:12px;font-weight:600;color:var(--steel);margin-bottom:7px;letter-spacing:1px;text-transform:uppercase}
+.sw2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.sttl{font-family:var(--raj);font-size:12px;font-weight:600;color:var(--steel);margin-bottom:7px;letter-spacing:1px;text-transform:uppercase}
+canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;width:100%;height:110px;display:block;cursor:crosshair;touch-action:none}
+.notice{padding:9px 14px;border-radius:6px;font-size:12.5px;display:none;margin-top:10px}
+.notice.ok{background:#e8f8ee;border:1px solid #27ae6028;color:#1e8449;display:block}
+.notice.err{background:#fdecea;border:1px solid #c0392b28;color:#922b21;display:block}
+.notice.info{background:#e8f4fd;border:1px solid #3498db28;color:#1a5276;display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:880px){.mg4{grid-template-columns:repeat(2,1fr)}.giswrap{grid-template-columns:1fr}.sw2{grid-template-columns:1fr}.pg2{grid-template-columns:1fr}}
+.psl-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;border:1.5px solid #d0ddd5;background:#f8fbf9;cursor:pointer;transition:all .15s;user-select:none}
+.psl-item:hover{border-color:#6b8474;background:#edf4ef}
+.psl-item.psl-on{border-color:#27ae60;background:#e8f8ee}
+.psl-icon{font-size:18px;flex-shrink:0;width:26px;text-align:center}
+.psl-info{flex:1;display:flex;flex-direction:column;gap:1px}
+.psl-name{font-family:'Rajdhani',sans-serif;font-size:13px;font-weight:700;color:#1a2620;letter-spacing:.5px}
+.psl-desc{font-size:10.5px;color:#7a9485;font-family:'Share Tech Mono',monospace}
+.psl-chk{width:22px;height:22px;border-radius:5px;border:2px solid #b4c8bc;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#27ae60;flex-shrink:0;background:#fff;transition:all .15s}
+.psl-item.psl-on .psl-chk{background:#27ae60;border-color:#27ae60;color:#fff}
+
+/* ── STICKY COLUMNS (horizontal scroll) ────────────────── */
+/* No. column — freeze at left:0 */
+.ct td:first-child,.ct th:first-child{
+  position:sticky;left:0;z-index:6;background:var(--sticky-td)
+}
+/* Inspection Item column — freeze at left:30px (width of No. col) */
+.ct td:nth-child(2),.ct th:nth-child(2){
+  position:sticky;left:30px;z-index:6;background:var(--sticky-td);
+  box-shadow:3px 0 6px -2px rgba(44,62,48,0.13)
+}
+/* Alternate row (mr) */
+.ct .mr td:first-child,.ct .mr td:nth-child(2){background:var(--sticky-td-mr)}
+/* Section header row (colSpan 99) */
+.ct .shdr td:first-child{background:var(--sticky-shdr)}
+/* Thead top-left corner cells — both axes sticky, highest z-index */
+.ct thead th:first-child,.ct thead th:nth-child(2){z-index:16;background:var(--sticky-th)}
+.ct thead th:nth-child(2){box-shadow:3px 0 6px -2px rgba(44,62,48,0.13)}
+
+/* GIS table sticky header */
+.gt thead th{position:sticky;top:calc(var(--topbar-h) + var(--tabbar-h));z-index:10;background:var(--sticky-th)}
+
+/* Scroll hint overlay for mobile */
+.tbl-scroll-hint{
+  display:none;font-size:10.5px;color:var(--t3);font-family:var(--mono);
+  text-align:right;padding:3px 2px 5px;letter-spacing:.5px;opacity:.8
+}
+
+/* ── MOBILE RESPONSIVE ──────────────────────────────────── */
+@media(max-width:768px){
+  /* show scroll hint on tables */
+  .tbl-scroll-hint{display:block}
+  /* wrap title shorter */
+  .ph-title{font-size:28px}
+}
+
+@media(max-width:640px){
+  /* topbar: hide subtitles, smaller buttons */
+  .topbar{padding:0 12px;gap:8px;height:48px}
+  :root{--topbar-h:48px}
+  .tsub{display:none}
+  .btn.bsm{padding:4px 8px;font-size:11px;letter-spacing:.5px}
+  /* tabbar: compact */
+  .tbtn{padding:8px 10px;font-size:11.5px;letter-spacing:.5px}
+  /* page header */
+  .ph{gap:8px;margin-bottom:14px}
+  .ph-title{font-size:24px}
+  .stats{margin-left:0;width:100%}
+  .sc{padding:6px 10px;font-size:12px}.sc span{font-size:15px}
+  /* WO grid */
+  .mg4{grid-template-columns:1fr 1fr}
+  /* table cells: tighter padding */
+  .ct td,.ct th{padding:5px 6px}
+  .rb{padding:3px 5px;font-size:9.5px}
+  .lc .lb{padding:2px 4px;font-size:9.5px}
+  .mi{min-width:48px;font-size:11px;padding:3px 4px}
+  .pct-inp{width:44px;font-size:10.5px}
+  .m3{grid-template-columns:repeat(3,minmax(40px,1fr))}
+  /* panel padding */
+  .panel{padding:14px 14px}
+  .wrap{padding:18px 12px 60px}
+}
+
+@media(max-width:400px){
+  .topbar{padding:0 10px}
+  .tsep{display:none}
+  .mg4{grid-template-columns:1fr 1fr}
+  .ph-title{font-size:20px}
+}
+@media print{
+  @page{size:A4 portrait;margin:12mm 15mm}
+  /* Force universal, pre-installed fonts for print — Rajdhani/Barlow/Share Tech
+     Mono are Google web fonts that load inconsistently across browsers'
+     print engines (esp. Safari), so Chrome/Edge/Safari can each fall back
+     differently and produce different-looking PDFs. Overriding the same
+     custom properties every rule already references via var(--sans) etc.
+     keeps the mono/heading/body distinction while making the actual font
+     identical (and independent of web font loading) on any browser or OS. */
+  :root{--sans:Arial,Helvetica,'Liberation Sans',sans-serif;--raj:Arial,Helvetica,'Liberation Sans',sans-serif;--mono:'Courier New',Courier,monospace;}
+  *,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  .topbar,.tr,.ldot,.action-row,.btn-row,.stats,#pdf-modal-overlay{display:none!important}
+  .print-header{display:flex!important}
+  body{background:#fff!important;font-size:11px}
+  .wrap{padding:10px 0 0;max-width:100%}
+  .panel,.ph-panel,.card,.section{box-shadow:none!important;margin-bottom:10px;break-inside:avoid;page-break-inside:avoid}
+  input[type=text],input[type=date],input[type=number],select,textarea{
+    background:transparent!important;border:none!important;
+    border-bottom:1px solid #b4c8bc!important;border-radius:0!important;
+    padding:2px 0!important;color:#1a2620!important;font-size:11px!important}
+  .rb,.r-btn,.tog-btn{border:none!important;border-radius:3px!important;
+    padding:2px 6px!important;font-size:10px!important;-webkit-appearance:none;appearance:none}
+  .meas-inp,.mi{background:transparent!important;border:none!important;
+    border-bottom:1px solid #b4c8bc!important;border-radius:0!important;
+    padding:2px 0!important;font-size:10px!important}
+  .mg4{grid-template-columns:1fr 1fr!important}
+}
+.print-header{display:none;font-family:monospace;font-size:10px;color:#3d5248;
+  padding:4px 0 8px;border-bottom:2px solid #4a5e52;margin-bottom:8px;
+  justify-content:space-between;align-items:center}
+.print-header strong{font-size:13px;color:#4a5e52;letter-spacing:1px}
+.btn-back{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:1px;text-decoration:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);transition:background .15s;white-space:nowrap;cursor:pointer;flex-shrink:0}
+.btn-back:hover{background:rgba(255,255,255,0.2);color:#fff}
+</style>
+</head>
+<body>
+<div class="print-header" id="print-header">
+  <div><strong>POMI — TRANSFORMER AT INSPECTION (NO DGA)</strong><br>
+    Unit 7/8 · 7EX-XFMR-AT · Weekly</div>
+  <div style="text-align:right">Date: <span id="ph-date">—</span><br>
+    WO: <span id="ph-wo">—</span></div>
+</div>
+<div class="topbar">
+  <span class="tl">PLTU</span><div class="tsep"></div>
+  <span class="tsub">TRANSFORMER AT — WEEKLY (NO DGA)</span><div class="tsep"></div>
+  <span class="tsub">EZ-GSU · EY-SU · EX-UAT · EX-EXC · EM-A1 · EM-B1 · EM-C1</span>
+  <div class="tr">
+    <a class="btn-back" href="index.html" title="Back to Portal">&#8592; Portal</a>
+
+    <div class="ldot"></div><span class="tclock" id="clock">--:--:--</span><div class="tsep"></div>
+    <button class="btn bo bsm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn br bsm" onclick="openPdfModal()">📥 Download PDF</button>
+    <button class="btn bsm" style="background:#27ae60;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
+  </div>
+</div>
+<div class="wrap">
+  <div class="ph">
+    <div><div class="ph-sub">Weekly Maintenance</div><div class="ph-title">TRANSFORMER AT <span>(NO DGA)</span></div></div>
+    <span class="badge">UNIT 7/8 — WITHOUT DGA</span>
+    <div class="stats">
+      <div class="sc t">Items <span id="cnt-t">0</span></div>
+      <div class="sc ok">OK <span id="cnt-ok">0</span></div>
+      <div class="sc ng">NG <span id="cnt-ng">0</span></div>
+    </div>
+  </div>
+
+  <div class="panel" style="border-radius:12px 12px 0 0;margin-bottom:0">
+    <div class="slbl">Work Order &amp; Inspector Information</div>
+    <div class="mg4">
+      <div class="mf"><label>Work Order No.</label><input type="text" id="wo-no" placeholder="WO-2025-XXXX"></div>
+      <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
+      <div class="mf"><label>Unit</label><select id="unit-sel"><option>7</option><option>8</option><option>7/8</option></select></div>
+      <div class="mf"><label>Inspection Type</label><select id="itype"><option>Weekly Inspection</option><option>Weekly Inspection</option><option>Three Monthly PM</option><option>Monthly</option></select></div>
+      <div class="mf"><label>Checked By</label><input type="text" id="checked-by" placeholder="Full name"></div>
+      <div class="mf"><label>NIK</label><input type="text" id="nik" placeholder="NIK-XXXXX"></div>
+      <div class="mf"><label>Reviewed By</label><input type="text" id="reviewed-by" placeholder="Supervisor name"></div>
+      <div class="mf"><label>Shift</label><select id="shift"><option>Shift 1 (07:00–15:00)</option><option>Shift 2 (15:00–23:00)</option><option>Shift 3 (23:00–07:00)</option><option>Normal Hours</option></select></div>
+    </div>
+  </div>
+
+  <div class="tabbar">
+    <button class="tbtn on" onclick="sw('main',this)">🔌 AT (No DGA)</button>
+    <button class="tbtn" onclick="sw('photo',this)">📷 Photos</button>
+    <button class="tbtn" onclick="sw('sign',this)">✍️ Sign-off</button>
+  </div>
+
+  <div class="tpane on panel top" id="p-main">
+    <div class="slbl">7EX-XFMR-AT — Unit 7/8 Weekly (Without DGA)</div>
+    <p style="font-size:11px;color:var(--t3);margin-bottom:12px">EZ-XFMR-GSU · EY-XFMR-SU · EX-XFMR-UAT · EX-XFMR-EXC · EM-XFMR-A1 · EM-XFMR-B1 · EM-XFMR-C1</p>
+    <div class="tbl-scroll-hint">← geser untuk scroll →</div>
+    <div style="overflow-x:auto"><table class="ct"><thead><tr>
+      <th style="width:30px">No.</th><th>Inspection Item</th>
+      <th class="ctr" style="min-width:110px">EZ-GSU</th><th class="ctr" style="min-width:90px">EY-SU</th>
+      <th class="ctr" style="min-width:82px">EX-UAT</th><th class="ctr" style="min-width:82px">EX-EXC</th>
+      <th class="ctr" style="min-width:82px">EM-A1</th><th class="ctr" style="min-width:82px">EM-B1</th>
+      <th class="ctr" style="min-width:82px">EM-C1</th>
+    </tr></thead><tbody id="tb-main"></tbody></table></div>
+  </div>
+
+  <div class="tpane panel top" id="p-photo">
+    <div class="slbl">Evidence Photos</div>
+    <div class="pg2" id="photo-wrap"></div>
+  </div>
+
+  <div class="tpane panel top" id="p-sign">
+    <div class="slbl">Findings &amp; Conclusion</div>
+    <div class="mg2" style="margin-bottom:12px">
+      <div class="mf"><label>Overall Condition</label>
+        <select id="overall"><option>✅ GOOD — Normal Operation</option><option>⚠️ FAIR — Requires Monitoring</option><option>🔧 POOR — Maintenance Required</option><option>🛑 CRITICAL — Must Shutdown</option></select>
+      </div>
+      <div class="mf"><label>Next Inspection Due</label><input type="date" id="next-insp"></div>
+    </div>
+    <div class="mg2" style="margin-bottom:16px">
+      <div class="mf"><label>Findings / Observations</label><textarea id="findings" rows="4" placeholder="List all findings…"></textarea></div>
+      <div class="mf"><label>Corrective Actions</label><textarea id="recommendations" rows="4" placeholder="Actions taken and follow-up…"></textarea></div>
+    </div>
+    <div class="slbl" style="margin-top:6px">Authorization &amp; Signatures</div>
+    <div class="sw2">
+      <div><div class="sttl">Checked By — Technician</div>
+        <div class="mf" style="margin-bottom:8px"><label>Name</label><input type="text" id="sig-tech-name" placeholder="Full name"></div>
+        <canvas class="sigc" id="sig-tech" width="600" height="110"></canvas>
+        <button class="btn bo bsm" style="margin-top:6px" onclick="clrSig('sig-tech')">✕ Clear</button>
+      </div>
+      <div><div class="sttl">Reviewed By — Supervisor</div>
+        <div class="mf" style="margin-bottom:8px"><label>Name</label><input type="text" id="sig-super-name" placeholder="Full name"></div>
+        <canvas class="sigc" id="sig-super" width="600" height="110"></canvas>
+        <button class="btn bo bsm" style="margin-top:6px" onclick="clrSig('sig-super')">✕ Clear</button>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-top:14px">
+    <button class="btn bo" onclick="saveDraft()">💾 Save Draft</button>
+    <button class="btn" style="background:#27ae60;color:#fff;font-size:15px;padding:10px 24px;border:none;border-radius:6px;cursor:pointer" onclick="submitToDb()">&#128202; Submit to Database</button>
+    <button class="btn bp" onclick="resetForm()">🔄 Reset</button>
+    <button class="btn br" onclick="openPdfModal()">📥 Download PDF</button>
+  </div>
+  <div id="notice" class="notice"></div>
+</div>
+
+<script>
+// CLOCK
+setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('id-ID'),1000);
+document.getElementById('clock').textContent=new Date().toLocaleTimeString('id-ID');
+
+// TABS
+function sw(n,b){document.querySelectorAll('.tpane').forEach(p=>p.classList.remove('on'));document.querySelectorAll('.tbtn').forEach(x=>x.classList.remove('on'));document.getElementById('p-'+n).classList.add('on');b.classList.add('on');}
+
+// STATE
+const ST={};
+function upStats(){const vs=Object.values(ST).filter(v=>v);const okS=new Set(['OK','No Leak','Clean','Normal']);const ngS=new Set(['NG','Leak','Dirty','Noise']);document.getElementById('cnt-t').textContent=vs.length;document.getElementById('cnt-ok').textContent=vs.filter(v=>okS.has(v)).length;document.getElementById('cnt-ng').textContent=vs.filter(v=>ngS.has(v)).length;}
+
+// CELL TYPES
+function meas(id,u){return `<input class="mi" type="number" step="any" id="${id}" placeholder="—"><span class="mu">${u}</span>`;}
+function meas3(id,u){return `<div class="m3">${['A','B','C'].map(x=>`<div class="m3c"><span class="m3lbl">${x}</span><input class="mi" type="number" step="any" id="${id}_${x}" placeholder="—"><span class="mu">${u}</span></div>`).join('')}</div>`;}
+function tog(id){return `<div class="rc"><button class="rb ok" data-id="${id}" data-v="OK" onclick="setT('${id}','OK',this)">OK</button><button class="rb ng" data-id="${id}" data-v="NG" onclick="setT('${id}','NG',this)">NG</button></div>`;}
+function lc(id,t){const p={leak:['Leak','leak','No Leak','noleak'],clean:['Clean','clean','Dirty','dirty'],noise:['Noise','noise','Normal','normal']}[t];return `<div class="lc"><button class="lb ${p[1]}" data-id="${id}" onclick="setLC('${id}','${p[0]}',this,'${p[1]}')">${p[0]}</button><button class="lb ${p[3]}" data-id="${id}" onclick="setLC('${id}','${p[2]}',this,'${p[3]}')">${p[2]}</button></div>`;}
+function na(){return `<span class="nac">N/A</span>`;}
+function setT(id,v,b){const w=b.classList.contains('a');b.closest('.rc').querySelectorAll('.rb').forEach(x=>x.classList.remove('a'));if(!w){b.classList.add('a');ST[id]=v;}else delete ST[id];upStats();}
+function setLC(id,v,b,c){const w=b.classList.contains('a');b.closest('.lc').querySelectorAll('.lb').forEach(x=>x.classList.remove('a'));if(!w){b.classList.add('a');ST[id]=v;}else delete ST[id];upStats();}
+
+// PCT input group: n inputs stacked, no labels
+function pctGrp(baseId, n){
+  let html='<div class="pct-grp">';
+  for(let i=1;i<=n;i++){
+    html+=`<div style="display:flex;align-items:center;gap:2px">
+      <input class="pct-inp" type="number" min="0" max="100" step="1" id="${baseId}_${i}" placeholder="—">
+      <span class="pct-u">%</span>
+    </div>`;
+  }
+  html+='</div>';
+  return html;
+}
+
+// ROW BUILDERS
+function shdr(tb,txt){const tr=tb.insertRow();tr.className='shdr';const td=tr.insertCell();td.colSpan=99;td.textContent=txt;}
+function row(tb,no,desc,crit,cells,mr=false){
+  const tr=tb.insertRow();if(mr)tr.className='mr';
+  tr.innerHTML=`<td class="tno">${no}</td><td class="tdesc">${desc}${crit?`<span class="crit">▸ ${crit}</span>`:''}</td>`;
+  cells.forEach(([t,id,u])=>{const td=tr.insertCell();td.style.textAlign='center';
+    if(t==='na')td.innerHTML=na();else if(t==='ok')td.innerHTML=tog(id);
+    else if(t==='leak')td.innerHTML=lc(id,'leak');else if(t==='clean')td.innerHTML=lc(id,'clean');
+    else if(t==='noise')td.innerHTML=lc(id,'noise');else if(t==='meas')td.innerHTML=meas(id,u||'');else if(t==='meas3')td.innerHTML=meas3(id,u||'');
+    else if(t==='pct1')td.innerHTML=pctGrp(id,1);
+    else if(t==='pct2')td.innerHTML=pctGrp(id,2);
+    else if(t==='pct3')td.innerHTML=pctGrp(id,3);
+  });
+}
+
+// SHEET builder (AT without DGA, NEW silicagel with % inputs)
+function mkSheet(tbId,pfx){
+  const tb=document.getElementById(tbId);
+  const C=['gsu','su','uat','exc','a1','b1','c1'];
+
+  // GSU=3 pct inputs, SU=2 pct inputs, UAT/A1/B1/C1=1, EXC=N/A
+  function silGrp(c,baseId){
+    if(c==='exc') return ['na','',''];
+    if(c==='gsu') return ['pct3',baseId,''];
+    if(c==='su')  return ['pct2',baseId,''];
+    return ['pct1',baseId,''];
+  }
+
+  shdr(tb,'A.  Transformer Temperature and Load');
+  row(tb,'A.1','Ambient Temperature','Record °C',C.map(c=>['meas',pfx+'_a1_'+c,'°C']),true);
+  row(tb,'A.2','Oil Temperature','SST/EXC ≤85°C · UAT/SUT/GSUT ≤95°C alarm',C.map(c=>['meas',pfx+'_a2_'+c,'°C']),true);
+  row(tb,'A.3','Winding Temperature','80°C→Fan stage1 · 85°C→Fan stage2',C.map(c=>['meas',pfx+'_a3_'+c,'°C']),true);
+  row(tb,'A.4','Voltage','Record kV',C.map(c=>c==='uat'?['meas3',pfx+'_a4_'+c,'kV']:['meas',pfx+'_a4_'+c,'kV']),true);
+  row(tb,'A.5','Apparent Power','GSUT≤873.6 · UAT/SUT≤112 · SST≤36 · EXC≤7.875 MVA',C.map(c=>c==='uat'?['meas3',pfx+'_a5_'+c,'MVA']:['meas',pfx+'_a5_'+c,'MVA']),true);
+  shdr(tb,'B.  Oil Level Gauge');
+  row(tb,'B.1','Main Tank Oil Level','In range per Temp vs Level table',C.map(c=>['meas',pfx+'_b1_'+c,'%']),true);
+  row(tb,'B.2','OLTC Oil Level (if equipped)','',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['meas',pfx+'_b2_'+c,'%']),true);
+  row(tb,'B.3','Dissolve Gas Analysis — DGA (ppm)','Alarm=500 ppm · High=1000 ppm',C.map(c=>c==='exc'?['na','','']:['meas',pfx+'_b3_'+c,'ppm']),true);
+
+  // ── SILICAGEL BREATHER — updated section ──
+  shdr(tb,'C.  Silicagel Breather');
+
+  // C.1a — % pink from bottom (≥70% replace)
+  row(tb,'C.1a',
+    'Check color change of silicagel (25% blue + 75% white)<br><small style="color:var(--t3);font-size:10px">▸ ≥ 70% silica pink from bottom → replace it</small>',
+    '',
+    C.map(c=>silGrp(c, pfx+'_c1a_'+c)),
+    true
+  );
+
+  // C.1b — % pink from upper portion
+  row(tb,'C.1b',
+    'If upper portions of silicagel was pink<br><small style="color:var(--t3);font-size:10px">▸ Check &amp; retighten the silicagel inlet cap and joint to the conservator</small>',
+    '',
+    C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_c2_'+c])
+  );
+
+  // C.2 — sealing oil level
+  row(tb,'C.2','Check the level of sealing oil in oil cup','Oil level = oil level mark at oil pot',C.map(c=>c==='exc'?['na','','']:['ok',pfx+'_c2_'+c]));
+
+  // C.3 — contamination (Clean/Dirty)
+  row(tb,'C.3','Check contamination of absorbent and sealing oil','Absorbent dirty / Sealing oil milky',C.map(c=>c==='exc'?['na','','']:['clean',pfx+'_c3_'+c]));
+
+  shdr(tb,'D.  Oil Leaks — Valves, Gauges, Gaskets, Welds');
+  row(tb,'D','Check all connections for oil leaks','No leak',C.map(c=>['leak',pfx+'_d_'+c]));
+  shdr(tb,'E.  Cooling Equipment');
+  row(tb,'E.1','Leakage on radiators','No leak',C.map(c=>['leak',pfx+'_e1_'+c]));
+  row(tb,'E.2','Dust / rust on radiator surface','No rust',C.map(c=>['clean',pfx+'_e2_'+c]));
+  row(tb,'E.3','Abnormal noise on cooling fans','No abnormal noise',C.map(c=>['noise',pfx+'_e3_'+c]));
+  shdr(tb,'F.  Bushing (Porcelain Type)');
+  row(tb,'F.1','Bushing oil level & leaks (if equipped)','Oil level > 50%',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['ok',pfx+'_f1_'+c]));
+  row(tb,'F.2','Porcelain contamination','Clean, No contamination',C.map(c=>c==='exc'?['na','','']:['clean',pfx+'_f2_'+c]));
+  shdr(tb,'G.  Pressure Relief Device');
+  row(tb,'G.1','Oil leakage on Pressure Relief Device','No leak',C.map(c=>['leak',pfx+'_g1_'+c]));
+  shdr(tb,'H.  On Load Tap Changer (OLTC)');
+  row(tb,'H.1','Tap changing operation counter','< 80,000 ops',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['meas',pfx+'_h1_'+c,'ops']),true);
+  shdr(tb,'I.  Oil Purifier');
+  row(tb,'I.1','Oil purifier leaks','No leak',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['leak',pfx+'_i1_'+c]));
+  row(tb,'I.2','Filter Differential Pressure','Diff Press < 0.4 MPa',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['meas',pfx+'_i2_'+c,'MPa']),true);
+  row(tb,'I.3','Oil flow sight — carbon contamination','No carbon contamination',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['clean',pfx+'_i3_'+c]));
+  shdr(tb,'J.  Cooler Control Cubicle');
+  row(tb,'J.1','Rust on cubicle','No rust',C.map(c=>['clean',pfx+'_j1_'+c]));
+  row(tb,'J.2','Loose connections inside cubicle','No looseness',C.map(c=>['ok',pfx+'_j2_'+c]));
+  row(tb,'J.3','Wire color / discoloration / overheating','No discoloration',C.map(c=>['ok',pfx+'_j3_'+c]));
+  shdr(tb,'K.  N₂ Pressure');
+  row(tb,'K.1','N₂ Bottle Pressure','>10 psi (Low Alarm)',C.map(c=>c==='exc'?['meas',pfx+'_k1_'+c,'psi']:['na','','']),true);
+  row(tb,'K.2','XFMR Tank Pressure','<+9 psi (Avg +2 psi)',C.map(c=>c==='exc'?['meas',pfx+'_k2_'+c,'psi']:['na','','']),true);
+  shdr(tb,'SF₆ Gas Pressure');
+  row(tb,'','SF₆ Gas Pressure','Alarm: 0.45 MPa · Trip: 0.40 MPa',C.map(c=>['uat','exc','a1','b1','c1'].includes(c)?['na','','']:['meas',pfx+'_sf_'+c,'MPa']),true);
+}
+
+// PHOTOS
+const PS={};
+const PSLOTS=[{"id": "ph1", "title": "Transformer Room Overview"}, {"id": "ph2", "title": "EZ-XFMR-GSU Condition"}, {"id": "ph3", "title": "EY-XFMR-SU Condition"}, {"id": "ph4", "title": "EX-XFMR-UAT Condition"}, {"id": "ph5", "title": "Thermal Scan — GSU/SU (IR)"}, {"id": "ph6", "title": "Thermal Scan — UAT/Others (IR)"}];
+function mkPhotos(){document.getElementById('photo-wrap').innerHTML=PSLOTS.map(p=>`<div><div class="pbtl">${p.title}</div><div class="pd" id="${p.id}"><input type="file" accept="image/*" onchange="lpx(this,'${p.id}')"><button class="delbtn" onclick="dpx('${p.id}',event)">×</button><div class="phi">📷</div><div class="pht">Click to upload</div></div><div class="pcap"><input type="text" id="${p.id}-cap" placeholder="Caption…"></div></div>`).join('');}
+function lpx(inp,id){if(!inp.files[0])return;const r=new FileReader();r.onload=e=>{PS[id]=e.target.result;const s=document.getElementById(id);let img=s.querySelector('img');if(!img){img=document.createElement('img');s.appendChild(img);}img.src=e.target.result;s.classList.add('hp');s.querySelector('.phi').style.display='none';s.querySelector('.pht').style.display='none';};r.readAsDataURL(inp.files[0]);}
+function dpx(id,e){e.stopPropagation();const s=document.getElementById(id);const img=s.querySelector('img');if(img)img.remove();s.classList.remove('hp');s.querySelector('.phi').style.display='';s.querySelector('.pht').style.display='';delete PS[id];}
+
+// SIGNATURE
+function initSig(id){const c=document.getElementById(id);const ctx=c.getContext('2d');let dr=false;function p(e){const r=c.getBoundingClientRect();const sx=c.width/r.width;const sy=c.height/r.height;if(e.touches)return{x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};}c.addEventListener('mousedown',e=>{dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);});c.addEventListener('mousemove',e=>{if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();});c.addEventListener('mouseup',()=>dr=false);c.addEventListener('mouseleave',()=>dr=false);c.addEventListener('touchstart',e=>{e.preventDefault();dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);},{passive:false});c.addEventListener('touchmove',e=>{e.preventDefault();if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();},{passive:false});c.addEventListener('touchend',()=>dr=false);}
+function clrSig(id){const c=document.getElementById(id);c.getContext('2d').clearRect(0,0,c.width,c.height);}
+
+// DRAFT
+function saveDraft(){const d={};document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>d['f'+i]=el.value);d._st=ST;try{localStorage.setItem('tx_at_nodga_draft_v1',JSON.stringify(d));note('💾 Draft saved.','ok');}catch(e){note('❌ '+e.message,'err');}}
+function loadDraft(){try{const raw=localStorage.getItem('tx_at_nodga_draft_v1');if(!raw)return;const d=JSON.parse(raw);document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>{if(d['f'+i]!==undefined)el.value=d['f'+i];});if(d._st){Object.assign(ST,d._st);Object.entries(ST).forEach(([id,val])=>{document.querySelectorAll(`[data-id="${id}"]`).forEach(b=>{if(b.dataset.v===val||b.textContent===val)b.classList.add('a');});});}upStats();}catch(e){}}
+function resetForm(){if(!confirm('Reset all data?'))return;document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file')el.value='';});Object.keys(ST).forEach(k=>delete ST[k]);document.querySelectorAll('.rb,.lb').forEach(b=>b.classList.remove('a'));clrSig('sig-tech');clrSig('sig-super');PSLOTS.forEach(p=>dpx(p.id,{stopPropagation:()=>{}}));upStats();}
+
+// NOTICE
+function note(msg,t){const n=document.getElementById('notice');n.textContent=msg;n.className='notice '+t;setTimeout(()=>n.className='notice',3500);}
+const vv=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
+const trunc=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'');
+
+// helper: get pct inputs value from group
+function getPct(baseId, n){
+  const vals=[];
+  for(let i=1;i<=n;i++){
+    const el=document.getElementById(baseId+'_'+i);
+    vals.push(el&&el.value?el.value+'%':'—');
+  }
+  return vals.join(' / ');
+}
+
+// PDF
+async function generatePDF(selSet){
+  if(!selSet)selSet=new Set(PDF_SHEETS.map(s=>s.key));
+  note('⏳ Generating PDF…','info');await new Promise(r=>setTimeout(r,200));
+  if(!window.jspdf||!window.jspdf.jsPDF){note('❌ jsPDF library tidak tersedia.','err');return;}
+  const{jsPDF}=window.jspdf;
+  const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const BASE_FONT='times';
+  const sanitizeText = s => s ? String(s).replace(/[^\x20-\x7E]/g,'') : '';
+  const W=297,H=210,M=11;let y=M;let firstPage=true;
+  const DARK=[44,62,48],STL=[74,94,82],RED=[192,57,43],OK=[39,174,96],NA=[142,68,173],LT=[240,245,241];
+  function nPage(){pdf.addPage();y=M;pgHdr();}
+  function ck(n){if(y+n>H-M)nPage();}
+  function pgHdr(){pdf.setFillColor(...DARK);pdf.rect(0,0,W,9,'F');pdf.setTextColor(168,212,184);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7.5);pdf.text(sanitizeText('TRANSFORMER AT INSPECTION (NO DGA) - UNIT '+vv('unit-sel')),M,6.5);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(6.5);pdf.setTextColor(100,150,120);pdf.text(sanitizeText(`WO: ${vv('wo-no')||' - '}  Date: ${vv('wo-date')||' - '}  By: ${vv('checked-by')||' - '}`),W-M,6.5,{align:'right'});y=13;}
+  function ensurePage(){if(!firstPage){nPage();}else{firstPage=false;pgHdr();}}
+
+  // Cover
+  if(selSet.has('cover')){
+    firstPage=false;
+    pdf.setFillColor(...DARK);pdf.rect(0,0,W,44,'F');pdf.setFillColor(...RED);pdf.rect(0,42,W,2,'F');
+    pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(20);pdf.text(sanitizeText('TRANSFORMER AT INSPECTION (NO DGA)'),M,15);
+    pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(12);pdf.setTextColor(168,212,184);pdf.text(sanitizeText('UNIT '+vv('unit-sel')+' - XFMR-AT WITHOUT DGA (WEEKLY)'),M,25);
+    pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(8);pdf.setTextColor(100,150,120);pdf.text(sanitizeText('Generated: '+new Date().toLocaleString('en-GB')),M,35);pdf.text(sanitizeText('PLTU Maintenance Dept.'),W-M,35,{align:'right'});
+    y=50;
+    pdf.setFillColor(244,248,245);pdf.setDrawColor(180,200,185);pdf.setLineWidth(0.25);pdf.roundedRect(M,y,W-M*2,28,2,2,'FD');
+    function ib(l,v,x,yy){pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(6.5);pdf.setTextColor(120,160,135);pdf.text(sanitizeText(l.toUpperCase()),x,yy);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(9.5);pdf.setTextColor(...DARK);pdf.text(sanitizeText(trunc(v||' - ',28)),x,yy+5.5);}
+    const cx=[M+3,62,115,165,215];
+    ib('WO',vv('wo-no'),cx[0],y+7);ib('Date',vv('wo-date'),cx[1],y+7);ib('Unit',vv('unit-sel'),cx[2],y+7);ib('Type',vv('itype'),cx[3],y+7);
+    ib('Checked By',vv('checked-by'),cx[0],y+19);ib('NIK',vv('nik'),cx[1],y+19);ib('Reviewed By',vv('reviewed-by'),cx[2],y+19);ib('Shift',vv('shift').split(' ')[0],cx[3],y+19);
+    y+=34;
+    const to=parseInt(document.getElementById('cnt-t').textContent)||0;
+    const oc=parseInt(document.getElementById('cnt-ok').textContent)||0;
+    const nc=parseInt(document.getElementById('cnt-ng').textContent)||0;
+    [[M,'TOTAL',String(to),STL],[M+36,'OK/NORMAL',String(oc),OK],[M+72,'NG/ISSUE',String(nc),RED]].forEach(([x,l,v,cl])=>{
+      pdf.setFillColor(...cl,.06);pdf.setDrawColor(...cl);pdf.setLineWidth(0.35);pdf.roundedRect(x,y,30,11,2,2,'FD');
+      pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(6);pdf.setTextColor(...cl);pdf.text(sanitizeText(l),x+2,y+4.5);pdf.setFontSize(11);pdf.text(sanitizeText(v),x+2,y+10);
+    });y+=17;
+  }
+
+  function drawTbl(title,tbId,hdrs,cws){
+    ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(8.5);pdf.text('>  '+sanitizeText(title),M+3,y+5);y+=10;
+    const columnStyles = {0:{cellWidth:8,halign:'center'},1:{cellWidth:cws[0]||70},...hdrs.reduce((o,_,i)=>({...o,[i+2]:{cellWidth:cws[i+1]||22,halign:'center'}}),{})};
+    const body=[];
+    document.getElementById(tbId).querySelectorAll('tr').forEach(tr=>{
+      if(tr.classList.contains('shdr')){body.push([{content:tr.querySelector('td').textContent,colSpan:99,styles:{fillColor:[240,245,241],fontStyle:'bold',fontSize:7,textColor:[74,94,82]}}]);return;}
+      const tds=[...tr.querySelectorAll('td')];if(tds.length<2)return;
+      const no=sanitizeText(tds[0].textContent.trim());const desc=sanitizeText(tds[1].textContent.replace(/▸.*/,'').trim());
+      const crit=sanitizeText(tds[1].querySelector('.crit')?.textContent.replace('▸ ','').trim()||'');
+      const vals=tds.slice(2).map(td=>{
+        if(td.querySelector('.nac'))return'N/A';
+        const a=td.querySelector('.rb.a,.lb.a');if(a)return sanitizeText(a.textContent);
+        const pctInps=td.querySelectorAll('.pct-inp');
+        if(pctInps.length>0)return sanitizeText([...pctInps].map(i=>i.value?i.value+'%':'-').join('/'));
+        const miInps=td.querySelectorAll('.mi');
+        if(miInps.length>1)return sanitizeText([...miInps].map(i=>i.value||'-').join('/'));
+        const inp=td.querySelector('input[type=number]');
+        return inp&&inp.value?sanitizeText(inp.value):'-';
+      });
+      body.push([no,crit?`${desc}\n- ${crit}`:desc,...vals]);
+    });
+    pdf.autoTable({startY:y,head:[['No.','Inspection Item',...hdrs]],body,theme:'grid',
+      styles:{font:BASE_FONT,fontSize:6.8,cellPadding:2,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.16},
+      headStyles:{fillColor:[240,245,241],textColor:[80,110,90],fontStyle:'bold',fontSize:6.5,halign:'center'},
+      columnStyles, didParseCell:d=>{const v=d.cell.text[0];if(['OK','No Leak','Clean','Normal'].includes(v)){d.cell.styles.textColor=[...OK];d.cell.styles.fontStyle='bold';}if(['NG','Leak','Dirty','Noise'].includes(v)){d.cell.styles.textColor=[...RED];d.cell.styles.fontStyle='bold';}if(v==='N/A')d.cell.styles.textColor=[...NA];},
+      margin:{left:M,right:M}});y=pdf.lastAutoTable.finalY+5;
+  }
+
+  function drawNote(label,text){text=sanitizeText(text||'').trim();if(!text)return;const lines=pdf.splitTextToSize(text, W-M*2);const need=10+lines.length*4.2;ck(need);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7);pdf.setTextColor(...STL);pdf.text(sanitizeText(label), M, y);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(7);pdf.setTextColor(...DARK);pdf.text(lines, M, y+4);y+=need;}
+
+  if(selSet.has('main')){ensurePage();drawTbl('7EX-XFMR-AT (Without DGA)','tb-main',['EZ-GSU','EY-SU','EX-UAT','EX-EXC','EM-A1','EM-B1','EM-C1'],[72,22,22,22,22,22,22,22]);}
+
+  // Photos
+  if(selSet.has('photos')){
+    const hp=PSLOTS.filter(p=>PS[p.id]);
+    if(hp.length){
+      ensurePage();
+      ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(8.5);pdf.text(sanitizeText('>  Evidence Photos'),M+3,y+5);y+=11;
+      const cw=(W-M*2)/3-3;
+      for(let i=0;i<hp.length;i+=3){const g=hp.slice(i,i+3);const ih=50;ck(ih+14);g.forEach((p,pi)=>{const xo=M+pi*(cw+3);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7);pdf.setTextColor(...STL);pdf.text(sanitizeText(trunc(p.title,32)),xo,y+5);try{pdf.addImage(PS[p.id],'JPEG',xo,y+7,cw,ih,undefined,'MEDIUM');}catch(e){}const cap=document.getElementById(p.id+'-cap')?.value||'';if(cap){pdf.setFont(BASE_FONT,'italic');pdf.setFontSize(6.5);pdf.setTextColor(120,155,135);pdf.text(sanitizeText(trunc(cap,40)),xo,y+7+ih+4);}});y+=ih+18;}
+    }
+  }
+
+  // Findings & Signatures
+  if(selSet.has('findings')){
+    ensurePage();
+    ck(48);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(8.5);pdf.text(sanitizeText('>  Findings & Conclusion'),M+3,y+5);y+=10;
+    pdf.autoTable({startY:y,body:[[sanitizeText('Overall'),sanitizeText(vv('overall')||' - ')],[sanitizeText('Next Inspection'),sanitizeText(vv('next-insp')||' - ')],[sanitizeText('Findings'),sanitizeText(vv('findings')||' - ')],[sanitizeText('Corrective Actions'),sanitizeText(vv('recommendations')||' - ')]],theme:'grid',styles:{font:BASE_FONT,fontSize:8.5,cellPadding:3.5,textColor:[26,38,32],lineColor:[200,215,205],lineWidth:0.18},columnStyles:{0:{cellWidth:46,fontStyle:'bold',fillColor:[244,248,245],textColor:[74,94,82]}},margin:{left:M,right:M}});y=pdf.lastAutoTable.finalY+7;
+    ck(42);const sw=(W-M*2)/2-5;
+    ['sig-tech','sig-super'].forEach((id,i)=>{const xo=M+i*(sw+10);const lbl=sanitizeText(i===0?'Checked By - Technician':'Reviewed By - Supervisor');const nm=sanitizeText(i===0?(vv('sig-tech-name')||vv('checked-by')):(vv('sig-super-name')||vv('reviewed-by')));pdf.setFillColor(244,248,245);pdf.setDrawColor(180,200,185);pdf.setLineWidth(0.25);pdf.roundedRect(xo,y,sw,36,2,2,'FD');pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7.5);pdf.setTextColor(...STL);pdf.text(lbl,xo+3,y+5.5);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(9);pdf.setTextColor(...DARK);pdf.text(nm||'',xo+3,y+12);const c=document.getElementById(id);if(c){const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data.some(v=>v);if(d)try{pdf.addImage(c.toDataURL('image/png'),'PNG',xo+3,y+14,sw-6,18);}catch(e){}}pdf.setDrawColor(180,200,185);pdf.line(xo+3,y+33,xo+sw-3,y+33);pdf.setFont(BASE_FONT,'italic');pdf.setFontSize(6.5);pdf.setTextColor(120,155,135);pdf.text('Signature',xo+3,y+36);});
+  }
+
+  const pages=pdf.internal.getNumberOfPages();
+  for(let pg=1;pg<=pages;pg++){pdf.setPage(pg);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(6.5);pdf.setTextColor(150);pdf.text(`Page ${pg}/${pages}`,W-M,H-5,{align:'right'});pdf.text(sanitizeText('PLTU - Transformer AT Inspection (No DGA)'),M,H-5);}
+
+  const fn=`transformer_at_nodga_${(vv('wo-no')||'workorder')}_${(vv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
+  pdf.save(fn);note('✅ PDF saved: '+fn,'ok');
+}
+
+// PDF MODAL
+const PDF_SHEETS=[{"key": "cover", "label": "Cover & Header", "icon": "📋", "desc": "Cover page + WO info + stats"}, {"key": "main", "label": "AT Sheet (No DGA)", "icon": "🔌", "desc": "EZ-GSU · EY-SU · EX-UAT · EX-EXC · EM-A1/B1/C1"}, {"key": "photos", "label": "Evidence Photos", "icon": "📷", "desc": "Uploaded inspection photos"}, {"key": "findings", "label": "Findings & Sign-off", "icon": "✍️", "desc": "Conclusion, actions & signatures"}];
+let _pdfSel=new Set(PDF_SHEETS.map(s=>s.key));
+
+function openPdfModal(){_pdfSel=new Set(PDF_SHEETS.map(s=>s.key));renderPdfModal();document.getElementById('pdf-modal-overlay').style.display='flex';}
+function closePdfModal(){document.getElementById('pdf-modal-overlay').style.display='none';}
+function renderPdfModal(){
+  const list=document.getElementById('pdf-sheet-list');
+  if(!list){note('⚠️ Modal sheet list not found.','err');return;}
+  list.innerHTML=PDF_SHEETS.map(s=>`<div class="psl-item ${_pdfSel.has(s.key)?'psl-on':''}" id="pslrow-${s.key}" onclick="toggleSheet('${s.key}')"><span class="psl-icon">${s.icon}</span><span class="psl-info"><span class="psl-name">${s.label}</span><span class="psl-desc">${s.desc}</span></span><span class="psl-chk" id="pslchk-${s.key}">${_pdfSel.has(s.key)?'✓':''}</span></div>`).join('');
+  updatePdfBadge();
+}
+function toggleSheet(key){if(!_pdfSel||!(_pdfSel instanceof Set))_pdfSel=new Set();if(_pdfSel.has(key))_pdfSel.delete(key);else _pdfSel.add(key);const row=document.getElementById('pslrow-'+key);const chk=document.getElementById('pslchk-'+key);if(row)row.className='psl-item'+(_pdfSel.has(key)?' psl-on':'');if(chk)chk.textContent=_pdfSel.has(key)?'✓':'';updatePdfBadge();}
+function updatePdfBadge(){const el=document.getElementById('pdf-count-badge');if(el)el.textContent=_pdfSel.size+' sheet'+(_pdfSel.size!==1?'s':'');}
+function pdfSelectAll(){_pdfSel=new Set(PDF_SHEETS.map(s=>s.key));renderPdfModal();}
+function pdfClearAll(){_pdfSel=new Set();renderPdfModal();}
+function generatePDFSelected(){if(!_pdfSel||_pdfSel.size===0){note('⚠️ Pilih minimal 1 sheet!','err');return;}closePdfModal();try{generatePDF(new Set(_pdfSel));}catch(e){console.error('PDF generation failed:',e);note('❌ Gagal membuat PDF: '+(e.message||'Unknown error'),'err');}}
+
+// INIT
+mkSheet('tb-main','main');
+mkPhotos();initSig('sig-tech');initSig('sig-super');loadDraft();upStats();loadLastSubmission();
+
+function collectSheetData(tbId, columns, pfx) {
+  const tb = document.getElementById(tbId);
+  if (!tb) return [];
+  const rows = [];
+  let currentSection = '';
+  tb.querySelectorAll('tr').forEach(tr => {
+    if (tr.classList.contains('shdr')) { currentSection = tr.textContent.trim(); return; }
+    const noCell = tr.querySelector('.tno');
+    const descCell = tr.querySelector('.tdesc');
+    if (!descCell) return;
+    const no = noCell ? noCell.textContent.trim() : '';
+    const desc = descCell.childNodes[0] ? descCell.childNodes[0].textContent.trim() : descCell.textContent.trim();
+    const critEl = descCell.querySelector('.crit');
+    const crit = critEl ? critEl.textContent.replace('▸','').trim() : '';
+    const values = {};
+    columns.forEach((col, ci) => {
+      const tds = tr.querySelectorAll('td');
+      const td = tds[ci + 2];
+      if (!td) return;
+      const mi = td.querySelector('.mi');
+      const pctInps = td.querySelectorAll('.pct-inp');
+      const activeBtn = td.querySelector('.rb.a, .lb.a');
+      const naEl = td.querySelector('.nac');
+      if (mi && mi.value) values[col] = mi.value;
+      else if (pctInps.length > 0) {
+        const pv = [...pctInps].map(p => p.value ? p.value + '%' : '—').join('/');
+        if (pv.replace(/[—/]/g, '')) values[col] = pv;
+      }
+      else if (activeBtn) values[col] = activeBtn.textContent.trim() || activeBtn.dataset.v || '';
+      else if (naEl) values[col] = 'N/A';
+    });
+    rows.push({ section: currentSection, no, desc, crit, values });
+  });
+  return rows;
+}
+
+function collectGISPanel(tbId, pfx) {
+  const tb = document.getElementById(tbId);
+  if (!tb) return [];
+  return GTAGS.map((tags, i) => {
+    const values = {};
+    tags.forEach((tag, ti) => {
+      const el = document.getElementById(pfx + '_' + tag);
+      values['Phase ' + 'ABC'[ti]] = el && el.value ? el.value + ' MPa' : '—';
+    });
+    return { no: i + 1, desc: tags.join(' / '), crit: 'Alarm ≥0.45 · Trip ≤0.40 MPa', values };
+  });
+}
+
+async function submitToDb(){
+  const data = {
+    assetTag: '7EX-XFMR-AT',
+    assetName: 'Transformer AT — Without DGA (Weekly)',
+    frequency: 'WEEKLY',
+    woNumber: vv('wo-no'),
+    executionDate: vv('wo-date'),
+    timeStart: '',
+    timeEnd: '',
+    checkedBy: vv('checked-by'),
+    nik: vv('nik'),
+    reviewedBy: vv('reviewed-by'),
+    shift: vv('shift'),
+    unit: vv('unit-sel'),
+    inspectionType: vv('itype'),
+    overallCondition: vv('overall'),
+    nextInspection: vv('next-insp'),
+    findings: vv('findings'),
+    recommendations: vv('recommendations'),
+    countOk: parseInt(document.getElementById('cnt-ok').textContent) || 0,
+    countNg: parseInt(document.getElementById('cnt-ng').textContent) || 0,
+    countNa: 0,
+    overallStatus: (parseInt(document.getElementById('cnt-ng').textContent) || 0) > 0 ? 'NG' : 'OK',
+    sheets: {}
+  };
+
+  const cols = ["EZ-GSU", "EY-SU", "EX-UAT", "EX-EXC", "EM-A1", "EM-B1", "EM-C1"];
+  data.sheets.main = { title: 'AT (Without DGA)', columns: cols, rows: collectSheetData('tb-main', cols, 'main') };
+
+  data.items = [];
+  data.measurements = [];
+
+  if (!data.executionDate) { DB.showSubmitResult(false, 'Isi tanggal eksekusi terlebih dahulu.'); return; }
+  if (!data.checkedBy) { DB.showSubmitResult(false, 'Isi nama teknisi terlebih dahulu.'); return; }
+  try {
+    const id = await DB.save(data);
+    DB.showSubmitResult(true, 'Data berhasil disimpan ke database! ID: ' + id);
+  } catch(e) {
+    DB.showSubmitResult(false, 'Gagal menyimpan: ' + e.message);
+  }
+}
+
+async function loadLastSubmission() {
+  try {
+    const snap = await db.collection('checksheets')
+      .where('assetTag', '==', '7EX-XFMR-AT')
+      .orderBy('createdAt', 'desc').limit(1).get();
+    if (snap.empty) return;
+    const d = snap.docs[0].data();
+    if (d.woNumber) document.getElementById('wo-no').value = d.woNumber;
+    if (d.executionDate) document.getElementById('wo-date').value = d.executionDate;
+    if (d.checkedBy) document.getElementById('checked-by').value = d.checkedBy;
+    if (d.nik) document.getElementById('nik').value = d.nik;
+    if (d.reviewedBy) document.getElementById('reviewed-by').value = d.reviewedBy;
+    if (d.shift) document.getElementById('shift').value = d.shift;
+    if (d.unit) document.getElementById('unit-sel').value = d.unit;
+    if (d.inspectionType) document.getElementById('itype').value = d.inspectionType;
+    if (d.overallCondition) document.getElementById('overall').value = d.overallCondition;
+    if (d.nextInspection) document.getElementById('next-insp').value = d.nextInspection;
+    if (d.findings) document.getElementById('findings').value = d.findings;
+    if (d.recommendations) document.getElementById('recommendations').value = d.recommendations;
+
+    const sheet = d.sheets && d.sheets.main;
+    if (sheet && sheet.rows && sheet.columns) {
+      const tb = document.getElementById('tb-main');
+      if (tb) {
+        const colMap = {};
+        sheet.columns.forEach((c, i) => colMap[c] = i);
+        let rowIdx = 0;
+        tb.querySelectorAll('tr').forEach(tr => {
+          if (tr.classList.contains('shdr')) return;
+          const descCell = tr.querySelector('.tdesc');
+          if (!descCell) return;
+          const savedRow = sheet.rows[rowIdx];
+          rowIdx++;
+          if (!savedRow || !savedRow.values) return;
+          const tds = tr.querySelectorAll('td');
+          sheet.columns.forEach((col, ci) => {
+            const val = savedRow.values[col];
+            if (!val || val === 'N/A') return;
+            const td = tds[ci + 2];
+            if (!td) return;
+            const mi = td.querySelector('.mi');
+            const pctInps = td.querySelectorAll('.pct-inp');
+            const btns = td.querySelectorAll('.rb, .lb');
+            if (mi) { mi.value = val; }
+            else if (pctInps.length > 0) {
+              const parts = val.split('/');
+              pctInps.forEach((p, pi) => { if (parts[pi]) p.value = parts[pi].replace('%','').trim(); });
+            } else if (btns.length > 0) {
+              btns.forEach(b => {
+                if ((b.textContent.trim() === val || b.dataset.v === val)) {
+                  b.classList.add('a');
+                  const id = b.dataset.id;
+                  if (id) ST[id] = val;
+                }
+              });
+            }
+          });
+        });
+      }
+    }
+    upStats();
+    note('📂 Data terakhir dimuat dari database.', 'ok');
+  } catch(e) { console.log('Auto-load skip:', e.message); }
+}
+
+</script>
+
+<!-- PDF Sheet Selector Modal -->
+<div id="pdf-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(20,35,25,0.65);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(4px)">
+  <div style="background:#f0f5f1;border:1.5px solid #b4c8bc;border-radius:14px;padding:0;width:480px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden">
+    <div style="background:linear-gradient(90deg,#2c3e30,#3d5248);padding:16px 22px;display:flex;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-family:'Rajdhani',sans-serif;font-size:17px;font-weight:700;color:#a8d4b8;letter-spacing:2px">PILIH SHEET PDF</div>
+        <div style="font-size:11px;color:#6aaa8a;margin-top:2px">Centang sheet yang ingin dimasukkan dalam PDF</div>
+      </div>
+      <button onclick="closePdfModal()" style="background:none;border:none;color:#7aaa8a;font-size:20px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px">✕</button>
+    </div>
+    <div style="padding:14px 18px 6px">
+      <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center">
+        <button onclick="pdfSelectAll()" class="btn bo bsm" style="font-size:11px;padding:4px 12px">✅ Pilih Semua</button>
+        <button onclick="pdfClearAll()" class="btn bo bsm" style="font-size:11px;padding:4px 12px">☐ Kosongkan</button>
+        <span id="pdf-count-badge" style="margin-left:auto;font-family:'Share Tech Mono',monospace;font-size:12px;color:#4a5e52;background:#dde3de;padding:3px 10px;border-radius:20px;font-weight:700">4 sheets</span>
+      </div>
+      <div id="pdf-sheet-list" style="display:flex;flex-direction:column;gap:5px;max-height:360px;overflow-y:auto;padding-right:4px"></div>
+    </div>
+      <div style="padding:14px 18px 18px;display:flex;gap:10px;justify-content:flex-end;border-top:1px solid #dde3de;margin-top:10px">
+      <button onclick="closePdfModal()" class="btn bo">Batal</button>
+      <button onclick="generatePDFSelected()" class="btn br" style="min-width:140px">📥 Download Selected</button>
+    </div>
+  </div>
+</div>
+</body>
+</html>
