@@ -254,7 +254,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 
 <div class="topbar">
   <div class="live-dot"></div>
-  <span class="tb-logo">HV MOTOR <em>MCC</em></span>
+  <span class="tb-logo">HV MOTOR <em>SWITCHGEAR</em></span>
   <div class="tb-sep"></div>
   <span class="tb-sub">PM CHECK SHEET · POMI UNIT 7</span>
   <div class="tb-right">
@@ -288,8 +288,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 </div>
 
 <div class="hero">
-  <div class="hero-eyebrow">Preventive Maintenance — MCC High Voltage Motor</div>
-  <div class="hero-title">HV MOTOR <em>MCC</em></div>
+  <div class="hero-eyebrow">Preventive Maintenance — HV Motor Switchgear</div>
+  <div class="hero-title">HV MOTOR <em>SWITCHGEAR</em></div>
   <div class="hero-sub">POMI Unit 7 · Maintenance Check Sheet · Work Completion Report</div>
   <div class="hero-stats">
     <div class="hstat"><span class="hstat-n" id="h-total">0</span><span class="hstat-l">Total</span></div>
@@ -1081,9 +1081,23 @@ async function submitToDb(){
 // ═══════════════════════════════════════════════════
 //  PDF GENERATION
 // ═══════════════════════════════════════════════════
+async function imgToDataUrl(src){
+  return new Promise(res=>{
+    const img=new Image();
+    img.crossOrigin='anonymous';
+    img.onload=()=>{
+      try{const cv=document.createElement('canvas');cv.width=img.naturalWidth;cv.height=img.naturalHeight;
+        cv.getContext('2d').drawImage(img,0,0);res({url:cv.toDataURL('image/png'),w:img.naturalWidth,h:img.naturalHeight});}
+      catch{res(null);}
+    };
+    img.onerror=()=>res(null);
+    img.src=src+'?'+Date.now();
+  });
+}
 async function generatePDF(selectedSections){
   showNote('⏳ Membuat PDF, harap tunggu...', 'info');
   await new Promise(r => setTimeout(r, 200));
+  const logoImg = await imgToDataUrl('LOGO POMI.png');
   const {jsPDF} = window.jspdf;
   const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
   const W=210, H=297, M=13, CW=184; let y=M;
@@ -1107,17 +1121,23 @@ async function generatePDF(selectedSections){
     y = 12;
   }
 
-  // ── Cover header ──
-  pdf.setFillColor(...NAVY); pdf.rect(0,0,W,44,'F');
-  pdf.setFillColor(...BLUE); pdf.rect(0,42,W,2,'F');
-  pdf.setTextColor(...WH); pdf.setFont('helvetica','bold'); pdf.setFontSize(22);
-  pdf.text('HV MOTOR SWGR', M, 18);
-  pdf.setFontSize(11); pdf.setTextColor(...SKY);
-  pdf.text('PM Check Sheet — Work Completion Report', M, 27);
-  pdf.setFontSize(8); pdf.setFont('helvetica','normal'); pdf.setTextColor(...SKY);
-  pdf.text('Generated: '+new Date().toLocaleString('en-GB'), M, 36);
-  pdf.text('POMI — Unit 7 Electrical Maintenance', W-M, 36, {align:'right'});
-  y = 50;
+  // ── Letterhead: POMI logo + title ──
+  const logoH=16, logoW = logoImg ? logoH*(logoImg.w/logoImg.h) : 32;
+  if(logoImg) pdf.addImage(logoImg.url,'PNG',M,y,logoW,logoH);
+  const titleX = M+logoW+6, titleY = y+logoH/2-1;
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(15); pdf.setTextColor(...NAVY);
+  pdf.text('HV MOTOR SWITCHGEAR', titleX, titleY);
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...GR);
+  pdf.text('PM Check Sheet — Work Completion Report', titleX, titleY+6);
+  const tw = pdf.getTextWidth('HV MOTOR SWITCHGEAR');
+  pdf.setDrawColor(...BLUE); pdf.setLineWidth(0.35); pdf.line(titleX, titleY+8, titleX+Math.max(tw,80), titleY+8);
+  y += logoH+4;
+  pdf.setDrawColor(...NAVY); pdf.setLineWidth(0.8); pdf.line(M,y,W-M,y);
+  y += 5;
+  pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(...GR);
+  pdf.text('Generated: '+new Date().toLocaleString('en-GB'), M, y);
+  pdf.text('POMI — Unit 7 Electrical Maintenance', W-M, y, {align:'right'});
+  y += 6;
 
   // ── Work info box ──
   if(include('workInfo')){
