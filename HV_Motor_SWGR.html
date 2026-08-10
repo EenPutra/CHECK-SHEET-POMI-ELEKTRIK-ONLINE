@@ -91,6 +91,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   font-family:var(--mono);font-size:13px;background:var(--bg2);color:var(--txt);transition:border-color .18s;width:100%}
 .md-input:focus{outline:none;border-color:var(--blue);background:#fff}
 .md-input[readonly]{background:#f1f5f9;color:var(--txt2)}
+.check-card{border:1px solid var(--bdr2);border-radius:8px;margin-bottom:14px;overflow:hidden;background:var(--surf)}
+.check-card:last-child{margin-bottom:0}
+.check-card-hdr{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--bdr2)}
+.check-card-no{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 5px;
+  border-radius:6px;background:var(--blue);color:#fff;font-size:10px;font-family:var(--mono);flex-shrink:0}
+.check-card-title{font-family:var(--raj);font-weight:700;font-size:13.5px;color:var(--navy);letter-spacing:0.5px;text-transform:uppercase}
 .tbl-wrap{overflow-x:auto}
 .ct{width:100%;border-collapse:collapse;font-size:12px;min-width:750px}
 .ct th{background:var(--navy);color:var(--sky2);padding:8px 10px;text-align:center;
@@ -262,14 +268,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-draft btn-sm" onclick="saveDraft()">💾 Draft</button>
-    <button class="btn btn-pdf btn-sm" onclick="togglePrintOptions()">🖨️ Print / PDF</button>
+    <button class="btn btn-pdf btn-sm" onclick="togglePrintOptions()">📥 Download PDF</button>
     <button class="btn btn-submit btn-sm" onclick="submitToDb()">🗄️ Submit</button>
   </div>
 </div>
 
-<!-- Print options popup -->
+<!-- PDF export options popup -->
 <div id="print-options" style="position:fixed;right:16px;top:72px;background:#fff;border:1px solid #ddd;padding:12px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,0.08);display:none;z-index:120">
-  <div style="font-weight:700;margin-bottom:6px">Print / Export Options</div>
+  <div style="font-weight:700;margin-bottom:6px">PDF Export Options</div>
   <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px">
     <label><input type="checkbox" class="prt-opt" value="workInfo" checked> Work Info</label>
     <label><input type="checkbox" class="prt-opt" value="basic" checked> Basic Motor Data</label>
@@ -281,8 +287,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <label><input type="checkbox" class="prt-opt" value="conclusion" checked> Conclusion & Notes</label>
   </div>
   <div style="display:flex;gap:8px;justify-content:flex-end">
-    <button class="btn" onclick="printSelected()">Print Selected</button>
-    <button class="btn btn-pdf" onclick="exportSelectedPDF()">Export Selected PDF</button>
+    <button class="btn btn-pdf" onclick="exportSelectedPDF()">Download PDF</button>
     <button class="btn" onclick="togglePrintOptions(true)">Close</button>
   </div>
 </div>
@@ -372,21 +377,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
-    <div class="tbl-wrap">
-      <table class="ct">
-        <thead>
-          <tr>
-            <th style="width:36px">No.</th>
-            <th class="tl" style="width:110px">Component</th>
-            <th class="tl">Check Items / Point</th>
-            <th class="tl" style="width:130px">Criteria</th>
-            <th style="width:88px">Result</th>
-            <th class="tl" style="width:160px">Remark</th>
-          </tr>
-        </thead>
-        <tbody id="check-tbody"></tbody>
-      </table>
-    </div>
+    <div id="check-cards"></div>
   </div>
 </div>
 
@@ -457,7 +448,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="actions">
   <button class="btn" style="background:var(--navy);color:#fff" onclick="resetForm()">🔄 Reset</button>
   <button class="btn btn-draft" onclick="saveDraft()">💾 Save Draft</button>
-  <button class="btn btn-pdf" onclick="printPage()">🖨️ Print / Save PDF</button>
+  <button class="btn btn-pdf" onclick="generatePDF()">📥 Download PDF</button>
   <button class="btn btn-submit" style="font-size:14px;padding:8px 24px" onclick="submitToDb()">🗄️ Submit to Database</button>
 </div>
 
@@ -630,191 +621,217 @@ function mkRmk(id,ph='Remark...'){
   return `<input class="rmk-inp" id="rmk-${id}" type="text" placeholder="${ph}">`;
 }
 
-function buildTable(){
-  const tbody = document.getElementById('check-tbody');
-  let html = '';
-  CHECKS.forEach(chk => {
-    if(chk.special === 'ol'){
-      html += `<tr>
-        <td class="no">${chk.no}</td>
-        <td class="comp">${chk.comp.replace(/\n/g,'<br>')}</td>
-        <td colspan="4" class="spec-cell">
-          <div style="font-size:11px;color:var(--txt);line-height:1.5;margin-bottom:8px">${chk.task}</div>
-          <div class="ol-box">
-            <div class="ol-info">
-              <div class="ol-field"><label>OL Type / Heater</label><span id="ol-code">—</span></div>
-              <div class="ol-field"><label>Rating Plug (A)</label><span id="ol-plug">—</span></div>
-              <div class="ol-field"><label>OL Setting (%)</label><span id="ol-setting">—</span></div>
-            </div>
-            <div class="ol-size-row">
-              <span class="ol-size-lbl">Contactor Size :</span>
-              ${[0,1,2,3,4].map(n=>`<button class="sz-btn" onclick="selectSize(${n})">${n}</button>`).join('')}
-            </div>
-            <table class="ol-tbl">
-              <thead><tr>
-                <th>Heater Code</th><th>Std. Min (A)</th><th>Std. Max (A)</th>
-                <th>Amb. Comp. Min (A)</th><th>Amb. Comp. Max (A)</th>
-              </tr></thead>
-              <tbody id="ol-range-body">
-                <tr><td colspan="5" style="text-align:center;color:var(--txt4);font-style:italic;padding:8px">Select contactor size to see heater ranges</td></tr>
-              </tbody>
-            </table>
-            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-              <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
-              ${mkSel('c6')}
-              <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
-              <input class="rmk-inp" id="rmk-c6" type="text" placeholder="e.g. Bkr capacity checked" style="max-width:240px">
-            </div>
+function chkRowHtml(chk){
+  if(chk.special === 'ol'){
+    return `<tr>
+      <td class="no">${chk.no}</td>
+      <td colspan="4" class="spec-cell">
+        <div style="font-size:11px;color:var(--txt);line-height:1.5;margin-bottom:8px">${chk.task}</div>
+        <div class="ol-box">
+          <div class="ol-info">
+            <div class="ol-field"><label>OL Type / Heater</label><span id="ol-code">—</span></div>
+            <div class="ol-field"><label>Rating Plug (A)</label><span id="ol-plug">—</span></div>
+            <div class="ol-field"><label>OL Setting (%)</label><span id="ol-setting">—</span></div>
           </div>
-        </td>
-      </tr>`;
-    } else if(chk.special === 'meggerTrend'){
-      const times = ['15s','30s','45s','1m','2m','3m','4m','5m','6m','7m','8m','9m','10m'];
-      const rows = times.map(t => {
-        const id = 'meg-'+t.replace(/\s+/g,'').replace(/m/g,'m');
-        return `<tr><td>${t}</td><td><input class="meas-inp" id="${id}" type="number" step="0.01" min="0" placeholder="0.00" oninput="updatePiDar()"></td></tr>`;
-      }).join('');
-      html += `<tr>
-        <td class="no">${chk.no}</td><td class="comp"></td>
-        <td class="task">${chk.task}</td>
-        <td colspan="3" class="spec-cell">
-          <table class="meas-tbl"><thead><tr><th>Time</th><th>Insulation Resistance (MΩ)</th></tr></thead><tbody>${rows}</tbody></table>
-          <div style="margin-top:10px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
-            <div style="flex:1;min-width:260px">
-              <label style="font-size:12px;color:var(--txt4);margin-bottom:4px;display:block">Trend picture</label>
-              <input type="file" id="trend-photo-input" accept="image/*" multiple onchange="onAddTrendPhotos(this)">
-              <div id="trend-photo-preview" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px"></div>
-            </div>
-            <div style="flex:1;min-width:240px">
-              <div style="font-size:11px;color:var(--txt4);line-height:1.5">PI and DAR will calculate automatically from the 30s, 1m and 10m values.</div>
-            </div>
+          <div class="ol-size-row">
+            <span class="ol-size-lbl">Contactor Size :</span>
+            ${[0,1,2,3,4].map(n=>`<button class="sz-btn" onclick="selectSize(${n})">${n}</button>`).join('')}
           </div>
-          <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
-            ${mkSel('c16')}
-            <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
-            ${mkRmk('c16')}
-          </div>
-        </td>
-      </tr>`;
-    } else if(chk.special === 'piDar'){
-      html += `<tr>
-        <td class="no">${chk.no}</td><td class="comp"></td>
-        <td class="task">${chk.task}</td>
-        <td colspan="3" class="spec-cell">
-          <table class="meas-tbl">
-            <thead><tr><th>Calculation</th><th>Value</th></tr></thead>
-            <tbody>
-              <tr><td>PI (10m / 1m)</td><td><input class="meas-inp" id="pi-val" type="text" readonly placeholder="Auto" ></td></tr>
-              <tr><td>DAR (1m / 30s)</td><td><input class="meas-inp" id="dar-val" type="text" readonly placeholder="Auto"></td></tr>
+          <table class="ol-tbl">
+            <thead><tr>
+              <th>Heater Code</th><th>Std. Min (A)</th><th>Std. Max (A)</th>
+              <th>Amb. Comp. Min (A)</th><th>Amb. Comp. Max (A)</th>
+            </tr></thead>
+            <tbody id="ol-range-body">
+              <tr><td colspan="5" style="text-align:center;color:var(--txt4);font-style:italic;padding:8px">Select contactor size to see heater ranges</td></tr>
             </tbody>
           </table>
-          <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
             <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
-            ${mkSel('c17')}
+            ${mkSel('c6')}
             <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
-            ${mkRmk('c17')}
+            <input class="rmk-inp" id="rmk-c6" type="text" placeholder="e.g. Bkr capacity checked" style="max-width:240px">
           </div>
-        </td>
-      </tr>`;
-    } else if(chk.special === 'resistance'){
-      html += `<tr>
-        <td class="no">${chk.no}</td><td class="comp"></td>
-        <td class="task">${chk.task}<br>
-          <small style="color:var(--txt4);font-size:10px">Measured resistance should be within 5% of each other.</small></td>
-        <td colspan="3" class="spec-cell">
-          <table class="meas-tbl">
-            <thead><tr><th>Test Points</th><th>Resistance (Ω)</th><th>Result</th><th>Remark</th></tr></thead>
-            <tbody>
-              <tr><td>T1 – T2</td><td><input class="meas-inp" id="res-t12" type="number" step="0.01" placeholder="0.00"></td><td>${mkSel('c12a')}</td><td>${mkRmk('c12a')}</td></tr>
-              <tr><td>T1 – T3</td><td><input class="meas-inp" id="res-t13" type="number" step="0.01" placeholder="0.00"></td><td>${mkSel('c12b')}</td><td>${mkRmk('c12b')}</td></tr>
-              <tr><td>T2 – T3</td><td><input class="meas-inp" id="res-t23" type="number" step="0.01" placeholder="0.00"></td><td>${mkSel('c12c')}</td><td>${mkRmk('c12c')}</td></tr>
-            </tbody>
-          </table>
-        </td>
-      </tr>`;
-    } else if(chk.special === 'rtdInputs'){
-      html += `<tr>
-        <td class="no">${chk.no}</td><td class="comp"></td>
-        <td class="task">${chk.task}</td>
-        <td colspan="3" class="spec-cell">
-          <div id="rtd-input-container" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
-          <button class="sz-btn" type="button" onclick="addRTDInput()">+ Add RTD</button>
-          <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
-            ${mkSel('c20')}
-            <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
-            ${mkRmk('c20')}
+        </div>
+      </td>
+    </tr>`;
+  } else if(chk.special === 'meggerTrend'){
+    const times = ['15s','30s','45s','1m','2m','3m','4m','5m','6m','7m','8m','9m','10m'];
+    const rows = times.map(t => {
+      const id = 'meg-'+t.replace(/\s+/g,'').replace(/m/g,'m');
+      return `<tr><td>${t}</td><td><input class="meas-inp" id="${id}" type="number" step="0.01" min="0" placeholder="0.00" oninput="updatePiDar()"></td></tr>`;
+    }).join('');
+    return `<tr>
+      <td class="no">${chk.no}</td>
+      <td class="task">${chk.task}</td>
+      <td colspan="3" class="spec-cell">
+        <table class="meas-tbl"><thead><tr><th>Time</th><th>Insulation Resistance (MΩ)</th></tr></thead><tbody>${rows}</tbody></table>
+        <div style="margin-top:10px;display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap">
+          <div style="flex:1;min-width:260px">
+            <label style="font-size:12px;color:var(--txt4);margin-bottom:4px;display:block">Trend picture</label>
+            <input type="file" id="trend-photo-input" accept="image/*" multiple onchange="onAddTrendPhotos(this)">
+            <div id="trend-photo-preview" style="margin-top:10px;display:flex;flex-wrap:wrap;gap:10px"></div>
           </div>
-        </td>
-      </tr>`;
-    } else if(chk.special === 'motorProtection'){
-      html += `<tr>
-        <td class="no">${chk.no}</td><td class="comp">${chk.comp.replace(/\n/g,'<br>')}</td>
-        <td class="task">${chk.task}</td>
-        <td colspan="3" class="spec-cell">
-          <table class="meas-tbl">
-            <thead><tr><th width="36">No</th><th>Protection point</th><th>Value</th></tr></thead>
-            <tbody>
-              <tr><td>1</td><td>Number of motor starts</td><td><input class="meas-inp" id="mpr-1" type="text" placeholder="Value"></td></tr>
-              <tr><td>2</td><td>Number of Emergency starts</td><td><input class="meas-inp" id="mpr-2" type="text" placeholder="Value"></td></tr>
-              <tr><td>3</td><td>Number of Starters operation</td><td><input class="meas-inp" id="mpr-3" type="text" placeholder="Value"></td></tr>
-              <tr><td>4</td><td>Motor running hours</td><td><input class="meas-inp" id="mpr-4" type="text" placeholder="Value"></td></tr>
-              <tr><td>5</td><td>Cause of last trip</td><td><input class="meas-inp" id="mpr-5" type="text" placeholder="Value"></td></tr>
-              <tr><td>6</td><td>Time of last trip</td><td><input class="meas-inp" id="mpr-6" type="text" placeholder="Value"></td></tr>
-            </tbody>
-          </table>
-          <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
-            ${mkSel('c21')}
-            <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
-            ${mkRmk('c21')}
+          <div style="flex:1;min-width:240px">
+            <div style="font-size:11px;color:var(--txt4);line-height:1.5">PI and DAR will calculate automatically from the 30s, 1m and 10m values.</div>
           </div>
-        </td>
+        </div>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
+          ${mkSel('c16')}
+          <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
+          ${mkRmk('c16')}
+        </div>
+      </td>
+    </tr>`;
+  } else if(chk.special === 'piDar'){
+    return `<tr>
+      <td class="no">${chk.no}</td>
+      <td class="task">${chk.task}</td>
+      <td colspan="3" class="spec-cell">
+        <table class="meas-tbl">
+          <thead><tr><th>Calculation</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>PI (10m / 1m)</td><td><input class="meas-inp" id="pi-val" type="text" readonly placeholder="Auto" ></td></tr>
+            <tr><td>DAR (1m / 30s)</td><td><input class="meas-inp" id="dar-val" type="text" readonly placeholder="Auto"></td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
+          ${mkSel('c17')}
+          <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
+          ${mkRmk('c17')}
+        </div>
+      </td>
+    </tr>`;
+  } else if(chk.special === 'resistance'){
+    return `<tr>
+      <td class="no">${chk.no}</td>
+      <td class="task">${chk.task}<br>
+        <small style="color:var(--txt4);font-size:10px">Measured resistance should be within 5% of each other.</small></td>
+      <td colspan="3" class="spec-cell">
+        <table class="meas-tbl">
+          <thead><tr><th>Test Points</th><th>Resistance (Ω)</th><th>Result</th><th>Remark</th></tr></thead>
+          <tbody>
+            <tr><td>T1 – T2</td><td><input class="meas-inp" id="res-t12" type="number" step="0.01" placeholder="0.00"></td><td>${mkSel('c12a')}</td><td>${mkRmk('c12a')}</td></tr>
+            <tr><td>T1 – T3</td><td><input class="meas-inp" id="res-t13" type="number" step="0.01" placeholder="0.00"></td><td>${mkSel('c12b')}</td><td>${mkRmk('c12b')}</td></tr>
+            <tr><td>T2 – T3</td><td><input class="meas-inp" id="res-t23" type="number" step="0.01" placeholder="0.00"></td><td>${mkSel('c12c')}</td><td>${mkRmk('c12c')}</td></tr>
+          </tbody>
+        </table>
+      </td>
+    </tr>`;
+  } else if(chk.special === 'rtdInputs'){
+    return `<tr>
+      <td class="no">${chk.no}</td>
+      <td class="task">${chk.task}</td>
+      <td colspan="3" class="spec-cell">
+        <div id="rtd-input-container" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+        <button class="sz-btn" type="button" onclick="addRTDInput()">+ Add RTD</button>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
+          ${mkSel('c20')}
+          <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
+          ${mkRmk('c20')}
+        </div>
+      </td>
+    </tr>`;
+  } else if(chk.special === 'motorProtection'){
+    return `<tr>
+      <td class="no">${chk.no}</td>
+      <td class="task">${chk.task}</td>
+      <td colspan="3" class="spec-cell">
+        <table class="meas-tbl">
+          <thead><tr><th width="36">No</th><th>Protection point</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Number of motor starts</td><td><input class="meas-inp" id="mpr-1" type="text" placeholder="Value"></td></tr>
+            <tr><td>2</td><td>Number of Emergency starts</td><td><input class="meas-inp" id="mpr-2" type="text" placeholder="Value"></td></tr>
+            <tr><td>3</td><td>Number of Starters operation</td><td><input class="meas-inp" id="mpr-3" type="text" placeholder="Value"></td></tr>
+            <tr><td>4</td><td>Motor running hours</td><td><input class="meas-inp" id="mpr-4" type="text" placeholder="Value"></td></tr>
+            <tr><td>5</td><td>Cause of last trip</td><td><input class="meas-inp" id="mpr-5" type="text" placeholder="Value"></td></tr>
+            <tr><td>6</td><td>Time of last trip</td><td><input class="meas-inp" id="mpr-6" type="text" placeholder="Value"></td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
+          ${mkSel('c21')}
+          <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
+          ${mkRmk('c21')}
+        </div>
+      </td>
+    </tr>`;
+  } else if(chk.special === 'dcsReadings'){
+    return `<tr>
+      <td class="no">${chk.no}</td>
+      <td class="task">${chk.task}</td>
+      <td colspan="3" class="spec-cell">
+        <table class="meas-tbl">
+          <thead><tr><th width="36">#</th><th>Parameter</th><th>Value</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>Stator RTD 1</td><td><input class="meas-inp" id="dcs-stator-1" type="text" placeholder="Value"></td></tr>
+            <tr><td>2</td><td>Stator RTD 2</td><td><input class="meas-inp" id="dcs-stator-2" type="text" placeholder="Value"></td></tr>
+            <tr><td>3</td><td>Stator RTD 3</td><td><input class="meas-inp" id="dcs-stator-3" type="text" placeholder="Value"></td></tr>
+            <tr><td>4</td><td>Bearing DE</td><td><input class="meas-inp" id="dcs-bearing-1" type="text" placeholder="Value"></td></tr>
+            <tr><td>5</td><td>Bearing NDE</td><td><input class="meas-inp" id="dcs-bearing-2" type="text" placeholder="Value"></td></tr>
+          </tbody>
+        </table>
+        <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
+          ${mkSel('c22')}
+          <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
+          ${mkRmk('c22')}
+        </div>
+      </td>
+    </tr>`;
+  } else {
+    const rows = chk.crit.length;
+    let out = `<tr>
+      <td class="no" rowspan="${rows}">${chk.no}</td>
+      <td class="task" rowspan="${rows}">${chk.task}</td>
+      <td class="crit">${chk.crit[0].lbl}</td>
+      <td class="res">${mkSel(chk.crit[0].id)}</td>
+      <td class="rmk">${mkRmk(chk.crit[0].id)}</td>
+    </tr>`;
+    for(let i=1;i<rows;i++){
+      out += `<tr>
+        <td class="crit">${chk.crit[i].lbl}</td>
+        <td class="res">${mkSel(chk.crit[i].id)}</td>
+        <td class="rmk">${mkRmk(chk.crit[i].id)}</td>
       </tr>`;
-    } else if(chk.special === 'dcsReadings'){
-      html += `<tr>
-        <td class="no">${chk.no}</td><td class="comp"></td>
-        <td class="task">${chk.task}</td>
-        <td colspan="3" class="spec-cell">
-          <table class="meas-tbl">
-            <thead><tr><th width="36">#</th><th>Parameter</th><th>Value</th></tr></thead>
-            <tbody>
-              <tr><td>1</td><td>Stator RTD 1</td><td><input class="meas-inp" id="dcs-stator-1" type="text" placeholder="Value"></td></tr>
-              <tr><td>2</td><td>Stator RTD 2</td><td><input class="meas-inp" id="dcs-stator-2" type="text" placeholder="Value"></td></tr>
-              <tr><td>3</td><td>Stator RTD 3</td><td><input class="meas-inp" id="dcs-stator-3" type="text" placeholder="Value"></td></tr>
-              <tr><td>4</td><td>Bearing DE</td><td><input class="meas-inp" id="dcs-bearing-1" type="text" placeholder="Value"></td></tr>
-              <tr><td>5</td><td>Bearing NDE</td><td><input class="meas-inp" id="dcs-bearing-2" type="text" placeholder="Value"></td></tr>
-            </tbody>
-          </table>
-          <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
-            <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
-            ${mkSel('c22')}
-            <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
-            ${mkRmk('c22')}
-          </div>
-        </td>
-      </tr>`;
-    } else {
-      const rows = chk.crit.length;
-      html += `<tr>
-        <td class="no" rowspan="${rows}">${chk.no}</td>
-        <td class="comp" rowspan="${rows}">${chk.comp.replace(/\n/g,'<br>')}</td>
-        <td class="task" rowspan="${rows}">${chk.task}</td>
-        <td class="crit">${chk.crit[0].lbl}</td>
-        <td class="res">${mkSel(chk.crit[0].id)}</td>
-        <td class="rmk">${mkRmk(chk.crit[0].id)}</td>
-      </tr>`;
-      for(let i=1;i<rows;i++){
-        html += `<tr>
-          <td class="crit">${chk.crit[i].lbl}</td>
-          <td class="res">${mkSel(chk.crit[i].id)}</td>
-          <td class="rmk">${mkRmk(chk.crit[i].id)}</td>
-        </tr>`;
-      }
     }
+    return out;
+  }
+}
+
+function buildTable(){
+  const container = document.getElementById('check-cards');
+  const groups = [];
+  let cur = null;
+  CHECKS.forEach(chk => {
+    if(chk.comp || !cur){ cur = {title: chk.comp || 'General', items: []}; groups.push(cur); }
+    cur.items.push(chk);
   });
-  tbody.innerHTML = html;
+  container.innerHTML = groups.map(g => `
+    <div class="check-card">
+      <div class="check-card-hdr">
+        <span class="check-card-no">${g.items[0].no}</span>
+        <span class="check-card-title">${g.title}</span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="ct">
+          <thead>
+            <tr>
+              <th style="width:44px">No.</th>
+              <th class="tl">Check Items / Point</th>
+              <th class="tl" style="width:150px">Criteria</th>
+              <th style="width:96px">Result</th>
+              <th class="tl" style="width:180px">Remark</th>
+            </tr>
+          </thead>
+          <tbody>${g.items.map(chkRowHtml).join('')}</tbody>
+        </table>
+      </div>
+    </div>
+  `).join('');
   if(document.getElementById('rtd-input-container')) renderRTDInputs();
   updatePiDar();
   renderTrendPhotos();
@@ -1183,9 +1200,9 @@ async function generatePDF(selectedSections){
   // ── OL Data ──
   if(include('ol')){
     ckY(28);
-    const olCode    = document.getElementById('ol-code').textContent;
-  const olPlug    = document.getElementById('ol-plug').textContent;
-  const olSetTxt  = document.getElementById('ol-setting').textContent;
+    const olCode    = document.getElementById('ol-code')?.textContent || '—';
+  const olPlug    = document.getElementById('ol-plug')?.textContent || '—';
+  const olSetTxt  = document.getElementById('ol-setting')?.textContent || '—';
   const szLabel   = olSize !== null ? 'Size '+olSize : '—';
   const hlRow     = olSize !== null ? getHeaterRow(olCode, olSize) : null;
 
@@ -1601,74 +1618,8 @@ function removePhoto(idx){
 }
 
 // ═══════════════════════════════════════════════════
+//  PDF EXPORT OPTIONS
 // ═══════════════════════════════════════════════════
-//  PRINT / SAVE AS PDF
-// ═══════════════════════════════════════════════════
-function printPage(){
-  // populate the print-only header strip
-  const tag  = document.getElementById('tag-search')?.value  || '—';
-  const desc = document.getElementById('tag-desc')?.value    || '—';
-  const date = document.getElementById('wo-date')?.value     || '—';
-  const wo   = document.getElementById('wo-no')?.value       || '—';
-  document.getElementById('ph-tag').textContent  = tag;
-  document.getElementById('ph-desc').textContent = desc;
-  document.getElementById('ph-date').textContent = date;
-  document.getElementById('ph-wo').textContent   = wo;
-  // force-expand all collapsed panels so everything prints
-  document.querySelectorAll('.sec-hdr').forEach(h => h.classList.add('open'));
-  document.querySelectorAll('.sec-body').forEach(b => b.style.display = 'block');
-
-  // Compress photos before print to keep PDF file size ≤ ~5 MB
-  const MAX_PX  = 560;   // max dimension (px) — A4 half-width ~85mm @ 167dpi
-  const QUALITY = 0.45;  // JPEG quality for print output (~40-60KB per photo)
-
-  const imgs     = Array.from(document.querySelectorAll('.photo-img-wrap img'));
-  const origSrcs = imgs.map(el => el.src);
-
-  function compressDataUrl(src){
-    return new Promise(resolve => {
-      const im = new Image();
-      im.onload = () => {
-        const W = im.naturalWidth, H = im.naturalHeight;
-        const scale = Math.min(1, MAX_PX / Math.max(W, H));
-        const cv  = document.createElement('canvas');
-        cv.width  = Math.round(W * scale);
-        cv.height = Math.round(H * scale);
-        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
-        resolve(cv.toDataURL('image/jpeg', QUALITY));
-      };
-      im.onerror = () => resolve(src); // fallback — keep original on error
-      im.src = src;
-    });
-  }
-
-  if(!imgs.length){
-    window.print();
-    return;
-  }
-
-  Promise.all(origSrcs.map(compressDataUrl)).then(compressed => {
-    // estimate total compressed size and warn if still large
-    const totalKB = compressed.reduce((s, d) => s + Math.round(d.length * 0.75 / 1024), 0);
-    if(totalKB > 4000){
-      const ok = confirm(`Estimasi ukuran foto: ~${Math.round(totalKB/1024)} MB.\nFile PDF mungkin besar. Lanjut cetak?`);
-      if(!ok) return;
-    }
-
-    imgs.forEach((el, i) => { el.src = compressed[i]; });
-
-    // restore originals once print dialog closes (print or cancel)
-    const restore = () => {
-      imgs.forEach((el, i) => { el.src = origSrcs[i]; });
-      window.removeEventListener('afterprint', restore);
-    };
-    window.addEventListener('afterprint', restore);
-
-    window.print();
-  });
-}
-
-// Print options helpers
 function togglePrintOptions(close){
   const el = document.getElementById('print-options');
   if(!el) return;
@@ -1677,22 +1628,6 @@ function togglePrintOptions(close){
 }
 function getSelectedPrintOptions(){
   return Array.from(document.querySelectorAll('.prt-opt:checked')).map(i=>i.value);
-}
-function printSelected(){
-  const sel = getSelectedPrintOptions();
-  const panelMap = {workInfo:'Work Completion Report', basic:'Basic Motor Data', checkItems:'Check Items', photos:'Photo Documentation', conclusion:'Conclusion & Notes'};
-  const panels = Array.from(document.querySelectorAll('.panel'));
-  const hidden = [];
-  panels.forEach(p=>{
-    const title = p.querySelector('.sec-hdr-title')?.textContent?.trim();
-    const keep = Object.keys(panelMap).some(k=> sel.includes(k) && panelMap[k]===title);
-    if(!keep){ p.dataset._oldDisplay = p.style.display || ''; p.style.display = 'none'; hidden.push(p); }
-  });
-  // close options UI
-  togglePrintOptions(true);
-  const restore = () => { hidden.forEach(p=>{ p.style.display = p.dataset._oldDisplay || ''; delete p.dataset._oldDisplay; }); window.removeEventListener('afterprint', restore); };
-  window.addEventListener('afterprint', restore);
-  printPage();
 }
 async function exportSelectedPDF(){
   const sel = getSelectedPrintOptions();
