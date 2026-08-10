@@ -802,14 +802,19 @@ function chkRowHtml(chk){
   }
 }
 
-function buildTable(){
-  const container = document.getElementById('check-cards');
+function groupChecks(){
   const groups = [];
   let cur = null;
   CHECKS.forEach(chk => {
     if(chk.comp || !cur){ cur = {title: chk.comp || 'General', items: []}; groups.push(cur); }
     cur.items.push(chk);
   });
+  return groups;
+}
+
+function buildTable(){
+  const container = document.getElementById('check-cards');
+  const groups = groupChecks();
   container.innerHTML = groups.map(g => `
     <div class="check-card">
       <div class="check-card-hdr">
@@ -1111,6 +1116,52 @@ async function imgToDataUrl(src){
     img.src=src+'?'+Date.now();
   });
 }
+// jsPDF's built-in fonts (helvetica/times/courier) only support the WinAnsi glyph
+// set — Greek letters, math comparison symbols etc. render as blank/garbled boxes.
+// Map the common ones to plain-ASCII equivalents, then strip anything left over
+// so a stray character never breaks the PDF.
+function sanitizeText(s){
+  if(s===null || s===undefined) return '';
+  return String(s)
+    .replace(/[“”]/g,'"')
+    .replace(/[‘’]/g,"'")
+    .replace(/[–—]/g,'-')
+    .replace(/•/g,'-')
+    .replace(/·/g,'.')
+    .replace(/Ω/g,'Ohm')
+    .replace(/[µμ]/g,'u')
+    .replace(/°/g,'deg')
+    .replace(/≥/g,'>=')
+    .replace(/≤/g,'<=')
+    .replace(/×/g,'x')
+    .replace(/Δ/g,'Delta')
+    .replace(/[^\x20-\x7E\n]/g,'');
+}
+function stripHtml(s){
+  return sanitizeText(String(s==null?'':s).replace(/<br\s*\/?>/gi,' ').replace(/<[^>]+>/g,''));
+}
+// Mirrors groupChecks()/buildTable() so the PDF's Check Items section matches
+// the on-screen component cards exactly (same grouping, same task text, same
+// result/remark values) instead of a separate hardcoded list.
+function chkPdfRows(chk){
+  const resOf = id => sanitizeText(document.getElementById('res-'+id)?.value || '—');
+  const rmkOf = id => { const v = document.getElementById('rmk-'+id)?.value?.trim(); return sanitizeText(v || '—'); };
+  const task = stripHtml(chk.task);
+  switch(chk.special){
+    case 'ol': return [[chk.no, task, resOf('c6'), rmkOf('c6')]];
+    case 'meggerTrend': return [[chk.no, 'Megger insulation resistance trend (15s-10m) - see Measurement Data', resOf('c16'), rmkOf('c16')]];
+    case 'piDar': return [[chk.no, 'PI / DAR calculation - see Measurement Data', resOf('c17'), rmkOf('c17')]];
+    case 'resistance': return [
+      [chk.no, '3-Phase Resistance T1-T2', resOf('c12a'), rmkOf('c12a')],
+      ['', '3-Phase Resistance T1-T3', resOf('c12b'), rmkOf('c12b')],
+      ['', '3-Phase Resistance T2-T3', resOf('c12c'), rmkOf('c12c')],
+    ];
+    case 'rtdInputs': return [[chk.no, 'RTD values (winding & bearing) - see Measurement Data', resOf('c20'), rmkOf('c20')]];
+    case 'motorProtection': return [[chk.no, 'Motor protection relay values - see Measurement Data', resOf('c21'), rmkOf('c21')]];
+    case 'dcsReadings': return [[chk.no, 'DCS readings - see Measurement Data', resOf('c22'), rmkOf('c22')]];
+    default: return chk.crit.map((c,i) => [i===0?chk.no:'', task + (chk.crit.length>1?` (${sanitizeText(c.lbl)})`:''), resOf(c.id), rmkOf(c.id)]);
+  }
+}
 async function generatePDF(selectedSections){
   showNote('⏳ Membuat PDF, harap tunggu...', 'info');
   await new Promise(r => setTimeout(r, 200));
@@ -1121,8 +1172,11 @@ async function generatePDF(selectedSections){
   const NAVY=[30,58,95], BLUE=[37,99,235], SKY=[125,211,252], LT=[240,247,255],
         OKC=[22,163,74], NGC=[220,38,38], NAC=[180,120,0], GR=[100,116,139], WH=[255,255,255];
 
-  const gv = id => { const e=document.getElementById(id); return e?e.value.trim():''; };
-  const tag = document.getElementById('tag-search').value.trim();
+  const T = sanitizeText;
+  // every value read off the form is routed through sanitizeText so nothing
+  // a technician types (or a fixed label containing Ω/≥/≤) can break a PDF cell
+  const gv = id => { const e=document.getElementById(id); return T(e?e.value.trim():''); };
+  const tag = gv('tag-search');
   const selSections = (Array.isArray(selectedSections) && selectedSections.length) ? selectedSections : null;
   const include = s => !selSections || selSections.includes(s);
 
@@ -1132,9 +1186,9 @@ async function generatePDF(selectedSections){
   function miniHdr(){
     pdf.setFillColor(...NAVY); pdf.rect(0,0,W,8,'F');
     pdf.setFont('helvetica','bold'); pdf.setFontSize(7); pdf.setTextColor(...SKY);
-    pdf.text('HV MOTOR SWGR — PM CHECK SHEET', M, 5.5);
+    pdf.text(T('HV MOTOR SWITCHGEAR - PM CHECK SHEET'), M, 5.5);
     pdf.setFont('helvetica','normal'); pdf.setFontSize(6);
-    pdf.text('Tag: '+(tag||'—')+'  Date: '+(gv('wo-date')||'—')+'  By: '+(gv('done-by')||'—'), W-M, 5.5, {align:'right'});
+    pdf.text(T('Tag: '+(tag||'-')+'  Date: '+(gv('wo-date')||'-')+'  By: '+(gv('done-by')||'-')), W-M, 5.5, {align:'right'});
     y = 12;
   }
 
@@ -1145,15 +1199,15 @@ async function generatePDF(selectedSections){
   pdf.setFont('helvetica','bold'); pdf.setFontSize(15); pdf.setTextColor(...NAVY);
   pdf.text('HV MOTOR SWITCHGEAR', titleX, titleY);
   pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...GR);
-  pdf.text('PM Check Sheet — Work Completion Report', titleX, titleY+6);
+  pdf.text(T('PM Check Sheet - Work Completion Report'), titleX, titleY+6);
   const tw = pdf.getTextWidth('HV MOTOR SWITCHGEAR');
   pdf.setDrawColor(...BLUE); pdf.setLineWidth(0.35); pdf.line(titleX, titleY+8, titleX+Math.max(tw,80), titleY+8);
   y += logoH+4;
   pdf.setDrawColor(...NAVY); pdf.setLineWidth(0.8); pdf.line(M,y,W-M,y);
   y += 5;
   pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(...GR);
-  pdf.text('Generated: '+new Date().toLocaleString('en-GB'), M, y);
-  pdf.text('POMI — Unit 7 Electrical Maintenance', W-M, y, {align:'right'});
+  pdf.text(T('Generated: '+new Date().toLocaleString('en-GB')), M, y);
+  pdf.text(T('POMI - Unit 7 Electrical Maintenance'), W-M, y, {align:'right'});
   y += 6;
 
   // ── Work info box ──
@@ -1161,12 +1215,12 @@ async function generatePDF(selectedSections){
     pdf.setFillColor(...LT); pdf.setDrawColor(...SKY); pdf.setLineWidth(0.3);
     pdf.roundedRect(M, y, CW, 40, 2, 2, 'FD');
     pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(...NAVY);
-    pdf.text(tag||'—', M+4, y+9);
+    pdf.text(tag||'-', M+4, y+9);
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...GR);
     const desc = gv('tag-desc'); pdf.text(desc.slice(0,60), M+4, y+16);
     function ib(lbl,val,x,yy){
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(6); pdf.setTextColor(...GR); pdf.text(lbl.toUpperCase(),x,yy);
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...NAVY); pdf.text(String(val||'—').slice(0,28),x,yy+5);
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(6); pdf.setTextColor(...GR); pdf.text(T(lbl).toUpperCase(),x,yy);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...NAVY); pdf.text(T(String(val||'-')).slice(0,28),x,yy+5);
     }
     ib('Date',gv('wo-date'),M+4,y+24); ib('Done By',gv('done-by'),M+44,y+24);
     ib('WO No.',gv('wo-no'),M+100,y+24);
@@ -1192,7 +1246,7 @@ async function generatePDF(selectedSections){
       pdf.setFillColor(col%2===0?248:244, 250, 255); pdf.rect(x,yy,cw3,rh,'F');
       pdf.setDrawColor(...SKY); pdf.setLineWidth(0.1); pdf.rect(x,yy,cw3,rh,'D');
       pdf.setFont('helvetica','bold'); pdf.setFontSize(6); pdf.setTextColor(...GR); pdf.text(f[0].toUpperCase(),x+2,yy+3.5);
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(...NAVY); pdf.text(String(f[1]||'—'),x+2,yy+7.5);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(...NAVY); pdf.text(T(String(f[1]||'-')),x+2,yy+7.5);
     });
     y += Math.ceil(mdF.length/3)*rh + 6;
   }
@@ -1200,10 +1254,10 @@ async function generatePDF(selectedSections){
   // ── OL Data ──
   if(include('ol')){
     ckY(28);
-    const olCode    = document.getElementById('ol-code')?.textContent || '—';
-  const olPlug    = document.getElementById('ol-plug')?.textContent || '—';
-  const olSetTxt  = document.getElementById('ol-setting')?.textContent || '—';
-  const szLabel   = olSize !== null ? 'Size '+olSize : '—';
+    const olCode    = T(document.getElementById('ol-code')?.textContent || '-');
+  const olPlug    = T(document.getElementById('ol-plug')?.textContent || '-');
+  const olSetTxt  = T(document.getElementById('ol-setting')?.textContent || '-');
+  const szLabel   = olSize !== null ? 'Size '+olSize : '-';
   const hlRow     = olSize !== null ? getHeaterRow(olCode, olSize) : null;
 
   pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
@@ -1216,8 +1270,8 @@ async function generatePDF(selectedSections){
     head:[['OL Heater Code','Rating Plug (A)','OL Setting (%)','Contactor Size',
            'Std. Min (A)','Std. Max (A)','Amb. Min (A)','Amb. Max (A)']],
     body:[[olCode, olPlug, olSetTxt, szLabel,
-           hlRow?hlRow.stdMin:'—', hlRow?hlRow.stdMax:'—',
-           hlRow?hlRow.ambMin:'—', hlRow?hlRow.ambMax:'—']],
+           hlRow?T(hlRow.stdMin):'-', hlRow?T(hlRow.stdMax):'-',
+           hlRow?T(hlRow.ambMin):'-', hlRow?T(hlRow.ambMax):'-']],
     styles:{fontSize:8,cellPadding:3},
     headStyles:{fillColor:BLUE,textColor:WH,fontStyle:'bold'},
     alternateRowStyles:{fillColor:LT},
@@ -1226,65 +1280,38 @@ async function generatePDF(selectedSections){
   y = pdf.lastAutoTable.finalY + 6;
   }
 
-  // ── Check Items ──
+  // ── Check Items — mirrors the on-screen component cards exactly ──
   if(include('checkItems')){
-    ckY(16);
-    pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(...WH);
-    pdf.text('CHECK ITEMS', M+3, y+5.5);
-    y += 10;
+    groupChecks().forEach(g => {
+      ckY(16);
+      pdf.setFillColor(...BLUE); pdf.rect(M,y,CW,7,'F');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(...WH);
+      pdf.text(T(g.title.toUpperCase()), M+3, y+5);
+      y += 9;
 
-    const CI = [
-    ['1','No sign of damage','c1'],
-    ['2','No dust or dirty','c2'],
-    ['3a','No deterioration in insulation','c3a'],
-    ['3b','Tightness','c3b'],
-    ['4a','Dressing the contact','c4a'],
-    ['4b','Replace the contact','c4b'],
-    ['5','Moving parts operate freely','c5'],
-    ['6','OL Setting OK','c6'],
-    ['7','Motor heater OK','c7'],
-    ['8','Indicating lights OK','c8'],
-    ['9a','Cleanliness','c9a'],
-    ['9b','No sign of mechanical hit','c9b'],
-    ['10','Bearing greasing OK','c10'],
-    ['11','Megger T1/T2/T3-Ground (≥1.5MΩ)','c11'],
-    ['12a','3-Phase Resistance T1-T2 (≤5%)','c12a'],
-    ['12b','3-Phase Resistance T1-T3 (≤5%)','c12b'],
-    ['12c','3-Phase Resistance T2-T3 (≤5%)','c12c'],
-    ['13a','No looseness (RTD)','c13a'],
-    ['13b','No dirty or corroded (RTD)','c13b'],
-    ['14','Grounding cable OK','c14'],
-    ['15','Work history recorded','c15'],
-  ];
-    const tableBody = CI.map(([no,crit,id]) => {
-      const sel = document.getElementById('res-'+id);
-      const res = sel ? sel.value : '';
-      const rmk = document.getElementById('rmk-'+id);
-      return [no, crit, res||'—', rmk?rmk.value.trim():'—'];
+      const body = g.items.flatMap(chkPdfRows);
+      pdf.autoTable({
+        startY:y,
+        head:[['No.','Check Item / Point','Result','Remark']],
+        body,
+        styles:{fontSize:8,cellPadding:3,overflow:'linebreak'},
+        headStyles:{fillColor:NAVY,textColor:WH,fontStyle:'bold'},
+        columnStyles:{0:{cellWidth:12,halign:'center'},1:{cellWidth:100},2:{cellWidth:20,halign:'center'},3:{cellWidth:CW-132}},
+        didParseCell: d => {
+          if(d.section==='body'&&d.column.index===2){
+            const v=d.cell.raw;
+            if(v==='OK') d.cell.styles.textColor=OKC;
+            else if(v==='NG') d.cell.styles.textColor=NGC;
+            else if(v==='N/A') d.cell.styles.textColor=NAC;
+            else d.cell.styles.textColor=GR;
+            d.cell.styles.fontStyle='bold';
+          }
+        },
+        alternateRowStyles:{fillColor:[248,250,255]},
+        margin:{left:M,right:M}
+      });
+      y = pdf.lastAutoTable.finalY + 6;
     });
-
-    pdf.autoTable({
-      startY:y,
-      head:[['No.','Criteria','Result','Remark']],
-      body:tableBody,
-      styles:{fontSize:8,cellPadding:3,overflow:'linebreak'},
-      headStyles:{fillColor:NAVY,textColor:WH,fontStyle:'bold'},
-      columnStyles:{0:{cellWidth:12,halign:'center'},1:{cellWidth:80},2:{cellWidth:16,halign:'center'},3:{cellWidth:CW-108}},
-      didParseCell: d => {
-        if(d.section==='body'&&d.column.index===2){
-          const v=d.cell.raw;
-          if(v==='OK') d.cell.styles.textColor=OKC;
-          else if(v==='NG') d.cell.styles.textColor=NGC;
-          else if(v==='N/A') d.cell.styles.textColor=NAC;
-          else d.cell.styles.textColor=GR;
-          d.cell.styles.fontStyle='bold';
-        }
-      },
-      alternateRowStyles:{fillColor:[248,250,255]},
-      margin:{left:M,right:M}
-    });
-    y = pdf.lastAutoTable.finalY + 6;
   }
 
   // ── Measurement data ──
@@ -1296,16 +1323,16 @@ async function generatePDF(selectedSections){
     y += 10;
 
     const megTimes = ['15s','30s','45s','1m','2m','3m','4m','5m','6m','7m','8m','9m','10m'];
-    const megVals = megTimes.map(t => ({t, v: document.getElementById('meg-'+t.replace(/\s+/g,'').replace(/m/g,'m'))?.value || '—' }));
-    const rt12  = document.getElementById('res-t12')?.value   || '—';
-    const rt13  = document.getElementById('res-t13')?.value   || '—';
-    const rt23  = document.getElementById('res-t23')?.value   || '—';
-    const piVal = gv('pi-val') || '—';
-    const darVal = gv('dar-val') || '—';
+    const megVals = megTimes.map(t => ({t, v: T(document.getElementById('meg-'+t.replace(/\s+/g,'').replace(/m/g,'m'))?.value || '-') }));
+    const rt12  = T(document.getElementById('res-t12')?.value   || '-');
+    const rt13  = T(document.getElementById('res-t13')?.value   || '-');
+    const rt23  = T(document.getElementById('res-t23')?.value   || '-');
+    const piVal = gv('pi-val') || '-';
+    const darVal = gv('dar-val') || '-';
 
     pdf.autoTable({
       startY:y,
-      head:[['Time','Insulation Resistance (MΩ)']],
+      head:[['Time','Insulation Resistance (Mohm)']],
       body: megVals.map(m => [m.t, m.v]),
       styles:{fontSize:9,cellPadding:3}, headStyles:{fillColor:BLUE,textColor:WH}, alternateRowStyles:{fillColor:LT}, margin:{left:M,right:M}
     });
@@ -1314,7 +1341,7 @@ async function generatePDF(selectedSections){
     pdf.autoTable({ startY:y, body:[[ 'PI (10m / 1m)', piVal ], [ 'DAR (1m / 30s)', darVal ]], styles:{fontSize:9,cellPadding:3}, margin:{left:M,right:M} });
     y = pdf.lastAutoTable.finalY + 6;
 
-    const rtdVals = Array.from(document.querySelectorAll('.rtd-input')).map(el => el.value.trim()).filter(v=>v!=='');
+    const rtdVals = Array.from(document.querySelectorAll('.rtd-input')).map(el => T(el.value.trim())).filter(v=>v!=='');
     const mpr = [gv('mpr-1'), gv('mpr-2'), gv('mpr-3'), gv('mpr-4'), gv('mpr-5'), gv('mpr-6')];
     const dcs = [gv('dcs-stator-1'), gv('dcs-stator-2'), gv('dcs-stator-3'), gv('dcs-bearing-1'), gv('dcs-bearing-2')];
 
@@ -1322,11 +1349,11 @@ async function generatePDF(selectedSections){
       startY:y,
       head:[['Test','Points','Value','Unit']],
       body:[
-        ['Megger summary','T1/T2/T3 — various', megVals.map(m=>m.v).join(' / '),'MΩ'],
-        ['3-Phase Resistance','T1 – T2',rt12,'Ω'],
-        ['3-Phase Resistance','T1 – T3',rt13,'Ω'],
-        ['3-Phase Resistance','T2 – T3',rt23,'Ω'],
-        ['RTD readings','All RTDs', rtdVals.length? rtdVals.join(', '):'—',''],
+        ['Megger summary','T1/T2/T3 - various', megVals.map(m=>m.v).join(' / '),'Mohm'],
+        ['3-Phase Resistance','T1 - T2',rt12,'Ohm'],
+        ['3-Phase Resistance','T1 - T3',rt13,'Ohm'],
+        ['3-Phase Resistance','T2 - T3',rt23,'Ohm'],
+        ['RTD readings','All RTDs', rtdVals.length? rtdVals.join(', '):'-',''],
         ['Motor protection','Starts / Emg / StarterOps / Hours / LastTrip / Time', mpr.join(' / '),''],
         ['DCS readings','Stator1 / Stator2 / Stator3 / BearingDE / BearingNDE', dcs.join(' / '),'']
       ],
@@ -1338,7 +1365,7 @@ async function generatePDF(selectedSections){
       ckY(12);
       pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
       pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(...WH);
-      pdf.text('MEGGER TREND PICTURES ('+TREND_PHOTOS.length+')', M+3, y+5.5);
+      pdf.text(T('MEGGER TREND PICTURES ('+TREND_PHOTOS.length+')'), M+3, y+5.5);
       y += 10;
       const tImgs = await Promise.all(TREND_PHOTOS.map(p=> new Promise(res=>{const im=new Image();im.onload=()=>res({src:p.src,nw:im.naturalWidth,nh:im.naturalHeight});im.onerror=()=>res(null);im.src=p.src;})));
       const validT = tImgs.filter(Boolean);
@@ -1355,7 +1382,7 @@ async function generatePDF(selectedSections){
     ckY(20);
     pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
     pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(...WH);
-    pdf.text('PHOTO DOCUMENTATION ('+PHOTOS.length+' foto)', M+3, y+5.5);
+    pdf.text(T('PHOTO DOCUMENTATION ('+PHOTOS.length+' foto)'), M+3, y+5.5);
     y += 10;
 
     // Pre-load all images to get natural dimensions
@@ -1397,7 +1424,7 @@ async function generatePDF(selectedSections){
 
       // Caption 1
       pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(...GR);
-      const cap1 = p1.caption || ('Foto '+(i+1));
+      const cap1 = T(p1.caption || ('Foto '+(i+1)));
       pdf.text(cap1, M + COL_W/2, y + rowImgH + 7, {align:'center', maxWidth:COL_W});
 
       // Image 2
@@ -1408,7 +1435,7 @@ async function generatePDF(selectedSections){
         const x2off = (COL_W - f2.w) / 2;
         const y2off = (rowImgH - f2.h) / 2;
         try{ pdf.addImage(p2.src, 'JPEG', x2 + x2off, y + 1 + y2off, f2.w, f2.h); }catch(e){}
-        const cap2 = p2.caption || ('Foto '+(i+2));
+        const cap2 = T(p2.caption || ('Foto '+(i+2)));
         pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(...GR);
         pdf.text(cap2, x2 + COL_W/2, y + rowImgH + 7, {align:'center', maxWidth:COL_W});
       }
@@ -1434,15 +1461,15 @@ async function generatePDF(selectedSections){
       startY:y,
       body:[
         [{content:'Overall Findings', styles:{fontStyle:'bold',fillColor:[240,247,255]}},
-         findings||'—'],
+         findings||'-'],
         [{content:'Corrective Actions', styles:{fontStyle:'bold',fillColor:[240,247,255]}},
-         actionsTaken||'—'],
+         actionsTaken||'-'],
         [{content:'Overall Result', styles:{fontStyle:'bold',fillColor:[240,247,255]}},
-         {content:overallRes||'—',
+         {content:overallRes||'-',
           styles:{textColor: overallRes==='GOOD'?OKC:overallRes==='FAILED'?NGC:overallRes==='NEED ACTION'?NAC:NAVY,
                   fontStyle:'bold'}}],
         [{content:'Next PM Date', styles:{fontStyle:'bold',fillColor:[240,247,255]}},
-         nextPm||'—'],
+         nextPm||'-'],
       ],
       columnStyles:{0:{cellWidth:44},1:{cellWidth:CW-44}},
       styles:{fontSize:9,cellPadding:4,overflow:'linebreak'},
@@ -1464,8 +1491,8 @@ async function generatePDF(selectedSections){
   pdf.text(gv('done-by')||'____________________', M+4, y+16);
   pdf.text(gv('ack-by')||'____________________', M+half+4, y+16);
   pdf.setFontSize(8); pdf.setTextColor(...GR);
-  pdf.text('Date: '+(gv('wo-date')||'—'), M+4, y+24);
-  pdf.text('Date: '+(gv('ack-date')||'—'), M+half+4, y+24);
+  pdf.text(T('Date: '+(gv('wo-date')||'-')), M+4, y+24);
+  pdf.text(T('Date: '+(gv('ack-date')||'-')), M+half+4, y+24);
   y += 36;
 
   // ── Page footer on all pages ──
@@ -1474,7 +1501,7 @@ async function generatePDF(selectedSections){
     pdf.setPage(p);
     pdf.setFillColor(...NAVY); pdf.rect(0,H-10,W,10,'F');
     pdf.setFont('helvetica','normal'); pdf.setFontSize(7); pdf.setTextColor(...SKY);
-    pdf.text('POMI — HV Motor SWGR PM Check Sheet', M, H-4);
+    pdf.text('POMI - HV Motor Switchgear PM Check Sheet', M, H-4);
     pdf.text('Page '+p+' of '+pages, W-M, H-4, {align:'right'});
   }
 
