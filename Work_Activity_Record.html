@@ -267,6 +267,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
    ═══════════════════════════════════════════════════════════════════════ */
 .print-only{display:none}
 
+@page{size:A4;margin:0}
+
 @media print{
   *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 
@@ -275,7 +277,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   .img-chg,.file-dz,.blk-empty,.drop-zone,.fcard-chg,
   .hero,.sec-hdr,.notice{display:none!important}
 
-  body{background:#fff!important;font-size:10pt;font-family:Arial,sans-serif;color:#000}
+  body{background:#fff!important;font-size:10pt;font-family:Arial,sans-serif;color:#000;
+    padding:26mm 12mm 20mm 12mm!important;margin:0!important}
   .wrap{max-width:100%!important;padding:0!important}
   .panel{border:none!important;box-shadow:none!important;border-radius:0!important;margin:0!important;overflow:visible!important}
   .sec-body,.sec-body.closed{display:block!important}
@@ -284,21 +287,26 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   .print-only{display:block!important}
   .screen-only{display:none!important}
 
-  /* ── REPORT HEADER ── */
-  .print-hdr{
-    display:flex!important;align-items:center;justify-content:space-between;
-    border-bottom:2px solid #1e3a5f;padding-bottom:8pt;margin-bottom:10pt
-  }
-  .print-hdr-left img{height:50pt;width:auto;object-fit:contain}
-  .print-hdr-center{text-align:center;flex:1;padding:0 12pt}
-  .print-hdr-center h1{font-size:16pt;font-weight:bold;letter-spacing:2px;color:#000;margin:0}
-  .print-hdr-right{display:flex;align-items:center;gap:8pt}
-  .print-hdr-right img{height:36pt;width:auto;object-fit:contain}
+  /* ── REPEATING HEADER / FOOTER BAND (repeats on every printed page) ── */
+  .pdf-hdr-band{position:fixed;top:0;left:0;width:100%;height:auto;display:block!important;z-index:10}
+  .pdf-ftr-band{position:fixed;bottom:0;left:0;width:100%;height:auto;display:block!important;z-index:10}
 
-  /* ── INFO TABLE ── */
-  .print-info-tbl{width:100%;border-collapse:collapse;font-size:10pt;margin-bottom:10pt}
-  .print-info-tbl td{border:1px solid #888;padding:4pt 8pt;vertical-align:top}
-  .print-info-tbl td:first-child{font-weight:bold;width:28%;background:#f2f2f2;color:#000}
+  /* ── REPORT TITLE (page 1 only) ── */
+  .pdf-title{text-align:center;font-size:21pt;font-weight:800;letter-spacing:0.5pt;
+    color:#000;margin:2pt 0 9pt;font-family:Arial,sans-serif}
+
+  /* ── INFO TABLES ── */
+  .pdf-info-tbl{width:100%;border-collapse:collapse;font-size:9.2pt;margin-bottom:0;border:2px solid #000}
+  .pdf-info-tbl td{border:1px solid #555;padding:4pt 7pt;vertical-align:top}
+  .pdf-info-tbl td.lbl{font-weight:bold;color:#000;white-space:nowrap}
+  .pdf-info-tbl+.pdf-info-tbl{border-top:none;margin-top:8pt;border:1px solid #000}
+  .pdf-info-tbl+.pdf-info-tbl td.lbl{width:26%;white-space:normal}
+  .pdf-chk-cell{white-space:nowrap}
+  .pdf-chk-box{display:inline-flex;align-items:center;justify-content:center;width:9pt;height:9pt;
+    border:1.2px solid #000;margin-right:5pt;flex-shrink:0;font-size:8pt;line-height:1;font-weight:bold}
+  .pdf-chk-row{display:flex;align-items:center;margin:1.5pt 0}
+  .pdf-hl-box{margin:9pt 0 0;font-size:9.5pt;line-height:1.5}
+  .pdf-hl-box ol{margin:0;padding-left:16pt}
 
   /* ── BLOCKS ── */
   .blocks-list{display:grid!important;grid-template-columns:1fr 1fr!important;gap:4pt!important;padding:0!important}
@@ -392,25 +400,36 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   </div>
 </div>
 
-<!-- ══ PRINT-ONLY HEADER ═══════════════════════════════════════════════ -->
-<div class="print-only print-hdr">
-  <div class="print-hdr-left"><img src="image.png" alt="Logo"></div>
-  <div class="print-hdr-center"><h1>WORK ACTIVITY RECORD</h1></div>
-  <div class="print-hdr-right">
-    <img src="logo PE.png" alt="Paiton Energy">
-    <img src="LOGO POMI.png" alt="POMI">
-  </div>
-</div>
+<!-- ══ PRINT-ONLY REPEATING HEADER / FOOTER BAND ═════════════════════════ -->
+<img class="print-only pdf-hdr-band" src="war-header-band.png" alt="">
+<img class="print-only pdf-ftr-band" src="war-footer-band.png" alt="">
 
-<!-- ══ PRINT-ONLY INFO TABLE ══════════════════════════════════════════ -->
+<!-- ══ PRINT-ONLY TITLE + INFO TABLE (page 1 only) ════════════════════ -->
 <div class="print-only">
-  <table class="print-info-tbl">
-    <tr><td>Asset</td><td id="p-asset">—</td></tr>
-    <tr><td>Description</td><td id="p-desc">—</td></tr>
-    <tr><td>Work Order No</td><td id="p-wo">—</td></tr>
-    <tr><td>Failure Desc</td><td id="p-failure">—</td></tr>
-    <tr><td>PIC</td><td id="p-pic">—</td></tr>
-    <tr><td>Date</td><td id="p-date">—</td></tr>
+  <h1 class="pdf-title">WORK ACTIVITY REPORT</h1>
+
+  <table class="pdf-info-tbl">
+    <tr>
+      <td class="lbl">WO No.</td><td id="p-wo">—</td>
+      <td class="lbl">Date/Time</td><td id="p-date">—</td>
+      <td class="lbl" rowspan="3">Work Order Type</td>
+      <td class="pdf-chk-cell" id="p-wot-prev">—</td>
+    </tr>
+    <tr>
+      <td class="lbl">Asset Tag</td><td id="p-asset">—</td>
+      <td class="lbl">PIC</td><td id="p-pic" style="white-space:pre-wrap">—</td>
+      <td class="pdf-chk-cell" id="p-wot-corr">—</td>
+    </tr>
+    <tr>
+      <td class="lbl">Asset Description</td><td colspan="3" id="p-desc">—</td>
+      <td class="pdf-chk-cell" id="p-wot-emrg">—</td>
+    </tr>
+  </table>
+
+  <table class="pdf-info-tbl">
+    <tr><td class="lbl">Failure/Work Description</td><td id="p-failure">—</td></tr>
+    <tr><td class="lbl">High Level Information, Resume Activity, Recommendations</td>
+      <td id="p-highlvl" style="white-space:pre-wrap">—</td></tr>
   </table>
 </div>
 
@@ -433,10 +452,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
         <input type="text" id="wo-no" placeholder="e.g. 2502161057" oninput="syncPrint()"></div>
       <div class="mf"><label>Date</label>
         <input type="date" id="wo-date" oninput="syncPrint()"></div>
+      <div class="mf"><label>Work Order Type</label>
+        <select id="wo-type" oninput="syncPrint()" onchange="syncPrint()">
+          <option value="preventive">Preventive Maintenance</option>
+          <option value="correction" selected>Correction Maintenance</option>
+          <option value="emergency">Emergency Maintenance</option>
+        </select></div>
       <div class="mf mf-full"><label>Failure Description</label>
         <input type="text" id="failure-desc" placeholder="Describe the failure / defect found" oninput="syncPrint()"></div>
       <div class="mf mf-full"><label>PIC (Person In Charge)</label>
-        <input type="text" id="pic" placeholder="Names of technicians involved" oninput="syncPrint()"></div>
+        <textarea id="pic" rows="2" placeholder="Names of technicians involved — one per line" oninput="syncPrint()"></textarea></div>
+      <div class="mf mf-full"><label>High Level Information, Resume Activity, Recommendations</label>
+        <textarea id="high-level" placeholder="Brief summary points, one per line…" oninput="syncPrint()"></textarea></div>
     </div>
   </div>
 </div>
@@ -1135,16 +1162,33 @@ function onFileFile(idx,inp){
 // ═══════════════════════════════════════════════════
 //  SYNC PRINT VIEW  (called before printing)
 // ═══════════════════════════════════════════════════
+function fmtDate(iso){
+  if(!iso)return'';
+  const d=new Date(iso+'T00:00:00');
+  if(isNaN(d))return iso;
+  return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}).toUpperCase();
+}
+
 function syncPrint(){
   const gv=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
-  document.getElementById('p-asset').textContent   = gv('asset')        || '—';
-  document.getElementById('p-desc').textContent    = gv('desc')         || '—';
-  document.getElementById('p-wo').textContent      = gv('wo-no')        || '—';
-  document.getElementById('p-failure').textContent = gv('failure-desc') || '—';
-  document.getElementById('p-pic').textContent     = gv('pic')          || '—';
-  document.getElementById('p-date').textContent    = gv('wo-date')      || '—';
-  document.getElementById('p-concl').textContent   = gv('conclusion')   || '—';
-  document.getElementById('p-reco').textContent    = gv('recommendations') || '—';
+  document.getElementById('p-asset').textContent    = gv('asset')        || '—';
+  document.getElementById('p-desc').textContent     = gv('desc')         || '—';
+  document.getElementById('p-wo').textContent       = gv('wo-no')        || '—';
+  document.getElementById('p-failure').textContent  = gv('failure-desc') || '—';
+  document.getElementById('p-pic').textContent      = gv('pic')          || '—';
+  document.getElementById('p-date').textContent     = fmtDate(gv('wo-date')) || '—';
+  document.getElementById('p-highlvl').textContent  = gv('high-level')   || '—';
+  document.getElementById('p-concl').textContent    = gv('conclusion')   || '—';
+  document.getElementById('p-reco').textContent     = gv('recommendations') || '—';
+
+  const wot=gv('wo-type')||'correction';
+  const chk=(id,on,label)=>{
+    document.getElementById(id).innerHTML=
+      `<div class="pdf-chk-row"><span class="pdf-chk-box">${on?'✓':''}</span>${label}</div>`;
+  };
+  chk('p-wot-prev',wot==='preventive','Preventive Maintenance');
+  chk('p-wot-corr',wot==='correction','Correction Maintenance');
+  chk('p-wot-emrg',wot==='emergency','Emergency Maintenance');
 }
 
 window.addEventListener('beforeprint',()=>{
@@ -1399,7 +1443,8 @@ async function generatePDF(){
 function saveDraft(){
   const gv=id=>{const e=document.getElementById(id);return e?e.value:'';};
   const fields={asset:gv('asset'),desc:gv('desc'),'wo-no':gv('wo-no'),'wo-date':gv('wo-date'),
-    'failure-desc':gv('failure-desc'),pic:gv('pic'),conclusion:gv('conclusion'),recommendations:gv('recommendations')};
+    'wo-type':gv('wo-type'),'failure-desc':gv('failure-desc'),pic:gv('pic'),'high-level':gv('high-level'),
+    conclusion:gv('conclusion'),recommendations:gv('recommendations')};
   // Save text/file blocks only (skip images — too large for localStorage)
   const blocksToSave=BLOCKS.map(b=>{
     if(b.type==='image')return{...b,photos:(b.photos||[]).map(p=>({...p,src:null,_dropped:true}))};
