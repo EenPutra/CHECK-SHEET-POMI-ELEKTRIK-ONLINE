@@ -472,6 +472,7 @@ const OL_HEATERS=[{"code": "C087A", "stdMin": 0.65, "stdMax": 0.74, "ambMin": 0.
 let selectedMotor = null;
 let olSize = null;
 const resultState = {};
+let draftTagLoaded = null;
 
 // ═══════════════════════════════════════════════════
 //  CLOCK
@@ -541,6 +542,11 @@ function selectTag(tag){
   olSize = null;
   document.querySelectorAll('.sz-btn').forEach(b => b.classList.remove('active'));
   refreshOLTable();
+
+  // Pull the last DB submission for this tag so the sheet isn't blank on
+  // reopen. Skip if a local draft for this exact tag was already restored —
+  // that draft is newer, unsubmitted work and shouldn't be overwritten.
+  if(draftTagLoaded !== tag) loadLastFromDb(tag);
 }
 
 // ═══════════════════════════════════════════════════
@@ -975,7 +981,7 @@ function loadDraft(){
     const raw = localStorage.getItem('hv_motor_swgr_draft');
     if(!raw) return;
     const d = JSON.parse(raw);
-    if(d._tag) document.getElementById('tag-search').value = d._tag;
+    if(d._tag){ document.getElementById('tag-search').value = d._tag; draftTagLoaded = d._tag; }
     document.querySelectorAll('input,select,textarea').forEach(el => {
       if(el.id && d['f_'+el.id] !== undefined) el.value = d['f_'+el.id];
     });
@@ -998,6 +1004,57 @@ function loadDraft(){
     rtdKeys.forEach(n => { while(!document.getElementById('rtd-'+n)) addRTDInput(); });
     updateStats();
   }catch(e){}
+}
+
+// ═══════════════════════════════════════════════════
+//  LOAD LAST SUBMISSION (Firestore)
+// ═══════════════════════════════════════════════════
+// Pre-fills the sheet from the most recent DB submission for a tag, so
+// reopening the page never shows an all-blank form for an asset that has
+// already been checked before. Mirrors loadDraft()'s restore logic but
+// sources values from Firestore instead of localStorage.
+async function loadLastFromDb(tag){
+  if(!tag) return;
+  try{
+    const snap = await db.collection(DB.COLLECTION)
+      .where('assetTag', '==', tag)
+      .orderBy('createdAt', 'desc').limit(1).get();
+    if(snap.empty) return;
+    const d = snap.docs[0].data();
+    const iv = d.inputValues || {};
+
+    // Create enough dynamic RTD rows before setting their values
+    const rtdKeys = Object.keys(iv).filter(k => k.startsWith('rtd-'))
+      .map(k => parseInt(k.replace('rtd-',''),10)).filter(n => !isNaN(n)).sort((a,b)=>a-b);
+    rtdKeys.forEach(n => { while(!document.getElementById('rtd-'+n)) addRTDInput(); });
+
+    // Restore every plain input/select/textarea captured by id
+    Object.entries(iv).forEach(([id,val]) => {
+      const el = document.getElementById(id);
+      if(el) el.value = val;
+    });
+
+    // Re-sync .r-sel styling + resultState for restored result dropdowns
+    document.querySelectorAll('.r-sel').forEach(sel => {
+      if(!sel.id.startsWith('res-') || !sel.value) return;
+      onResChange(sel, sel.id.slice(4));
+    });
+
+    // OL heater display + size aren't plain inputs — restore from olData
+    if(d.olData){
+      document.getElementById('ol-code').textContent    = d.olData.heaterCode || '—';
+      document.getElementById('ol-plug').textContent    = d.olData.ratingPlug || '—';
+      document.getElementById('ol-setting').textContent = d.olData.olSetting  || '—';
+      if(d.olData.size !== null && d.olData.size !== undefined) selectSize(d.olData.size);
+    }
+
+    draftTagLoaded = tag;
+    updateStats();
+    document.getElementById('doc-id-display').textContent = 'Data terakhir dimuat (DOC: '+snap.docs[0].id+')';
+    showNote('📥 Data submisi terakhir untuk tag ini berhasil dimuat.', 'ok');
+  }catch(e){
+    console.log('loadLastFromDb skip:', e.message);
+  }
 }
 
 function resetForm(){
