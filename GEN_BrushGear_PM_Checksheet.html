@@ -10,6 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -828,14 +830,27 @@ function updateFileCountLabel(){
 function handleFiles(fileList){
   Array.from(fileList).forEach(file=>{
     if(file.size>10*1024*1024){showNotice('File '+file.name+' terlalu besar (maks 10MB)','err');return;}
-    const reader=new FileReader();
     const isImg=file.type.startsWith('image/');
     const entry={name:file.name,type:file.type,size:file.size,dataUrl:null};
+    if(isImg){
+      // PhotoKit intake: img-helper downscales + bakes in the EXIF rotation, then
+      // the crop modal sets the print size in cm. Both travel with the entry, so
+      // the PDF draws the photo at that size at its own aspect ratio.
+      PhotoKit.fromFile(file,res=>{
+        if(!res)return;
+        entry.dataUrl=res.src;entry.type='image/jpeg';entry.w=res.w;entry.h=res.h;
+        entry.widthCm=res.widthCm;entry.heightCm=res.heightCm;
+        FILES.push(entry);
+        renderPhoto(entry,FILES.length-1);
+        updateFileCountLabel();
+      });
+      return;
+    }
+    const reader=new FileReader();
     reader.onload=e=>{
       entry.dataUrl=e.target.result;
       FILES.push(entry);
-      if(isImg)renderPhoto(entry,FILES.length-1);
-      else renderFile(entry,FILES.length-1);
+      renderFile(entry,FILES.length-1);
       updateFileCountLabel();
     };
     reader.readAsDataURL(file);
@@ -849,9 +864,24 @@ function renderPhoto(entry,idx){
   div.innerHTML=`
     <img src="${entry.dataUrl}" alt="${entry.name}" loading="lazy">
     <button class="photo-del" onclick="removeFile(${idx})" title="Remove">✕</button>
-    <div class="photo-caption">${entry.name.slice(0,20)}</div>
+    <button class="photo-del" style="left:6px;right:auto;background:rgba(37,99,235,.85)" onclick="recropFile(${idx})" title="Crop &amp; ukuran cetak">✂</button>
+    <div class="photo-caption">${entry.name.slice(0,20)}${entry.widthCm?` · ${entry.widthCm.toFixed(1)}×${entry.heightCm.toFixed(1)}cm`:''}</div>
   `;
   grid.appendChild(div);
+}
+function recropFile(idx){
+  const e=FILES[idx];
+  if(!e||!e.dataUrl||!/^image\//.test(e.type||''))return;
+  PhotoKit.recrop({src:e.dataUrl,w:e.w,h:e.h,widthCm:e.widthCm,heightCm:e.heightCm},r=>{
+    if(!r)return;
+    e.dataUrl=r.src;e.w=r.w;e.h=r.h;e.widthCm=r.widthCm;e.heightCm=r.heightCm;
+    const thumb=document.getElementById('thumb-'+idx);
+    if(thumb){
+      const img=thumb.querySelector('img');if(img)img.src=r.src;
+      const cap=thumb.querySelector('.photo-caption');
+      if(cap)cap.textContent=e.name.slice(0,20)+' \u00b7 '+r.widthCm.toFixed(1)+'\u00d7'+r.heightCm.toFixed(1)+'cm';
+    }
+  });
 }
 function renderFile(entry,idx){
   const list=document.getElementById('file-list');
@@ -1286,15 +1316,18 @@ async function generatePDF(){
     nPage();
     sectionBar('C — Photo Evidence ('+photoFiles.length+' foto)');
     const PW=58,PH=44,GAP=4,COLS=3;
+    // Each photo is FITTED inside its PW x PH cell at its own aspect ratio and
+    // centred there. Passing PW/PH straight to addImage() stretched every shot
+    // that was not exactly 58:44.
     let col=0,rowY=y;
     for(let i=0;i<photoFiles.length;i++){
       if(col>=COLS){col=0;rowY+=PH+10;}
       if(rowY+PH>H-M){nPage();col=0;rowY=y;}
       const px=M+col*(PW+GAP);
-      try{
-        const fmt=photoFiles[i].type==='image/png'?'PNG':'JPEG';
-        pdf.addImage(photoFiles[i].dataUrl,fmt,px,rowY,PW,PH);
-      }catch(e){}
+      const pf=photoFiles[i];
+      const pe={src:pf.dataUrl,w:pf.w,h:pf.h,widthCm:pf.widthCm,heightCm:pf.heightCm};
+      const f=PhotoKit.fit(pe,PW,PH);
+      PhotoKit.draw(pdf,pe,px,rowY+(PH-f.h)/2,PW,f.h,{align:'center'});
       pdf.setFont('helvetica','normal');pdf.setFontSize(5.5);pdf.setTextColor(...GR);
       pdf.text((i+1)+'. '+photoFiles[i].name.slice(0,26),px,rowY+PH+3.5);
       col++;
@@ -1322,6 +1355,7 @@ buildInsTableMerged('tbody-ins');
 // pm-skip default = 0 (minggu ini), auto-detect dari PM_REF date
 buildWeekBtns();
 rebuildBrushMags();
+PhotoKit.configure({maxWcm:5.8,maxHcm:18,defaultWcm:5.8,defaultHcm:4.4});  // 3-up 58x44mm grid
 loadDraft();
 updateKPI();
 updateFileCountLabel();

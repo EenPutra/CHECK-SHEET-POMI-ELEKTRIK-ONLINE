@@ -10,6 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -115,7 +117,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .photo-drop:hover{border-color:var(--blue)}
 .photo-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;z-index:2}
 .photo-drop img{width:100%;height:auto;display:block;border-radius:6px;position:relative;z-index:1}
-.photo-drop.has-photo .del-btn{display:flex}
+.photo-drop.has-photo .del-btn{display:flex}.photo-drop .pk-crop-btn{position:absolute;top:5px;left:5px;background:rgba(37,99,235,.85);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center;z-index:5}.photo-drop.has-photo .pk-crop-btn{display:flex}.pk-sz{font-size:10px;color:#64748b;text-align:center;margin-top:3px;min-height:12px}
 .del-btn{position:absolute;top:5px;right:5px;background:rgba(220,38,38,.9);border:none;color:#fff;width:24px;height:24px;border-radius:50%;cursor:pointer;font-size:14px;display:none;align-items:center;justify-content:center;z-index:3;box-shadow:0 2px 6px rgba(0,0,0,0.3)}
 .ph-icon{font-size:22px;margin-bottom:5px;pointer-events:none;z-index:1}
 .ph-hint{font-size:10px;color:var(--txt4);text-align:center;pointer-events:none;font-family:var(--mono);z-index:1}
@@ -462,53 +464,89 @@ function addPhoto(type){
     +'</div>'
     +'<input class="photo-cap-inp" id="cap_'+id+'" placeholder="Keterangan foto...">';
   grid.appendChild(wrap);
+  pkWireDrops();
   refreshBadge(type);
   setTimeout(function(){wrap.scrollIntoView({behavior:'smooth',block:'nearest'});},150);
 }
 
-function loadPhoto(input,slotId,type,num){
-  if(!input.files||!input.files[0])return;
-  const reader=new FileReader();
-  reader.onload=function(e){
-    const img=new Image();
-    img.onload=function(){
-      photoStore[slotId]={src:e.target.result,w:img.naturalWidth,h:img.naturalHeight};
-      const slot=document.getElementById(slotId);
-      var existing=slot.querySelector('img');
-      if(existing)existing.remove();
-      var imgEl=document.createElement('img');
-      imgEl.src=e.target.result;
-      imgEl.style.width='100%';
-      imgEl.style.height='auto';
-      imgEl.style.display='block';
-      imgEl.style.borderRadius='6px';
-      slot.insertBefore(imgEl,slot.querySelector('.del-btn'));
-      slot.classList.add('has-photo');
-      slot.querySelector('.ph-icon').style.display='none';
-      slot.querySelector('.ph-hint').style.display='none';
-      slot.querySelector('.del-btn').style.display='flex';
-      refreshBadge(type);
-    };
-    img.src=e.target.result;
-  };
-  reader.readAsDataURL(input.files[0]);
+// ── PhotoKit layer ─────────────────────────────────
+// Photos go through PhotoKit: source picker -> EXIF-upright downscale (img-helper)
+// -> crop modal (Default / ratio preset / 1:1 / manual cm) -> an entry that knows
+// both its pixel size and its print size in cm. The PDF draws it at that exact
+// size at its own aspect ratio, so a photo can never come out stretched.
+var PE={};   // slotId -> PhotoKit entry
+function pkEntry(id){
+  var e=PE[id];if(e)return e;
+  var p=photoStore[id];if(!p)return null;
+  return {src:p.src||p,w:p.w,h:p.h};
 }
-
-function delPhoto(slotId,type,e){
-  e.stopPropagation();
-  const slot=document.getElementById(slotId);
-  const img=slot.querySelector('img');
-  if(img)img.remove();
-  slot.classList.remove('has-photo');
-  const icon=slot.querySelector('.ph-icon');
-  const hint=slot.querySelector('.ph-hint');
-  const delbtn=slot.querySelector('.del-btn');
-  if(icon)icon.style.display='';
-  if(hint)hint.style.display='';
-  if(delbtn)delbtn.style.display='none';
-  delete photoStore[slotId];
+function setPhoto(id,type,entry){
+  PE[id]=entry;
+  photoStore[id]={src:entry.src,w:entry.w,h:entry.h,widthCm:entry.widthCm,heightCm:entry.heightCm};
+  var slot=document.getElementById(id);
+  if(slot){
+    var existing=slot.querySelector('img');
+    if(existing)existing.remove();
+    var imgEl=document.createElement('img');
+    imgEl.src=entry.src;
+    imgEl.style.width='100%';imgEl.style.height='auto';imgEl.style.display='block';imgEl.style.borderRadius='6px';
+    slot.insertBefore(imgEl,slot.querySelector('.del-btn'));
+    slot.classList.add('has-photo');
+    var ic=slot.querySelector('.ph-icon'),hi=slot.querySelector('.ph-hint'),db=slot.querySelector('.del-btn');
+    if(ic)ic.style.display='none';if(hi)hi.style.display='none';if(db)db.style.display='flex';
+  }
+  var sz=document.getElementById('sz_'+id);
+  if(sz)sz.textContent='Cetak '+entry.widthCm.toFixed(1)+' \u00d7 '+entry.heightCm.toFixed(1)+' cm';
   refreshBadge(type);
 }
+function pickPhoto(slot,id,type){PhotoKit.upload(slot,{},function(e){if(e)setPhoto(id,type,e);});}
+function recropPhoto(id,type,ev){
+  ev.stopPropagation();
+  var cur=pkEntry(id);if(!cur)return;
+  PhotoKit.recrop(cur,function(e){if(e)setPhoto(id,type,e);});
+}
+function delPhoto(slotId,type,e){
+  if(e&&e.stopPropagation)e.stopPropagation();
+  var slot=document.getElementById(slotId);
+  if(slot){
+    var img=slot.querySelector('img');if(img)img.remove();
+    slot.classList.remove('has-photo');
+    var icon=slot.querySelector('.ph-icon'),hint=slot.querySelector('.ph-hint'),delbtn=slot.querySelector('.del-btn');
+    if(icon)icon.style.display='';if(hint)hint.style.display='';if(delbtn)delbtn.style.display='none';
+  }
+  var sz=document.getElementById('sz_'+slotId);if(sz)sz.textContent='';
+  delete photoStore[slotId];delete PE[slotId];
+  refreshBadge(type);
+}
+// Slots are created at runtime by addPhoto(), so this runs after each one: it
+// swaps the hidden <input type=file> for the PhotoKit picker and adds a re-crop
+// button, keeping the markup builder itself untouched.
+function pkWireDrops(){
+  document.querySelectorAll('.photo-drop').forEach(function(slot){
+    if(slot.dataset.pkWired)return;
+    var inp=slot.querySelector('input[type=file]');
+    var id=slot.id,type='';
+    if(inp){
+      var m=(inp.getAttribute('onchange')||'').match(/'([^']+)'\s*,\s*'([^']+)'/);
+      if(m){id=m[1];type=m[2];}
+      inp.remove();
+    }
+    if(!id)return;
+    slot.dataset.pkWired='1';
+    if(!slot.querySelector('.pk-crop-btn')){
+      var b=document.createElement('button');b.type='button';b.className='pk-crop-btn';
+      b.title='Crop & ukuran cetak';b.innerHTML='&#9986;';
+      b.onclick=function(ev){recropPhoto(id,type,ev);};
+      slot.appendChild(b);
+    }
+    slot.addEventListener('click',function(ev){if(ev.target.closest('button'))return;pickPhoto(slot,id,type);});
+    if(!document.getElementById('sz_'+id)){
+      var d=document.createElement('div');d.className='pk-sz';d.id='sz_'+id;
+      slot.parentNode.insertBefore(d,slot.nextSibling);
+    }
+  });
+}
+
 
 function refreshBadge(type){
   const total=photoCounts[type];
@@ -794,17 +832,18 @@ async function generatePDF(){
       for(var i=0;i<keys.length;i+=2){
         var pair=keys.slice(i,i+2);
 
-        // Calculate row height
-        var rowH=maxPhotoH;
+        // Row height = the TALLEST photo in the pair once each has been fitted to
+        // the column at its own aspect ratio. (It used to take the SHORTEST, so a
+        // taller photo overflowed its frame and ran into the caption below.)
+        var fits={};
+        var rowH=0;
         pair.forEach(function(pid){
           var p=photoStore[pid];
-          if(p&&p.w&&p.h){
-            var ratio=p.h/p.w;
-            var calcH=colW*ratio;
-            if(calcH<rowH)rowH=calcH;
-          }
+          if(!p)return;
+          fits[pid]=PhotoKit.fit(pkEntry(pid),colW,maxPhotoH);
+          if(fits[pid].h>rowH)rowH=fits[pid].h;
         });
-        rowH=Math.min(rowH,maxPhotoH);
+        if(!rowH)rowH=maxPhotoH;
         var blockH=rowH+24;
         checkY(blockH);
 
@@ -823,15 +862,11 @@ async function generatePDF(){
           var label=(type==='activity'?'Foto Kegiatan':'After Cleaning')+' #'+num;
           doc.text(label,xo+3,y+4.5);
 
-          // Calculate display size preserving ratio
-          var dispW=colW,dispH=rowH;
-          if(p.w&&p.h){
-            var ratio=p.h/p.w;
-            dispH=colW*ratio;
-            if(dispH>maxPhotoH){dispH=maxPhotoH;dispW=dispH/ratio;}
-            else{dispW=colW;}
-          }
-          var xImg=xo+(colW-dispW)/2;
+          // Display size comes straight from the fit computed above — never the
+          // raw box, which is what stretched photos out of shape.
+          var fit=fits[pid]||PhotoKit.fit(pkEntry(pid),colW,maxPhotoH);
+          var dispW=fit.w,dispH=fit.h;
+          var xImg=xo+fit.dx;
           var yImg=y+7.5;
 
           // Photo border
@@ -840,7 +875,7 @@ async function generatePDF(){
 
           // Add image
           try{
-            doc.addImage(p.src,'JPEG',xImg,yImg,dispW,dispH,'','FAST');
+            PhotoKit.draw(doc,pkEntry(pid),xImg,yImg,dispW,dispH,{align:'center',compression:'FAST'});
           }catch(imgErr){
             doc.setFont('helvetica','italic');doc.setFontSize(8);doc.setTextColor(150,150,150);
             doc.text('[Image could not be rendered]',xo+colW/2,yImg+rowH/2,{align:'center'});
@@ -883,6 +918,7 @@ async function generatePDF(){
 }
 
 // ── INIT ───────────────────────────────────────────
+PhotoKit.configure({maxWcm:8.5,maxHcm:20,defaultWcm:8.5,defaultHcm:6});
 buildCheckTable();
 loadDraft();
 updateStats();

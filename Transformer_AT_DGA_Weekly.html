@@ -10,6 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#e8ece9;--bg2:#dde3de;--panel:rgba(255,255,255,0.80);--pb:rgba(180,200,185,0.55);--steel:#4a5e52;--sl:#6b8474;--red:#c0392b;--ok:#27ae60;--warn:#f39c12;--na:#8e44ad;--text:#1a2620;--t2:#3d5248;--t3:#7a9485;--sh:0 4px 24px rgba(30,60,40,0.10);--mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
@@ -87,9 +89,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--text);min-height:1
 .pg2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .pd{border:2px dashed var(--pb);border-radius:8px;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;background:rgba(74,94,82,.025);position:relative;overflow:hidden}
 .pd:hover{border-color:var(--sl);background:rgba(74,94,82,.06)}.pd input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.pd img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:6px}
+.pd img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#eef2ef;border-radius:6px}
 .pd .delbtn{position:absolute;top:5px;right:5px;background:rgba(192,57,43,.85);border:none;color:#fff;width:21px;height:21px;border-radius:50%;cursor:pointer;font-size:13px;display:none;align-items:center;justify-content:center;z-index:5}
-.pd.hp .delbtn{display:flex}.phi{font-size:24px;margin-bottom:5px;pointer-events:none}.pht{font-size:10.5px;color:var(--t3);text-align:center;pointer-events:none}
+.pd.hp .delbtn{display:flex}.pd .cropbtn{position:absolute;top:5px;left:5px;background:rgba(74,94,82,.85);border:none;color:#fff;width:21px;height:21px;border-radius:50%;cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center;z-index:5}.pd.hp .cropbtn{display:flex}.psz{font-size:10px;color:var(--t3);text-align:center;margin-top:3px;min-height:12px}.phi{font-size:24px;margin-bottom:5px;pointer-events:none}.pht{font-size:10.5px;color:var(--t3);text-align:center;pointer-events:none}
 .pcap{margin-top:6px}.pcap input{width:100%;border:1.5px solid var(--pb);border-radius:5px;padding:5px 8px;font-size:12px;background:#f4f8f5;color:var(--text)}
 .pbtl{font-family:var(--raj);font-size:12px;font-weight:600;color:var(--steel);margin-bottom:7px;letter-spacing:1px;text-transform:uppercase}
 .sw2{display:grid;grid-template-columns:1fr 1fr;gap:20px}
@@ -421,10 +423,25 @@ function mkSheet(tbId,pfx){
 
 // PHOTOS
 const PS={};
+const PSD={};
+const PE={};    // full PhotoKit entry per slot (crop result + chosen print size in cm)   // natural pixel size per photo id — the PDF needs it to keep each photo's aspect ratio
 const PSLOTS=[{"id": "ph1", "title": "Transformer Room Overview"}, {"id": "ph2", "title": "EZ-XFMR-GSU Condition"}, {"id": "ph3", "title": "EY-XFMR-SU Condition"}, {"id": "ph4", "title": "EX-XFMR-UAT Condition"}, {"id": "ph5", "title": "Thermal Scan — GSU/SU (IR)"}, {"id": "ph6", "title": "Thermal Scan — UAT/Others (IR)"}];
-function mkPhotos(){document.getElementById('photo-wrap').innerHTML=PSLOTS.map(p=>`<div><div class="pbtl">${p.title}</div><div class="pd" id="${p.id}"><input type="file" accept="image/*" onchange="lpx(this,'${p.id}')"><button class="delbtn" onclick="dpx('${p.id}',event)">×</button><div class="phi">📷</div><div class="pht">Click to upload</div></div><div class="pcap"><input type="text" id="${p.id}-cap" placeholder="Caption…"></div></div>`).join('');}
-function lpx(inp,id){if(!inp.files[0])return;const r=new FileReader();r.onload=e=>{PS[id]=e.target.result;const s=document.getElementById(id);let img=s.querySelector('img');if(!img){img=document.createElement('img');s.appendChild(img);}img.src=e.target.result;s.classList.add('hp');s.querySelector('.phi').style.display='none';s.querySelector('.pht').style.display='none';};r.readAsDataURL(inp.files[0]);}
-function dpx(id,e){e.stopPropagation();const s=document.getElementById(id);const img=s.querySelector('img');if(img)img.remove();s.classList.remove('hp');s.querySelector('.phi').style.display='';s.querySelector('.pht').style.display='';delete PS[id];}
+function mkPhotos(){document.getElementById('photo-wrap').innerHTML=PSLOTS.map(p=>`<div><div class="pbtl">${p.title}</div><div class="pd" id="${p.id}" onclick="pickPhoto(this,'${p.id}')"><button class="cropbtn" onclick="recropPhoto('${p.id}',event)" title="Crop &amp; print size">✂</button><button class="delbtn" onclick="dpx('${p.id}',event)">×</button><div class="phi">📷</div><div class="pht">Click to upload</div></div><div class="pcap"><input type="text" id="${p.id}-cap" placeholder="Caption…"></div><div class="psz" id="${p.id}-sz"></div></div>`).join('');}
+// Photos go through PhotoKit: source picker -> EXIF-upright downscale (img-helper)
+// -> crop modal (Default / ratio preset / 1:1 / manual cm) -> entry that carries
+// its own pixel size AND its print size in cm, so the PDF never has to guess a box.
+function setPhoto(id,entry){
+  PE[id]=entry;PS[id]=entry.src;PSD[id]={w:entry.w,h:entry.h};
+  const s=document.getElementById(id);let img=s.querySelector('img');
+  if(!img){img=document.createElement('img');s.appendChild(img);}
+  img.src=entry.src;s.classList.add('hp');
+  s.querySelector('.phi').style.display='none';s.querySelector('.pht').style.display='none';
+  const sz=document.getElementById(id+'-sz');
+  if(sz)sz.textContent='Print '+entry.widthCm.toFixed(1)+' \u00d7 '+entry.heightCm.toFixed(1)+' cm';
+}
+function pickPhoto(el,id){PhotoKit.upload(el,{},entry=>{if(entry)setPhoto(id,entry);});}
+function recropPhoto(id,e){e.stopPropagation();if(!PE[id])return;PhotoKit.recrop(PE[id],entry=>{if(entry)setPhoto(id,entry);});}
+function dpx(id,e){e.stopPropagation();const s=document.getElementById(id);const img=s.querySelector('img');if(img)img.remove();s.classList.remove('hp');s.querySelector('.phi').style.display='';s.querySelector('.pht').style.display='';const sz=document.getElementById(id+'-sz');if(sz)sz.textContent='';delete PS[id];delete PSD[id];delete PE[id];}
 
 // SIGNATURE
 function initSig(id){const c=document.getElementById(id);const ctx=c.getContext('2d');let dr=false;function p(e){const r=c.getBoundingClientRect();const sx=c.width/r.width;const sy=c.height/r.height;if(e.touches)return{x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};}c.addEventListener('mousedown',e=>{dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);});c.addEventListener('mousemove',e=>{if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();});c.addEventListener('mouseup',()=>dr=false);c.addEventListener('mouseleave',()=>dr=false);c.addEventListener('touchstart',e=>{e.preventDefault();dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);},{passive:false});c.addEventListener('touchmove',e=>{e.preventDefault();if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();},{passive:false});c.addEventListener('touchend',()=>dr=false);}
@@ -553,7 +570,27 @@ async function generatePDF(selSet){
       ensurePage();
       ck(18);pdf.setFillColor(...STL);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(...LT);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(8.5);pdf.text(sanitizeText('>  Evidence Photos'),M+3,y+5);y+=11;
       const cw=(W-M*2)/3-3;
-      for(let i=0;i<hp.length;i+=3){const g=hp.slice(i,i+3);const ih=50;ck(ih+14);g.forEach((p,pi)=>{const xo=M+pi*(cw+3);pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7);pdf.setTextColor(...STL);pdf.text(sanitizeText(trunc(p.title,32)),xo,y+5);try{pdf.addImage(PS[p.id],'JPEG',xo,y+7,cw,ih,undefined,'MEDIUM');}catch(e){}const cap=document.getElementById(p.id+'-cap')?.value||'';if(cap){pdf.setFont(BASE_FONT,'italic');pdf.setFontSize(6.5);pdf.setTextColor(120,155,135);pdf.text(sanitizeText(trunc(cap,40)),xo,y+7+ih+4);}});y+=ih+18;}
+      const MAXH=56;
+      // Each photo is drawn at the size the technician picked in the crop modal
+      // (capped to this column), always at its own aspect ratio and centred in
+      // the cell. PhotoKit.draw() returns the rect it actually painted, so the
+      // row is exactly as tall as its tallest photo -- no fixed box, no squash.
+      for(let i=0;i<hp.length;i+=3){
+        const g=hp.slice(i,i+3);
+        const dims=g.map(p=>PhotoKit.fit(PE[p.id]||{src:PS[p.id],w:PSD[p.id]&&PSD[p.id].w,h:PSD[p.id]&&PSD[p.id].h},cw,MAXH));
+        const ih=Math.max(...dims.map(d=>d.h));
+        ck(ih+16);
+        g.forEach((p,pi)=>{
+          const xo=M+pi*(cw+3);
+          pdf.setFont(BASE_FONT,'bold');pdf.setFontSize(7);pdf.setTextColor(...STL);
+          pdf.text(sanitizeText(trunc(p.title,32)),xo,y+5);
+          PhotoKit.draw(pdf,PE[p.id]||{src:PS[p.id],w:PSD[p.id]&&PSD[p.id].w,h:PSD[p.id]&&PSD[p.id].h},xo,y+7,cw,MAXH,{align:'center'});
+          const cap=document.getElementById(p.id+'-cap')?.value||'';
+          if(cap){pdf.setFont(BASE_FONT,'italic');pdf.setFontSize(6.5);pdf.setTextColor(120,155,135);
+            pdf.text(sanitizeText(trunc(cap,40)),xo,y+7+ih+4);}
+        });
+        y+=ih+18;
+      }
     }
   }
 
@@ -593,6 +630,7 @@ function generatePDFSelected(){if(!_pdfSel||_pdfSel.size===0){note('⚠️ Pilih
 
 // INIT
 mkSheet('tb-main','main');
+PhotoKit.configure({maxWcm:8.8,maxHcm:15,defaultWcm:8.8,defaultHcm:5.6});  // 3-up grid on a landscape A4 page: one column is 8.8cm wide
 mkPhotos();initSig('sig-tech');initSig('sig-super');loadDraft();upStats();loadLastSubmission();
 
 function collectSheetData(tbId, columns, pfx) {

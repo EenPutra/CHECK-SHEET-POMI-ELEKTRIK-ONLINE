@@ -10,6 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -680,27 +682,14 @@ function buildRowspanTable(tbodyId,rows){
 // ── PHOTOS ────────────────────────────────────────
 const PHOTOS=[];
 
-// Compress: resize to max 1200px, JPEG quality 0.78
+// Compress + upright: shared intake (img-helper.js) — downscales, bakes in EXIF
+// rotation, and reports the real pixel size the PDF needs to keep the ratio.
 function compressImage(file){
   return new Promise(resolve=>{
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const img=new Image();
-      img.onload=()=>{
-        const MAX=1200,Q=0.78;
-        let w=img.naturalWidth,h=img.naturalHeight;
-        if(w>MAX||h>MAX){
-          if(w>=h){h=Math.round(h*MAX/w);w=MAX;}
-          else{w=Math.round(w*MAX/h);h=MAX;}
-        }
-        const canvas=document.createElement('canvas');
-        canvas.width=w;canvas.height=h;
-        canvas.getContext('2d').drawImage(img,0,0,w,h);
-        resolve({dataUrl:canvas.toDataURL('image/jpeg',Q),w,h});
-      };
-      img.src=e.target.result;
-    };
-    reader.readAsDataURL(file);
+    IMG.read(file,res=>{
+      if(res) resolve({dataUrl:res.dataUrl,w:res.w,h:res.h});
+      else resolve({dataUrl:'',w:0,h:0});
+    });
   });
 }
 
@@ -712,9 +701,21 @@ function handlePhotoInput(inp){
 }
 
 async function addPhoto(file){
-  const{dataUrl,w,h}=await compressImage(file);
-  PHOTOS.push({dataUrl,caption:'',w,h});
+  // PhotoKit: img-helper downscale + EXIF fix, then the crop modal for the print
+  // size in cm. Both ride along on the entry so the PDF never guesses a box.
+  const e=await new Promise(res=>PhotoKit.fromFile(file,res));
+  if(!e)return;
+  PHOTOS.push({dataUrl:e.src,caption:'',w:e.w,h:e.h,widthCm:e.widthCm,heightCm:e.heightCm});
   renderPhotos();
+}
+
+function recropPhotoAt(i){
+  const p=PHOTOS[i];if(!p)return;
+  PhotoKit.recrop({src:p.dataUrl,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm},e=>{
+    if(!e)return;
+    p.dataUrl=e.src;p.w=e.w;p.h=e.h;p.widthCm=e.widthCm;p.heightCm=e.heightCm;
+    renderPhotos();
+  });
 }
 
 function renderPhotos(){
@@ -726,10 +727,11 @@ function renderPhotos(){
     const ratio=p.w&&p.h?((p.w/p.h)>=1?'landscape':'portrait'):'';
     const card=document.createElement('div');
     card.className='pcard';
-    card.innerHTML=`<img src="${p.dataUrl}" alt="Photo ${i+1}" onclick="zoomPhoto(${i})" style="width:100%;height:130px;object-fit:cover;display:block;cursor:zoom-in">
+    card.innerHTML=`<img src="${p.dataUrl}" alt="Photo ${i+1}" onclick="zoomPhoto(${i})" style="width:100%;height:130px;object-fit:contain;background:#f1f5f9;display:block;cursor:zoom-in">
       <div class="pcard-body">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--txt4);margin-bottom:3px">${dim}~${kb} KB · ${ratio}</div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--txt4);margin-bottom:3px">${dim}~${kb} KB · ${ratio}${p.widthCm?` · cetak ${p.widthCm.toFixed(1)}×${p.heightCm.toFixed(1)}cm`:''}</div>
         <input class="pcap" type="text" placeholder="Caption…" value="${p.caption.replace(/"/g,'&quot;')}" oninput="PHOTOS[${i}].caption=this.value">
+        <button class="pdel" style="background:#2563eb;margin-bottom:4px" onclick="recropPhotoAt(${i})">✂ Crop &amp; ukuran cetak</button>
         <button class="pdel" onclick="delPhoto(${i})">✕ Hapus foto</button>
       </div>`;
     grid.appendChild(card);
@@ -955,27 +957,27 @@ async function generatePDF(){
     pdf.addPage();y=M;miniHdr();
     secHdr('G — Photos & Documentation');
     const BOX_W=85,BOX_MAX_H=95,GAP_X=8,CAP_H=10;
-    // Fit image into box preserving aspect ratio
-    const fitBox=(pw,ph)=>{
-      if(!pw||!ph){pw=4;ph=3;} // fallback 4:3
-      const sc=Math.min(BOX_W/pw,BOX_MAX_H/ph);
-      return{dw:pw*sc,dh:ph*sc};
+    // Fit image into box preserving aspect ratio, and centre it in its column —
+    // shared with every other check sheet (img-helper.js).
+    const fitBox=(p)=>{
+      const f=PhotoKit.fit({src:p.dataUrl,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm},BOX_W,BOX_MAX_H);
+      return{dw:f.w,dh:f.h,ox:f.dx};
     };
     for(let i=0;i<PHOTOS.length;i+=2){
-      const s0=fitBox(PHOTOS[i].w,PHOTOS[i].h);
-      const s1=PHOTOS[i+1]?fitBox(PHOTOS[i+1].w,PHOTOS[i+1].h):null;
+      const s0=fitBox(PHOTOS[i]);
+      const s1=PHOTOS[i+1]?fitBox(PHOTOS[i+1]):null;
       const rowH=Math.max(s0.dh,s1?s1.dh:0)+CAP_H;
       ckY(rowH);
       // Left
-      try{pdf.addImage(PHOTOS[i].dataUrl,'JPEG',M,y,s0.dw,s0.dh);}
-      catch(e){pdf.setFillColor(220,220,220);pdf.rect(M,y,s0.dw,s0.dh,'F');}
+      if(!PhotoKit.draw(pdf,{src:PHOTOS[i].dataUrl,w:PHOTOS[i].w,h:PHOTOS[i].h,widthCm:PHOTOS[i].widthCm,heightCm:PHOTOS[i].heightCm},M+s0.ox,y,s0.dw,s0.dh,{align:'center'}))
+        {pdf.setFillColor(220,220,220);pdf.rect(M+s0.ox,y,s0.dw,s0.dh,'F');}
       pdf.setFont('times','italic');pdf.setFontSize(7);pdf.setTextColor(...GRAY);
       pdf.text(`[${i+1}] ${PHOTOS[i].caption||'No caption'}`,M,y+s0.dh+5,{maxWidth:BOX_W});
       // Right
       if(s1){
         const x1=M+BOX_W+GAP_X;
-        try{pdf.addImage(PHOTOS[i+1].dataUrl,'JPEG',x1,y,s1.dw,s1.dh);}
-        catch(e){pdf.setFillColor(220,220,220);pdf.rect(x1,y,s1.dw,s1.dh,'F');}
+        if(!PhotoKit.draw(pdf,{src:PHOTOS[i+1].dataUrl,w:PHOTOS[i+1].w,h:PHOTOS[i+1].h,widthCm:PHOTOS[i+1].widthCm,heightCm:PHOTOS[i+1].heightCm},x1+s1.ox,y,s1.dw,s1.dh,{align:'center'}))
+          {pdf.setFillColor(220,220,220);pdf.rect(x1+s1.ox,y,s1.dw,s1.dh,'F');}
         pdf.text(`[${i+2}] ${PHOTOS[i+1].caption||'No caption'}`,x1,y+s1.dh+5,{maxWidth:BOX_W});
       }
       y+=rowH;
@@ -1066,6 +1068,7 @@ buildVisual();
 buildRowspanTable('tbody-temp',TEMP_ROWS);
 buildRowspanTable('tbody-cond',COND_ROWS);
 document.getElementById('env-ac').innerHTML=mkTog('env-ac');
+PhotoKit.configure({maxWcm:8.5,maxHcm:9.5,defaultWcm:8.5,defaultHcm:6.1});  // 2-up 85x95mm boxes
 loadDraft();
 updateStats();
 

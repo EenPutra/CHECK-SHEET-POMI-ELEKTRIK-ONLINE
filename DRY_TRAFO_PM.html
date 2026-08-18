@@ -10,6 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -111,9 +113,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .photo-drop{border:2px dashed var(--bdr);border-radius:8px;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;background:#fff;position:relative;overflow:hidden}
 .photo-drop:hover{border-color:var(--blue);background:var(--bg2)}
 .photo-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.photo-drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:6px}
+.photo-drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#f1f5f9;border-radius:6px}
 .photo-drop .del-btn{position:absolute;top:5px;right:5px;background:rgba(220,38,38,.85);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:13px;display:none;align-items:center;justify-content:center;z-index:5}
-.photo-drop.has-photo .del-btn{display:flex}
+.photo-drop.has-photo .del-btn{display:flex}.photo-drop .pk-crop-btn{position:absolute;top:5px;left:5px;background:rgba(37,99,235,.85);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center;z-index:5}.photo-drop.has-photo .pk-crop-btn{display:flex}.pk-sz{font-size:10px;color:#64748b;text-align:center;margin-top:3px;min-height:12px}
 .photo-icon{font-size:24px;margin-bottom:5px;pointer-events:none}
 .photo-hint{font-size:10px;color:var(--txt4);text-align:center;pointer-events:none;font-family:var(--mono)}
 .photo-cap{width:100%;border:1.5px solid var(--bdr);border-radius:5px;padding:5px 8px;font-size:12px;background:#fff;color:var(--txt);font-family:var(--sans)}
@@ -816,6 +818,7 @@ function styleRemarks(){
 // ── STATS ──────────────────────────────────────────
 const PHOTO_IDS=['pd-megger-hv','pd-megger-lv','pd-etm-disp','pd-etm-lamp','pd-etm-set','pd-before','pd-after'];
 const photoStore={};
+const photoDims={};  // slotId -> {w,h} natural pixels, so the PDF can keep each photo's aspect ratio
 
 function updateStats(){
   const vals=Object.values(ST);
@@ -830,32 +833,63 @@ function updateStats(){
 }
 
 // ── PHOTO UPLOAD ───────────────────────────────────
-function loadPhoto(input,slotId){
-  if(!input.files[0])return;
-  const r=new FileReader();
-  r.onload=e=>{
-    photoStore[slotId]=e.target.result;
-    const slot=document.getElementById(slotId);
-    let img=slot.querySelector('img');
-    if(!img){img=document.createElement('img');slot.appendChild(img);}
-    img.src=e.target.result;
-    slot.classList.add('has-photo');
-    slot.querySelector('.photo-icon').style.display='none';
-    slot.querySelector('.photo-hint').style.display='none';
-    updateStats();
-  };
-  r.readAsDataURL(input.files[0]);
+
+// ── PhotoKit layer ─────────────────────────────────
+// Every photo now goes through PhotoKit: source picker -> EXIF-upright downscale
+// (img-helper) -> crop modal (Default / ratio preset / 1:1 / manual cm) -> an entry
+// that carries both its pixel size and its print size in cm. The PDF then draws it
+// at that exact size with its own aspect ratio, so nothing is ever stretched.
+const PE={};   // slotId -> PhotoKit entry
+function pkEntry(id){
+  const e=PE[id];if(e)return e;
+  const s=photoStore[id];if(!s)return null;
+  const d=(typeof photoDims!=='undefined'&&photoDims[id])||{};
+  return {src:s.src||s,w:d.w||s.w,h:d.h||s.h};
 }
-function delPhoto(slotId,e){
-  e.stopPropagation();
-  const slot=document.getElementById(slotId);
-  const img=slot.querySelector('img');
-  if(img)img.remove();
-  slot.classList.remove('has-photo');
-  slot.querySelector('.photo-icon').style.display='';
-  slot.querySelector('.photo-hint').style.display='';
-  delete photoStore[slotId];
-  updateStats();
+function pkChrome(slot,show){
+  slot.querySelectorAll('.photo-icon,.photo-hint,.photo-drop-icon,.photo-drop-hint').forEach(el=>el.style.display=show?'':'none');
+}
+function setPhoto(id,entry){
+  PE[id]=entry;photoStore[id]=entry.src;photoDims[id]={w:entry.w,h:entry.h};
+  const slot=document.getElementById(id);if(!slot)return;
+  let img=slot.querySelector('img');
+  if(!img){img=document.createElement('img');slot.appendChild(img);}
+  img.src=entry.src;slot.classList.add('has-photo');pkChrome(slot,false);
+  const sz=document.getElementById(id+'-sz');
+  if(sz)sz.textContent='Print '+entry.widthCm.toFixed(1)+' \u00d7 '+entry.heightCm.toFixed(1)+' cm';
+  if(typeof updateStats==='function')updateStats();
+}
+function pickPhoto(slot,id){PhotoKit.upload(slot,{},e=>{if(e)setPhoto(id,e);});}
+function recropPhoto(id,ev){ev.stopPropagation();const cur=pkEntry(id);if(!cur)return;PhotoKit.recrop(cur,e=>{if(e)setPhoto(id,e);});}
+function delPhoto(id,ev){
+  if(ev&&ev.stopPropagation)ev.stopPropagation();
+  const slot=document.getElementById(id);
+  if(slot){const img=slot.querySelector('img');if(img)img.remove();slot.classList.remove('has-photo');pkChrome(slot,true);}
+  const sz=document.getElementById(id+'-sz');if(sz)sz.textContent='';
+  delete photoStore[id];delete photoDims[id]; delete PE[id];
+  if(typeof updateStats==='function')updateStats();
+}
+// Replaces each drop zone's hidden <input type=file> with the PhotoKit picker and
+// adds a re-crop button, so the markup itself needs no per-slot edits.
+function pkWireDrops(){
+  document.querySelectorAll('.photo-drop').forEach(slot=>{
+    if(slot.dataset.pkWired)return;
+    const inp=slot.querySelector('input[type=file]');
+    let id=slot.id;
+    if(inp){const m=(inp.getAttribute('onchange')||'').match(/'([^']+)'/);if(m)id=m[1];inp.remove();}
+    if(!id)return;
+    slot.dataset.pkWired='1';
+    if(!slot.querySelector('.pk-crop-btn')){
+      const b=document.createElement('button');b.type='button';b.className='pk-crop-btn';
+      b.title='Crop & print size';b.innerHTML='&#9986;';
+      b.onclick=ev=>recropPhoto(id,ev);slot.appendChild(b);
+    }
+    slot.addEventListener('click',ev=>{if(ev.target.closest('button'))return;pickPhoto(slot,id);});
+    if(!document.getElementById(id+'-sz')){
+      const s=document.createElement('div');s.className='pk-sz';s.id=id+'-sz';
+      slot.parentNode.insertBefore(s,slot.nextSibling);
+    }
+  });
 }
 
 // ── DRAFT ──────────────────────────────────────────
@@ -1055,10 +1089,14 @@ async function generatePDF(){
   const hasP6=photos6.filter(p=>photoStore[p.id]);
   if(hasP6.length){
     ckY(14);secHdr('Evidence Photos — Item 6');
-    const imgW=(W-M*2)/2-3;const imgH=45;ckY(imgH+14);
-    hasP6.forEach((p,i)=>{const x=M+i*(imgW+3);
+    const imgW=(W-M*2)/2-3;const maxImgH=48;
+    // Fit each photo to the column at its OWN aspect ratio, then size the row to the
+    // tallest result — passing imgW/imgH straight to addImage() stretched the photo.
+    const fits=hasP6.map(p=>PhotoKit.fit(pkEntry(p.id),imgW,maxImgH));
+    const imgH=Math.max(...fits.map(f=>f.h));ckY(imgH+14);
+    hasP6.forEach((p,i)=>{const x=M+i*(imgW+3);const f=fits[i];
       pdf.setFont('NotoSans','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
-      try{pdf.addImage(photoStore[p.id],'JPEG',x,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
+      PhotoKit.draw(pdf,pkEntry(p.id),x+f.dx,y+7,f.w,f.h,{align:'center'});
       const cap=v(p.cap);if(cap){pdf.setFont('NotoSans','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
     });y+=imgH+18;
   }
@@ -1090,10 +1128,14 @@ async function generatePDF(){
   const hasP9=photos9.filter(p=>photoStore[p.id]);
   if(hasP9.length){
     ckY(14);secHdr('Evidence Photos — Item 9');
-    const imgW=(W-M*2)/2-3;const imgH=45;ckY(imgH+14);
-    hasP9.forEach((p,i)=>{const x=M+i*(imgW+3);
+    const imgW=(W-M*2)/2-3;const maxImgH=48;
+    // Fit each photo to the column at its OWN aspect ratio, then size the row to the
+    // tallest result — passing imgW/imgH straight to addImage() stretched the photo.
+    const fits=hasP9.map(p=>PhotoKit.fit(pkEntry(p.id),imgW,maxImgH));
+    const imgH=Math.max(...fits.map(f=>f.h));ckY(imgH+14);
+    hasP9.forEach((p,i)=>{const x=M+i*(imgW+3);const f=fits[i];
       pdf.setFont('NotoSans','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
-      try{pdf.addImage(photoStore[p.id],'JPEG',x,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
+      PhotoKit.draw(pdf,pkEntry(p.id),x+f.dx,y+7,f.w,f.h,{align:'center'});
       const cap=v(p.cap);if(cap){pdf.setFont('NotoSans','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
     });y+=imgH+18;
   }
@@ -1106,9 +1148,12 @@ async function generatePDF(){
     ['TRIP','200°C',v('etm-trip')+'°C',gT('tog-trip')],
   ]);
   if(photoStore['pd-etm-set']){
-    const imgW=70;const imgH=52;ckY(imgH+16);
+    // Single photo: 70x52 was a fixed box; fit inside it instead so the shot keeps
+    // its own proportions.
+    const etmFit=PhotoKit.fit(pkEntry('pd-etm-set'),70,52);
+    const imgW=etmFit.w;const imgH=etmFit.h;ckY(imgH+16);
     pdf.setFont('NotoSans','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text('ETM Setting Display',M,y+5);
-    try{pdf.addImage(photoStore['pd-etm-set'],'JPEG',M,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
+    PhotoKit.draw(pdf,pkEntry('pd-etm-set'),M,y+7,imgW,imgH,{align:'center'});  // imgW/imgH already aspect-correct
     const cap=v('cap-etm-set');if(cap){pdf.setFont('NotoSans','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),M,y+7+imgH+4);}
     y+=imgH+18;
   }
@@ -1130,10 +1175,14 @@ async function generatePDF(){
   const hasP12=photos12.filter(p=>photoStore[p.id]);
   if(hasP12.length){
     ckY(14);secHdr('Evidence Photos — Item 12 (Before & After Cleaning)');
-    const imgW=(W-M*2)/2-3;const imgH=55;ckY(imgH+14);
-    hasP12.forEach((p,i)=>{const x=M+i*(imgW+3);
+    const imgW=(W-M*2)/2-3;const maxImgH=58;
+    // Fit each photo to the column at its OWN aspect ratio, then size the row to the
+    // tallest result — passing imgW/imgH straight to addImage() stretched the photo.
+    const fits=hasP12.map(p=>PhotoKit.fit(pkEntry(p.id),imgW,maxImgH));
+    const imgH=Math.max(...fits.map(f=>f.h));ckY(imgH+14);
+    hasP12.forEach((p,i)=>{const x=M+i*(imgW+3);const f=fits[i];
       pdf.setFont('NotoSans','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
-      try{pdf.addImage(photoStore[p.id],'JPEG',x,y+7,imgW,imgH,undefined,'MEDIUM');}catch(e){}
+      PhotoKit.draw(pdf,pkEntry(p.id),x+f.dx,y+7,f.w,f.h,{align:'center'});
       const cap=v(p.cap);if(cap){pdf.setFont('NotoSans','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
     });y+=imgH+18;
   }
@@ -1165,6 +1214,8 @@ async function generatePDF(){
 // ── INIT ───────────────────────────────────────────
 buildToggles();
 styleRemarks();
+PhotoKit.configure({maxWcm:9.2,maxHcm:20,defaultWcm:9.2,defaultHcm:6.5});
+pkWireDrops();
 loadDraft();
 updateStats();
 

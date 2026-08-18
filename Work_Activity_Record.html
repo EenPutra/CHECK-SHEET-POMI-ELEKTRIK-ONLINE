@@ -7,6 +7,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <style>
 /* ═══════════════════════════════ VARIABLES ══════════════════════════════ */
 :root{
@@ -725,6 +727,7 @@ function renderImgBlock(b,i){
         <button class="photo-sz ${sz==='s'?'active':''}" onclick="setPhotoSize(${i},${pi},'s')" title="Small — 3/row">S</button>
         <button class="photo-sz ${sz==='m'?'active':''}" onclick="setPhotoSize(${i},${pi},'m')" title="Medium — 2/row">M</button>
         <button class="photo-sz ${sz==='l'?'active':''}" onclick="setPhotoSize(${i},${pi},'l')" title="Large — full width">L</button>
+        <button class="photo-edit" onclick="recropBlockPhoto(${i},${pi})" title="Crop & print size">✂️ Crop</button>
         <button class="photo-edit" onclick="openPhotoEditor(${i},${pi})" title="Edit photo">✏️ Edit</button>
         <button class="photo-del" onclick="removePhoto(${i},${pi})">✕</button>
       </div>
@@ -734,8 +737,7 @@ function renderImgBlock(b,i){
     </div>`;
   }).join('');
 
-  const addBtn=`<div class="photo-add-btn">
-    <input type="file" accept="image/*" multiple onchange="onAddPhotos(${i},this)">
+  const addBtn=`<div class="photo-add-btn" onclick="onAddPhotos(${i},this)">
     ➕ Add Photo
   </div>`;
 
@@ -899,20 +901,25 @@ function normalizeImgOrientation(dataUrl){
 }
 
 // ── FILE HANDLERS ────────────────────────────────
-function onAddPhotos(blockIdx,inp){
-  const files=Array.from(inp.files);if(!files.length)return;
-  let pending=0;
-  files.forEach(f=>{
-    if(f.size>15*1024*1024){showNotice('File terlalu besar (maks 15 MB): '+f.name,'err');return;}
-    pending++;
-    const r=new FileReader();
-    r.onload=async e=>{
-      const fixedSrc=await normalizeImgOrientation(e.target.result);
-      BLOCKS[blockIdx].photos.push({src:fixedSrc,filename:f.name,caption:'',size:'m',full:false});
-      pending--;
-      if(pending===0)renderBlocks();
-    };
-    r.readAsDataURL(f);
+function onAddPhotos(blockIdx,el){
+  // PhotoKit: source picker -> EXIF-upright downscale (img-helper) -> crop modal.
+  // The chosen print size in cm rides on the photo and overrides the S/M/L box in
+  // the PDF, which is still fitted to the photo's own aspect ratio either way.
+  PhotoKit.upload(el,{multiple:true},entry=>{
+    if(!entry)return;
+    BLOCKS[blockIdx].photos.push({src:entry.src,w:entry.w,h:entry.h,
+      widthCm:entry.widthCm,heightCm:entry.heightCm,
+      filename:entry.filename||'photo.jpg',caption:'',size:'m',full:false});
+    renderBlocks();
+  });
+}
+
+function recropBlockPhoto(blockIdx,photoIdx){
+  const p=BLOCKS[blockIdx].photos[photoIdx];if(!p)return;
+  PhotoKit.recrop(p,e=>{
+    if(!e)return;
+    p.src=e.src;p.w=e.w;p.h=e.h;p.widthCm=e.widthCm;p.heightCm=e.heightCm;
+    renderBlocks();
   });
 }
 function removePhoto(blockIdx,photoIdx){
@@ -1370,27 +1377,25 @@ async function generatePDF(){
       if(cur.length)rows.push(cur);
 
       for(const row of rows){
-        const infos=await Promise.all(row.map(({p})=>getImgInfo(p.src)));
+        // Prefer the dimensions captured at upload; fall back to measuring for
+        // photos restored from an older draft that predates them.
+        const infos=await Promise.all(row.map(({p})=>(p.w&&p.h)?Promise.resolve({w:p.w,h:p.h}):getImgInfo(p.src)));
         const maxH=row[0].p.size==='s'?42:row[0].p.size==='l'?95:65;
-        // Row height = smallest constrained height across cells
-        let rowH=maxH;
-        row.forEach(({p,frac},i)=>{
-          const cellW=frac*CW-1;
-          const asp=infos[i].w/infos[i].h||1;
-          rowH=Math.min(rowH,Math.min(maxH,cellW/asp));
-        });
-        rowH=Math.max(rowH,10);
+        // Each cell is sized by PhotoKit: the crop modal's cm capped by the cell
+        // and by the S/M/L box, always at the photo's own aspect ratio. The row is
+        // as tall as its tallest photo, so nothing is squashed to match a neighbour.
+        const dims=row.map(({p,frac},i)=>PhotoKit.fit(
+          {src:p.src,w:infos[i].w,h:infos[i].h,widthCm:p.widthCm,heightCm:p.heightCm},
+          frac*CW-1, maxH));
+        let rowH=Math.max(10,...dims.map(d=>d.h));
         const hasCap=row.some(({p})=>p.caption);
         checkY(rowH+(hasCap?8:3));
         let rx=M;
         row.forEach(({p,frac},i)=>{
           const cellW=frac*CW;
-          const asp=infos[i].w/infos[i].h||1;
-          let iw=Math.min(cellW-1,rowH*asp);
-          let ih=iw/asp;
-          if(ih>rowH){ih=rowH;iw=ih*asp;}
+          const iw=dims[i].w, ih=dims[i].h;
           const ix=rx+(cellW-iw)/2;
-          try{pdf.addImage(p.src,p.src.startsWith('data:image/png')?'PNG':'JPEG',ix,y,iw,ih);}catch{}
+          PhotoKit.draw(pdf,{src:p.src,w:infos[i].w,h:infos[i].h,widthCm:p.widthCm,heightCm:p.heightCm},ix,y,iw,ih,{align:'center'});
           if(p.caption){
             pdf.setFont('helvetica','italic');pdf.setFontSize(6);pdf.setTextColor(...GRAY);
             pdf.text(p.caption,rx+cellW/2,y+rowH+4.5,{align:'center',maxWidth:cellW-2});
@@ -1540,6 +1545,7 @@ function printPage(){
 
 document.getElementById('wo-date').value=new Date().toISOString().split('T')[0];
 syncPrint();
+PhotoKit.configure({maxWcm:17,maxHcm:9.5,defaultWcm:8.5,defaultHcm:6.5});  // A4 portrait content width
 loadDraft();
 </script>
 </body>

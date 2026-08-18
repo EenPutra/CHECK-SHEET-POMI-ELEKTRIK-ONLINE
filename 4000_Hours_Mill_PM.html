@@ -9,6 +9,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -333,7 +335,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <div class="sec-body">
       <div class="photo-upload-area">
-        <div class="photo-drop" onclick="document.getElementById('photo-input-pvr').click()"
+        <div class="photo-drop" onclick="pickPhotos('pvr',this)"
              ondragover="event.preventDefault();this.style.borderColor='var(--blue)'"
              ondragleave="this.style.borderColor=''"
              ondrop="event.preventDefault();this.style.borderColor='';onAddPhotos('pvr',{files:event.dataTransfer.files})">
@@ -391,7 +393,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <div class="sec-body">
       <div class="photo-upload-area">
-        <div class="photo-drop" onclick="document.getElementById('photo-input-fdr500').click()"
+        <div class="photo-drop" onclick="pickPhotos('fdr500',this)"
              ondragover="event.preventDefault();this.style.borderColor='var(--blue)'"
              ondragleave="this.style.borderColor=''"
              ondrop="event.preventDefault();this.style.borderColor='';onAddPhotos('fdr500',{files:event.dataTransfer.files})">
@@ -451,7 +453,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <div class="sec-body">
       <div class="photo-upload-area">
-        <div class="photo-drop" onclick="document.getElementById('photo-input-fdr501').click()"
+        <div class="photo-drop" onclick="pickPhotos('fdr501',this)"
              ondragover="event.preventDefault();this.style.borderColor='var(--blue)'"
              ondragleave="this.style.borderColor=''"
              ondrop="event.preventDefault();this.style.borderColor='';onAddPhotos('fdr501',{files:event.dataTransfer.files})">
@@ -509,7 +511,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <div class="sec-body">
       <div class="photo-upload-area">
-        <div class="photo-drop" onclick="document.getElementById('photo-input-p700').click()"
+        <div class="photo-drop" onclick="pickPhotos('p700',this)"
              ondragover="event.preventDefault();this.style.borderColor='var(--blue)'"
              ondragleave="this.style.borderColor=''"
              ondrop="event.preventDefault();this.style.borderColor='';onAddPhotos('p700',{files:event.dataTransfer.files})">
@@ -567,7 +569,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <div class="sec-body">
       <div class="photo-upload-area">
-        <div class="photo-drop" onclick="document.getElementById('photo-input-htr700').click()"
+        <div class="photo-drop" onclick="pickPhotos('htr700',this)"
              ondragover="event.preventDefault();this.style.borderColor='var(--blue)'"
              ondragleave="this.style.borderColor=''"
              ondrop="event.preventDefault();this.style.borderColor='';onAddPhotos('htr700',{files:event.dataTransfer.files})">
@@ -1334,23 +1336,27 @@ function normalizeImgOrientation(dataUrl){
 // ═══════════════════════════════════════════════════
 //  PHOTO GALLERY (one array per asset sheet, keyed by ASSET_DEFS[i].key)
 // ═══════════════════════════════════════════════════
-function onAddPhotos(key, inp){
-  const files = Array.from(inp.files||[]); if(!files.length) return;
+function pickPhotos(key, el){
+  // Source picker -> EXIF-upright downscale (img-helper) -> crop modal, per asset
+  // tab. Photos stay in that tab's own array, and each entry carries the print
+  // size in cm the PDF will draw it at, at its own aspect ratio.
   if(!PHOTOS[key]) PHOTOS[key] = [];
-  let pending = 0;
-  files.forEach(f => {
-    if(f.size > 20*1024*1024){showNote('File terlalu besar (maks 20 MB): '+f.name,'err');return;}
-    pending++;
-    const r = new FileReader();
-    r.onload = async e => {
-      const fixed = await normalizeImgOrientation(e.target.result);
-      PHOTOS[key].push({src:fixed, caption:''});
-      pending--;
-      if(pending===0) renderPhotos(key);
-    };
-    r.readAsDataURL(f);
+  PhotoKit.upload(el,{multiple:true},entry=>{
+    if(!entry)return;
+    entry.caption='';
+    PHOTOS[key].push(entry);
+    renderPhotos(key);
   });
-  inp.value = '';
+}
+
+function recropPhotoAt(key, idx){
+  const cur=(PHOTOS[key]||[])[idx];if(!cur)return;
+  PhotoKit.recrop(cur,e=>{
+    if(!e)return;
+    e.caption=cur.caption||'';
+    PHOTOS[key][idx]=e;      // replace in place so order and captions do not shift
+    renderPhotos(key);
+  });
 }
 
 function renderPhotos(key){
@@ -1369,7 +1375,9 @@ function renderPhotos(key){
         <span style="font-size:10px;color:var(--txt4);font-family:var(--mono)">Foto ${i+1}</span>
         <button class="p-btn" onclick="rotatePhoto('${key}',${i},-90)" title="Putar kiri">↺</button>
         <button class="p-btn" onclick="rotatePhoto('${key}',${i},90)" title="Putar kanan">↻</button>
+        <button class="p-btn" onclick="recropPhotoAt('${key}',${i})" title="Crop &amp; ukuran cetak">✂ Crop</button>
         <button class="p-btn del" onclick="removePhoto('${key}',${i})" title="Hapus">✕ Hapus</button>
+        <span style="font-size:10px;color:var(--txt4);font-family:var(--mono)">${p.widthCm?('cetak '+p.widthCm.toFixed(1)+'×'+p.heightCm.toFixed(1)+' cm'):''}</span>
       </div>
       <input class="photo-cap" type="text" placeholder="Caption / keterangan foto ${i+1}..."
         value="${p.caption.replace(/"/g,'&quot;')}" oninput="PHOTOS['${key}'][${i}].caption=this.value">
@@ -1390,6 +1398,10 @@ function rotatePhoto(key, idx, deg){
     ctx.rotate(deg*Math.PI/180);
     ctx.drawImage(img, -W/2, -H/2);
     PHOTOS[key][idx].src = cv.toDataURL('image/jpeg', 0.92);
+    PHOTOS[key][idx].w = cv.width;   // rotating swaps the axes — keep w/h in step
+    PHOTOS[key][idx].h = cv.height;  // or the PDF would size it to the old ratio
+    const pr=PHOTOS[key][idx];
+    if(swap && pr.widthCm && pr.heightCm){ const t=pr.widthCm; pr.widthCm=pr.heightCm; pr.heightCm=t; }
     renderPhotos(key);
   };
   img.src = PHOTOS[key][idx].src;
@@ -1634,6 +1646,7 @@ ASSET_DEFS.forEach(a => {
   if(a.kind==='hv') MEG_ROWS.forEach(r => updateMeggerChart(a.key, r.key));
 });
 document.getElementById('wo-date').value = new Date().toISOString().split('T')[0];
+PhotoKit.configure({maxWcm:9,maxHcm:18,defaultWcm:9,defaultHcm:5.2});  // 2-up grid on portrait A4
 loadDraft();
 updateStats();
 
@@ -1827,24 +1840,27 @@ async function generatePDF(){
       pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(10.5);
       pdf.text(tag+'  —  Photo Documentation', M+3, y+5.5);
       y += 11;
-      const PW=(CW-6)/2, PH=48;
-      let col=0, rowY=y;
-      for(let i=0;i<assetPhotos.length;i++){
-        if(col===0){ checkY(PH+8); rowY=y; }
-        const px = M + col*(PW+6);
-        try{
-          const fmt = assetPhotos[i].src.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-          pdf.addImage(assetPhotos[i].src, fmt, px, rowY, PW, PH);
-        }catch(e){}
-        pdf.setDrawColor(...LINE); pdf.setLineWidth(0.2); pdf.rect(px,rowY,PW,PH,'D');
-        if(assetPhotos[i].caption){
-          pdf.setFont('helvetica','italic'); pdf.setFontSize(7); pdf.setTextColor(100,116,139);
-          pdf.text(assetPhotos[i].caption, px+1, rowY+PH+3.5, {maxWidth:PW-2});
-        }
-        col++;
-        if(col===2){ col=0; y=rowY+PH+8; }
+      // Two photos per row. Each is fitted to the column at its OWN aspect ratio
+      // and the row takes the height of the taller one — feeding PW/PH straight to
+      // addImage() is what used to squash portrait shots out of shape.
+      const PW=(CW-6)/2, PH_MAX=52;
+      for(let i=0;i<assetPhotos.length;i+=2){
+        const pair = assetPhotos.slice(i,i+2);
+        const fits = pair.map(p=>PhotoKit.fit(p,PW,PH_MAX));
+        const rowH = Math.max(...fits.map(f=>f.h));
+        checkY(rowH+8);
+        const rowY = y;
+        pair.forEach((p,ci)=>{
+          const px = M + ci*(PW+6), f = fits[ci];
+          PhotoKit.draw(pdf, p, px+f.dx, rowY, f.w, f.h, {align:'center'});
+          pdf.setDrawColor(...LINE); pdf.setLineWidth(0.2); pdf.rect(px+f.dx,rowY,f.w,f.h,'D');
+          if(p.caption){
+            pdf.setFont('helvetica','italic'); pdf.setFontSize(7); pdf.setTextColor(100,116,139);
+            pdf.text(p.caption, px+1, rowY+rowH+3.5, {maxWidth:PW-2});
+          }
+        });
+        y = rowY + rowH + 8;
       }
-      if(col===1) y = rowY+PH+8;
     }
   }
 

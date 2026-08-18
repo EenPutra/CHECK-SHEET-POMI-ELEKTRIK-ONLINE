@@ -9,6 +9,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -388,7 +390,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   </div>
   <div class="sec-body">
     <div class="photo-upload-area">
-      <div class="photo-drop" onclick="document.getElementById('photo-input').click()"
+      <div class="photo-drop" onclick="pickPhotos(this)"
            ondragover="event.preventDefault();this.style.borderColor='var(--blue)'"
            ondragleave="this.style.borderColor=''"
            ondrop="event.preventDefault();this.style.borderColor='';onAddPhotos({files:event.dataTransfer.files})">
@@ -771,7 +773,7 @@ function saveDraft(){
     localStorage.setItem('lv_motor_mcc_draft', JSON.stringify(d));
     // Photos stored separately to avoid exceeding localStorage limit
     try{
-      localStorage.setItem('lv_motor_mcc_photos', JSON.stringify(PHOTOS.map(p=>({src:p.src,caption:p.caption}))));
+      localStorage.setItem('lv_motor_mcc_photos', JSON.stringify(PHOTOS.map(p=>({src:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm}))));
     }catch(e){}
     showNote('💾 Draft tersimpan.', 'ok');
   }catch(e){ showNote('❌ Gagal simpan draft: '+e.message, 'err'); }
@@ -1091,15 +1093,19 @@ async function generatePDF(){
     // Pre-load all images to get natural dimensions
     const imgInfoArr = await Promise.all(PHOTOS.map(p => new Promise(res => {
       const im = new Image();
-      im.onload = () => res({src:p.src, nw:im.naturalWidth, nh:im.naturalHeight, caption:p.caption||''});
+      if(p.w && p.h){ res({src:p.src, nw:p.w, nh:p.h, caption:p.caption||'', widthCm:p.widthCm, heightCm:p.heightCm}); return; }
+      im.onload = () => res({src:p.src, nw:im.naturalWidth, nh:im.naturalHeight, caption:p.caption||'', widthCm:p.widthCm, heightCm:p.heightCm});
       im.onerror = () => res(null);
       im.src = p.src;
     })));
     const validImgs = imgInfoArr.filter(Boolean);
 
-    function fitImg(nw,nh,maxW,maxH){
-      const scale = Math.min(maxW/nw, maxH/nh);
-      return {w:nw*scale, h:nh*scale};
+    // Aspect-ratio-preserving fit, shared with every other check sheet so photos
+    // are sized identically everywhere (see img-helper.js).
+    // Size comes from the crop modal's cm, capped to the column, aspect kept.
+    function fitImg(p,maxW,maxH){
+      const f = PhotoKit.fit({src:p.src,w:p.nw,h:p.nh,widthCm:p.widthCm,heightCm:p.heightCm}, maxW, maxH);
+      return {w:f.w, h:f.h};
     }
 
     const COL_W = (CW - 5) / 2; // 2 columns with 5mm gap
@@ -1109,8 +1115,8 @@ async function generatePDF(){
     for(let i=0; i<validImgs.length; i+=2){
       const p1 = validImgs[i];
       const p2 = validImgs[i+1] || null;
-      const f1 = fitImg(p1.nw, p1.nh, COL_W, MAX_H);
-      const f2 = p2 ? fitImg(p2.nw, p2.nh, COL_W, MAX_H) : null;
+      const f1 = fitImg(p1, COL_W, MAX_H);
+      const f2 = p2 ? fitImg(p2, COL_W, MAX_H) : null;
       const rowImgH = Math.max(f1.h, f2 ? f2.h : 0);
       const rowTotalH = rowImgH + CAP_H + 4;
 
@@ -1123,7 +1129,7 @@ async function generatePDF(){
       // Image 1 — centered in cell
       const x1off = (COL_W - f1.w) / 2;
       const y1off = (rowImgH - f1.h) / 2;
-      try{ pdf.addImage(p1.src, 'JPEG', M + x1off, y + 1 + y1off, f1.w, f1.h); }catch(e){}
+      PhotoKit.draw(pdf, {src:p1.src,w:p1.nw,h:p1.nh,widthCm:p1.widthCm,heightCm:p1.heightCm}, M + x1off, y + 1 + y1off, f1.w, f1.h, {align:'center'});
 
       // Caption 1
       pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(...GR);
@@ -1137,7 +1143,7 @@ async function generatePDF(){
         pdf.roundedRect(x2, y, COL_W, rowImgH+2, 1, 1, 'FD');
         const x2off = (COL_W - f2.w) / 2;
         const y2off = (rowImgH - f2.h) / 2;
-        try{ pdf.addImage(p2.src, 'JPEG', x2 + x2off, y + 1 + y2off, f2.w, f2.h); }catch(e){}
+        PhotoKit.draw(pdf, {src:p2.src,w:p2.nw,h:p2.nh,widthCm:p2.widthCm,heightCm:p2.heightCm}, x2 + x2off, y + 1 + y2off, f2.w, f2.h, {align:'center'});
         const cap2 = p2.caption || ('Foto '+(i+2));
         pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(...GR);
         pdf.text(cap2, x2 + COL_W/2, y + rowImgH + 7, {align:'center', maxWidth:COL_W});
@@ -1280,22 +1286,50 @@ function normalizeImgOrientation(dataUrl){
 // ═══════════════════════════════════════════════════
 let PHOTOS = []; // [{src, caption}]
 
-function onAddPhotos(inp){
-  const files = Array.from(inp.files||[]); if(!files.length) return;
-  let pending = 0;
-  files.forEach(f => {
-    if(f.size > 20*1024*1024){showNote('File terlalu besar (maks 20 MB): '+f.name,'err');return;}
-    pending++;
-    const r = new FileReader();
-    r.onload = async e => {
-      const fixed = await normalizeImgOrientation(e.target.result);
-      PHOTOS.push({src:fixed, caption:''});
-      pending--;
-      if(pending===0) renderPhotos();
-    };
-    r.readAsDataURL(f);
+function pickPhotos(el){
+  // Source picker -> EXIF-upright downscale (img-helper) -> crop modal, one photo
+  // at a time. The entry keeps its pixel size AND its print size in cm, which is
+  // what the PDF draws it at -- always at its own aspect ratio.
+  PhotoKit.upload(el,{multiple:true},entry=>{
+    if(!entry)return;
+    entry.caption='';
+    PHOTOS.push(entry);
+    renderPhotos();
   });
-  inp.value = '';
+}
+
+function recropPhotoAt(idx){
+  const cur=PHOTOS[idx];if(!cur)return;
+  PhotoKit.recrop(cur,e=>{
+    if(!e)return;
+    e.caption=cur.caption||'';
+    PHOTOS[idx]=e;          // replace in place: order and caption must not shift
+    renderPhotos();
+  });
+}
+
+function rotatePhoto(idx, deg){
+  const img = new Image();
+  img.onload = () => {
+    const W=img.naturalWidth, H=img.naturalHeight;
+    const norm = ((deg%360)+360)%360;
+    const swap = norm===90||norm===270;
+    const cv = document.createElement('canvas');
+    cv.width = swap?H:W; cv.height = swap?W:H;
+    const ctx = cv.getContext('2d');
+    ctx.translate(cv.width/2, cv.height/2);
+    ctx.rotate(deg*Math.PI/180);
+    ctx.drawImage(img, -W/2, -H/2);
+    PHOTOS[idx].src = cv.toDataURL('image/jpeg', 0.92);
+    // A quarter turn swaps the axes: the stored pixel size and the print size in
+    // cm have to swap with it, or the PDF keeps drawing the pre-rotation shape.
+    PHOTOS[idx].w = cv.width; PHOTOS[idx].h = cv.height;
+    if(swap && PHOTOS[idx].widthCm && PHOTOS[idx].heightCm){
+      const t=PHOTOS[idx].widthCm; PHOTOS[idx].widthCm=PHOTOS[idx].heightCm; PHOTOS[idx].heightCm=t;
+    }
+    renderPhotos();
+  };
+  img.src = PHOTOS[idx].src;
 }
 
 function renderPhotos(){
@@ -1315,7 +1349,9 @@ function renderPhotos(){
         <span style="font-size:10px;color:var(--txt4);font-family:var(--mono)">Foto ${i+1}</span>
         <button class="p-btn" onclick="rotatePhoto(${i},-90)" title="Putar kiri">↺</button>
         <button class="p-btn" onclick="rotatePhoto(${i},90)" title="Putar kanan">↻</button>
+        <button class="p-btn" onclick="recropPhotoAt(${i})" title="Crop &amp; ukuran cetak">✂ Crop</button>
         <button class="p-btn del" onclick="removePhoto(${i})" title="Hapus">✕ Hapus</button>
+        <span style="font-size:10px;color:var(--txt4);font-family:var(--mono)">${p.widthCm?('Cetak '+p.widthCm.toFixed(1)+' × '+p.heightCm.toFixed(1)+' cm'):''}</span>
       </div>
       <input class="photo-cap" type="text" placeholder="Caption / keterangan foto ${i+1}..."
         value="${p.caption.replace(/"/g,'&quot;')}" oninput="PHOTOS[${i}].caption=this.value">
@@ -1323,23 +1359,6 @@ function renderPhotos(){
   `).join('');
 }
 
-function rotatePhoto(idx, deg){
-  const img = new Image();
-  img.onload = () => {
-    const W=img.naturalWidth, H=img.naturalHeight;
-    const norm = ((deg%360)+360)%360;
-    const swap = norm===90||norm===270;
-    const cv = document.createElement('canvas');
-    cv.width = swap?H:W; cv.height = swap?W:H;
-    const ctx = cv.getContext('2d');
-    ctx.translate(cv.width/2, cv.height/2);
-    ctx.rotate(deg*Math.PI/180);
-    ctx.drawImage(img, -W/2, -H/2);
-    PHOTOS[idx].src = cv.toDataURL('image/jpeg', 0.92);
-    renderPhotos();
-  };
-  img.src = PHOTOS[idx].src;
-}
 
 function removePhoto(idx){
   if(!confirm('Hapus foto ini?')) return;
@@ -1419,6 +1438,7 @@ function printPage(){
 //  INIT
 // ═══════════════════════════════════════════════════
 buildTable();
+PhotoKit.configure({maxWcm:9.0,maxHcm:20,defaultWcm:9.0,defaultHcm:6.5});
 loadDraft();
 updateStats();
 </script>

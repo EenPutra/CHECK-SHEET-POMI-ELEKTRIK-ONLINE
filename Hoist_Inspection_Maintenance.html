@@ -9,6 +9,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -249,7 +251,8 @@ input[type=range].esl::-webkit-slider-thumb{-webkit-appearance:none;width:14px;h
   .ct th,.ct td{font-size:10px!important;padding:5px 7px!important}
   .meas-tbl th,.meas-tbl td{font-size:10px!important;padding:4px 6px!important}
   .photo-item{flex:0 0 calc(50% - 6px);break-inside:avoid}
-  .photo-img-wrap img{max-height:140px}
+  /* Print at the size chosen in the crop modal; max-* only, so the ratio is never forced. */
+  .photo-img-wrap img{max-width:var(--pk-w,100%);max-height:var(--pk-h,140px);width:auto;height:auto}
   .photo-cap{border-top:1px solid #dbeafe!important;padding:3px 6px!important;font-size:10px!important}
   .photo-grid{gap:8px;padding:10px}
   .conc-grid{grid-template-columns:1fr 1fr}
@@ -934,7 +937,8 @@ updateStats();
 /* ══════════════════════════════════════════════════
    PHOTO SYSTEM
 ══════════════════════════════════════════════════ */
-let PHOTOS=[]; // [{src,caption}]
+let PHOTOS=[]; // [{src,caption,widthCm,heightCm}] - cm is the print size chosen in the crop modal
+let pendingCrop=null;   // print size of the photo currently in the editor
 
 function triggerAddPhoto(){
   const inp=document.getElementById('photo-file-input');
@@ -946,13 +950,17 @@ function onFileChosen(inp){
   if(!inp.files||!inp.files[0])return;
   const file=inp.files[0];
   if(file.size>30*1024*1024){showNotice('File terlalu besar (maks 30 MB)','err');return;}
-  const reader=new FileReader();
-  reader.onload=e=>{
+  // PhotoKit intake: img-helper downscales and bakes in the EXIF rotation, then
+  // the crop modal frames the shot and fixes its print size in cm. Only after
+  // that does the annotation editor open, so both act on the same photo.
+  PhotoKit.fromFile(file,e=>{
+    inp.value='';
+    if(!e)return;
     editorTargetIdx=null; // new photo
     editorFilename=file.name;
-    openEditorWithSrc(e.target.result);
-  };
-  reader.readAsDataURL(file);
+    pendingCrop={widthCm:e.widthCm,heightCm:e.heightCm};
+    openEditorWithSrc(e.src);
+  });
 }
 
 function renderPhotos(){
@@ -968,13 +976,15 @@ function renderPhotos(){
     item.id='photo-item-'+i;
     item.innerHTML=`
       <div class="photo-img-wrap" onclick="openEditorForEdit(${i})" title="Klik untuk edit foto">
-        <img src="${p.src}" alt="Foto ${i+1}">
+        <img src="${p.src}" alt="Foto ${i+1}" style="${p.widthCm?`--pk-w:${p.widthCm}cm;--pk-h:${p.heightCm}cm`:''}">
       </div>
       <div class="photo-ctrl">
         <button class="p-btn edit-btn" onclick="openEditorForEdit(${i})">✏️ Edit</button>
         <button class="p-btn" onclick="rotatePhotoInPlace(${i},-90)" title="Putar kiri">↺</button>
         <button class="p-btn" onclick="rotatePhotoInPlace(${i},90)" title="Putar kanan">↻</button>
+        <button class="p-btn" onclick="recropPhotoAt(${i})" title="Crop &amp; ukuran cetak">✂ Crop</button>
         <button class="p-btn del" onclick="removePhoto(${i})">✕ Hapus</button>
+        <span style="font-size:10px;color:var(--txt4)">${p.widthCm?('cetak '+p.widthCm.toFixed(1)+'×'+p.heightCm.toFixed(1)+' cm'):''}</span>
       </div>
       <input class="photo-cap" type="text" placeholder="Caption / deskripsi foto..."
         value="${(p.caption||'').replace(/"/g,'&quot;')}"
@@ -984,6 +994,15 @@ function renderPhotos(){
   });
 
   document.getElementById('photo-count-badge').textContent=PHOTOS.length+' foto';
+}
+
+function recropPhotoAt(idx){
+  const p=PHOTOS[idx];if(!p)return;
+  PhotoKit.recrop({src:p.src,widthCm:p.widthCm,heightCm:p.heightCm},e=>{
+    if(!e)return;
+    p.src=e.src;p.widthCm=e.widthCm;p.heightCm=e.heightCm;
+    renderPhotos();
+  });
 }
 
 function removePhoto(idx){
@@ -1289,9 +1308,11 @@ function applyEditor(){
   const dataUrl=outCanvas.toDataURL('image/jpeg',q);
   if(editorTargetIdx!==null){
     PHOTOS[editorTargetIdx].src=dataUrl;
+    if(pendingCrop){PHOTOS[editorTargetIdx].widthCm=pendingCrop.widthCm;PHOTOS[editorTargetIdx].heightCm=pendingCrop.heightCm;}
   }else{
-    PHOTOS.push({src:dataUrl,caption:''});
+    PHOTOS.push({src:dataUrl,caption:'',widthCm:pendingCrop&&pendingCrop.widthCm,heightCm:pendingCrop&&pendingCrop.heightCm});
   }
+  pendingCrop=null;
   renderPhotos();
   closeEditor(true);
 }
@@ -1456,6 +1477,7 @@ function showNotice(msg,type){
 
 /* ── INIT ───────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded',()=>{
+  PhotoKit.configure({maxWcm:8.5,maxHcm:14,defaultWcm:8.5,defaultHcm:6});  // 2-up print layout
   // Set today's date
   const today=new Date().toISOString().split('T')[0];
   document.getElementById('wo-date').value=today;

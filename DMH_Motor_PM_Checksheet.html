@@ -10,6 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -944,24 +946,21 @@ function onUnitChange(){
 // ══════════════════════════════════════════════════
 let ATTACH=[];
 const EVD_MAX_PX=1000,EVD_QUALITY=0.65;
+// Image intake goes through PhotoKit: img-helper downscales and bakes in the EXIF
+// rotation, then the crop modal lets the technician set the print size in cm. The
+// entry carries both, so the PDF never has to force the photo into a fixed box.
 function compressImageFile(file){
   return new Promise(resolve=>{
-    const reader=new FileReader();
-    reader.onload=e=>{
-      const img=new Image();
-      img.onload=()=>{
-        const scale=Math.min(1,EVD_MAX_PX/Math.max(img.naturalWidth,img.naturalHeight));
-        const cv=document.createElement('canvas');
-        cv.width=Math.round(img.naturalWidth*scale);
-        cv.height=Math.round(img.naturalHeight*scale);
-        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
-        resolve(cv.toDataURL('image/jpeg',EVD_QUALITY));
-      };
-      img.onerror=()=>resolve(e.target.result);
-      img.src=e.target.result;
-    };
-    reader.onerror=()=>resolve(null);
-    reader.readAsDataURL(file);
+    PhotoKit.fromFile(file,e=>resolve(e?{dataUrl:e.src,w:e.w,h:e.h,widthCm:e.widthCm,heightCm:e.heightCm}:null));
+  });
+}
+function recropEvd(i){
+  const a=ATTACH[i];
+  if(!a||a.type!=='image'||!a.dataUrl)return;
+  PhotoKit.recrop({src:a.dataUrl,w:a.w,h:a.h,widthCm:a.widthCm,heightCm:a.heightCm},e=>{
+    if(!e)return;
+    a.dataUrl=e.src;a.w=e.w;a.h=e.h;a.widthCm=e.widthCm;a.heightCm=e.heightCm;
+    renderEvdGrid();
   });
 }
 function handleEvdFiles(fileList){
@@ -972,7 +971,8 @@ function handleEvdFiles(fileList){
     if(file.size>15*1024*1024){showNote('❌ '+file.name+' terlalu besar (maks 15MB).','err');return;}
     const entry={id:'evd_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),type:isImg?'image':'pdf',name:file.name,caption:'',dataUrl:null};
     if(isImg){
-      entry.dataUrl=await compressImageFile(file);
+      const prepped=await compressImageFile(file);
+      if(prepped){entry.dataUrl=prepped.dataUrl;entry.w=prepped.w;entry.h=prepped.h;entry.widthCm=prepped.widthCm;entry.heightCm=prepped.heightCm;}
     }
     ATTACH.push(entry);
     renderEvdGrid();
@@ -991,13 +991,14 @@ function renderEvdGrid(){
         ${a.type==='image'&&a.dataUrl?`<img src="${a.dataUrl}" alt="${a.name}">`:`<div class="evd-doc-ico">📄</div>`}
         <span class="evd-order">#${i+1}</span>
         <button class="evd-del" onclick="removeEvd(${i})" title="Remove">✕</button>
+        ${a.type==='image'&&a.dataUrl?`<button class="evd-del" style="left:6px;right:auto;background:rgba(37,99,235,.85)" onclick="recropEvd(${i})" title="Crop &amp; ukuran cetak">✂</button>`:''}
         <div class="evd-move">
           <button onclick="moveEvd(${i},-1)" title="Move up">▲</button>
           <button onclick="moveEvd(${i},1)" title="Move down">▼</button>
         </div>
       </div>
       <div class="evd-body">
-        <div class="evd-name">${a.name}</div>
+        <div class="evd-name">${a.name}${a.widthCm?` <span style="opacity:.7">· cetak ${a.widthCm.toFixed(1)}×${a.heightCm.toFixed(1)} cm</span>`:''}</div>
         <textarea class="evd-cap" placeholder="Keterangan foto/file ini…" oninput="ATTACH[${i}].caption=this.value">${a.caption}</textarea>
       </div>
     </div>
@@ -1394,13 +1395,18 @@ async function generatePDF(){
     secBar('Photo Evidence ('+imgAttach.length+' foto)');
     const COLS=3,GAP=4;
     const PW=(W-M*2-GAP*(COLS-1))/COLS,PH=PW*0.72;
+    // Photos go in a 3-up grid, but each one is FITTED inside its PW x PH cell at
+    // its own aspect ratio and centred there. Handing PW/PH straight to addImage()
+    // is what stretched portrait shots until the text in them was unreadable.
     let col=0,rowY=y;
     imgAttach.forEach((a,i)=>{
       if(col>=COLS){col=0;rowY+=PH+13;}
       if(rowY+PH+13>H-M){nPage();col=0;rowY=y;}
       const px=M+col*(PW+GAP);
-      pdf.setDrawColor(...SKY);pdf.setLineWidth(0.2);pdf.rect(px,rowY,PW,PH);
-      try{pdf.addImage(a.dataUrl,'JPEG',px,rowY,PW,PH);}catch(e){}
+      const f=PhotoKit.fit({src:a.dataUrl,w:a.w,h:a.h,widthCm:a.widthCm,heightCm:a.heightCm},PW,PH);
+      const fx=px+(PW-f.w)/2, fy=rowY+(PH-f.h)/2;
+      pdf.setDrawColor(...SKY);pdf.setLineWidth(0.2);pdf.rect(fx,fy,f.w,f.h);
+      PhotoKit.draw(pdf,{src:a.dataUrl,w:a.w,h:a.h,widthCm:a.widthCm,heightCm:a.heightCm},fx,fy,f.w,f.h,{align:'center'});
       pdf.setFont('helvetica','bold');pdf.setFontSize(6.5);pdf.setTextColor(...NAVY);
       pdf.text('#'+(ATTACH.indexOf(a)+1)+'  '+a.name.slice(0,28),px,rowY+PH+3.5);
       if(a.caption){
@@ -1464,6 +1470,7 @@ buildMtr1y();
 buildCr2y();
 buildMtr3y();
 renderTagLabels();
+PhotoKit.configure({maxWcm:6,maxHcm:18,defaultWcm:6,defaultHcm:4.3});  // 3-up grid on portrait A4
 loadDraft();
 renderEvdGrid();
 document.getElementById('wo-date').value=document.getElementById('wo-date').value||new Date().toISOString().slice(0,10);

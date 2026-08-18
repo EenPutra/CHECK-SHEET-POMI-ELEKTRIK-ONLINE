@@ -85,6 +85,78 @@ This is the part most likely to regress if a check sheet is edited without check
   `7BG-ESP-V1`) kept for compatibility but not linked from the portal — don't treat it as the
   reference implementation.
 
+## Photos: `img-helper.js` + `photo-kit.js` — never size a photo by hand
+
+Every check sheet that takes evidence photos now shares one pipeline. **Do not add a
+`<input type="file">` handler or a `pdf.addImage(dataUrl,'JPEG',x,y,W,H)` call of your own** —
+that is exactly what used to squash photos: jsPDF scales X and Y independently, so a portrait
+phone shot forced into a landscape box came out distorted and the readings in it became
+unreadable.
+
+Two layers, loaded in this order, after `db-helper.js`:
+
+```html
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
+```
+
+- **`img-helper.js` (`window.IMG`)** — low level, no UI. `IMG.read(file,cb)` normalises a picked
+  file (bakes in the EXIF rotation, downscales to 1600px longest edge, re-encodes JPEG, reports
+  the true pixel size); `IMG.fit(boxW,boxH,nat)` is the letterbox maths; `IMG.place(pdf,…)` is an
+  aspect-safe `addImage`; `IMG.measure`/`IMG.ratioOf` recover a ratio for photos with no stored
+  size.
+- **`photo-kit.js` (`window.PhotoKit`)** — the UI and the print size, built ON TOP of `IMG` (it
+  delegates every low-level call to it, so there is one implementation of the maths, not two).
+  Adds the source picker (Camera/Gallery), the crop modal (Default / ratio preset / 1:1 / manual
+  cm) with 90° rotation, and a per-photo print size in cm.
+
+### The contract
+
+A photo is an **entry**: `{src, dataUrl, w, h, widthCm, heightCm, caption}` (`src` and `dataUrl`
+are the same string, so older per-sheet code reading either key keeps working). `w/h` are pixels;
+`widthCm/heightCm` are the size it prints at. On save the cm are snapped to the photo's real
+aspect ratio, so **the label on screen equals what lands in the PDF**.
+
+```js
+PhotoKit.configure({maxWcm:8.8, maxHcm:15, defaultWcm:8.8, defaultHcm:5.6});  // once, at init
+PhotoKit.upload(anchorEl, {multiple:true}, entry => { store(entry); render(); });
+PhotoKit.fromFile(file, entry => { … });       // when the sheet has its own <input>
+PhotoKit.recrop(entry, updated => { … });      // the ✂ button on a thumbnail
+await PhotoKit.prepare(list);                  // fill in w/h for photos from a draft/Firestore
+const d = PhotoKit.fit(entry, boxW, boxH);     // mm it will occupy; d.dx centres it in boxW
+PhotoKit.draw(pdf, entry, x, y, boxW, boxH, {align:'center'});
+```
+
+`PhotoKit.fit()` holds the anti-stretch invariant: the returned width/height **always** keep the
+source aspect ratio, and the chosen cm size is only ever an upper bound (a box the photo is
+fitted and centred into), never a stretch target. A caller therefore cannot distort a photo even
+by passing a box of the wrong shape.
+
+### Rules when touching a sheet's photo code
+
+- `configure()` per sheet, from that sheet's own page + grid geometry: `maxWcm` is the width of
+  the column the photo lands in (a 3-up grid on landscape A4 with M=11 is 8.8cm), `maxHcm` the
+  usable height. `PhotoKit.limitsFromMargins(mx,mtop,mbot,pageW,pageH)` computes the page-level
+  caps when there is no grid.
+- **Rotating a photo 90° must swap `w`/`h` AND `widthCm`/`heightCm`.** A rotate that only rewrites
+  `src` leaves the PDF sizing the photo to its pre-rotation shape (this bug existed in the motor
+  sheets' `rotatePhoto()`).
+- **Drafts and Firestore records must carry `w`, `h`, `widthCm`, `heightCm`.** Saving only
+  `{src, caption}` silently throws away the crop: on reload every photo falls back to the default
+  box (this bug existed in `HV_Motor_SWGR`'s draft save for both `PHOTOS` and `TREND_PHOTOS`).
+- Re-crop must replace the entry **at the same index** (`arr[i] = updated`), never
+  remove-then-push — otherwise the photo jumps to the end of the gallery and the captions, which
+  are indexed, end up attached to the wrong photos.
+- Thumbnails use `object-fit:contain`, not `cover`, so the on-screen preview shows what will
+  print.
+- For a sheet that prints via `window.print()` instead of jsPDF (`Hoist_Inspection_Maintenance`),
+  carry the cm into print CSS as `max-width`/`max-height` custom properties
+  (`--pk-w`/`--pk-h`) with `width:auto;height:auto` — max-only constraints cannot force a ratio.
+
+`Transformer_AT_NoDGA_Weekly.html` (slot-based) and `4000_Hours_Mill_PM.html` (per-tab galleries)
+are the reference integrations. `FITUR_REUSABLE_REFERENCE.md` in this folder is where the crop
+modal's UX rules come from (it documents the same feature set as implemented in another repo).
+
 ## PDF export — direct download, not the browser print dialog
 
 Newer check sheets (starting with `Work_Activity_Record.html`) generate the PDF directly with
@@ -159,6 +231,10 @@ itself, following this same pattern for consistency:
   the letterhead image ever changes.
 
 - **Button label**: "⬇️ Download PDF" calling `generatePDF()`, not "🖨️ Print / Save PDF".
+
+- **Photos inside the PDF**: never call `pdf.addImage()` on an evidence photo directly — use
+  `PhotoKit.draw()`/`PhotoKit.fit()` (see the photo section above). Passing a fixed width/height
+  box to `addImage()` stretches the photo, because jsPDF scales the axes independently.
 
 - **Verifying changes to `generatePDF()`**: `pdf.save()` triggers a real browser download, so it
   can't be checked with a normal print-to-PDF screenshot. To inspect actual output, temporarily
