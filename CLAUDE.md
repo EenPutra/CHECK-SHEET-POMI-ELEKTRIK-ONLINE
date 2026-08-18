@@ -154,7 +154,12 @@ by passing a box of the wrong shape.
   (`--pk-w`/`--pk-h`) with `width:auto;height:auto` — max-only constraints cannot force a ratio.
 
 `Transformer_AT_NoDGA_Weekly.html` (slot-based) and `4000_Hours_Mill_PM.html` (per-tab galleries)
-are the reference integrations. `FITUR_REUSABLE_REFERENCE.md` in this folder is where the crop
+are the reference integrations. `Battery_7EB-BY-125-250.html` / `ESP_7BGPCP800A_B.html` show the
+shape to copy when a sheet has **no** photo feature yet: an "Evidence Photos" panel placed just
+before "Findings & Conclusion", a free-count gallery (`PHOTOS[]` with crop / rotate / delete /
+caption per thumbnail), photos persisted under their own `<draftKey>_photos` localStorage key
+(separate from the draft, so a quota error on the photos cannot take the draft down with it),
+and a matching photo section in `generatePDF()` just before its Findings block. `FITUR_REUSABLE_REFERENCE.md` in this folder is where the crop
 modal's UX rules come from (it documents the same feature set as implemented in another repo).
 
 ## PDF export — direct download, not the browser print dialog
@@ -231,6 +236,12 @@ itself, following this same pattern for consistency:
   the letterhead image ever changes.
 
 - **Button label**: "⬇️ Download PDF" calling `generatePDF()`, not "🖨️ Print / Save PDF".
+
+- **Only ASCII in `pdf.text()` unless the sheet embeds a font**: jsPDF's built-in helvetica/times
+  have no `▶`, so section headers written as `pdf.text('▶  '+title,…)` printed as `%¶` in
+  `Battery_7EB-BY-125-250.html`, `ESP_7BGPCP800A_B.html` and `esp_checksheet.html` — every header
+  on every page. Use `'>'`. Sheets with a `sanitizeText()` helper already strip these; the ones
+  without it must avoid the glyph at the call site.
 
 - **Photos inside the PDF**: never call `pdf.addImage()` on an evidence photo directly — use
   `PhotoKit.draw()`/`PhotoKit.fit()` (see the photo section above). Passing a fixed width/height

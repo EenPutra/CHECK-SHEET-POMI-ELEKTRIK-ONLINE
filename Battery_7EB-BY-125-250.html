@@ -10,6 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -222,6 +224,28 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .print-header strong{font-size:13px;color:var(--navy);font-family:var(--raj);letter-spacing:1px}
 .btn-back{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:1px;text-decoration:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);transition:background .15s;white-space:nowrap;cursor:pointer;flex-shrink:0}
 .btn-back:hover{background:rgba(255,255,255,0.2);color:#fff}
+
+/* ── EVIDENCE PHOTOS (PhotoKit) ───────────────────── */
+.photo-drop{border:2px dashed var(--bdr);border-radius:10px;padding:20px 16px;text-align:center;cursor:pointer;
+  background:var(--bg2);transition:all .2s;margin-bottom:12px}
+.photo-drop:hover{border-color:var(--blue);background:#eaf3ff}
+.photo-drop-ico{font-size:26px;margin-bottom:4px;pointer-events:none}
+.photo-drop-txt{color:var(--txt4);font-size:13px;pointer-events:none}
+.photo-drop-txt strong{color:var(--blue)}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.photo-item{border:1px solid var(--bdr);border-radius:10px;background:var(--surf);overflow:hidden}
+.photo-img-wrap{background:#eef4fb;display:flex;align-items:center;justify-content:center;height:150px}
+.photo-img-wrap img{max-width:100%;max-height:150px;width:auto;height:auto;object-fit:contain;display:block}
+.photo-ctrl{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px 7px;border-top:1px solid var(--bdr2)}
+.p-btn{border:1px solid var(--bdr);background:var(--bg2);color:var(--navy);border-radius:5px;padding:3px 7px;
+  font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
+.p-btn:hover{background:var(--sky2)}
+.p-btn.del{border-color:#fecaca;background:#fee2e2;color:#b91c1c}
+.p-sz{font-size:10px;color:var(--txt4);font-family:var(--mono);margin-left:auto}
+.photo-cap{width:100%;border:none;border-top:1px solid var(--bdr2);padding:6px 8px;font-size:12px;
+  font-family:inherit;color:var(--txt);background:transparent}
+.photo-cap:focus{outline:none;background:var(--bg2)}
+.photo-empty{color:var(--txt4);font-size:12px;text-align:center;padding:10px}
 </style>
 </head>
 <body>
@@ -455,6 +479,24 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   </div>
 </div>
 
+<!-- EVIDENCE PHOTOS -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">&#128247;</div>
+    <div><div class="sec-hdr-title">Evidence Photos</div></div>
+    <span class="sec-hdr-cnt" id="photo-cnt">0 foto</span>
+    <span class="sec-hdr-arrow">&#9660;</span>
+  </div>
+  <div class="sec-body">
+    <div class="photo-drop" onclick="pickPhotos(this)">
+      <div class="photo-drop-ico">&#128247;</div>
+      <div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong><br>
+        <small style="font-size:11px">Kamera atau galeri &middot; bisa banyak sekaligus &middot; crop &amp; ukuran cetak diatur setelah foto dipilih</small></div>
+    </div>
+    <div class="photo-grid" id="photo-grid"></div>
+  </div>
+</div>
+
 <!-- FINDINGS -->
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
@@ -625,11 +667,13 @@ function saveDraft(){
   d._st=ST;
   try{
     localStorage.setItem('battery_7eb_draft',JSON.stringify(d));
+    savePhotoDraft();
     showNote('💾 Draft tersimpan.','ok');
   }catch(e){showNote('❌ Gagal menyimpan: '+e.message,'err');}
 }
 function loadDraft(){
   try{
+    loadPhotoDraft();
     const raw=localStorage.getItem('battery_7eb_draft');
     if(!raw)return;
     const d=JSON.parse(raw);
@@ -650,6 +694,7 @@ function resetForm(){
   if(!confirm('Reset semua data? Tindakan ini tidak dapat dibatalkan.'))return;
   document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file')el.value='';});
   Object.keys(ST).forEach(k=>delete ST[k]);
+  PHOTOS=[];renderPhotos();
   document.querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
   updateStats();
 }
@@ -728,7 +773,9 @@ async function generatePDF(){
     ckY(14);
     pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,7,'F');
     pdf.setTextColor(255,255,255);pdf.setFont('helvetica','bold');pdf.setFontSize(8.5);
-    pdf.text('▶  '+title,M+3,y+5);y+=10;
+    // '▶' is not in jsPDF's standard helvetica and printed as garbage ('%¶')
+    // on every section header; '>' renders correctly in the built-in fonts.
+    pdf.text('>  '+title,M+3,y+5);y+=10;
   }
   function specLine(text){
     pdf.setFillColor(...LT);pdf.rect(M,y,W-M*2,8,'F');
@@ -810,6 +857,33 @@ async function generatePDF(){
     margin:{left:M,right:M}});
   y=pdf.lastAutoTable.finalY+6;
 
+
+  // Evidence photos — each drawn at the size picked in the crop modal, capped to
+  // its column and always at its own aspect ratio. Handing a fixed box to
+  // addImage() is what used to squash photos until the detail in them was lost.
+  if(PHOTOS.length){
+    ckY(18);
+    sectionHdr('Evidence Photos');
+    const PCOLS=2, PGAP=4;
+    const PW=(W-M*2-PGAP*(PCOLS-1))/PCOLS, PH_MAX=80;
+    for(let i=0;i<PHOTOS.length;i+=PCOLS){
+      const row=PHOTOS.slice(i,i+PCOLS);
+      const dims=row.map(p=>PhotoKit.fit(p,PW,PH_MAX));
+      const rowH=Math.max(...dims.map(d=>d.h));
+      const hasCap=row.some(p=>p.caption);
+      ckY(rowH+(hasCap?13:7));
+      row.forEach((p,ci)=>{
+        const px=M+ci*(PW+PGAP);
+        PhotoKit.draw(pdf,p,px,y,PW,rowH,{align:'center'});
+        if(p.caption){
+          pdf.setFont('helvetica','italic');pdf.setFontSize(7);pdf.setTextColor(...GRAY);
+          pdf.text(p.caption,px+PW/2,y+rowH+4,{align:'center',maxWidth:PW-2});
+        }
+      });
+      y+=rowH+(hasCap?12:6);
+    }
+  }
+
   // Findings
   ckY(30);
   sectionHdr('Findings & Conclusion');
@@ -839,7 +913,101 @@ async function generatePDF(){
   showNote('✅ PDF tersimpan: '+fn,'ok');
 }
 
+
+// ── EVIDENCE PHOTOS (PhotoKit) ─────────────────────
+// One shared pipeline with every other check sheet: source picker -> EXIF-upright
+// downscale (img-helper.js) -> crop modal that also fixes the print size in cm.
+// Each entry carries its pixel size AND that cm size, so generatePDF() draws it at
+// exactly that size at its own aspect ratio and can never stretch it.
+let PHOTOS=[];   // [{src,w,h,widthCm,heightCm,caption}]
+
+function pickPhotos(el){
+  PhotoKit.upload(el,{multiple:true},entry=>{
+    if(!entry)return;
+    entry.caption='';
+    PHOTOS.push(entry);
+    renderPhotos();
+  });
+}
+
+function recropPhotoAt(i){
+  const cur=PHOTOS[i];if(!cur)return;
+  PhotoKit.recrop(cur,e=>{
+    if(!e)return;
+    e.caption=cur.caption||'';
+    PHOTOS[i]=e;            // replace in place: order and captions are index-based
+    renderPhotos();
+  });
+}
+
+function rotatePhotoAt(i,deg){
+  const img=new Image();
+  img.onload=()=>{
+    const Wp=img.naturalWidth,Hp=img.naturalHeight;
+    const swap=((deg%360)+360)%360===90||((deg%360)+360)%360===270;
+    const cv=document.createElement('canvas');
+    cv.width=swap?Hp:Wp;cv.height=swap?Wp:Hp;
+    const ctx=cv.getContext('2d');
+    ctx.translate(cv.width/2,cv.height/2);
+    ctx.rotate(deg*Math.PI/180);
+    ctx.drawImage(img,-Wp/2,-Hp/2);
+    const p=PHOTOS[i];
+    p.src=cv.toDataURL('image/jpeg',0.92);
+    p.dataUrl=p.src;
+    p.w=cv.width;p.h=cv.height;   // a quarter turn swaps the axes...
+    if(swap&&p.widthCm&&p.heightCm){const t=p.widthCm;p.widthCm=p.heightCm;p.heightCm=t;}  // ...and the print size with them
+    renderPhotos();
+  };
+  img.src=PHOTOS[i].src;
+}
+
+function removePhotoAt(i){
+  if(!confirm('Hapus foto ini?'))return;
+  PHOTOS.splice(i,1);
+  renderPhotos();
+}
+
+function renderPhotos(){
+  const grid=document.getElementById('photo-grid');
+  if(!grid)return;
+  const cnt=document.getElementById('photo-cnt');
+  if(cnt)cnt.textContent=PHOTOS.length+' foto';
+  if(!PHOTOS.length){grid.innerHTML='<div class="photo-empty">Belum ada foto.</div>';return;}
+  grid.innerHTML=PHOTOS.map((p,i)=>`
+    <div class="photo-item">
+      <div class="photo-img-wrap"><img src="${p.src}" alt="Foto ${i+1}"></div>
+      <div class="photo-ctrl">
+        <button class="p-btn" onclick="recropPhotoAt(${i})" title="Crop &amp; ukuran cetak">&#9986; Crop</button>
+        <button class="p-btn" onclick="rotatePhotoAt(${i},-90)" title="Putar kiri">&#8634;</button>
+        <button class="p-btn" onclick="rotatePhotoAt(${i},90)" title="Putar kanan">&#8635;</button>
+        <button class="p-btn del" onclick="removePhotoAt(${i})" title="Hapus">&#10005;</button>
+        <span class="p-sz">${p.widthCm?p.widthCm.toFixed(1)+'\u00d7'+p.heightCm.toFixed(1)+'cm':''}</span>
+      </div>
+      <input class="photo-cap" type="text" placeholder="Caption / keterangan foto ${i+1}\u2026"
+        value="${(p.caption||'').replace(/"/g,'&quot;')}" oninput="PHOTOS[${i}].caption=this.value">
+    </div>`).join('');
+}
+
+// Photos live in their own localStorage key: they are far bigger than the rest of
+// the draft, and a quota error must not take the whole draft down with it.
+function savePhotoDraft(){
+  try{
+    localStorage.setItem('battery_7eb_draft_photos',JSON.stringify(
+      PHOTOS.map(p=>({src:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm}))));
+  }catch(e){ showNote('\u26a0\ufe0f Draft tersimpan, tapi foto terlalu besar untuk disimpan.','err'); }
+}
+function loadPhotoDraft(){
+  try{
+    const raw=localStorage.getItem('battery_7eb_draft_photos');
+    if(!raw)return;
+    PHOTOS=JSON.parse(raw)||[];
+    renderPhotos();
+  }catch(e){}
+}
+
 // ── INIT ───────────────────────────────────────────
+PhotoKit.configure({maxWcm:9,maxHcm:11,defaultWcm:9,defaultHcm:6.4});  // 2-up grid on portrait A4
+renderPhotos();
 build250();
 build125();
 buildNotes();
