@@ -43,6 +43,54 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .btn-pdf{background:var(--blue);color:#fff}.btn-pdf:hover{background:#1d4ed8}
 .btn-submit{background:#16a34a;color:#fff}.btn-submit:hover{background:#15803d}
 .btn-sm{padding:4px 10px;font-size:12px}
+.btn-outline{background:#fff;border:1.5px solid var(--bdr);color:var(--txt2)}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue)}
+
+/* ── PDF SHEET-SELECTION MODAL ── */
+#pdf-modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.65);z-index:9999;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px}
+#pdf-modal-overlay.show{display:flex}
+.pdfm-box{background:var(--surf);border:1.5px solid var(--bdr);border-radius:14px;padding:0;
+  width:480px;max-width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.25);overflow:hidden}
+.pdfm-hdr{background:linear-gradient(90deg,var(--navy),var(--navy2));padding:16px 22px;
+  display:flex;align-items:center;justify-content:space-between}
+.pdfm-title{font-family:var(--raj);font-size:17px;font-weight:700;color:var(--sky);letter-spacing:2px}
+.pdfm-sub{font-size:11px;color:#9dc4e8;margin-top:2px}
+.pdfm-x{background:none;border:none;color:#9dc4e8;font-size:20px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px}
+.pdfm-body{padding:14px 18px 6px}
+.pdfm-toolrow{display:flex;gap:8px;margin-bottom:12px;align-items:center}
+.pdfm-badge{margin-left:auto;font-family:var(--mono);font-size:12px;color:var(--txt2);
+  background:var(--bg2);padding:3px 10px;border-radius:20px;font-weight:700}
+.pdfm-list{display:flex;flex-direction:column;gap:5px;max-height:360px;overflow-y:auto;padding-right:4px}
+.psl-item{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:8px;
+  border:1.5px solid var(--bdr);background:var(--bg2);cursor:pointer;transition:all .15s;user-select:none}
+.psl-item:hover{border-color:var(--sky)}
+.psl-item.psl-on{border-color:var(--blue);background:#eff6ff}
+.psl-icon{font-size:18px;flex-shrink:0;width:26px;text-align:center}
+.psl-info{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0}
+.psl-name{font-family:var(--raj);font-size:13px;font-weight:700;color:var(--txt);letter-spacing:.5px}
+.psl-desc{font-size:10.5px;color:var(--txt4);font-family:var(--mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.psl-chk{width:22px;height:22px;border-radius:5px;border:2px solid var(--bdr);display:flex;
+  align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--blue);
+  flex-shrink:0;background:#fff;transition:all .15s}
+.psl-item.psl-on .psl-chk{background:var(--blue);border-color:var(--blue);color:#fff}
+.pdfm-ftr{padding:14px 18px 18px;display:flex;gap:10px;justify-content:flex-end;
+  border-top:1px solid var(--bdr2);margin-top:10px}
+
+/* ── PDF PREVIEW MODAL ── */
+#pdf-preview-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.85);z-index:10000;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:14px}
+#pdf-preview-overlay.show{display:flex}
+.pdfp-box{background:var(--surf);border-radius:14px;width:min(920px,100%);height:min(94vh,1200px);
+  display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.35)}
+.pdfp-hdr{background:linear-gradient(90deg,var(--navy),var(--navy2));padding:12px 18px;
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.pdfp-title{font-family:var(--raj);font-size:15px;font-weight:700;color:var(--sky);letter-spacing:1.5px}
+.pdfp-name{font-size:10.5px;color:#9dc4e8;font-family:var(--mono);margin-top:1px}
+.pdfp-frame-wrap{flex:1;background:#525659;min-height:0}
+.pdfp-frame-wrap iframe{width:100%;height:100%;border:none;display:block}
+.pdfp-ftr{padding:10px 18px;display:flex;gap:10px;justify-content:flex-end;
+  border-top:1px solid var(--bdr2);background:var(--bg2)}
 .hero{background:var(--navy);padding:24px 20px 20px;color:#fff}
 .hero-eyebrow{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:3px;
   text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
@@ -152,6 +200,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .notice.err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;display:block}
 .notice.info{background:#dbeafe;border:1px solid #93c5fd;color:#1e40af;display:block}
 .actions{display:flex;flex-wrap:wrap;gap:12px;justify-content:flex-end;padding:20px 0 10px;border-top:1px solid var(--bdr2);margin-top:4px}
+.autosave-ind{
+  align-self:center;font-family:var(--mono);font-size:11px;color:var(--txt4);
+  opacity:0;transition:opacity .3s;white-space:nowrap;
+}
+.autosave-ind.show{opacity:1}
+.autosave-ind.warn{color:#c2410c}
 .footer{background:var(--navy2);padding:14px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:20px}
 .footer span{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px}
 @media(max-width:640px){.tb-sub,.tb-sep{display:none}.wo-grid,.md-grid{grid-template-columns:1fr 1fr}}
@@ -234,7 +288,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <a class="btn-back" href="index.html" title="Back to Portal">&#8592; Portal</a>
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-draft btn-sm" onclick="saveDraft()">💾 Draft</button>
-    <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📥 Download PDF</button>
+    <button class="btn btn-pdf btn-sm" onclick="openPdfModal()">📥 Download PDF</button>
     <button class="btn btn-submit btn-sm" onclick="submitToDb()">🗄️ Submit</button>
   </div>
 </div>
@@ -613,8 +667,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="actions">
   <button class="btn" style="background:var(--navy);color:#fff" onclick="resetForm()">🔄 Reset</button>
   <button class="btn btn-draft" onclick="saveDraft()">💾 Save Draft</button>
-  <button class="btn btn-pdf" onclick="generatePDF()">📥 Download PDF</button>
+  <button class="btn btn-pdf" onclick="openPdfModal()">📥 Download PDF</button>
   <button class="btn btn-submit" style="font-size:14px;padding:8px 24px" onclick="submitToDb()">🗄️ Submit to Database</button>
+  <span class="autosave-ind" id="autosave-indicator"></span>
 </div>
 
 </div>
@@ -623,6 +678,51 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   <span>POMI — 4000 HOURS MILL PM CHECK SHEET</span>
   <span id="doc-id-display"></span>
   <span>Rev. 1.0 · 2026</span>
+</div>
+
+<!-- PDF SHEET-SELECTION MODAL -->
+<div id="pdf-modal-overlay">
+  <div class="pdfm-box">
+    <div class="pdfm-hdr">
+      <div>
+        <div class="pdfm-title">PILIH SHEET PDF</div>
+        <div class="pdfm-sub">Centang sheet yang ingin dimasukkan dalam PDF</div>
+      </div>
+      <button class="pdfm-x" onclick="closePdfModal()">✕</button>
+    </div>
+    <div class="pdfm-body">
+      <div class="pdfm-toolrow">
+        <button onclick="pdfSelectAll()" class="btn btn-outline btn-sm">✅ Pilih Semua</button>
+        <button onclick="pdfClearAll()" class="btn btn-outline btn-sm">☐ Kosongkan</button>
+        <span id="pdf-count-badge" class="pdfm-badge">— sheets</span>
+      </div>
+      <div id="pdf-sheet-list" class="pdfm-list"></div>
+    </div>
+    <div class="pdfm-ftr">
+      <button onclick="closePdfModal()" class="btn btn-outline">Batal</button>
+      <button onclick="generatePDFSelected()" class="btn btn-pdf" style="min-width:150px">👁️ Preview PDF</button>
+    </div>
+  </div>
+</div>
+
+<!-- PDF PRINT PREVIEW MODAL -->
+<div id="pdf-preview-overlay">
+  <div class="pdfp-box">
+    <div class="pdfp-hdr">
+      <div>
+        <div class="pdfp-title">PREVIEW PDF</div>
+        <div class="pdfp-name" id="pdf-preview-name">—</div>
+      </div>
+      <button class="pdfm-x" onclick="closePdfPreview()">✕</button>
+    </div>
+    <div class="pdfp-frame-wrap">
+      <iframe id="pdf-preview-frame" title="PDF preview"></iframe>
+    </div>
+    <div class="pdfp-ftr">
+      <button onclick="pdfPreviewBack()" class="btn btn-outline">← Ubah Pilihan Sheet</button>
+      <button onclick="pdfPreviewDownload()" class="btn btn-pdf" style="min-width:150px">📥 Unduh PDF</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1336,26 +1436,73 @@ function normalizeImgOrientation(dataUrl){
 // ═══════════════════════════════════════════════════
 //  PHOTO GALLERY (one array per asset sheet, keyed by ASSET_DEFS[i].key)
 // ═══════════════════════════════════════════════════
+
+// PhotoKit downscales to a print-sane pixel size but doesn't guarantee a byte
+// cap — a busy/detailed 1600px JPEG can still land over 1MB, and this sheet's
+// Firestore doc stores every photo inline (no separate blob storage), so an
+// oversized photo bloats the whole submission. Recompress anything over the
+// cap by lowering JPEG quality first, then — only if quality alone isn't
+// enough — shrinking the pixel dimensions too, never below a still-legible
+// 480px edge.
+const PHOTO_MAX_BYTES = 950 * 1024;   // ~950KB, safely under the 1MB ask either way it's counted
+function dataUrlBytes(dataUrl){
+  const i = dataUrl.indexOf(',');
+  const b64 = i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
+  return Math.round(b64.length * 3 / 4);
+}
+function compressUnder1MB(dataUrl, w, h){
+  return new Promise(resolve => {
+    if (dataUrlBytes(dataUrl) <= PHOTO_MAX_BYTES) { resolve({ src: dataUrl, w, h }); return; }
+    const img = new Image();
+    img.onload = () => {
+      let cw = w, ch = h, out = dataUrl;
+      const QUALITIES = [0.85, 0.75, 0.65, 0.55, 0.45];
+      for (let pass = 0; pass < 4; pass++) {
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(cw)); cv.height = Math.max(1, Math.round(ch));
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        let fitted = false;
+        for (const q of QUALITIES) {
+          const candidate = cv.toDataURL('image/jpeg', q);
+          out = candidate; cw = cv.width; ch = cv.height;
+          if (dataUrlBytes(candidate) <= PHOTO_MAX_BYTES) { fitted = true; break; }
+        }
+        if (fitted || cw <= 480 || ch <= 480) break;
+        cw = Math.round(cw * 0.8); ch = Math.round(ch * 0.8);   // quality alone wasn't enough — shrink and retry
+      }
+      resolve({ src: out, w: cw, h: ch });
+    };
+    img.onerror = () => resolve({ src: dataUrl, w, h });
+    img.src = dataUrl;
+  });
+}
+
 function pickPhotos(key, el){
   // Source picker -> EXIF-upright downscale (img-helper) -> crop modal, per asset
   // tab. Photos stay in that tab's own array, and each entry carries the print
   // size in cm the PDF will draw it at, at its own aspect ratio.
   if(!PHOTOS[key]) PHOTOS[key] = [];
-  PhotoKit.upload(el,{multiple:true},entry=>{
+  PhotoKit.upload(el,{multiple:true}, async entry=>{
     if(!entry)return;
+    const c = await compressUnder1MB(entry.src, entry.w, entry.h);
+    entry.src = c.src; entry.dataUrl = c.src; entry.w = c.w; entry.h = c.h;
     entry.caption='';
     PHOTOS[key].push(entry);
     renderPhotos(key);
+    autoSaveNow();
   });
 }
 
 function recropPhotoAt(key, idx){
   const cur=(PHOTOS[key]||[])[idx];if(!cur)return;
-  PhotoKit.recrop(cur,e=>{
+  PhotoKit.recrop(cur, async e=>{
     if(!e)return;
+    const c = await compressUnder1MB(e.src, e.w, e.h);
+    e.src = c.src; e.dataUrl = c.src; e.w = c.w; e.h = c.h;
     e.caption=cur.caption||'';
     PHOTOS[key][idx]=e;      // replace in place so order and captions do not shift
     renderPhotos(key);
+    autoSaveNow();
   });
 }
 
@@ -1387,7 +1534,7 @@ function renderPhotos(key){
 
 function rotatePhoto(key, idx, deg){
   const img = new Image();
-  img.onload = () => {
+  img.onload = async () => {
     const W=img.naturalWidth, H=img.naturalHeight;
     const norm = ((deg%360)+360)%360;
     const swap = norm===90||norm===270;
@@ -1397,12 +1544,14 @@ function rotatePhoto(key, idx, deg){
     ctx.translate(cv.width/2, cv.height/2);
     ctx.rotate(deg*Math.PI/180);
     ctx.drawImage(img, -W/2, -H/2);
-    PHOTOS[key][idx].src = cv.toDataURL('image/jpeg', 0.92);
-    PHOTOS[key][idx].w = cv.width;   // rotating swaps the axes — keep w/h in step
-    PHOTOS[key][idx].h = cv.height;  // or the PDF would size it to the old ratio
+    const c = await compressUnder1MB(cv.toDataURL('image/jpeg', 0.92), cv.width, cv.height);
+    PHOTOS[key][idx].src = c.src;
+    PHOTOS[key][idx].w = c.w;   // rotating swaps the axes — keep w/h in step
+    PHOTOS[key][idx].h = c.h;   // or the PDF would size it to the old ratio
     const pr=PHOTOS[key][idx];
     if(swap && pr.widthCm && pr.heightCm){ const t=pr.widthCm; pr.widthCm=pr.heightCm; pr.heightCm=t; }
     renderPhotos(key);
+    autoSaveNow();
   };
   img.src = PHOTOS[key][idx].src;
 }
@@ -1411,22 +1560,66 @@ function removePhoto(key, idx){
   if(!confirm('Hapus foto ini?')) return;
   PHOTOS[key].splice(idx,1);
   renderPhotos(key);
+  autoSaveNow();
 }
 
 // ═══════════════════════════════════════════════════
 //  DRAFT (localStorage — generic sweep of every id'd field)
+//
+//  Uploading a photo (or typing into any field) auto-saves to localStorage —
+//  the technician should never lose work to an accidental refresh just
+//  because they forgot to click "Save Draft" first. Photos are the reason
+//  this matters most (re-shooting/re-uploading is real lost time on site),
+//  so photo actions persist immediately; everything else is debounced so
+//  a burst of keystrokes doesn't spam localStorage writes on every character.
 // ═══════════════════════════════════════════════════
-function saveDraft(){
+function persistDraft(silent){
   const d = { _mill: selectedMillLetter, _st: {...resultState}, _ol: JSON.parse(JSON.stringify(olState)) };
   document.querySelectorAll('input,select,textarea').forEach(el => {
     if(el.id && el.value && el.type !== 'file') d['f_'+el.id] = el.value;
   });
   try{
     localStorage.setItem('mill4000h_draft', JSON.stringify(d));
-    try{ localStorage.setItem('mill4000h_photos', JSON.stringify(PHOTOS)); }catch(e){}
-    showNote('💾 Draft tersimpan.', 'ok');
-  }catch(e){ showNote('❌ Gagal simpan draft: '+e.message, 'err'); }
+  }catch(e){
+    if(silent) console.error('Auto-save gagal:', e); else showNote('❌ Gagal simpan draft: '+e.message, 'err');
+    return;
+  }
+  let photoErr = null;
+  try{ localStorage.setItem('mill4000h_photos', JSON.stringify(PHOTOS)); }
+  catch(e){ photoErr = e; }
+  if(silent) flashAutosaveIndicator(photoErr);
+  else showNote(photoErr
+    ? '💾 Draft tersimpan (foto terlalu besar untuk localStorage — unduh PDF sebagai cadangan).'
+    : '💾 Draft tersimpan.', photoErr ? 'err' : 'ok');
 }
+function saveDraft(){ persistDraft(false); }
+
+let _autosaveFlashTimer = null;
+function flashAutosaveIndicator(photoErr){
+  const el = document.getElementById('autosave-indicator');
+  if(!el) return;
+  const now = new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  el.textContent = photoErr ? '⚠️ Auto-save foto gagal (penyimpanan penuh)' : '✓ Tersimpan otomatis '+now;
+  el.className = 'autosave-ind show' + (photoErr ? ' warn' : '');
+  clearTimeout(_autosaveFlashTimer);
+  _autosaveFlashTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// Discrete, deliberate actions (upload/crop/rotate/remove a photo) save right
+// away — no debounce, so the save can't be lost to a refresh that happens to
+// land inside a debounce window.
+function autoSaveNow(){ persistDraft(true); }
+
+// Everything else (typing, toggling a result, picking a Mill) is debounced —
+// wired once via event delegation on `document`, so no per-field onchange
+// needs to be added anywhere else in this file to get autosave coverage.
+let _autoSaveTimer = null;
+function scheduleAutoSave(){
+  clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(autoSaveNow, 800);
+}
+document.addEventListener('input', e => { if(e.target.matches('input,select,textarea')) scheduleAutoSave(); });
+document.addEventListener('change', e => { if(e.target.matches('input,select,textarea')) scheduleAutoSave(); });
 
 function loadDraft(){
   try{
@@ -1477,6 +1670,10 @@ function resetForm(){
   ASSET_DEFS.forEach(a => { PHOTOS[a.key] = []; renderPhotos(a.key); });
   MEG_ROWS.forEach(r => updateMeggerChart('pvr', r.key));
   updateStats();
+  // Auto-save mirrors every change into localStorage, including the ones just
+  // made above — clear the stored draft too, or a refresh right after Reset
+  // would silently restore the pre-reset data via loadDraft() on next load.
+  try{ localStorage.removeItem('mill4000h_draft'); localStorage.removeItem('mill4000h_photos'); }catch(e){}
 }
 
 // ═══════════════════════════════════════════════════
@@ -1646,19 +1843,110 @@ ASSET_DEFS.forEach(a => {
   if(a.kind==='hv') MEG_ROWS.forEach(r => updateMeggerChart(a.key, r.key));
 });
 document.getElementById('wo-date').value = new Date().toISOString().split('T')[0];
-PhotoKit.configure({maxWcm:9,maxHcm:18,defaultWcm:9,defaultHcm:5.2});  // 2-up grid on portrait A4
+// Default bound (9x8.5cm) matches the normal 2-up PDF column (~90x85mm) so a
+// photo left on "Default" crop mode already prints at a readable size instead
+// of being capped to a tiny box regardless of how much page room the PDF side
+// actually has. maxWcm/maxHcm (18x18cm) are generous on purpose: PhotoKit.fit()
+// always draws at min(entry's chosen cm, the PDF box) — raising the ceiling
+// here can never overflow a smaller box, it only lets someone who explicitly
+// crops a photo bigger (Preset/Manual mode) fill the wider box a lone trailing
+// photo gets in the PDF (see the solo-photo branch in generatePDF()).
+PhotoKit.configure({maxWcm:18,maxHcm:18,defaultWcm:9,defaultHcm:8.5});  // 2-up grid on portrait A4
 loadDraft();
 updateStats();
 
 
 // ═══════════════════════════════════════════════════
+//  PDF SHEET SELECTION — checkbox modal, mirrors the PDF_SHEETS/_pdfSel
+//  pattern from Transformer_AT_NoDGA_Weekly.html. "Sheet" here means the
+//  header/WO-info block, each of the 5 assets' own section (checklist +
+//  photos), and the findings block — generatePDF(selSet) only builds
+//  whichever of those are checked.
+// ═══════════════════════════════════════════════════
+const PDF_SHEETS = [
+  {key:'cover', label:'Header & Info WO', icon:'📋', desc:'Judul laporan, No. WO, tanggal, checked/reviewed by'},
+  ...ASSET_DEFS.map(a => ({key:a.key, label:a.short, icon: a.kind==='hv'?'⚡':'⚙️', desc:a.title})),
+  {key:'findings', label:'Findings & Recommendations', icon:'📝', desc:'Kesimpulan dan rekomendasi tindak lanjut'},
+];
+let _pdfSel = new Set(PDF_SHEETS.map(s=>s.key));
+
+function openPdfModal(){
+  if(!selectedMillLetter){ showNote('❌ Pilih Mill (A–F) terlebih dahulu.', 'err'); return; }
+  _pdfSel = new Set(PDF_SHEETS.map(s=>s.key));
+  renderPdfModal();
+  document.getElementById('pdf-modal-overlay').classList.add('show');
+}
+function closePdfModal(){ document.getElementById('pdf-modal-overlay').classList.remove('show'); }
+function renderPdfModal(){
+  const list = document.getElementById('pdf-sheet-list');
+  list.innerHTML = PDF_SHEETS.map(s => `
+    <div class="psl-item ${_pdfSel.has(s.key)?'psl-on':''}" id="pslrow-${s.key}" onclick="toggleSheet('${s.key}')">
+      <span class="psl-icon">${s.icon}</span>
+      <span class="psl-info"><span class="psl-name">${s.label}</span><span class="psl-desc">${s.desc}</span></span>
+      <span class="psl-chk" id="pslchk-${s.key}">${_pdfSel.has(s.key)?'✓':''}</span>
+    </div>`).join('');
+  updatePdfBadge();
+}
+function toggleSheet(key){
+  if(_pdfSel.has(key)) _pdfSel.delete(key); else _pdfSel.add(key);
+  const row = document.getElementById('pslrow-'+key), chk = document.getElementById('pslchk-'+key);
+  if(row) row.className = 'psl-item'+(_pdfSel.has(key)?' psl-on':'');
+  if(chk) chk.textContent = _pdfSel.has(key)?'✓':'';
+  updatePdfBadge();
+}
+function updatePdfBadge(){
+  const el = document.getElementById('pdf-count-badge');
+  if(el) el.textContent = _pdfSel.size+' sheet'+(_pdfSel.size!==1?'s':'');
+}
+function pdfSelectAll(){ _pdfSel = new Set(PDF_SHEETS.map(s=>s.key)); renderPdfModal(); }
+function pdfClearAll(){ _pdfSel = new Set(); renderPdfModal(); }
+function generatePDFSelected(){
+  if(!_pdfSel || _pdfSel.size===0){ showNote('⚠️ Pilih minimal 1 sheet!', 'err'); return; }
+  closePdfModal();
+  try{ generatePDF(new Set(_pdfSel), {preview:true}); }
+  catch(e){ console.error('PDF generation failed:', e); showNote('❌ Gagal membuat PDF: '+(e.message||'Unknown error'), 'err'); }
+}
+
+// ═══════════════════════════════════════════════════
+//  PDF PRINT PREVIEW — the built pdf object is kept around (not re-generated)
+//  so "Unduh PDF" in the preview modal just calls .save() on it directly.
+// ═══════════════════════════════════════════════════
+let _previewPdf = null, _previewName = '';
+function showPdfPreview(pdf, filename){
+  _previewPdf = pdf; _previewName = filename;
+  const frame = document.getElementById('pdf-preview-frame');
+  frame.src = pdf.output('bloburl');
+  document.getElementById('pdf-preview-name').textContent = filename;
+  document.getElementById('pdf-preview-overlay').classList.add('show');
+  showNote('👁️ Preview siap — periksa hasil sebelum mengunduh.', 'ok');
+}
+function closePdfPreview(){
+  document.getElementById('pdf-preview-overlay').classList.remove('show');
+  const frame = document.getElementById('pdf-preview-frame');
+  if(frame.src && frame.src.startsWith('blob:')) URL.revokeObjectURL(frame.src);
+  frame.src = 'about:blank';
+}
+function pdfPreviewBack(){
+  closePdfPreview();
+  openPdfModal();   // let the technician adjust the sheet selection and preview again
+}
+function pdfPreviewDownload(){
+  if(!_previewPdf) return;
+  _previewPdf.save(_previewName);
+  showNote('✅ PDF berhasil diunduh!', 'ok');
+  closePdfPreview();
+}
+
+// ═══════════════════════════════════════════════════
 //  PDF GENERATOR — jsPDF + autoTable, POMI letterhead background
 //  (see CLAUDE.md "PDF export — direct download, not the browser print dialog")
 // ═══════════════════════════════════════════════════
-async function generatePDF(){
+async function generatePDF(selSet, opts){
+  opts = opts || {};
   if(!selectedMillLetter){ showNote('❌ Pilih Mill (A–F) terlebih dahulu.', 'err'); return; }
   if(!window.jspdf){ showNote('❌ Library PDF belum dimuat', 'err'); return; }
-  showNote('⏳ Membuat PDF…', 'info');
+  if(!selSet) selSet = new Set(PDF_SHEETS.map(s=>s.key));
+  showNote(opts.preview ? '⏳ Menyiapkan preview…' : '⏳ Membuat PDF…', 'info');
   await new Promise(r=>setTimeout(r,150));
 
   const{jsPDF} = window.jspdf;
@@ -1681,11 +1969,6 @@ async function generatePDF(){
   }
   ensureBg();
 
-  // ── TITLE ──
-  pdf.setTextColor(...BLACK); pdf.setFont('helvetica','bold'); pdf.setFontSize(19);
-  pdf.text('4000 HOURS MILL '+selectedMillLetter+' — PM REPORT', W/2, y+6, {align:'center'});
-  y += 12;
-
   const kvTheme = {
     theme:'grid',
     styles:{font:'helvetica',fontSize:8.3,cellPadding:2.2,textColor:DARK,lineColor:LINE,lineWidth:0.2,valign:'middle'},
@@ -1694,18 +1977,6 @@ async function generatePDF(){
   };
   const bold = c => ({content:c, styles:{fontStyle:'bold', textColor:BLACK}});
 
-  // ── WO INFO TABLE ──
-  pdf.autoTable({
-    ...kvTheme, startY:y,
-    body:[
-      [bold('WO No.'), gv('wo-no')||'—', bold('Date'), fmtDatePdf(gv('wo-date'))||'—'],
-      [bold('Checked By'), gv('checked-by')||'—', bold('Reviewed By'), gv('reviewed-by')||'—'],
-      [bold('Mill Assets'), {content: ASSET_DEFS.map(a=>a.prefix+selectedMillLetter).join('   ·   '), colSpan:3}],
-    ],
-    columnStyles:{0:{cellWidth:30},1:{cellWidth:63},2:{cellWidth:30},3:{cellWidth:63}},
-  });
-  y = pdf.lastAutoTable.finalY + 6;
-
   function fmtDatePdf(iso){
     if(!iso) return '';
     const d = new Date(iso+'T00:00:00');
@@ -1713,9 +1984,36 @@ async function generatePDF(){
     return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}).toUpperCase();
   }
 
-  // ── PER-ASSET SECTIONS (each asset starts on its own fresh page) ──
-  for(const [assetIdx, a] of ASSET_DEFS.entries()){
-    if(assetIdx > 0){ pdf.addPage(); y=TOP_START; ensureBg(); }
+  // firstSection tracks the first sheet actually rendered (independent of
+  // ASSET_DEFS index) so page breaks land only between sheets that were
+  // really drawn — skipping an unchecked asset must never leave a blank page.
+  let firstSection = true;
+
+  // ── TITLE + WO INFO TABLE ──
+  if(selSet.has('cover')){
+    firstSection = false;
+    pdf.setTextColor(...BLACK); pdf.setFont('helvetica','bold'); pdf.setFontSize(19);
+    pdf.text('4000 HOURS MILL '+selectedMillLetter+' — PM REPORT', W/2, y+6, {align:'center'});
+    y += 12;
+
+    pdf.autoTable({
+      ...kvTheme, startY:y,
+      body:[
+        [bold('WO No.'), gv('wo-no')||'—', bold('Date'), fmtDatePdf(gv('wo-date'))||'—'],
+        [bold('Checked By'), gv('checked-by')||'—', bold('Reviewed By'), gv('reviewed-by')||'—'],
+        [bold('Mill Assets'), {content: ASSET_DEFS.map(a=>a.prefix+selectedMillLetter).join('   ·   '), colSpan:3}],
+      ],
+      columnStyles:{0:{cellWidth:30},1:{cellWidth:63},2:{cellWidth:30},3:{cellWidth:63}},
+    });
+    y = pdf.lastAutoTable.finalY + 6;
+  }
+
+  // ── PER-ASSET SECTIONS (each starts on its own fresh page, but only among
+  //    the ones actually selected) ──
+  for(const a of ASSET_DEFS){
+    if(!selSet.has(a.key)) continue;
+    if(!firstSection){ pdf.addPage(); y=TOP_START; ensureBg(); }
+    firstSection = false;
     const tag = a.prefix + selectedMillLetter;
     checkY(14);
     pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
@@ -1736,9 +2034,29 @@ async function generatePDF(){
     // before), so a table that splits mid-page would get its continuation rows painted
     // OVER by ensureBg() on the next page. Force a clean page break instead so every
     // autoTable call fits entirely within one page's TOP_START..BOTTOM_LIMIT band.
-    checkY(Math.min(BOTTOM_LIMIT-TOP_START, checkRows.length*9+10));
+    //
+    // On PVR-500 the motor-data table + this 20-row checklist come to ~255mm
+    // combined (measured from a real render) against a ~249mm page — over by
+    // just ~6mm. Rather than let that tiny overflow force the ENTIRE checklist
+    // onto a fresh page (leaving the motor-data table's page mostly blank and
+    // the checklist looking orphaned at the top of the next one — confirmed by
+    // rendering an actual PDF and inspecting it), tighten this table's own
+    // cellPadding (2.2mm -> 1.7mm) to reclaim ~1mm/row, comfortably closing the
+    // gap so both tables sit together on one page as originally intended. Only
+    // this table's padding changes — every other table on the page keeps
+    // kvTheme's normal spacing.
+    const checklistStyles = {...kvTheme.styles, cellPadding:1.7};
+    // Re-estimate with the tightened padding (~8.7mm/row incl. wrapped lines,
+    // measured from PVR-500's real 20-row render) so this pre-check's decision
+    // still matches what autoTable itself will do — a table that STILL doesn't
+    // fit (a future, even-longer checklist) must still get its own clean page
+    // rather than autoTable splitting it mid-table (see the comment on checkY()
+    // above / CLAUDE.md "PDF export" section for why that's unsafe with this
+    // file's didDrawPage->ensureBg() background repaint).
+    checkY(Math.min(BOTTOM_LIMIT-TOP_START, checkRows.length*8.7+12));
     pdf.autoTable({
       ...kvTheme, startY:y,
+      styles: checklistStyles,
       head:[['No','Check Item','Result','Remark']],
       body: checkRows,
       headStyles:{fillColor:[240,247,255], textColor:NAVY, fontStyle:'bold', lineColor:LINE, lineWidth:0.2},
@@ -1840,23 +2158,30 @@ async function generatePDF(){
       pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(10.5);
       pdf.text(tag+'  —  Photo Documentation', M+3, y+5.5);
       y += 11;
-      // Two photos per row. Each is fitted to the column at its OWN aspect ratio
-      // and the row takes the height of the taller one — feeding PW/PH straight to
-      // addImage() is what used to squash portrait shots out of shape.
-      const PW=(CW-6)/2, PH_MAX=52;
+      // Two photos per row, each fitted to its column at its OWN aspect ratio —
+      // feeding a fixed box straight to addImage() is what used to squash
+      // portrait shots out of shape. PH_MAX is generous (85mm) because a 52mm
+      // cap left portrait phone shots height-constrained to a sliver of their
+      // column's width; a lone trailing photo (odd count) spans the FULL
+      // column instead of being squeezed into half, so the last shot of an
+      // asset doesn't print noticeably smaller just for landing on its own.
+      const GAP=6, PH_MAX=85, PH_MAX_SOLO=110;
       for(let i=0;i<assetPhotos.length;i+=2){
         const pair = assetPhotos.slice(i,i+2);
-        const fits = pair.map(p=>PhotoKit.fit(p,PW,PH_MAX));
+        const solo = pair.length===1;
+        const PW = solo ? CW : (CW-GAP)/2;
+        const maxH = solo ? PH_MAX_SOLO : PH_MAX;
+        const fits = pair.map(p=>PhotoKit.fit(p,PW,maxH));
         const rowH = Math.max(...fits.map(f=>f.h));
         checkY(rowH+8);
         const rowY = y;
         pair.forEach((p,ci)=>{
-          const px = M + ci*(PW+6), f = fits[ci];
+          const px = M + ci*(PW+GAP), f = fits[ci];
           PhotoKit.draw(pdf, p, px+f.dx, rowY, f.w, f.h, {align:'center'});
           pdf.setDrawColor(...LINE); pdf.setLineWidth(0.2); pdf.rect(px+f.dx,rowY,f.w,f.h,'D');
           if(p.caption){
             pdf.setFont('helvetica','italic'); pdf.setFontSize(7); pdf.setTextColor(100,116,139);
-            pdf.text(p.caption, px+1, rowY+rowH+3.5, {maxWidth:PW-2});
+            pdf.text(p.caption, px+PW/2, rowY+rowH+3.5, {align:'center',maxWidth:PW-2});
           }
         });
         y = rowY + rowH + 8;
@@ -1865,21 +2190,28 @@ async function generatePDF(){
   }
 
   // ── CONCLUSION & RECOMMENDATIONS ──
-  const findings = gv('findings'), reco = gv('recommendations');
-  if(findings || reco){
-    y += 2; checkY(10);
-    const rows = [];
-    if(findings) rows.push([bold('Findings'), findings]);
-    if(reco) rows.push([bold('Recommendations'), reco]);
-    pdf.autoTable({...kvTheme, startY:y, body:rows, columnStyles:{0:{cellWidth:40}}});
-    y = pdf.lastAutoTable.finalY;
+  if(selSet.has('findings')){
+    const findings = gv('findings'), reco = gv('recommendations');
+    if(findings || reco){
+      y += 2; checkY(10);
+      const rows = [];
+      if(findings) rows.push([bold('Findings'), findings]);
+      if(reco) rows.push([bold('Recommendations'), reco]);
+      pdf.autoTable({...kvTheme, startY:y, body:rows, columnStyles:{0:{cellWidth:40}}});
+      y = pdf.lastAutoTable.finalY;
+    }
   }
 
-  // ── SAVE FILE ──
+  // ── SAVE / PREVIEW ──
   const wo = gv('wo-no') || 'MILL'+selectedMillLetter;
   const dt = gv('wo-date') || new Date().toISOString().split('T')[0];
-  pdf.save(`4000H_Mill${selectedMillLetter}_${wo}_${dt}.pdf`);
-  showNote('✅ PDF berhasil diunduh!', 'ok');
+  const filename = `4000H_Mill${selectedMillLetter}_${wo}_${dt}.pdf`;
+  if(opts.preview){
+    showPdfPreview(pdf, filename);
+  } else {
+    pdf.save(filename);
+    showNote('✅ PDF berhasil diunduh!', 'ok');
+  }
 }
 
 </script>

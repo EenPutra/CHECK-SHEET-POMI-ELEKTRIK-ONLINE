@@ -258,6 +258,21 @@ itself, following this same pattern for consistency:
   list table in `4000_Hours_Mill_PM.html` (up to 27 rows) for a worked example — it forces a page
   break instead of trusting autoTable to split cleanly.
 
+  **A near-miss overflow (content only slightly over one page's budget) is usually better fixed by
+  making it fit than by forcing an earlier break.** On the PVR-500 tab, the motor-data table plus
+  its 20-row checklist measured ~255mm combined against a ~249mm page — over by only ~6mm. Forcing
+  `checkY()` to break earlier just pushed the ENTIRE checklist onto a fresh page, leaving the
+  motor-data table's page mostly blank and the checklist looking orphaned at the top of the next
+  one (confirmed by rendering the actual PDF, not by reasoning about the numbers). The fix was to
+  tighten that one table's `cellPadding` (2.2mm → 1.7mm, via a local `{...kvTheme.styles,
+  cellPadding:1.7}` override passed as `styles:` on just that `autoTable()` call) to reclaim
+  ~1mm/row, closing the gap so both tables render together as originally intended — and updating
+  the `checkY()` row-height estimate to match the tightened padding (`rows.length*8.7+12`) so the
+  pre-check still agrees with what autoTable will actually do. Don't reach for "force a page break
+  sooner" as the default fix for an overflow this small; check whether shaving padding on the
+  oversized table closes the gap first, and only fall back to an earlier break when the content
+  is too long to ever fit on one page no matter how tight the padding gets.
+
 - **Content margins**: reserve roughly the top ~27mm and bottom ~21mm of each A4 page (i.e. keep
   body content between y≈27mm and y≈276mm) so text never overlaps the letterhead's header/footer
   artwork. These numbers come from measuring `war-pdf-background.jpg` itself — recompute them if
@@ -336,10 +351,65 @@ pattern rather than inventing a new one:
 - **Photos belong to the sheet that took them, not one shared gallery.** Give every tab its own
   upload zone and its own array (`PHOTOS[key]`), not one array for the whole submission — otherwise
   a photo taken for one asset visually and semantically leaks into another asset's report.
-- **Each asset's PDF section starts on a fresh page.** Force `pdf.addPage()` before every asset
-  except the first (`if(assetIdx > 0){ pdf.addPage(); y=TOP_START; ensureBg(); }`) so the exported
-  report reads as N self-contained sub-reports back to back, not one continuous flow with assets
-  bleeding into each other wherever a page happened to end.
+- **Each asset's PDF section starts on a fresh page.** Force `pdf.addPage()` before every section
+  except the first one that actually gets rendered so the exported report reads as N
+  self-contained sub-reports back to back, not one continuous flow with assets bleeding into
+  each other wherever a page happened to end. Once the PDF has selectable sheets (below), track
+  this with a `firstSection` flag set on whichever sheet renders first, not `assetIdx===0` —
+  skipping an unchecked asset must never leave a blank page where its `addPage()` would have
+  landed.
+- **Let the user pick which sheets go in the PDF, and preview before downloading.**
+  `4000_Hours_Mill_PM.html`'s "Download PDF" button opens a checkbox modal
+  (`PDF_SHEETS`/`_pdfSel`/`openPdfModal()`/`renderPdfModal()`/`toggleSheet()`) listing the cover
+  block, each asset's own section, and the findings block; `generatePDF(selSet, opts)` takes an
+  explicit `Set` of the checked sheet keys (defaulting to "all" when called with no args) and
+  guards every section with `if(selSet.has(key))`. Confirming the modal calls
+  `generatePDF(selSet, {preview:true})`, which builds the real `jsPDF` object but instead of
+  `pdf.save(...)` calls `showPdfPreview(pdf, filename)` — that loads `pdf.output('bloburl')` into
+  an `<iframe>` inside a second modal so the technician can actually look at the rendered pages
+  (including whether photos came out at a sane size) before committing to a download. The preview
+  modal's "Unduh PDF" button just calls `.save()` on that same already-built `pdf` object (no
+  regeneration); "← Ubah Pilihan Sheet" reopens the sheet-selection modal. This is the pattern to
+  copy for any check sheet where the report can get long enough that skipping irrelevant sections
+  or catching a layout mistake before download is worth the extra click — the checkbox-modal +
+  preview-modal pair, `generatePDF(selSet, opts)`'s signature, and `showPdfPreview()` are all
+  reusable as-is.
+- **Size photos to the space actually available, not one fixed box for every layout.** A fixed
+  `PH_MAX` height (52mm in an earlier version) left portrait phone photos tiny and letterboxed
+  inside a landscape-shaped column. Raise the cap generously (`PH_MAX=85` for a 2-up row) and, for
+  whichever asset ends up with an odd photo count, give the trailing lone photo the FULL column
+  width and a taller cap (`PH_MAX_SOLO=110`) instead of squeezing it into a half-width slot sized
+  for a pair — `PhotoKit.fit()` still respects each photo's own aspect ratio either way, this only
+  raises how much room it's allowed to use.
+- **Auto-compress uploaded photos to stay under a byte budget, not just a pixel budget.**
+  PhotoKit's own downscale is pixel-based and doesn't guarantee a file-size cap — a busy/detailed
+  JPEG at PhotoKit's normal output size can still land over 1MB, and since this file's Firestore
+  document stores every photo inline (no separate blob storage), one oversized photo bloats the
+  whole submission. `compressUnder1MB(dataUrl, w, h)` (see `4000_Hours_Mill_PM.html`) checks
+  `dataUrlBytes()` against a `PHOTO_MAX_BYTES` cap (~950KB, safely under 1MB either way it's
+  counted) and only if over, re-encodes at successively lower JPEG quality
+  (`[0.85,0.75,0.65,0.55,0.45]`), and only if quality alone still isn't enough, also shrinks pixel
+  dimensions by 20% per pass — never below a still-legible 480px edge — repeating until it fits.
+  Call this after every path that can produce a new photo blob: initial upload (`pickPhotos`),
+  recrop (`recropPhotoAt`), and rotate (`rotatePhoto`) all await it before storing the result.
+- **Persist uploaded photos and form state across an accidental browser refresh, not just on an
+  explicit "Save Draft" click.** Discrete photo actions (upload, recrop, rotate, remove) call
+  `autoSaveNow()` — an un-debounced, immediate `persistDraft(true)` — right after mutating
+  `PHOTOS[key]`, because re-shooting/re-uploading a photo is real lost time on site and a save
+  delayed by a debounce window can still be lost to a refresh that lands inside it. Everything
+  else (typing, toggling a result, picking a Mill) is covered by one delegated pair of listeners —
+  `document.addEventListener('input'/'change', e => { if(e.target.matches('input,select,textarea'))
+  scheduleAutoSave(); })` — so autosave coverage for a new field never needs a dedicated
+  `onchange` added by hand; `scheduleAutoSave()` just debounces (800ms) into the same
+  `persistDraft(true)`. `persistDraft(silent)` writes both `localStorage['mill4000h_draft']`
+  (every id'd field's value + toggle state) and `localStorage['mill4000h_photos']`
+  (`JSON.stringify(PHOTOS)`) — a silent call flashes a small `#autosave-indicator` ("✓ Tersimpan
+  otomatis HH:MM:SS") instead of the normal toast, and if the photos payload alone is too big for
+  localStorage's quota it still keeps the non-photo draft and shows a warning state on the
+  indicator rather than losing everything. `resetForm()` explicitly
+  `localStorage.removeItem('mill4000h_draft'/'mill4000h_photos')` — autosave mirrors every change
+  including Reset's own clearing, so without this a refresh right after Reset would silently
+  restore the pre-reset data via `loadDraft()`.
 - **When a source template's checklist is much larger than others being combined** (the ported HV
   motor checklist is 27 items with megger/PI-DAR/RTD/motor-protection/DCS sub-widgets, versus a
   15-item LV motor checklist), write ONE generic special-case renderer that switches on
