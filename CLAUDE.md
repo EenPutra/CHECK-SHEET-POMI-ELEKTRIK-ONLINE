@@ -338,12 +338,50 @@ To add a new check sheet's card to the portal, do **not** try to reconstruct or 
 ## `dashboard.html` — Transformer PM Trend Analysis (parameter trend chart)
 
 `dashboard.html` (the analytics dashboard, separate from the check sheets) has a
-"Transformer PM Trend Analysis" panel — pick one check sheet, one parameter, one
+"Transformer PM Trend Analysis" panel — pick a check sheet, a parameter, and a
 piece of equipment, and see that parameter's value across every past PM for that
-asset, compared against the immediately preceding submission. It is deliberately
-scoped to the two **weekly Transformer AT** sheets only (`Transformer_AT_NoDGA_Weekly.html`
-and `Transformer_AT_DGA_Weekly.html`) — this was a first rollout on one data set,
-not a general trend feature for every check sheet.
+asset, compared against the immediately preceding submission. Multiple parameters
+can be pinned into the same chart to compare them against each other. It is
+deliberately scoped to the two **weekly Transformer AT** sheets only
+(`Transformer_AT_NoDGA_Weekly.html` and `Transformer_AT_DGA_Weekly.html`) — this
+was a first rollout on one data set, not a general trend feature for every check
+sheet.
+
+**Single vs multi-parameter is a chip builder, not two separate UIs.** The
+Parameter/Equipment selects only ever *stage* a candidate; `TREND_SERIES` (an
+array, module-level) is the definitive "what's actually charted" list, rendered
+as removable chips above the chart. `renderParamTrend()` decides its data source
+each call: if `TREND_SERIES` has 1+ entries it renders those; if empty, it treats
+whatever is currently staged in the selects as an ad-hoc single series (so the
+common one-parameter case needs no extra click — pick param + equipment and the
+chart appears immediately, exactly like before this was added). Clicking
+"+ Tambah ke Perbandingan" pins the current selection as a chip and resets the
+selects so the next parameter can be picked. This means `renderParamTrend()`,
+`renderTrendCompare()`, `renderTrendCrit()`, `renderTrendChart()`, and
+`renderTrendTable()` all accept a `seriesData` array and must keep working for
+`seriesData.length === 1` (reproducing the original single-parameter layout
+exactly, including a "PM Sebelumnya" card and a per-row Δ table column that the
+2+-series layout deliberately drops) — don't special-case away the 1-series path
+when changing this.
+
+- **Status (OK/NG) parameters can only be the sole chip.** A line/bar mix, or
+  two differently-scaled status strips, isn't something one chart can show
+  usefully. `trendAddBlockedReason()` is the single source of truth for why the
+  "+ Tambah" button is disabled (also called by `updateAddState()` on every
+  select change to keep the button/hint live) — extend that function, not the
+  click handler, if another mixing rule is ever needed.
+- **Units decide the Y-axis layout, not the caller.** 1 distinct unit among the
+  pinned series → one axis. Exactly 2 → dual axis (left/right), each series
+  assigned by which of the two units it has. 3+ → everyone shares the left axis
+  and a `#trend-mixed-note` warning appears, because Chart.js has no clean way to
+  show more than two axes at once and a wrong 3rd axis would be worse than a
+  clear warning. This is computed fresh in `renderTrendChart()` every render, not
+  cached — don't try to persist an axis assignment across an add/remove.
+- **`TREND_MAX_SERIES` (6) exists to keep the legend and pivot table legible**,
+  not for a technical reason — raise it if a real workflow needs more, but check
+  the pivot table (`renderTrendTable()`'s 2+-series branch) still reads cleanly
+  first, since it adds one full column per series with no horizontal limit
+  beyond `.trend-table-wrap`'s `overflow-x:auto`.
 
 - **`TREND_ASSETS`** (assetTag → label) is the whitelist of check sheets the panel
   offers. Extending to another weekly sheet only works if that sheet's

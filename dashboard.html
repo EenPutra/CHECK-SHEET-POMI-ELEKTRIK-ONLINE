@@ -253,6 +253,27 @@ body::after{
 .trend-field select:disabled{color:var(--txt-3);background:var(--surf-2);cursor:not-allowed}
 .trend-field select:not(:disabled):hover{border-color:var(--bdr-2)}
 .trend-field select:focus{border-color:var(--pri);box-shadow:0 0 0 4px rgba(37,99,235,0.10)}
+.trend-add-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap}
+.trend-add-hint{font-size:11.5px;color:var(--txt-3);min-height:15px}
+.trend-add-btn{font-size:12.5px;padding:8px 14px}
+.trend-add-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important}
+.trend-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px}
+.trend-chip{
+  display:inline-flex;align-items:center;gap:7px;background:var(--surf-2);border:1px solid var(--bdr);
+  border-radius:20px;padding:6px 8px 6px 12px;font-size:12px;font-weight:600;color:var(--txt-2);
+}
+.trend-chip-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.trend-chip-x{
+  border:none;background:var(--bdr-2);color:var(--txt-2);width:18px;height:18px;border-radius:50%;
+  cursor:pointer;font-size:11px;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  padding:0;
+}
+.trend-chip-x:hover{background:var(--rose);color:#fff}
+.trend-chips-clear{margin-left:auto;background:none;border:none;color:var(--txt-3);font-size:11.5px;font-weight:600;cursor:pointer;text-decoration:underline;padding:4px}
+.trend-mixed-note{
+  font-size:11.5px;color:#92400e;background:var(--acc-soft);border:1px solid rgba(245,158,11,0.3);
+  border-radius:8px;padding:8px 12px;margin-top:12px;
+}
 .trend-empty{
   padding:48px 20px;text-align:center;color:var(--txt-3);font-size:13px;
   background:var(--surf-2);border:1px dashed var(--bdr-2);border-radius:12px;
@@ -812,7 +833,7 @@ table.dtbl tr:last-child td{border-bottom:none}
     <div class="chart-hdr">
       <div class="chart-title-w">
         <div class="chart-title">Transformer PM Trend Analysis</div>
-        <span class="chart-sub">Weekly Transformer AT — bandingkan satu parameter antar PM</span>
+        <span class="chart-sub">Weekly Transformer AT — bandingkan satu atau beberapa parameter antar PM</span>
       </div>
       <span class="trend-badge" id="trend-badge">—</span>
     </div>
@@ -832,17 +853,24 @@ table.dtbl tr:last-child td{border-bottom:none}
       </div>
       <div class="trend-field">
         <label>Equipment</label>
-        <select id="tr-equip" onchange="renderParamTrend()" disabled>
+        <select id="tr-equip" onchange="updateAddState();renderParamTrend()" disabled>
           <option value="">Pilih equipment…</option>
         </select>
       </div>
     </div>
+
+    <div class="trend-add-row">
+      <span class="trend-add-hint" id="trend-add-hint"></span>
+      <button type="button" class="btn btn-outline trend-add-btn" id="trend-add-btn" onclick="addTrendSeries()" disabled>+ Tambah ke Perbandingan</button>
+    </div>
+    <div class="trend-chips" id="trend-chips" style="display:none"></div>
 
     <div class="trend-empty" id="trend-empty">Pilih check sheet, parameter, dan equipment di atas untuk menampilkan tren.</div>
 
     <div id="trend-content" style="display:none">
       <div class="trend-compare" id="trend-compare"></div>
       <div class="chart-body tall"><canvas id="chartParamTrend"></canvas></div>
+      <div class="trend-mixed-note" id="trend-mixed-note" style="display:none"></div>
       <div class="trend-crit" id="trend-crit" style="display:none"></div>
       <div class="trend-table-wrap">
         <table class="dtbl" id="trend-table">
@@ -1305,6 +1333,13 @@ const TREND_UNITS = {
 let chartParamTrend = null;
 let TR = { tag: '', submissions: [], params: [], equips: [] };  // current-selection scratch state
 
+// Pinned comparison set — when non-empty, the chart/table/compare-card render
+// from THIS instead of whatever the Parameter/Equipment selects currently show.
+// The selects then act purely as a staging area for the next series to add.
+let TREND_SERIES = [];
+const TREND_MAX_SERIES = 6;
+const TREND_PALETTE = ['#2563eb', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#0ea5e9'];
+
 function trendUnitFor(tag, no, desc) {
   const map = TREND_UNITS[tag];
   return (map && map[(no || '') + '||' + desc]) || '';
@@ -1331,6 +1366,23 @@ function trendParseNumeric(raw) {
 
 function trendDateOf(d) { return d.executionDate || (d.createdAt || '').slice(0, 10) || ''; }
 
+function trendSeriesLabel(s) { return (s.no ? s.no + ' — ' : '') + s.desc + ' (' + s.equip + ')'; }
+
+function computeIsStatus(points) { return points.some(p => TREND_STATUS_TOKENS.has(p.raw)); }
+
+// Every historical (date, value) pair for one parameter+equipment, read from the
+// currently-loaded submissions of the active check sheet (TR.submissions).
+function buildSeriesPoints(key, equip) {
+  const points = [];
+  TR.submissions.forEach(s => {
+    const row = s.rows.find(r => (r.no || '') + '||' + (r.desc || '') === key);
+    const raw = row && row.values && row.values[equip];
+    if (!raw || raw === '—' || raw === 'N/A') return;
+    points.push({ date: s.date, wo: s.raw.woNumber || '-', raw, numeric: trendParseNumeric(raw) });
+  });
+  return points;
+}
+
 function initParamTrend() {
   const sel = document.getElementById('tr-sheet');
   const prevTag = sel.value;
@@ -1345,9 +1397,12 @@ function initParamTrend() {
 
   if (prevTag && present.includes(prevTag)) {
     sel.value = prevTag;
-    onTrendSheetChange(true);   // keep the technician's selection across a manual refresh
+    onTrendSheetChange(true);   // keep the technician's selection & pinned series across a manual refresh
   } else {
+    TREND_SERIES = [];
     resetTrendDownstream();
+    renderSeriesChips();
+    updateAddState();
   }
 }
 
@@ -1366,8 +1421,16 @@ function onTrendSheetChange(keepSelection) {
   const tag = document.getElementById('tr-sheet').value;
   const prevParam = keepSelection ? document.getElementById('tr-param').value : '';
   const prevEquip = keepSelection ? document.getElementById('tr-equip').value : '';
+  // A pinned comparison set only survives a refresh that keeps the SAME check
+  // sheet selected — switching sheets means a different parameter namespace,
+  // so any pinned series from the old sheet are discarded.
+  const keepSeries = !!(keepSelection && TREND_SERIES.length && TREND_SERIES[0].tag === tag);
+  if (!keepSeries) TREND_SERIES = [];
+
   resetTrendDownstream();
-  if (!tag) { TR = { tag: '', submissions: [], params: [], equips: [] }; return; }
+  renderSeriesChips();
+
+  if (!tag) { TR = { tag: '', submissions: [], params: [], equips: [] }; updateAddState(); return; }
 
   const submissions = allData
     .filter(d => d.assetTag === tag && d.sheets && d.sheets.main && d.sheets.main.rows)
@@ -1408,9 +1471,19 @@ function onTrendSheetChange(keepSelection) {
   pSel.innerHTML = html;
   pSel.disabled = params.length === 0;
 
+  if (keepSeries) {
+    // Drop any pinned series whose parameter/equipment no longer appears in the
+    // freshly reloaded data (e.g. the underlying submission was deleted).
+    TREND_SERIES = TREND_SERIES.filter(s => params.some(p => p.key === s.key) && equips.includes(s.equip));
+    renderSeriesChips();
+  }
+
   if (prevParam && params.some(p => p.key === prevParam)) {
     pSel.value = prevParam;
     onTrendParamChange(prevEquip);
+  } else {
+    updateAddState();
+    renderParamTrend();
   }
 }
 
@@ -1419,6 +1492,7 @@ function onTrendParamChange(keepEquip) {
   const key = document.getElementById('tr-param').value;
   if (!key) {
     eSel.innerHTML = '<option value="">Pilih equipment…</option>'; eSel.disabled = true;
+    updateAddState();
     renderParamTrend();
     return;
   }
@@ -1436,7 +1510,88 @@ function onTrendParamChange(keepEquip) {
   eSel.disabled = withData.length === 0;
 
   if (typeof keepEquip === 'string' && withData.includes(keepEquip)) eSel.value = keepEquip;
+  updateAddState();
   renderParamTrend();
+}
+
+// The (parameter, equipment) currently staged in the selects, or null if the
+// selection isn't complete yet.
+function trendCandidateFromSelection() {
+  const tag = TR.tag;
+  const key = document.getElementById('tr-param').value;
+  const equip = document.getElementById('tr-equip').value;
+  if (!tag || !key || !equip) return null;
+  const param = TR.params.find(p => p.key === key);
+  if (!param) return null;
+  return { tag, key, equip, no: param.no, desc: param.desc, section: param.section, unit: trendUnitFor(tag, param.no, param.desc) };
+}
+
+// Returns '' when the candidate can be added, or a human-readable reason why not.
+function trendAddBlockedReason(cand) {
+  if (!cand) return '';
+  if (TREND_SERIES.some(s => s.key === cand.key && s.equip === cand.equip)) return 'Parameter ini sudah ditambahkan ke chart.';
+  if (TREND_SERIES.length >= TREND_MAX_SERIES) return 'Maksimal ' + TREND_MAX_SERIES + ' parameter dalam satu chart.';
+  const candIsStatus = computeIsStatus(buildSeriesPoints(cand.key, cand.equip));
+  if (TREND_SERIES.length && candIsStatus) return 'Parameter status (OK/NG) hanya bisa ditampilkan sendiri — hapus dulu untuk menambah parameter lain.';
+  if (TREND_SERIES.length === 1 && computeIsStatus(buildSeriesPoints(TREND_SERIES[0].key, TREND_SERIES[0].equip)))
+    return 'Parameter yang tampil sekarang berupa status (OK/NG) — hapus dulu untuk membandingkan dengan parameter lain.';
+  return '';
+}
+
+function updateAddState() {
+  const btn = document.getElementById('trend-add-btn');
+  const hint = document.getElementById('trend-add-hint');
+  const cand = trendCandidateFromSelection();
+  if (!cand) { btn.disabled = true; hint.textContent = ''; return; }
+  const reason = trendAddBlockedReason(cand);
+  if (reason) { btn.disabled = true; hint.textContent = reason; return; }
+  btn.disabled = false;
+  hint.textContent = TREND_SERIES.length ? 'Klik untuk menambahkan ke perbandingan.' : '';
+}
+
+function addTrendSeries() {
+  const cand = trendCandidateFromSelection();
+  if (!cand) return;
+  const reason = trendAddBlockedReason(cand);
+  if (reason) { document.getElementById('trend-add-hint').textContent = reason; return; }
+
+  TREND_SERIES.push(cand);
+  // Reset the selects so the technician picks the next parameter fresh —
+  // the chart/table now render from TREND_SERIES, not from these selects.
+  document.getElementById('tr-param').value = '';
+  document.getElementById('tr-equip').innerHTML = '<option value="">Pilih equipment…</option>';
+  document.getElementById('tr-equip').disabled = true;
+
+  renderSeriesChips();
+  updateAddState();
+  renderParamTrend();
+}
+
+function removeTrendSeries(idx) {
+  TREND_SERIES.splice(idx, 1);
+  renderSeriesChips();
+  updateAddState();
+  renderParamTrend();
+}
+
+function clearTrendSeries() {
+  TREND_SERIES = [];
+  renderSeriesChips();
+  updateAddState();
+  renderParamTrend();
+}
+
+function renderSeriesChips() {
+  const wrap = document.getElementById('trend-chips');
+  if (!TREND_SERIES.length) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+  wrap.style.display = 'flex';
+  wrap.innerHTML = TREND_SERIES.map((s, i) => `
+    <span class="trend-chip">
+      <span class="trend-chip-dot" style="background:${TREND_PALETTE[i % TREND_PALETTE.length]}"></span>
+      ${esc(trendSeriesLabel(s))}
+      <button type="button" class="trend-chip-x" onclick="removeTrendSeries(${i})" title="Hapus dari chart">&times;</button>
+    </span>`).join('') +
+    (TREND_SERIES.length > 1 ? `<button type="button" class="trend-chips-clear" onclick="clearTrendSeries()">Hapus semua</button>` : '');
 }
 
 function trendGradient(ctx, hex, h) {
@@ -1446,14 +1601,22 @@ function trendGradient(ctx, hex, h) {
   return g;
 }
 
+// ── master render: draws the compare card, chart, criteria note and table from
+//    either the pinned TREND_SERIES (1+ parameters) or, when nothing is pinned
+//    yet, the parameter/equipment currently staged in the selects. ──
 function renderParamTrend() {
-  const tag = TR.tag;
-  const key = document.getElementById('tr-param').value;
-  const equip = document.getElementById('tr-equip').value;
   const content = document.getElementById('trend-content');
   const empty = document.getElementById('trend-empty');
 
-  if (!tag || !key || !equip) {
+  let seriesList;
+  if (TREND_SERIES.length) {
+    seriesList = TREND_SERIES;
+  } else {
+    const cand = trendCandidateFromSelection();
+    seriesList = cand ? [cand] : [];
+  }
+
+  if (!seriesList.length) {
     content.style.display = 'none';
     empty.style.display = 'block';
     empty.textContent = 'Pilih check sheet, parameter, dan equipment di atas untuk menampilkan tren.';
@@ -1461,16 +1624,11 @@ function renderParamTrend() {
     return;
   }
 
-  const param = TR.params.find(p => p.key === key);
-  const points = [];
-  TR.submissions.forEach(s => {
-    const row = s.rows.find(r => (r.no || '') + '||' + (r.desc || '') === key);
-    const raw = row && row.values && row.values[equip];
-    if (!raw || raw === '—' || raw === 'N/A') return;
-    points.push({ date: s.date, wo: s.raw.woNumber || '-', raw, numeric: trendParseNumeric(raw) });
-  });
+  const seriesData = seriesList
+    .map(s => ({ ...s, points: buildSeriesPoints(s.key, s.equip) }))
+    .filter(s => s.points.length);
 
-  if (!points.length) {
+  if (!seriesData.length) {
     content.style.display = 'none';
     empty.style.display = 'block';
     empty.textContent = 'Belum ada data untuk kombinasi parameter & equipment ini.';
@@ -1480,68 +1638,105 @@ function renderParamTrend() {
   empty.style.display = 'none';
   content.style.display = 'block';
 
-  const isStatus = points.some(p => TREND_STATUS_TOKENS.has(p.raw));
-  const unit = trendUnitFor(tag, param.no, param.desc);
+  const soloStatus = seriesData.length === 1 && computeIsStatus(seriesData[0].points);
 
-  // ── compare card: latest PM vs the one right before it ──
+  renderTrendCompare(seriesData, soloStatus);
+  renderTrendCrit(seriesData);
+  renderTrendChart(seriesData, soloStatus);
+  renderTrendTable(seriesData, soloStatus);
+}
+
+function renderTrendCompare(seriesData, soloStatus) {
   const cmp = document.getElementById('trend-compare');
-  const last = points[points.length - 1], prev = points.length > 1 ? points[points.length - 2] : null;
-  let cmpHtml = `
+  let html = '';
+
+  if (seriesData.length === 1) {
+    // Single parameter: the original 3-card layout (Latest / Previous / Change).
+    const s = seriesData[0], pts = s.points;
+    const last = pts[pts.length - 1], prev = pts.length > 1 ? pts[pts.length - 2] : null;
+    html += `
     <div class="trend-stat"><div class="trend-stat-lbl">PM Terakhir</div>
-      <div class="trend-stat-val">${esc(last.raw)}${unit && !isStatus ? ' ' + unit : ''}</div>
+      <div class="trend-stat-val">${esc(last.raw)}${s.unit && !soloStatus ? ' ' + esc(s.unit) : ''}</div>
       <div class="trend-stat-sub">${esc(last.date)} · WO ${esc(last.wo)}</div></div>`;
-  if (prev) {
-    cmpHtml += `
+    if (prev) {
+      html += `
     <div class="trend-stat"><div class="trend-stat-lbl">PM Sebelumnya</div>
-      <div class="trend-stat-val">${esc(prev.raw)}${unit && !isStatus ? ' ' + unit : ''}</div>
+      <div class="trend-stat-val">${esc(prev.raw)}${s.unit && !soloStatus ? ' ' + esc(s.unit) : ''}</div>
       <div class="trend-stat-sub">${esc(prev.date)} · WO ${esc(prev.wo)}</div></div>`;
-    if (!isStatus && last.numeric !== null && prev.numeric !== null) {
-      const delta = last.numeric - prev.numeric;
-      const pct = prev.numeric !== 0 ? (delta / Math.abs(prev.numeric) * 100) : null;
-      const dir = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
-      const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '—';
-      cmpHtml += `
-    <div class="trend-stat"><div class="trend-stat-lbl">Perubahan</div>
-      <div class="trend-stat-val ${dir}">${arrow} ${Math.abs(delta).toFixed(2)}${unit ? ' ' + unit : ''}</div>
-      <div class="trend-stat-sub">${pct !== null ? (delta >= 0 ? '+' : '') + pct.toFixed(1) + '% vs sebelumnya' : ''}</div></div>`;
-    } else if (isStatus) {
-      const gPrev = trendGoodness(prev.raw), gLast = trendGoodness(last.raw);
-      let label = 'Berubah', cls = '';
-      if (last.raw === prev.raw) { label = 'Tetap'; cls = ''; }
-      else if (gPrev === 1 && gLast === -1) { label = 'Memburuk'; cls = 'bad'; }
-      else if (gPrev === -1 && gLast === 1) { label = 'Membaik'; cls = 'good'; }
-      cmpHtml += `
+      if (soloStatus) {
+        const gPrev = trendGoodness(prev.raw), gLast = trendGoodness(last.raw);
+        let label = 'Berubah', cls = '';
+        if (last.raw === prev.raw) { label = 'Tetap'; cls = ''; }
+        else if (gPrev === 1 && gLast === -1) { label = 'Memburuk'; cls = 'bad'; }
+        else if (gPrev === -1 && gLast === 1) { label = 'Membaik'; cls = 'good'; }
+        html += `
     <div class="trend-stat"><div class="trend-stat-lbl">Perubahan</div>
       <div class="trend-stat-val ${cls}">${label}</div>
       <div class="trend-stat-sub">${esc(prev.raw)} → ${esc(last.raw)}</div></div>`;
+      } else if (last.numeric !== null && prev.numeric !== null) {
+        const delta = last.numeric - prev.numeric;
+        const pct = prev.numeric !== 0 ? (delta / Math.abs(prev.numeric) * 100) : null;
+        const dir = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
+        const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '—';
+        html += `
+    <div class="trend-stat"><div class="trend-stat-lbl">Perubahan</div>
+      <div class="trend-stat-val ${dir}">${arrow} ${Math.abs(delta).toFixed(2)}${s.unit ? ' ' + esc(s.unit) : ''}</div>
+      <div class="trend-stat-sub">${pct !== null ? (delta >= 0 ? '+' : '') + pct.toFixed(1) + '% vs sebelumnya' : ''}</div></div>`;
+      }
     }
-  }
-  cmpHtml += `
-    <div class="trend-stat"><div class="trend-stat-lbl">Riwayat Data</div>
-      <div class="trend-stat-val">${points.length}</div>
-      <div class="trend-stat-sub">PM · ${esc(points[0].date)} s/d ${esc(last.date)}</div></div>`;
-  cmp.innerHTML = cmpHtml;
-
-  // ── criteria note: shown verbatim from the check sheet, never a guessed
-  //    threshold line — the per-equipment limit text (e.g. "SST/EXC ≤85°C ·
-  //    UAT/SUT/GSUT ≤95°C") can't be split reliably per column from free text.
-  const critRow = TR.submissions.map(s => s.rows.find(r => (r.no || '') + '||' + (r.desc || '') === key)).filter(Boolean).slice(-1)[0];
-  const critEl = document.getElementById('trend-crit');
-  if (critRow && critRow.crit) {
-    critEl.style.display = 'block';
-    critEl.innerHTML = `<b>Kriteria:</b> ${esc(critRow.crit)}`;
   } else {
-    critEl.style.display = 'none';
+    // Multiple parameters: one compact card per series (value + delta vs its own previous PM).
+    seriesData.forEach((s, i) => {
+      const pts = s.points;
+      const last = pts[pts.length - 1], prev = pts.length > 1 ? pts[pts.length - 2] : null;
+      let sub = `${esc(last.date)} · WO ${esc(last.wo)}`;
+      if (prev && last.numeric !== null && prev.numeric !== null) {
+        const delta = last.numeric - prev.numeric;
+        const dir = delta > 0 ? 'up' : delta < 0 ? 'down' : '';
+        const arrow = delta > 0 ? '▲' : delta < 0 ? '▼' : '—';
+        sub = `<span class="trend-stat-val ${dir}" style="font-size:12px">${arrow} ${Math.abs(delta).toFixed(2)}${s.unit ? ' ' + esc(s.unit) : ''}</span> vs PM sebelumnya`;
+      }
+      html += `
+    <div class="trend-stat">
+      <div class="trend-stat-lbl"><span class="trend-chip-dot" style="background:${TREND_PALETTE[i % TREND_PALETTE.length]};display:inline-block;margin-right:5px"></span>${esc(trendSeriesLabel(s))}</div>
+      <div class="trend-stat-val">${esc(last.raw)}${s.unit ? ' ' + esc(s.unit) : ''}</div>
+      <div class="trend-stat-sub">${sub}</div></div>`;
+    });
   }
 
-  // ── chart: numeric parameters get a line trend; OK/NG-style parameters get
-  //    a colored status strip (a line implies a magnitude that OK/NG doesn't have) ──
+  const allDates = [...new Set(seriesData.flatMap(s => s.points.map(p => p.date)))].sort();
+  html += `
+    <div class="trend-stat"><div class="trend-stat-lbl">Riwayat Data</div>
+      <div class="trend-stat-val">${allDates.length}</div>
+      <div class="trend-stat-sub">PM · ${esc(allDates[0])} s/d ${esc(allDates[allDates.length - 1])}</div></div>`;
+  cmp.innerHTML = html;
+}
+
+function renderTrendCrit(seriesData) {
+  const critEl = document.getElementById('trend-crit');
+  const withCrit = seriesData.map(s => {
+    const rows = TR.submissions.map(sub => sub.rows.find(r => (r.no || '') + '||' + (r.desc || '') === s.key)).filter(Boolean);
+    const critText = rows.length ? rows[rows.length - 1].crit : '';
+    return critText ? { label: trendSeriesLabel(s), crit: critText } : null;
+  }).filter(Boolean);
+
+  if (!withCrit.length) { critEl.style.display = 'none'; return; }
+  critEl.style.display = 'block';
+  critEl.innerHTML = seriesData.length === 1
+    ? `<b>Kriteria:</b> ${esc(withCrit[0].crit)}`
+    : withCrit.map(w => `<div><b>${esc(w.label)}:</b> ${esc(w.crit)}</div>`).join('');
+}
+
+function renderTrendChart(seriesData, soloStatus) {
   if (chartParamTrend) chartParamTrend.destroy();
   const canvas = document.getElementById('chartParamTrend');
   const ctx = canvas.getContext('2d');
-  const labels = points.map(p => p.date);
+  const mixedNote = document.getElementById('trend-mixed-note');
+  mixedNote.style.display = 'none';
 
-  if (isStatus) {
+  if (soloStatus) {
+    const s = seriesData[0], points = s.points;
+    const labels = points.map(p => p.date);
     const colorOf = v => { const g = trendGoodness(v); return g === 1 ? '#10b981' : g === -1 ? '#f43f5e' : '#94a3b8'; };
     chartParamTrend = new Chart(ctx, {
       type: 'bar',
@@ -1565,58 +1760,107 @@ function renderParamTrend() {
         }
       }
     });
-  } else {
-    chartParamTrend = new Chart(ctx, {
-      type: 'line',
-      data: { labels, datasets: [{
-        label: (param.no ? param.no + ' — ' : '') + param.desc + (unit ? ' (' + unit + ')' : ''),
-        data: points.map(p => p.numeric),
-        spanGaps: true,
-        borderColor: '#2563eb', borderWidth: 2.5,
-        backgroundColor: trendGradient(ctx, '#2563eb', 340),
-        fill: true, tension: 0.3,
-        pointRadius: 4, pointHoverRadius: 6,
-        pointBackgroundColor: '#2563eb', pointBorderColor: '#fff', pointBorderWidth: 2
-      }] },
-      options: {
-        responsive: true, maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: {
-            title: items => points[items[0].dataIndex].date,
-            label: item => `${points[item.dataIndex].raw}${unit ? ' ' + unit : ''}  ·  WO ${points[item.dataIndex].wo}`
-          } }
-        },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 10.5 } } },
-          y: { title: { display: !!unit, text: unit }, grid: { color: '#eef1f6' } }
-        }
-      }
-    });
+    return;
   }
 
-  // ── history table (most recent first) ──
-  const tbody = document.querySelector('#trend-table tbody');
-  tbody.innerHTML = points.map((p, i) => {
-    let deltaCell = '<span style="color:var(--txt-3)">—</span>';
-    if (i > 0) {
-      const prv = points[i - 1];
-      if (!isStatus && p.numeric !== null && prv.numeric !== null) {
-        const d = p.numeric - prv.numeric;
-        const cls = d > 0 ? 'up' : d < 0 ? 'down' : 'neu';
-        const arrow = d > 0 ? '▲' : d < 0 ? '▼' : '—';
-        deltaCell = `<span class="trend-status-pill ${cls}">${arrow} ${Math.abs(d).toFixed(2)}${unit ? ' ' + unit : ''}</span>`;
-      } else if (isStatus) {
-        const gPrev = trendGoodness(prv.raw), gCur = trendGoodness(p.raw);
-        if (p.raw === prv.raw) deltaCell = '<span class="trend-status-pill neu">Tetap</span>';
-        else if (gPrev === 1 && gCur === -1) deltaCell = `<span class="trend-status-pill ng">${esc(prv.raw)} → ${esc(p.raw)}</span>`;
-        else if (gPrev === -1 && gCur === 1) deltaCell = `<span class="trend-status-pill ok">${esc(prv.raw)} → ${esc(p.raw)}</span>`;
-        else deltaCell = `<span class="trend-status-pill neu">${esc(prv.raw)} → ${esc(p.raw)}</span>`;
-      }
+  // Numeric: 1..N line series over the union of every date any of them has data
+  // for (spanGaps handles a series that's missing a point some weeks).
+  const allDates = [...new Set(seriesData.flatMap(s => s.points.map(p => p.date)))].sort();
+  const units = [...new Set(seriesData.map(s => s.unit).filter(Boolean))];
+  const useDualAxis = units.length === 2;
+  if (units.length >= 3) {
+    mixedNote.style.display = 'block';
+    mixedNote.textContent = '⚠️ Parameter ini memakai lebih dari 2 satuan berbeda — semua digabung dalam satu sumbu Y. Perhatikan satuan pada tooltip & legenda saat membaca nilainya.';
+  }
+  const axisOf = s => useDualAxis ? (s.unit === units[0] ? 'y' : (s.unit === units[1] ? 'y1' : 'y')) : 'y';
+
+  const datasets = seriesData.map((s, i) => {
+    const byDate = new Map(s.points.map(p => [p.date, p]));
+    const color = TREND_PALETTE[i % TREND_PALETTE.length];
+    return {
+      label: trendSeriesLabel(s) + (s.unit ? ' (' + s.unit + ')' : ''),
+      data: allDates.map(d => { const p = byDate.get(d); return p ? p.numeric : null; }),
+      spanGaps: true,
+      borderColor: color, borderWidth: 2.5,
+      backgroundColor: seriesData.length === 1 ? trendGradient(ctx, color, 340) : 'transparent',
+      fill: seriesData.length === 1,
+      tension: 0.3,
+      pointRadius: 4, pointHoverRadius: 6,
+      pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 2,
+      yAxisID: axisOf(s),
+      trendMeta: s
+    };
+  });
+
+  const scales = {
+    x: { grid: { display: false }, ticks: { font: { size: 10.5 } } },
+    y: { position: 'left', title: { display: units.length === 1 && !!units[0], text: units[0] || '' }, grid: { color: '#eef1f6' } }
+  };
+  if (useDualAxis) scales.y1 = { position: 'right', title: { display: true, text: units[1] }, grid: { drawOnChartArea: false } };
+
+  chartParamTrend = new Chart(ctx, {
+    type: 'line',
+    data: { labels: allDates, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: seriesData.length > 1, position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, usePointStyle: true } },
+        tooltip: { callbacks: {
+          label: item => {
+            const meta = item.dataset.trendMeta, v = item.parsed.y;
+            return v === null ? `${meta.desc}: —` : `${trendSeriesLabel(meta)}: ${v}${meta.unit ? ' ' + meta.unit : ''}`;
+          }
+        } }
+      },
+      scales
     }
-    return `<tr><td>${esc(p.date)}</td><td>${esc(p.wo)}</td><td style="font-weight:600">${esc(p.raw)}${unit && !isStatus ? ' ' + unit : ''}</td><td>${deltaCell}</td></tr>`;
-  }).reverse().join('');
+  });
 }
+
+function renderTrendTable(seriesData, soloStatus) {
+  const thead = document.querySelector('#trend-table thead tr');
+  const tbody = document.querySelector('#trend-table tbody');
+
+  if (seriesData.length === 1) {
+    thead.innerHTML = '<th>Tanggal PM</th><th>WO Number</th><th>Nilai</th><th>Δ vs PM Sebelumnya</th>';
+    const s = seriesData[0], points = s.points, unit = s.unit;
+    tbody.innerHTML = points.map((p, i) => {
+      let deltaCell = '<span style="color:var(--txt-3)">—</span>';
+      if (i > 0) {
+        const prv = points[i - 1];
+        if (!soloStatus && p.numeric !== null && prv.numeric !== null) {
+          const d = p.numeric - prv.numeric;
+          const cls = d > 0 ? 'up' : d < 0 ? 'down' : 'neu';
+          const arrow = d > 0 ? '▲' : d < 0 ? '▼' : '—';
+          deltaCell = `<span class="trend-status-pill ${cls}">${arrow} ${Math.abs(d).toFixed(2)}${unit ? ' ' + unit : ''}</span>`;
+        } else if (soloStatus) {
+          const gPrev = trendGoodness(prv.raw), gCur = trendGoodness(p.raw);
+          if (p.raw === prv.raw) deltaCell = '<span class="trend-status-pill neu">Tetap</span>';
+          else if (gPrev === 1 && gCur === -1) deltaCell = `<span class="trend-status-pill ng">${esc(prv.raw)} → ${esc(p.raw)}</span>`;
+          else if (gPrev === -1 && gCur === 1) deltaCell = `<span class="trend-status-pill ok">${esc(prv.raw)} → ${esc(p.raw)}</span>`;
+          else deltaCell = `<span class="trend-status-pill neu">${esc(prv.raw)} → ${esc(p.raw)}</span>`;
+        }
+      }
+      return `<tr><td>${esc(p.date)}</td><td>${esc(p.wo)}</td><td style="font-weight:600">${esc(p.raw)}${unit && !soloStatus ? ' ' + unit : ''}</td><td>${deltaCell}</td></tr>`;
+    }).reverse().join('');
+    return;
+  }
+
+  // 2+ parameters: a pivot table, one column per series, one row per PM date.
+  thead.innerHTML = '<th>Tanggal PM</th><th>WO Number</th>' + seriesData.map((s, i) =>
+    `<th><span class="trend-chip-dot" style="background:${TREND_PALETTE[i % TREND_PALETTE.length]};display:inline-block;margin-right:5px"></span>${esc(trendSeriesLabel(s))}${s.unit ? ' (' + esc(s.unit) + ')' : ''}</th>`).join('');
+  const byDate = seriesData.map(s => new Map(s.points.map(p => [p.date, p])));
+  const allDates = [...new Set(seriesData.flatMap(s => s.points.map(p => p.date)))].sort().reverse();
+  tbody.innerHTML = allDates.map(date => {
+    const anyPoint = byDate.map(m => m.get(date)).find(Boolean);
+    const cells = seriesData.map((s, i) => {
+      const p = byDate[i].get(date);
+      return `<td style="font-weight:600">${p ? esc(p.raw) + (s.unit ? ' ' + esc(s.unit) : '') : '<span style="color:var(--txt-3)">—</span>'}</td>`;
+    }).join('');
+    return `<tr><td>${esc(date)}</td><td>${esc(anyPoint ? anyPoint.wo : '-')}</td>${cells}</tr>`;
+  }).join('');
+}
+
 
 function populateAssetFilter() {
   const sel = document.getElementById('f-asset');
