@@ -270,6 +270,23 @@ body::after{
 }
 .trend-chip-x:hover{background:var(--rose);color:#fff}
 .trend-chips-clear{margin-left:auto;background:none;border:none;color:var(--txt-3);font-size:11.5px;font-weight:600;cursor:pointer;text-decoration:underline;padding:4px}
+.trend-scale-row{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px;
+  padding:10px 14px;background:var(--surf-2);border:1px solid var(--bdr);border-radius:10px;
+}
+.trend-scale-lbl{font-size:11.5px;font-weight:600;color:var(--txt-2);white-space:nowrap}
+.trend-scale-input{
+  width:78px;padding:6px 8px;border:1px solid var(--bdr);border-radius:7px;font-size:12px;
+  font-family:var(--mono);background:var(--surf);color:var(--txt);outline:none;
+}
+.trend-scale-input:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(37,99,235,0.10)}
+.trend-scale-sep{color:var(--txt-3);font-size:12px}
+.trend-scale-r{display:none;align-items:center;gap:8px}
+.trend-scale-reset{
+  margin-left:auto;background:none;border:1px solid var(--bdr);color:var(--txt-2);font-size:11.5px;
+  font-weight:600;padding:6px 12px;border-radius:7px;cursor:pointer;font-family:var(--body);
+}
+.trend-scale-reset:hover{border-color:var(--pri);color:var(--pri)}
 .trend-mixed-note{
   font-size:11.5px;color:#92400e;background:var(--acc-soft);border:1px solid rgba(245,158,11,0.3);
   border-radius:8px;padding:8px 12px;margin-top:12px;
@@ -870,6 +887,19 @@ table.dtbl tr:last-child td{border-bottom:none}
     <div id="trend-content" style="display:none">
       <div class="trend-compare" id="trend-compare"></div>
       <div class="chart-body tall"><canvas id="chartParamTrend"></canvas></div>
+      <div class="trend-scale-row" id="trend-scale-row" style="display:none">
+        <span class="trend-scale-lbl">Skala Y<span id="trend-scale-unit-lbl"></span></span>
+        <input type="number" id="trend-ymin" class="trend-scale-input" placeholder="Min" step="any" oninput="applyTrendScale()">
+        <span class="trend-scale-sep">–</span>
+        <input type="number" id="trend-ymax" class="trend-scale-input" placeholder="Max" step="any" oninput="applyTrendScale()">
+        <span class="trend-scale-r" id="trend-scale-r">
+          <span class="trend-scale-lbl">Sumbu kanan</span>
+          <input type="number" id="trend-y1min" class="trend-scale-input" placeholder="Min" step="any" oninput="applyTrendScale()">
+          <span class="trend-scale-sep">–</span>
+          <input type="number" id="trend-y1max" class="trend-scale-input" placeholder="Max" step="any" oninput="applyTrendScale()">
+        </span>
+        <button type="button" class="trend-scale-reset" onclick="resetTrendScale()">Auto</button>
+      </div>
       <div class="trend-mixed-note" id="trend-mixed-note" style="display:none"></div>
       <div class="trend-crit" id="trend-crit" style="display:none"></div>
       <div class="trend-table-wrap">
@@ -1355,6 +1385,12 @@ let TREND_SERIES = [];
 const TREND_MAX_SERIES = 6;
 const TREND_PALETTE = ['#2563eb', '#f59e0b', '#10b981', '#ef4444', '#8b5cf6', '#0ea5e9'];
 
+// What renderTrendChart() last drew, so the Y-scale inputs can re-render the
+// chart on every keystroke without re-fetching or re-deduping the underlying
+// data — only renderParamTrend() (an actual change of what's charted) touches
+// the series data itself.
+let TREND_LAST_RENDER = null;
+
 function trendUnitFor(tag, no, desc) {
   const map = TREND_UNITS[tag];
   return (map && map[(no || '') + '||' + desc]) || '';
@@ -1685,6 +1721,8 @@ function renderParamTrend() {
     empty.style.display = 'block';
     empty.textContent = 'Pilih check sheet, parameter, dan equipment di atas untuk menampilkan tren.';
     if (chartParamTrend) { chartParamTrend.destroy(); chartParamTrend = null; }
+    TREND_LAST_RENDER = null;
+    document.getElementById('trend-scale-row').style.display = 'none';
     return;
   }
 
@@ -1697,12 +1735,21 @@ function renderParamTrend() {
     empty.style.display = 'block';
     empty.textContent = 'Belum ada data untuk kombinasi parameter & equipment ini.';
     if (chartParamTrend) { chartParamTrend.destroy(); chartParamTrend = null; }
+    TREND_LAST_RENDER = null;
+    document.getElementById('trend-scale-row').style.display = 'none';
     return;
   }
   empty.style.display = 'none';
   content.style.display = 'block';
 
   const soloStatus = seriesData.length === 1 && computeIsStatus(seriesData[0].points);
+
+  // A genuine change of what's being charted invalidates any manually-typed Y
+  // range from before (a 40-70 range picked for °C makes no sense once the
+  // parameter switches to kV) — only applyTrendScale()'s own re-render, called
+  // directly from the scale inputs, is allowed to keep them.
+  resetTrendScaleInputs();
+  TREND_LAST_RENDER = { seriesData, soloStatus };
 
   renderTrendCompare(seriesData, soloStatus);
   renderTrendCrit(seriesData);
@@ -1791,14 +1838,43 @@ function renderTrendCrit(seriesData) {
     : withCrit.map(w => `<div><b>${esc(w.label)}:</b> ${esc(w.crit)}</div>`).join('');
 }
 
+// Reads whatever's currently typed into the Min/Max inputs for one axis and
+// returns a Chart.js scale-option fragment — {} (i.e. auto) when a field is
+// empty or not a number, so an untouched input never overrides Chart.js's own
+// scaling. axisId is 'y' (left) or 'y1' (right).
+function trendScaleOverride(axisId) {
+  const minEl = document.getElementById(axisId === 'y1' ? 'trend-y1min' : 'trend-ymin');
+  const maxEl = document.getElementById(axisId === 'y1' ? 'trend-y1max' : 'trend-ymax');
+  const out = {};
+  if (minEl && minEl.value !== '') { const v = parseFloat(minEl.value); if (isFinite(v)) out.min = v; }
+  if (maxEl && maxEl.value !== '') { const v = parseFloat(maxEl.value); if (isFinite(v)) out.max = v; }
+  return out;
+}
+function resetTrendScaleInputs() {
+  ['trend-ymin', 'trend-ymax', 'trend-y1min', 'trend-y1max'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+}
+// Wired to the scale inputs' oninput — re-draws the chart from what was last
+// rendered without touching TREND_SERIES or re-fetching/deduping any data, so
+// every keystroke stays cheap.
+function applyTrendScale() {
+  if (!TREND_LAST_RENDER) return;
+  renderTrendChart(TREND_LAST_RENDER.seriesData, TREND_LAST_RENDER.soloStatus);
+}
+function resetTrendScale() {
+  resetTrendScaleInputs();
+  applyTrendScale();
+}
+
 function renderTrendChart(seriesData, soloStatus) {
   if (chartParamTrend) chartParamTrend.destroy();
   const canvas = document.getElementById('chartParamTrend');
   const ctx = canvas.getContext('2d');
   const mixedNote = document.getElementById('trend-mixed-note');
   mixedNote.style.display = 'none';
+  const scaleRow = document.getElementById('trend-scale-row');
 
   if (soloStatus) {
+    scaleRow.style.display = 'none';   // OK/NG has no magnitude — nothing to scale
     const s = seriesData[0], points = s.points;
     const labels = points.map(p => p.date);
     const colorOf = v => { const g = trendGoodness(v); return g === 1 ? '#10b981' : g === -1 ? '#f43f5e' : '#94a3b8'; };
@@ -1838,6 +1914,10 @@ function renderTrendChart(seriesData, soloStatus) {
   }
   const axisOf = s => useDualAxis ? (s.unit === units[0] ? 'y' : (s.unit === units[1] ? 'y1' : 'y')) : 'y';
 
+  scaleRow.style.display = 'flex';
+  document.getElementById('trend-scale-unit-lbl').textContent = units.length === 1 && units[0] ? ` (${units[0]})` : '';
+  document.getElementById('trend-scale-r').style.display = useDualAxis ? 'inline-flex' : 'none';
+
   const datasets = seriesData.map((s, i) => {
     const byDate = new Map(s.points.map(p => [p.date, p]));
     const color = TREND_PALETTE[i % TREND_PALETTE.length];
@@ -1858,9 +1938,9 @@ function renderTrendChart(seriesData, soloStatus) {
 
   const scales = {
     x: { grid: { display: false }, ticks: { font: { size: 10.5 } } },
-    y: { position: 'left', title: { display: units.length === 1 && !!units[0], text: units[0] || '' }, grid: { color: '#eef1f6' } }
+    y: { position: 'left', title: { display: units.length === 1 && !!units[0], text: units[0] || '' }, grid: { color: '#eef1f6' }, ...trendScaleOverride('y') }
   };
-  if (useDualAxis) scales.y1 = { position: 'right', title: { display: true, text: units[1] }, grid: { drawOnChartArea: false } };
+  if (useDualAxis) scales.y1 = { position: 'right', title: { display: true, text: units[1] }, grid: { drawOnChartArea: false }, ...trendScaleOverride('y1') };
 
   chartParamTrend = new Chart(ctx, {
     type: 'line',

@@ -461,6 +461,21 @@ one point per submission** — the compare card and table must show the same
 per-date series the chart does, or a duplicate-heavy date silently renders as
 several stacked identical-looking table rows instead of one.
 
+**The Y-axis Min/Max inputs are presentation-only — they never touch
+`TREND_SERIES` or re-fetch data.** `TREND_LAST_RENDER` caches the last
+`{seriesData, soloStatus}` `renderTrendChart()` drew; the four number inputs
+(`#trend-ymin`/`#trend-ymax` for the left axis, `#trend-y1min`/`#trend-y1max`
+for the right, shown only when dual-axis is active) call `applyTrendScale()`
+on every keystroke, which just re-invokes `renderTrendChart()` on that cached
+data — `trendScaleOverride(axisId)` reads whatever's currently typed and
+returns `{}` (Chart.js's own auto-scaling) for any field left blank, so a
+value must be explicitly typed to override anything. `renderParamTrend()`
+calls `resetTrendScaleInputs()` before every real re-render (new parameter,
+equipment, or chip set) — a manually-typed 0–100°C range left over from a
+previous parameter would silently mislead once the chart switches to, say,
+kV. Hidden entirely for the status-strip chart (`soloStatus`), since OK/NG
+bars have no magnitude to scale.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that
