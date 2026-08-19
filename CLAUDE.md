@@ -418,6 +418,49 @@ when changing this.
   feature and silently implied "higher = worse" for parameters where that isn't
   true.
 
+**`TREND_LEGACY_SOURCE` pulls in pre-split history.** Before the weekly Transformer
+AT sheets existed as separate files, every week's inspection was ONE combined
+submission — `assetTag: '7EX-XFMR'`, `assetName: 'Transformer Weekly Inspection'`
+— with each section under its own `sheets` key (`s1` = AT+DGA, `s2` = AT without
+DGA, `s3` = USST, `s4`/`s5` = Common SST, `gis`/`gis150`/`gis500` = GIS SF6).
+Confirmed by pulling a real submission: `s1`/`s2` use the **exact same** row shape
+and equipment tags as the split sheets' `main` sheet — same `no`/`desc`/`crit`
+text, same columns — so `onTrendSheetChange()` merges them into one history
+instead of the trend only going back to whenever the sheets were split apart.
+Extending `TREND_ASSETS` to a currently-unlisted tag does **not** require a
+legacy source — only add one to `TREND_LEGACY_SOURCE` if you've actually
+confirmed a matching pre-split bundle exists in Firestore with the same row
+shape; guessing at this produces confidently wrong trend data, worse than no
+trend at all.
+
+**Submissions are deduplicated to one point per calendar date, not one per
+document**, inside `buildSeriesPoints()` — this matters because real data has
+two distinct causes of same-date collisions, both confirmed by querying the
+live `checksheets` collection directly:
+1. A technician re-opens the same week's draft and submits again (same
+   `executionDate`, same day) — a genuine duplicate.
+2. `executionDate` is a free-text field a check sheet can leave stale from a
+   prior week's auto-filled draft. One real cluster in the legacy
+   `7EX-XFMR` data had **16 submissions** sharing a single `executionDate`
+   while their `createdAt` timestamps actually spanned **two weeks** with
+   visibly different readings each time — i.e. 16 real, distinct inspections
+   mislabeled onto one day.
+
+`onTrendSheetChange()` handles case 2 first: whenever ≥2 submissions for a tag
+share an `executionDate`, each one's `.date` is reassigned to its own
+`createdAt` date (the one field a technician can't leave stale — it's set once,
+client-side, at the moment of `DB.save()`), which is what actually spread that
+16-submission cluster back out across its true 4 real calendar days. Submissions
+are then sorted by `(date, createdAt)` ascending, so `buildSeriesPoints()`'s
+per-date `Map` — which keeps the *last* value written for a given key without
+moving its position — ends up keeping the newest-created submission for any
+date that still collides after that (case 1), consistent with how
+`loadLastSubmission()` elsewhere in this codebase already treats "latest" via
+`orderBy('createdAt','desc')`. **Never revert `buildSeriesPoints()` to pushing
+one point per submission** — the compare card and table must show the same
+per-date series the chart does, or a duplicate-heavy date silently renders as
+several stacked identical-looking table rows instead of one.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that

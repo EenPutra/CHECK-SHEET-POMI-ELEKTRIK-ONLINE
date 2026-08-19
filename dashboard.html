@@ -1330,6 +1330,21 @@ const TREND_UNITS = {
   }
 };
 
+// Before the two weekly Transformer AT sheets were split into their own files,
+// every week's inspection was ONE combined submission — assetTag "7EX-XFMR",
+// assetName "Transformer Weekly Inspection" — with each section under its own
+// sheets key (s1 = AT+DGA, s2 = AT without DGA, s3 = USST, s4/s5 = Common SST,
+// gis/gis150/gis500 = GIS SF6). Confirmed by inspecting a real submission: s1
+// and s2 use the EXACT same row shape (no/desc/crit/section) and the EXACT same
+// equipment tags as the split sheets' "main" sheet — same text, same columns —
+// so their history belongs in the same trend, not a second disconnected one.
+// Without this, the trend only goes back to whenever the sheets were split
+// apart instead of to whenever weekly Transformer AT inspections started.
+const TREND_LEGACY_SOURCE = {
+  '7EX-XFMR-AT': { tag: '7EX-XFMR', sheetKey: 's2' },
+  '7EX-XFMR-AT-DGA': { tag: '7EX-XFMR', sheetKey: 's1' }
+};
+
 let chartParamTrend = null;
 let TR = { tag: '', submissions: [], params: [], equips: [] };  // current-selection scratch state
 
@@ -1373,25 +1388,47 @@ function computeIsStatus(points) { return points.some(p => TREND_STATUS_TOKENS.h
 // Every historical (date, value) pair for one parameter+equipment, read from the
 // currently-loaded submissions of the active check sheet (TR.submissions).
 function buildSeriesPoints(key, equip) {
-  const points = [];
+  // One point per DATE, not per submission — a date can still hold more than one
+  // real submission after the executionDate-collision fix above (e.g. several
+  // genuinely submitted the same real day). TR.submissions is sorted ascending
+  // by (date, createdAt), and Map.set() on an existing key updates its value
+  // without moving its position, so the last submission processed for a given
+  // date — the newest-created one — is what's kept, at that date's correct
+  // chronological slot. Without this, the compare card and table would show one
+  // row per submission instead of one per date, out of step with the chart
+  // (which already collapses to one point per date via its own by-date Map).
+  const byDate = new Map();
   TR.submissions.forEach(s => {
     const row = s.rows.find(r => (r.no || '') + '||' + (r.desc || '') === key);
     const raw = row && row.values && row.values[equip];
     if (!raw || raw === '—' || raw === 'N/A') return;
-    points.push({ date: s.date, wo: s.raw.woNumber || '-', raw, numeric: trendParseNumeric(raw) });
+    byDate.set(s.date, { date: s.date, wo: s.raw.woNumber || '-', raw, numeric: trendParseNumeric(raw) });
   });
-  return points;
+  return [...byDate.values()];
+}
+
+// A tag "has data" if either its own submissions exist, or its legacy source
+// (the pre-split combined weekly inspection) does.
+function trendHasAnyData(tag) {
+  if (allData.some(d => d.assetTag === tag && d.sheets && d.sheets.main && d.sheets.main.rows)) return true;
+  const legacy = TREND_LEGACY_SOURCE[tag];
+  return !!(legacy && allData.some(d => d.assetTag === legacy.tag && d.sheets && d.sheets[legacy.sheetKey] && d.sheets[legacy.sheetKey].rows));
+}
+function trendSubmissionCount(tag) {
+  const legacy = TREND_LEGACY_SOURCE[tag];
+  const own = allData.filter(d => d.assetTag === tag && d.sheets && d.sheets.main).length;
+  const leg = legacy ? allData.filter(d => d.assetTag === legacy.tag && d.sheets && d.sheets[legacy.sheetKey]).length : 0;
+  return own + leg;
 }
 
 function initParamTrend() {
   const sel = document.getElementById('tr-sheet');
   const prevTag = sel.value;
-  const present = Object.keys(TREND_ASSETS).filter(tag =>
-    allData.some(d => d.assetTag === tag && d.sheets && d.sheets.main && d.sheets.main.rows));
+  const present = Object.keys(TREND_ASSETS).filter(trendHasAnyData);
   sel.innerHTML = '<option value="">Pilih check sheet…</option>' +
     present.map(tag => `<option value="${esc(tag)}">${esc(TREND_ASSETS[tag])}</option>`).join('');
 
-  const totalSubs = present.reduce((n, tag) => n + allData.filter(d => d.assetTag === tag).length, 0);
+  const totalSubs = present.reduce((n, tag) => n + trendSubmissionCount(tag), 0);
   document.getElementById('trend-badge').textContent =
     present.length ? totalSubs + ' submission tersedia' : 'Belum ada data weekly transformer';
 
@@ -1432,11 +1469,38 @@ function onTrendSheetChange(keepSelection) {
 
   if (!tag) { TR = { tag: '', submissions: [], params: [], equips: [] }; updateAddState(); return; }
 
-  const submissions = allData
+  const ownSubs = allData
     .filter(d => d.assetTag === tag && d.sheets && d.sheets.main && d.sheets.main.rows)
-    .map(d => ({ raw: d, date: trendDateOf(d), rows: d.sheets.main.rows, columns: d.sheets.main.columns || [] }))
-    .filter(s => s.date)
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .map(d => ({ raw: d, date: trendDateOf(d), rows: d.sheets.main.rows, columns: d.sheets.main.columns || [] }));
+  const legacy = TREND_LEGACY_SOURCE[tag];
+  const legacySubs = legacy ? allData
+    .filter(d => d.assetTag === legacy.tag && d.sheets && d.sheets[legacy.sheetKey] && d.sheets[legacy.sheetKey].rows)
+    .map(d => ({ raw: d, date: trendDateOf(d), rows: d.sheets[legacy.sheetKey].rows, columns: d.sheets[legacy.sheetKey].columns || [] }))
+    : [];
+  let submissions = [...legacySubs, ...ownSubs].filter(s => s.date);
+
+  // executionDate is a free-text field a technician can leave stale from a prior
+  // week's auto-filled draft — confirmed in the real "Transformer Weekly
+  // Inspection" legacy data, where several submissions share one executionDate
+  // but were actually created (createdAt) anywhere from days to two weeks apart,
+  // each with genuinely different readings. Left alone, every submission after
+  // the first would silently overwrite the trend point for that date. When two
+  // or more submissions collide on the same executionDate, fall back to each
+  // one's own createdAt date so every real inspection still gets its own point.
+  const dateCounts = {};
+  submissions.forEach(s => { dateCounts[s.date] = (dateCounts[s.date] || 0) + 1; });
+  submissions.forEach(s => {
+    if (dateCounts[s.date] > 1) {
+      const created = (s.raw.createdAt || '').slice(0, 10);
+      if (created) s.date = created;
+    }
+  });
+
+  // Any submissions still left sharing a date (created the same day) are sorted
+  // oldest-created first, so the newest one — the one most likely to be the
+  // corrected/final entry — is what buildSeriesPoints()'s per-date Map ends up
+  // keeping, consistent with how loadLastSubmission() elsewhere treats "latest".
+  submissions.sort((a, b) => a.date.localeCompare(b.date) || (a.raw.createdAt || '').localeCompare(b.raw.createdAt || ''));
 
   // Parameter list: union of every (no,desc) pair ever submitted for this sheet,
   // first-seen order, grouped by the section header it appeared under.
