@@ -335,6 +335,51 @@ To add a new check sheet's card to the portal, do **not** try to reconstruct or 
    the array length at runtime, so a correctly-inserted entry updates them automatically with no
    further edits needed.
 
+## `dashboard.html` — Transformer PM Trend Analysis (parameter trend chart)
+
+`dashboard.html` (the analytics dashboard, separate from the check sheets) has a
+"Transformer PM Trend Analysis" panel — pick one check sheet, one parameter, one
+piece of equipment, and see that parameter's value across every past PM for that
+asset, compared against the immediately preceding submission. It is deliberately
+scoped to the two **weekly Transformer AT** sheets only (`Transformer_AT_NoDGA_Weekly.html`
+and `Transformer_AT_DGA_Weekly.html`) — this was a first rollout on one data set,
+not a general trend feature for every check sheet.
+
+- **`TREND_ASSETS`** (assetTag → label) is the whitelist of check sheets the panel
+  offers. Extending to another weekly sheet only works if that sheet's
+  `base.sheets.main.rows` follow the same shape everyone else already uses (see
+  "The data contract" above): `{section, no, desc, crit, values}` with `values`
+  keyed by an equipment/column tag. Add the tag to `TREND_ASSETS` and — if any of
+  its numeric rows should show a unit — add a matching entry to `TREND_UNITS`.
+- **`TREND_UNITS`** exists because `collectSheetData()` in the check sheets never
+  saves the unit into `values` (only the technician's raw number — the unit is a
+  sibling `<span>` in the DOM, not part of the saved value). The map mirrors each
+  row's unit as labelled in that sheet's own `mkSheet()`, keyed by `"no||desc"`,
+  **kept separate per asset tag** — the No-DGA and +DGA weekly sheets diverge on
+  which rows are numeric (e.g. `B.1`/`B.2` are OK/NG toggles in the DGA sheet but
+  `%` measurements in the other). Getting one row's unit wrong here only mislabels
+  an axis/table cell, it never changes what's plotted.
+- **Numeric vs status is auto-detected from the data**, not hardcoded per row:
+  if any historical value for the chosen (parameter, equipment) pair is one of
+  `TREND_STATUS_TOKENS` (`OK`/`NG`/`Leak`/`No Leak`/`Clean`/`Dirty`/`Noise`/`Normal`),
+  the whole series renders as a colored status strip (bar chart, green/red/gray
+  per `trendGoodness()`) instead of a line chart. Otherwise every value is run
+  through `trendParseNumeric()` (averages every number found in the string, so a
+  multi-input field saved as `"34/56/78%"` — the silicagel breakdown — still
+  plots a sensible point) and rendered as a line.
+- **No guessed threshold lines.** Row `crit` text (e.g. `"SST/EXC ≤85°C ·
+  UAT/SUT/GSUT ≤95°C alarm"`) is shown verbatim under the chart, not parsed into
+  a drawn limit line — the per-equipment-column threshold can't be split
+  reliably out of that free text, and a wrong line would be worse than no line.
+- **Delta color-coding is deliberately split in two:** a numeric parameter's
+  up/down arrow uses neutral blue/indigo (`.up`/`.down` — we don't know whether
+  *any* given parameter trending up is good or bad), while a status parameter's
+  change uses real green/red (`.good`/`.bad`, `trendGoodness()`) because OK↔NG
+  genuinely is a quality judgement the technician already made. Don't collapse
+  these back into one color scheme — that was tried in an earlier draft of this
+  feature and silently implied "higher = worse" for parameters where that isn't
+  true.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that
