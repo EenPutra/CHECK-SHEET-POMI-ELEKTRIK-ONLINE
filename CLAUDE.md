@@ -7,11 +7,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 A set of standalone HTML "PM check sheet" forms for POMI's Electric Unit 7/8 electrical
 maintenance team (motors, transformers, switchgear, UPS, batteries, ESP, hoists, generator
 brush gear, etc.), plus a shared `dashboard.html` that reads every submission back out of
-Firestore for review and Excel export. There is **no build step, no bundler, no package.json,
+Firestore for review, Excel export, and a Transformer PM parameter trend chart (see the
+`dashboard.html` section below). There is **no build step, no bundler, no package.json,
 no test suite** — every page is a single self-contained `.html` file with inline `<style>`
-and `<script>`, sharing two small JS files (`firebase-config.js`, `db-helper.js`) and a couple
-of PNG assets (`LOGO POMI.png`, `brush_magazine_diagram.png`) via plain `<script src>`/`<img src>`
-tags.
+and `<script>`, sharing four small JS files (`firebase-config.js`, `db-helper.js`,
+`img-helper.js`, `photo-kit.js` — the last two are the shared evidence-photo pipeline, see
+"Photos" below) and a couple of PNG assets (`LOGO POMI.png`, `brush_magazine_diagram.png`) via
+plain `<script src>`/`<img src>` tags.
 
 ## Running / testing changes
 
@@ -26,8 +28,34 @@ tags.
 - There is no linter or test command. Verify JS changes with `node --check` on the extracted
   inline `<script>` body before considering an edit done, since a syntax error inside one
   `<script>` block silently kills every function defined after it on that page.
-- No headless/browser test harness exists in this repo; manual verification means opening the
-  page and clicking through Draft/Submit DB/Download PDF.
+- **There is no *committed* test harness, but headless Chrome driven over the DevTools Protocol
+  (CDP) works well as an ad hoc one and was used throughout the photo-pipeline and
+  `dashboard.html` trend-chart work** — don't assume "no test suite" means no way to verify JS
+  logic without a human clicking through the UI. The pattern: serve the folder
+  (`python3 -m http.server 8765`), launch
+  `google-chrome --headless=new --disable-gpu --remote-debugging-port=9333 --remote-allow-origins=* <url>`,
+  then drive it from Node with the `ws` package — `GET /json/list` on port 9333 to find the tab,
+  open its `webSocketDebuggerUrl`, and send `Runtime.evaluate` (with `awaitPromise:true` for an
+  async IIFE) to run arbitrary JS in the page and read back `window.__res`/`window.__done`. This
+  lets a session inject synthetic data (`allData = [...]` for `dashboard.html`, fake `PHOTOS`/
+  `FILES` entries for a check sheet), call the page's own functions directly (`renderParamTrend()`,
+  `addTrendSeries()`, `generatePDF()`, …), and assert on real return values / DOM / Chart.js
+  instance state — not just "did it throw". `Page.captureScreenshot` (full page, or a `clip` from
+  an element's `getBoundingClientRect()`) gives a visual check without a human in the loop. Two
+  gotchas that cost real debugging time: (1) a `<script>`-defined top-level `let`/`const` is a
+  lexical binding, not a `window` property — assign to it directly (`allData = [...]`, no
+  `window.` prefix) or a later `Runtime.evaluate` reading `allData` won't see the change; (2) give
+  the page enough time to finish loading its CDN scripts (Chart.js, Firestore SDK, jsPDF) before
+  the first `Runtime.evaluate` — 6–8s is not always enough, a `getElementById(...) === null`
+  error on an element that definitely exists in the HTML is the symptom, not a real bug.
+  `dashboard.html`'s login gate is a pure client-side check, not a Firestore security rule — for
+  read-only investigation, `document.getElementById('login-overlay').style.display='none'` plus
+  calling `loadData()` directly reaches real Firestore data without needing dashboard credentials
+  (this is how the `TREND_LEGACY_SOURCE` gap was found and confirmed — see below). Never use this
+  read access path to *write*; treat any write-triggering call (`DB.save`, `submitToDb()`,
+  `generatePDF()`'s own `pdf.save()`) as a real action requiring the same care as if a human
+  clicked the button, and confirm with the user first if a session's test plan would trigger one
+  against production data.
 
 ## The data contract that must stay consistent
 
@@ -248,12 +276,23 @@ itself, following this same pattern for consistency:
   box to `addImage()` stretches the photo, because jsPDF scales the axes independently.
 
 - **Verifying changes to `generatePDF()`**: `pdf.save()` triggers a real browser download, so it
-  can't be checked with a normal print-to-PDF screenshot. To inspect actual output, temporarily
-  replace the `pdf.save(...)` line with
-  `window.__pdfDataUri = pdf.output('datauristring'); window.__pdfDone = true;` in a scratch copy,
-  drive it with headless Chrome over the DevTools protocol (`--remote-debugging-port`,
-  `--remote-allow-origins=*`), poll for `window.__pdfDone`, then read back `window.__pdfDataUri`
-  and decode it to a `.pdf` file. Never leave this debug hook in the committed file.
+  can't be checked with a normal print-to-PDF screenshot. Uses the same headless-Chrome/CDP
+  technique as "Running / testing changes" above; two ways to capture the output without ever
+  editing the committed file:
+  - **Preferred — patch the method at runtime, not the file**: from the CDP driver, before calling
+    `generatePDF()`, run
+    `const API=window.jspdf.jsPDF.API; const orig=API.save; API.save=function(){window.__pdfDataUri=this.output('datauristring');return this;};`
+    then call `generatePDF()` and restore `API.save=orig` after. No file edit, no debug hook to
+    remember to revert — this is what the PhotoKit rollout used to generate real PDFs from
+    synthetic photo data across a dozen check sheets.
+  - **Older/simpler variant**: temporarily replace the `pdf.save(...)` line with
+    `window.__pdfDataUri = pdf.output('datauristring'); window.__pdfDone = true;` in a scratch
+    copy of the file, poll for `window.__pdfDone`. Only use this if the API-patch approach doesn't
+    fit (e.g. the sheet doesn't expose `window.jspdf`); never leave the hook in the committed file.
+
+  Either way, decode `window.__pdfDataUri` (strip the `data:...;base64,` prefix, `base64 -d`) to a
+  real `.pdf`, then `pdftoppm`/`pdftotext` it to check the actual rendered page rather than
+  trusting the JS didn't throw.
 
 - **Charts in the PDF (e.g. megger insulation-resistance trend graphs)**: no charting library is
   needed — draw a plain `<canvas>` per chart with a small hand-rolled line-chart function (axes,
