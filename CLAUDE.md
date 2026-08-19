@@ -585,6 +585,51 @@ previous parameter would silently mislead once the chart switches to, say,
 kV. Hidden entirely for the status-strip chart (`soloStatus`), since OK/NG
 bars have no magnitude to scale.
 
+**The table/stat-cards/charts/export show one row per real visit by default,
+not one row per Firestore document.** Field technicians sometimes hit "Submit
+to Database" more than once for the same visit (a flaky connection, or just
+wanting to be sure it saved), which piles up several near-identical documents
+under one WO/date — `dedupeSubmissions(docs)` collapses each such cluster down
+to the newest `createdAt` doc. It's a one-line delegate to `DB.dedupeLatest()`
+in db-helper.js — the dedup algorithm lives there (shared with any other page
+that wants it), not duplicated in dashboard.html. Full writeup, the real-data
+evidence, and how to port this to another check sheet's own submission list:
+see `DEDUP_LATEST_SUBMISSION.md`.
+
+**Grouping on `assetTag + woNumber + executionDate` alone is NOT safe** — an
+earlier version of this feature did exactly that and was caught before ship by
+checking it against real production data: 191 documents, 38 same-key groups,
+one of them (a transformer, key repeated 16 times) actually spanned **three
+separate real weekly visits** with different `countOk` results each time, all
+sharing one stale `executionDate` a technician never edited across drafts.
+Naive key-only dedup would have silently thrown away 2 of those 3 real weeks.
+The fix: two docs only count as "the same visit, resubmitted" if they also
+share a key AND their `createdAt` timestamps land within `CLUSTER_GAP_HOURS`
+(24h) of each other — real data shows a clean split, genuine resubmits
+cluster within ~21h, genuinely different visits sharing a stale date are
+≥70h apart (up to 358h), so 24h sits safely in the gap. `DB.dedupeLatest()`
+sorts each key-group by `createdAt`, walks it, and starts a new cluster
+whenever the gap to the previous doc exceeds `CLUSTER_GAP_HOURS`, keeping only
+the last (newest) doc of each cluster. `createdAt` (not `executionDate`)
+drives both the key-free tie-break and the clustering because it's the one
+field that can't go stale — set once, client-side, at the moment of
+`DB.save()` — the same reasoning `TREND_LEGACY_SOURCE`'s date-collision
+handling above already relies on. A document missing `assetTag` or `woNumber`
+can't be grouped safely and is always kept as its own row.
+
+This never touches Firestore or deletes anything — `allDataRaw` always holds
+every document `DB.getAll()` returned (raw, undeduped — that's `getAll()`'s
+default now); `allData` (what the table, `computeStatsFrom()`, the charts,
+and `exportExcel()` all actually read) is `allDataRaw` deduped, or
+`allDataRaw` verbatim when the "Submission terbaru saja" checkbox
+(`#toggle-history`) is unchecked — `toggleShowAllHistory()` flips
+`showAllHistory` and calls `applyDedupeToggle()` to re-derive everything from
+`allDataRaw` without a network round-trip. **`DB.getStats()` in db-helper.js
+is intentionally no longer called from here** — it runs its own separate,
+non-deduped Firestore query, which would silently disagree with what the
+table shows; the stat cards are now driven by `computeStatsFrom(allData)` (a
+local port of the same aggregation logic) so they always match.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that

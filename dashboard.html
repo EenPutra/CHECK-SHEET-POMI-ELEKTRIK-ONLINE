@@ -374,6 +374,17 @@ body::after{
 }
 .filter-bar select:hover,.filter-bar input:hover{border-color:var(--bdr-2)}
 .filter-bar select:focus,.filter-bar input:focus{border-color:var(--pri);box-shadow:0 0 0 4px rgba(37,99,235,0.10)}
+.history-toggle{
+  display:inline-flex;align-items:center;gap:7px;margin-left:auto;
+  font-family:var(--body);font-size:12.5px;font-weight:600;color:var(--txt-2);
+  cursor:pointer;user-select:none;white-space:nowrap;
+}
+.history-toggle input{width:15px;height:15px;accent-color:var(--pri);cursor:pointer}
+.dedupe-badge{
+  font-family:var(--mono);font-size:11px;color:#92400e;background:var(--acc-soft);
+  border:1px solid rgba(245,158,11,0.3);padding:2px 9px;border-radius:20px;
+  margin-left:10px;white-space:nowrap;
+}
 
 .del-bar{display:none;align-items:center;gap:12px;padding:12px 22px;background:var(--rose-soft);border-bottom:1px solid rgba(244,63,94,0.20)}
 .del-bar.show{display:flex}
@@ -917,6 +928,7 @@ table.dtbl tr:last-child td{border-bottom:none}
       <div style="display:flex;align-items:center;flex-wrap:wrap">
         <div class="table-hdr-title">Riwayat Check Sheet</div>
         <div class="table-hdr-count" id="tbl-count">Memuat data...</div>
+        <div class="dedupe-badge" id="dedupe-badge" style="display:none"></div>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-excel" onclick="exportExcel()">
@@ -951,6 +963,10 @@ table.dtbl tr:last-child td{border-bottom:none}
       <input type="date" id="f-from" onchange="applyFilters()" title="Dari tanggal">
       <input type="date" id="f-to" onchange="applyFilters()" title="Sampai tanggal">
       <button class="btn btn-outline" onclick="clearFilters()" style="font-size:12px;padding:8px 14px">Reset</button>
+      <label class="history-toggle" title="Kalau dimatikan, semua submission duplikat (WO &amp; tanggal sama) ikut ditampilkan — berguna untuk audit atau menghapus duplikat lama.">
+        <input type="checkbox" id="toggle-history" checked onchange="toggleShowAllHistory()">
+        Submission terbaru saja
+      </label>
     </div>
 
     <div class="tbl-wrap">
@@ -1016,10 +1032,84 @@ table.dtbl tr:last-child td{border-bottom:none}
 </div>
 
 <script>
-let allData = [];
+let allData = [];       // what the table/stats/charts/export actually use — deduped by default
+let allDataRaw = [];    // exactly what Firestore returned, duplicates included
 let filteredData = [];
 let loggedInUser = null;
 let cachedStats = null;
+let showAllHistory = false;   // "Submission terbaru saja" checkbox is checked by default -> this starts false
+
+// ── DEDUPE: keep only the newest submission per real visit ──
+// Technicians in the field sometimes hit "Submit to Database" more than once
+// for the same visit (worried about losing data over a flaky connection or a
+// draft that never got saved), which piles up several near-identical
+// documents under one WO/date. This never touches Firestore — the raw history
+// is always still there and one "Submission terbaru saja" checkbox away — it
+// only decides what the dashboard counts and displays by default, so stat
+// cards, charts, the table, and Excel export don't all triple-count the same
+// visit.
+//
+// Delegates to DB.dedupeLatest() (db-helper.js) rather than re-implementing
+// the grouping here — see that function's comment, and DEDUP_LATEST_SUBMISSION.md,
+// for why grouping on (assetTag, woNumber, executionDate) alone is NOT safe
+// (some check sheets pre-fill executionDate from the last draft, and a
+// technician can leave it unedited across real, different weekly visits —
+// confirmed against production data) and why CLUSTER_GAP_HOURS-based time
+// clustering on createdAt is required on top of that key.
+function dedupeSubmissions(docs) {
+  return DB.dedupeLatest(docs);
+}
+
+// Mirrors DB.getStats() in db-helper.js, but runs on already-fetched data
+// instead of a second Firestore query — so stat cards/charts always agree
+// with exactly what the table below is showing (deduped or not), and so
+// toggling "Submission terbaru saja" doesn't need a network round-trip.
+function computeStatsFrom(docs) {
+  const total = docs.length;
+  const byAsset = {}; const byMonth = {};
+  let totalOk = 0, totalNg = 0, totalNa = 0;
+  docs.forEach(d => {
+    const tag = d.assetTag || 'Unknown';
+    if (!byAsset[tag]) byAsset[tag] = { total: 0, ok: 0, ng: 0 };
+    byAsset[tag].total++;
+    const ok = parseInt(d.countOk) || 0, ng = parseInt(d.countNg) || 0, na = parseInt(d.countNa) || 0;
+    totalOk += ok; totalNg += ng; totalNa += na;
+    byAsset[tag].ok += ok; byAsset[tag].ng += ng;
+    const month = (d.executionDate || d.createdAt || '').substring(0, 7);
+    if (month) {
+      if (!byMonth[month]) byMonth[month] = { submissions: 0, ok: 0, ng: 0 };
+      byMonth[month].submissions++; byMonth[month].ok += ok; byMonth[month].ng += ng;
+    }
+  });
+  return { total, totalOk, totalNg, totalNa, byAsset, byMonth };
+}
+
+// Re-derives `allData` (and everything downstream of it) from `allDataRaw`
+// per the current toggle state — called on load and whenever the toggle
+// flips, never needs to re-fetch from Firestore.
+function applyDedupeToggle() {
+  const deduped = dedupeSubmissions(allDataRaw);
+  allData = showAllHistory ? allDataRaw : deduped;
+  const hidden = allDataRaw.length - deduped.length;
+  const badge = document.getElementById('dedupe-badge');
+  if (!showAllHistory && hidden > 0) {
+    badge.textContent = `${hidden} duplikat disembunyikan`;
+    badge.style.display = 'inline';
+  } else {
+    badge.style.display = 'none';
+  }
+  const stats = computeStatsFrom(allData);
+  cachedStats = stats;
+  renderStats(stats);
+  renderCharts(stats);
+}
+
+function toggleShowAllHistory() {
+  showAllHistory = !document.getElementById('toggle-history').checked;
+  applyDedupeToggle();
+  populateAssetFilter();
+  applyFilters();
+}
 
 /* ── AUTH ── */
 async function hashPass(str) {
@@ -1109,11 +1199,8 @@ async function loadData() {
   document.getElementById('empty-state').style.display = 'none';
 
   try {
-    allData = await DB.getAll();
-    const stats = await DB.getStats();
-    cachedStats = stats;
-    renderStats(stats);
-    renderCharts(stats);
+    allDataRaw = await DB.getAll();
+    applyDedupeToggle();   // sets allData (deduped or not) + stat cards + charts from allDataRaw
     populateAssetFilter();
     initParamTrend();
     applyFilters();

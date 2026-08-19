@@ -5,6 +5,60 @@
 const DB = {
   COLLECTION: 'checksheets',
 
+  // A technician re-submitting the same job to make sure it isn't lost creates
+  // a brand-new Firestore document every time (save() always .add()s, never
+  // updates) — so without de-duplication, the dashboard's stats/charts/table
+  // count the same PM job 2x, 5x, sometimes 19x. See DEDUP_LATEST_SUBMISSION.md
+  // for the full writeup, the real-data evidence, and how to port this to
+  // another project's own "list latest submissions" query.
+  //
+  // Grouping on (assetTag, woNumber, executionDate) alone is NOT safe: some
+  // check sheets pre-fill executionDate from the last draft, and a technician
+  // can leave it unedited across REAL, DIFFERENT weekly visits — confirmed
+  // directly against production data (one group of 16 "same" submissions
+  // actually spanned two real weeks with different results each time). Two
+  // submissions only count as "the same visit, resubmitted" if their
+  // createdAt timestamps are also close together; CLUSTER_GAP_HOURS is that
+  // cutoff. Real data shows a clean split: genuine resubmissions land within
+  // ~21h of each other, genuinely different visits sharing a stale date are
+  // ≥70h apart — 24h sits safely in that gap.
+  CLUSTER_GAP_HOURS: 24,
+
+  // Keeps the newest document per "visit cluster": documents that share
+  // (assetTag, woNumber, executionDate) AND whose createdAt timestamps are
+  // within CLUSTER_GAP_HOURS of their neighbors collapse to just the latest
+  // one. A document missing assetTag or woNumber can't be grouped safely and
+  // is always kept as its own row, rather than risking merging two unrelated
+  // submissions under an empty key.
+  dedupeLatest(docs) {
+    const groups = new Map();
+    docs.forEach(d => {
+      const tag = (d.assetTag || '').trim();
+      const wo = (d.woNumber || '').trim();
+      if (!tag || !wo) return;
+      const key = tag + '||' + wo + '||' + (d.executionDate || '').trim();
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(d);
+    });
+
+    const keep = new Set();
+    const gapMs = this.CLUSTER_GAP_HOURS * 3600 * 1000;
+    groups.forEach(list => {
+      const sorted = [...list].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+      for (let i = 0; i < sorted.length; i++) {
+        const isClusterEnd = i === sorted.length - 1 ||
+          (new Date(sorted[i + 1].createdAt || 0) - new Date(sorted[i].createdAt || 0)) > gapMs;
+        if (isClusterEnd) keep.add(sorted[i]);   // newest doc in this cluster (ascending sort -> last)
+      }
+    });
+
+    return docs.filter(d => {
+      const tag = (d.assetTag || '').trim();
+      const wo = (d.woNumber || '').trim();
+      return (!tag || !wo) || keep.has(d);
+    });
+  },
+
   async save(data) {
     data.submittedAt = firebase.firestore.FieldValue.serverTimestamp();
     data.createdAt = new Date().toISOString();
@@ -17,7 +71,12 @@ const DB = {
     if (filters.assetTag) query = query.where('assetTag', '==', filters.assetTag);
     if (filters.status) query = query.where('overallStatus', '==', filters.status);
     const snap = await query.get();
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    // Raw by default — dashboard.html keeps its own `allDataRaw` (exactly this
+    // list, duplicates included) so its "Submission terbaru saja" toggle can
+    // switch views without a network round-trip; call dedupeLatest() yourself
+    // (or pass {dedupe:true}) where you specifically want the collapsed view.
+    return filters.dedupe === true ? this.dedupeLatest(docs) : docs;
   },
 
   async getById(id) {
