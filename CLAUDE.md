@@ -508,11 +508,14 @@ To add a new check sheet's card to the portal, do **not** try to reconstruct or 
 "Transformer PM Trend Analysis" panel — pick a check sheet, a parameter, and a
 piece of equipment, and see that parameter's value across every past PM for that
 asset, compared against the immediately preceding submission. Multiple parameters
-can be pinned into the same chart to compare them against each other. It is
-deliberately scoped to the two **weekly Transformer AT** sheets only
-(`Transformer_AT_NoDGA_Weekly.html` and `Transformer_AT_DGA_Weekly.html`) — this
-was a first rollout on one data set, not a general trend feature for every check
-sheet.
+can be pinned into the same chart to compare them against each other. It started
+scoped to the two **weekly Transformer AT** sheets only (`Transformer_AT_NoDGA_Weekly.html`
+and `Transformer_AT_DGA_Weekly.html`) as a first rollout on one data set — since
+extended to `ESP_7BGPCP800A_B.html` ("ESP Weekly Maintenance") too, see the
+`TREND_SHEET_KEYS` bullet below for what a multi-sheet check sheet like ESP needs
+that a single-sheet one doesn't. Still not a blanket feature for every check
+sheet — extending further means going through the `TREND_ASSETS` checklist below
+for whichever sheet is next.
 
 **Single vs multi-parameter is a chip builder, not two separate UIs.** The
 Parameter/Equipment selects only ever *stage* a candidate; `TREND_SERIES` (an
@@ -551,11 +554,47 @@ when changing this.
   beyond `.trend-table-wrap`'s `overflow-x:auto`.
 
 - **`TREND_ASSETS`** (assetTag → label) is the whitelist of check sheets the panel
-  offers. Extending to another weekly sheet only works if that sheet's
-  `base.sheets.main.rows` follow the same shape everyone else already uses (see
-  "The data contract" above): `{section, no, desc, crit, values}` with `values`
-  keyed by an equipment/column tag. Add the tag to `TREND_ASSETS` and — if any of
-  its numeric rows should show a unit — add a matching entry to `TREND_UNITS`.
+  offers. Extending to another weekly sheet only works if that sheet's rows
+  follow the same shape everyone else already uses (see "The data contract"
+  above): `{section, no, desc, crit, values}` with `values` keyed by an
+  equipment/column tag. Add the tag to `TREND_ASSETS` and — if any of its
+  numeric rows should show a unit — add a matching entry to `TREND_UNITS`.
+- **`TREND_SHEET_KEYS`** covers a check sheet whose CURRENT data lives across
+  more than one `sheets` key — not a legacy/pre-split case (that's
+  `TREND_LEGACY_SOURCE` below), just how the sheet saves today.
+  `ESP_7BGPCP800A_B.html` is the example: it saves `sA`..`sF` (one per
+  equipment zone — Rectifier Transformer, four Rapping Motor zones, Hopper
+  Heater) plus `sF2`, never a `main` key. `trendSheetKeysFor(tag)` returns
+  `TREND_SHEET_KEYS[tag]` or `['main']` by default, and `trendMergedRowsFor(d,
+  sheetKeys)` in `onTrendSheetChange()` flattens every listed key's rows/columns
+  into one combined `(rows, columns)` pair per submission before anything else
+  runs — every other function downstream (`buildSeriesPoints`, params/equips
+  lists, `renderTrendCrit`, …) treats it exactly like a single `main` sheet
+  after that point, no other special-casing needed.
+  **This merge is NOT safe to do naively by no+desc alone.** ESP's four Rapping
+  Motor zones (`sB`/`sC`/`sD`/`sE`) run the IDENTICAL 5-item checklist
+  (`'1' — Overheating (°C)'`, `'2' — Lubrication Leakage'`, …) against 4
+  different equipment sets that never overlap (`COLS_B`..`COLS_E`) — keying a
+  parameter by `no+desc` alone would collapse all 4 zones' identical-looking
+  rows into ONE dropdown entry (whichever sheet's row a submission happens to
+  list first), making the other 3 zones' history completely unreachable from
+  the trend selector. Confirmed against real data before shipping: naively
+  keyed, only zone B's "Lubrication Leakage" was reachable; C/D/E's identical
+  item silently vanished. The fix is `trendRowKey(r)` — `section + '||' + no +
+  '||' + desc` instead of just `no + '||' + desc` — used everywhere a
+  param/row key is built or matched (`buildSeriesPoints`, the params-list
+  builder, `onTrendParamChange`, `renderTrendCrit`). `trendMergedRowsFor()`
+  stamps `section` with the sheet's own `title` on any row that doesn't
+  already carry one, so this costs nothing for sheets like Transformer's
+  `main` whose rows already have unique `section` values within their one
+  sheet — the extra key segment is a no-op there. Verified post-fix against
+  real ESP data (20 submissions) that all 4 zones' "Lubrication Leakage" now
+  appear as separate optgroup entries, each correctly scoped to its own 8
+  equipment codes with zero overlap between zones.
+  `onTrendParamChange()`'s existing "only offer equipment columns with real
+  data for this row" filter (unchanged) is what keeps the Equipment dropdown
+  narrowed to the right subset once a specific zone's parameter is picked —
+  no separate equipment-scoping logic was needed on top of `trendRowKey()`.
 - **`TREND_UNITS`** exists because `collectSheetData()` in the check sheets never
   saves the unit into `values` (only the technician's raw number — the unit is a
   sibling `<span>` in the DOM, not part of the saved value). The map mirrors each

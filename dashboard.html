@@ -1429,7 +1429,8 @@ function renderCharts(stats) {
 // ══════════════════════════════════════════════════
 const TREND_ASSETS = {
   '7EX-XFMR-AT':     'Transformer AT — Without DGA (Weekly)',
-  '7EX-XFMR-AT-DGA': 'Transformer AT + DGA (Weekly)'
+  '7EX-XFMR-AT-DGA': 'Transformer AT + DGA (Weekly)',
+  '7BG-PCP-800A/B':  'ESP Weekly Maintenance'
 };
 
 // Firestore only stores the technician's raw typed number (see
@@ -1462,6 +1463,18 @@ const TREND_UNITS = {
     'I.2||Filter Differential Pressure': 'MPa',
     'K.1||N₂ Bottle Pressure': 'psi', 'K.2||XFMR Tank Pressure': 'psi',
     '||SF₆ Gas Pressure': 'MPa'
+  },
+  '7BG-PCP-800A/B': {
+    '1||Ambient Temp. (°C)': '°C',
+    '2||AC Input Voltage T/R (V)': 'V',
+    '3||AC Input Current T/R (A)': 'A',
+    '4||DC Output Voltage T/R (kV)': 'kV',
+    '5||DC Output Current T/R (mA)': 'mA',
+    '6||DC Current Limit Is (mA)': 'mA',
+    '6b||DC Voltage Limit Vs (kV)': 'kV',
+    '8||Oil Temperature (°C)': '°C',
+    '1||Overheating (°C)': '°C',
+    '1||Hopper Heater Current (A)': 'A'
   }
 };
 
@@ -1479,6 +1492,46 @@ const TREND_LEGACY_SOURCE = {
   '7EX-XFMR-AT': { tag: '7EX-XFMR', sheetKey: 's2' },
   '7EX-XFMR-AT-DGA': { tag: '7EX-XFMR', sheetKey: 's1' }
 };
+
+// Every other asset here saves ONE current sheet ('main'). ESP Weekly
+// Maintenance (ESP_7BGPCP800A_B.html) instead splits its checklist across six
+// sheet keys — sA..sF for the five equipment groups (Rectifier Transformer,
+// four Rapping Motor zones, Hopper Heater) plus sF2 (panel cleaning) — each
+// with its OWN distinct set of equipment columns (COLS_A..COLS_F never
+// overlap). List every sheet key that should be merged into one trend history
+// per asset tag here; anything not listed defaults to just ['main'].
+const TREND_SHEET_KEYS = {
+  '7BG-PCP-800A/B': ['sA', 'sB', 'sC', 'sD', 'sE', 'sF', 'sF2']
+};
+function trendSheetKeysFor(tag) { return TREND_SHEET_KEYS[tag] || ['main']; }
+
+// Several of ESP's sheets (sB/sC/sD/sE, the four Rapping Motor zones) reuse
+// the EXACT same no+desc text for their checklist items ('1' — Overheating,
+// '2' — Lubrication Leakage, …) since it's the same 5-item checklist run
+// against 4 different equipment zones. Keying a parameter by no+desc alone
+// would silently collapse all 4 zones into ONE dropdown entry — whichever
+// sheet's row is seen first — and make the other 3 zones' data unreachable
+// from the trend selector. Folding in `section` (which trendMergedRowsFor()
+// below stamps with the sheet's own title when a row doesn't already carry
+// one) keeps every sheet's rows distinct. Transformer's own rows already
+// carry unique no+desc within their one sheet, so this is a no-op there.
+function trendRowKey(r) { return (r.section || '') + '||' + (r.no || '') + '||' + (r.desc || ''); }
+
+// Merges every configured sheet key's rows/columns for one submission into a
+// single (rows, columns) pair that the rest of the trend code can treat as if
+// it came from one flat sheet — each row stamped with which sheet it came
+// from (via `section`) so trendRowKey() can tell otherwise-identical rows
+// from different sheets apart.
+function trendMergedRowsFor(d, sheetKeys) {
+  const rows = [], columns = [];
+  sheetKeys.forEach(sk => {
+    const sheet = d.sheets && d.sheets[sk];
+    if (!sheet || !sheet.rows) return;
+    sheet.rows.forEach(r => rows.push(r.section ? r : { ...r, section: sheet.title || sk }));
+    (sheet.columns || []).forEach(c => { if (!columns.includes(c)) columns.push(c); });
+  });
+  return { rows, columns };
+}
 
 let chartParamTrend = null;
 let TR = { tag: '', submissions: [], params: [], equips: [] };  // current-selection scratch state
@@ -1540,7 +1593,7 @@ function buildSeriesPoints(key, equip) {
   // (which already collapses to one point per date via its own by-date Map).
   const byDate = new Map();
   TR.submissions.forEach(s => {
-    const row = s.rows.find(r => (r.no || '') + '||' + (r.desc || '') === key);
+    const row = s.rows.find(r => trendRowKey(r) === key);
     const raw = row && row.values && row.values[equip];
     if (!raw || raw === '—' || raw === 'N/A') return;
     byDate.set(s.date, { date: s.date, wo: s.raw.woNumber || '-', raw, numeric: trendParseNumeric(raw) });
@@ -1551,13 +1604,15 @@ function buildSeriesPoints(key, equip) {
 // A tag "has data" if either its own submissions exist, or its legacy source
 // (the pre-split combined weekly inspection) does.
 function trendHasAnyData(tag) {
-  if (allData.some(d => d.assetTag === tag && d.sheets && d.sheets.main && d.sheets.main.rows)) return true;
+  const keys = trendSheetKeysFor(tag);
+  if (allData.some(d => d.assetTag === tag && d.sheets && keys.some(k => d.sheets[k] && d.sheets[k].rows && d.sheets[k].rows.length))) return true;
   const legacy = TREND_LEGACY_SOURCE[tag];
   return !!(legacy && allData.some(d => d.assetTag === legacy.tag && d.sheets && d.sheets[legacy.sheetKey] && d.sheets[legacy.sheetKey].rows));
 }
 function trendSubmissionCount(tag) {
+  const keys = trendSheetKeysFor(tag);
   const legacy = TREND_LEGACY_SOURCE[tag];
-  const own = allData.filter(d => d.assetTag === tag && d.sheets && d.sheets.main).length;
+  const own = allData.filter(d => d.assetTag === tag && d.sheets && keys.some(k => d.sheets[k])).length;
   const leg = legacy ? allData.filter(d => d.assetTag === legacy.tag && d.sheets && d.sheets[legacy.sheetKey]).length : 0;
   return own + leg;
 }
@@ -1610,9 +1665,11 @@ function onTrendSheetChange(keepSelection) {
 
   if (!tag) { TR = { tag: '', submissions: [], params: [], equips: [] }; updateAddState(); return; }
 
+  const sheetKeys = trendSheetKeysFor(tag);
   const ownSubs = allData
-    .filter(d => d.assetTag === tag && d.sheets && d.sheets.main && d.sheets.main.rows)
-    .map(d => ({ raw: d, date: trendDateOf(d), rows: d.sheets.main.rows, columns: d.sheets.main.columns || [] }));
+    .filter(d => d.assetTag === tag && d.sheets)
+    .map(d => { const m = trendMergedRowsFor(d, sheetKeys); return { raw: d, date: trendDateOf(d), rows: m.rows, columns: m.columns }; })
+    .filter(s => s.rows.length);
   const legacy = TREND_LEGACY_SOURCE[tag];
   const legacySubs = legacy ? allData
     .filter(d => d.assetTag === legacy.tag && d.sheets && d.sheets[legacy.sheetKey] && d.sheets[legacy.sheetKey].rows)
@@ -1647,7 +1704,7 @@ function onTrendSheetChange(keepSelection) {
   // first-seen order, grouped by the section header it appeared under.
   const seenParam = new Set(); const params = [];
   submissions.forEach(s => s.rows.forEach(r => {
-    const k = (r.no || '') + '||' + (r.desc || '');
+    const k = trendRowKey(r);
     if (!r.desc || seenParam.has(k)) return;
     seenParam.add(k);
     params.push({ key: k, no: r.no || '', desc: r.desc, section: r.section || '' });
@@ -1706,7 +1763,7 @@ function onTrendParamChange(keepEquip) {
   // parameter somewhere in the history — a column that is always N/A for this
   // row (e.g. OLTC level on a transformer without an OLTC) isn't worth listing.
   const withData = TR.equips.filter(eq => TR.submissions.some(s => {
-    const row = s.rows.find(r => (r.no || '') + '||' + (r.desc || '') === key);
+    const row = s.rows.find(r => trendRowKey(r) === key);
     const v = row && row.values && row.values[eq];
     return v && v !== '—' && v !== 'N/A';
   }));
@@ -1931,7 +1988,7 @@ function renderTrendCompare(seriesData, soloStatus) {
 function renderTrendCrit(seriesData) {
   const critEl = document.getElementById('trend-crit');
   const withCrit = seriesData.map(s => {
-    const rows = TR.submissions.map(sub => sub.rows.find(r => (r.no || '') + '||' + (r.desc || '') === s.key)).filter(Boolean);
+    const rows = TR.submissions.map(sub => sub.rows.find(r => trendRowKey(r) === s.key)).filter(Boolean);
     const critText = rows.length ? rows[rows.length - 1].crit : '';
     return critText ? { label: trendSeriesLabel(s), crit: critText } : null;
   }).filter(Boolean);
