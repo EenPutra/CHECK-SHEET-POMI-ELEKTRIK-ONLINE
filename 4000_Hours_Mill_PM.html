@@ -324,6 +324,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
           <option value="E">4000 Hours Mill E</option>
           <option value="F">4000 Hours Mill F</option>
       </select>
+      <button type="button" class="btn btn-outline btn-sm" id="btn-load-db" onclick="loadLastFromDb()" disabled title="Pilih Mill terlebih dahulu">📥 Tarik Data Terakhir</button>
     </div>
     <div class="tag-summary" id="tag-summary">
       <div class="ss-empty">Pilih Mill di atas untuk melihat 5 asset tag yang akan digunakan.</div>
@@ -846,6 +847,8 @@ function onMillChange(){
   const letter = document.getElementById('mill-select').value;
   selectedMillLetter = letter || null;
   const summary = document.getElementById('tag-summary');
+  const loadBtn = document.getElementById('btn-load-db');
+  if(loadBtn){ loadBtn.disabled = !letter; loadBtn.title = letter ? '' : 'Pilih Mill terlebih dahulu'; }
 
   if(!letter){
     summary.innerHTML = '<div class="ss-empty">Pilih Mill di atas untuk melihat 5 asset tag yang akan digunakan.</div>';
@@ -1785,6 +1788,83 @@ function collectAssetSheets(a, tag){
 }
 
 // ═══════════════════════════════════════════════════
+//  LOAD LAST SUBMISSION FROM DATABASE (button, not automatic)
+// ═══════════════════════════════════════════════════
+// Pulls the most recent combined record for the currently selected Mill
+// (assetTag 'MILL-<letter>-4000H') and restores it into the form — mirrors
+// loadDraft()'s own restore logic (same generic-sweep-by-id approach) but
+// sources values from Firestore instead of localStorage.
+async function loadLastFromDb(){
+  if(!selectedMillLetter){ showNote('❌ Pilih Mill (A–F) terlebih dahulu.', 'err'); return; }
+  // Only warn on real user-entered progress — tag/desc/motor-data fields are
+  // auto-derived the moment a Mill is picked, so checking every input would
+  // always look "dirty" and prompt on first use.
+  const hasData = Object.keys(resultState).length > 0 || !!gv('checked-by') || !!gv('wo-no') ||
+    [...document.querySelectorAll('input[id^="meg-"],input[id^="rtd-"],input[id^="rmk-"],input[id^="pi-"],input[id^="dar-"]')].some(el => el.value);
+  if(hasData && !confirm('Menarik data terakhir akan menimpa data yang sudah diisi di form ini. Lanjutkan?')) return;
+
+  const millTag = 'MILL-'+selectedMillLetter+'-4000H';
+  showNote('⏳ Menarik data terakhir dari database...', 'info');
+  try{
+    const snap = await db.collection(DB.COLLECTION)
+      .where('assetTag', '==', millTag)
+      .orderBy('createdAt', 'desc').limit(1).get();
+    if(snap.empty){ showNote('ℹ️ Belum ada data tersimpan untuk Mill '+selectedMillLetter+'.', 'info'); return; }
+    const d = snap.docs[0].data();
+    const iv = d.inputValues || {};
+
+    // Pre-create RTD rows (rtd-<prefix>-<n>-loc/-val) before setting their
+    // values — these are added on demand via "+ Add RTD" and don't exist in
+    // the DOM until then, unlike every other field on this page.
+    const rtdMax = {};
+    Object.keys(iv).forEach(k => {
+      const m = k.match(/^rtd-([a-z0-9]+)-(\d+)-(loc|val)$/);
+      if(m){ const p = m[1], n = parseInt(m[2],10); rtdMax[p] = Math.max(rtdMax[p]||0, n); }
+    });
+    Object.entries(rtdMax).forEach(([prefix, max]) => {
+      while((rtdCount[prefix]||0) < max) addRTDInput(prefix);
+    });
+
+    // Generic restore: every plain input/select/textarea captured by id
+    document.querySelectorAll('input,select,textarea').forEach(el => {
+      if(el.id && iv[el.id] !== undefined) el.value = iv[el.id];
+    });
+
+    // Re-sync .r-sel styling + resultState for every restored result dropdown
+    document.querySelectorAll('.r-sel').forEach(sel => {
+      if(!sel.id.startsWith('res-') || !sel.value) return;
+      onResChange(sel, sel.id.slice(4));
+    });
+
+    // OL sizing state (LV tabs' item 6) isn't a plain input — restore from
+    // olData if the source submission has it (older records may not).
+    if(d.olData){
+      Object.assign(olState, d.olData);
+      Object.entries(d.olData).forEach(([prefix, st]) => {
+        const codeEl = document.getElementById('ol-code-'+prefix);
+        const plugEl = document.getElementById('ol-plug-'+prefix);
+        const setEl  = document.getElementById('ol-setting-'+prefix);
+        if(codeEl) codeEl.textContent = st.code || '—';
+        if(plugEl) plugEl.textContent = (st.plug!=null) ? st.plug : '—';
+        if(setEl)  setEl.textContent  = (st.setting!=null) ? st.setting+'%' : '—';
+        document.querySelectorAll(`.sz-btn[data-prefix="${prefix}"]`).forEach((b,i) => b.classList.toggle('active', i === st.size));
+        refreshOLTable(prefix);
+      });
+    }
+
+    // Megger charts + PI/DAR depend on the meg-* inputs just restored above
+    ASSET_DEFS.forEach(a => { if(a.kind==='hv') MEG_ROWS.forEach(r => updateMeggerChart(a.key, r.key)); });
+
+    updateStats();
+    document.getElementById('doc-id-display').textContent = 'Data terakhir dimuat (DOC: '+snap.docs[0].id+')';
+    showNote('📥 Data submisi terakhir untuk Mill '+selectedMillLetter+' berhasil dimuat.', 'ok');
+  }catch(e){
+    console.error('loadLastFromDb error:', e);
+    showNote('❌ Gagal memuat data terakhir: '+e.message, 'err');
+  }
+}
+
+// ═══════════════════════════════════════════════════
 //  FIREBASE SUBMIT (ONE combined record for all 5 assets)
 // ═══════════════════════════════════════════════════
 async function submitToDb(){
@@ -1809,6 +1889,7 @@ async function submitToDb(){
     base.photoCaptions[a.key] = photos.map(p=>p.caption);
   });
   base.photoCount = Object.values(base.photoCounts).reduce((n,c)=>n+c,0);
+  base.olData = JSON.parse(JSON.stringify(olState));
 
   const sels = [...document.querySelectorAll('.r-sel')];
   base.countOk = sels.filter(s=>s.value==='OK').length;

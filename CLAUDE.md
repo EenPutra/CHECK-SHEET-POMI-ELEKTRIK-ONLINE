@@ -449,6 +449,31 @@ pattern rather than inventing a new one:
   `chk.special` and takes a `prefix` argument, instead of copy-pasting each source file's own
   renderer per tab. It's more code up front but avoids five near-duplicate implementations
   drifting apart.
+- **"Load last submission" is a physical button here, not automatic-on-select** — unlike the
+  single-asset check sheets (`HV_Motor_SWGR.html`, the diverged Mill duplicate), where
+  `loadLastFromDb()` fires the instant a tag is picked, this file's `loadLastFromDb()` only runs
+  when the technician clicks "📥 Tarik Data Terakhir" next to the Mill selector (enabled/disabled
+  in step with `onMillChange()`). Automatic-on-select doesn't fit here: picking a Mill letter
+  ALSO auto-fills every tab's tag/description/motor-data fields from `MCC_MOTORS`/`ASSET_DEFS`
+  immediately, so there's no clean moment to distinguish "just picked a Mill" from "user is done
+  and wants historical data" the way a single-tag dropdown can. Queries Firestore directly for the
+  newest `assetTag == 'MILL-<letter>-4000H'` doc (the synthetic per-visit tag `submitToDb()`
+  saves under) and restores it with the same generic-sweep-by-id approach `loadDraft()` already
+  uses for localStorage drafts — reuse that pattern rather than inventing a third restore
+  mechanism if this needs to change. Two things `loadDraft()`'s restore doesn't have to deal with
+  that this DOES: (1) RTD rows (`rtd-<prefix>-<n>-loc`/`-val`) only exist in the DOM once "+ Add
+  RTD" has been clicked `n` times for that prefix — `loadLastFromDb()` pre-creates enough rows
+  (`rtdCount[prefix]` vs the max `n` found in the saved `inputValues`) before setting their
+  values, `loadDraft()` does not do this and will silently drop RTD values on a fresh page where
+  no rows have been added yet if that's ever hit; (2) OL sizing state (`olState[prefix]`, LV tabs'
+  item 6) wasn't being saved to Firestore at all before this feature — `submitToDb()` now also
+  sets `base.olData = JSON.parse(JSON.stringify(olState))` (mirroring what `persistDraft()`
+  already does for the local draft's `_ol` field) so it round-trips; older documents saved before
+  this change simply have no `olData`, which `loadLastFromDb()` treats as "nothing to restore"
+  rather than an error. Guards against clobbering in-progress work with a `confirm()` — but only
+  when `resultState`, `checked-by`, `wo-no`, or a measurement/RTD/remark input already has real
+  user-entered content, NOT just "some input has a value," since tag/desc/motor-data fields are
+  auto-derived the instant a Mill is picked and would make every first use look "dirty."
 
 ## The portal (`index.html`) is a bundled single-page app — do not "fix" it
 
