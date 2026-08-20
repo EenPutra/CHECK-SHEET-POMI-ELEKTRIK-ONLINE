@@ -368,6 +368,19 @@ itself, following this same pattern for consistency:
   too when `rowKey==='rst_g'`, same as a manual edit would) and `autoSaveNow()` (a JS-set `.value`
   doesn't fire the `input`/`change` events autosave's delegated listener depends on, so this has
   to be called explicitly — same reason photo actions do it, see the autosave section above).
+  **Read the file as bytes (`reader.readAsArrayBuffer`), never as text.** The first version of
+  this used `reader.readAsText(file)`, which assumes UTF-8 — instrument-exported `.txt` reports
+  from Windows measurement software are frequently NOT UTF-8 (UTF-16 with or without a BOM, or a
+  legacy ANSI codepage, are both common), and decoding those bytes as UTF-8 turns every character
+  into garbage, so the regex silently matches zero lines and the import looks like it does
+  nothing. `decodeMegFileAttempts(buffer)` sniffs a UTF-16 BOM (`FF FE`/`FE FF`) or UTF-8 BOM
+  first; with no BOM, it counts null bytes at even vs. odd offsets in the first 400 bytes (a long
+  run of one or the other is the tell for un-BOM'd UTF-16 on otherwise-ASCII content) to pick
+  UTF-16LE/BE, and always also tries plain UTF-8 and `windows-1252` as fallbacks —
+  `handleMegImportFile()` runs every candidate decode through `parseMegSeriesFile()` and keeps
+  whichever one actually produced readings, rather than betting on one encoding up front. Verified
+  by round-tripping the same sample data through UTF-8, UTF-16LE+BOM, and UTF-16LE-without-BOM
+  encodings and confirming all three parse to identical values.
 
 - **Never double-escape unicode/JS escapes when a tool writes literal file content.** `Write` and
   `Edit` write the exact bytes you give them — there is no extra string-literal layer to account

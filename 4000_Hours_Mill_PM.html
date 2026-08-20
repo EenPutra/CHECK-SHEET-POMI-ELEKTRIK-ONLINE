@@ -1334,6 +1334,34 @@ function parseMegSeriesFile(text){
   return { values, warnings, readingCount: readings.length };
 }
 
+// Instrument-exported .txt reports are frequently NOT plain UTF-8 (Windows
+// measurement-tool software commonly writes UTF-16, with or without a BOM,
+// or a legacy ANSI codepage) — reading the raw bytes as UTF-8 in that case
+// turns every character into garbage and the parser above would silently
+// match nothing. Read the file as bytes, sniff a BOM if present, and
+// otherwise try the encodings most likely for this kind of export in turn,
+// keeping whichever decode actually yields readings.
+function decodeMegFileAttempts(buffer){
+  const bytes = new Uint8Array(buffer);
+  if(bytes.length >= 2 && bytes[0]===0xFF && bytes[1]===0xFE) return [new TextDecoder('utf-16le').decode(buffer)];
+  if(bytes.length >= 2 && bytes[0]===0xFE && bytes[1]===0xFF) return [new TextDecoder('utf-16be').decode(buffer)];
+  if(bytes.length >= 3 && bytes[0]===0xEF && bytes[1]===0xBB && bytes[2]===0xBF) return [new TextDecoder('utf-8').decode(buffer.slice(3))];
+  // No BOM: a long run of 0x00 bytes on every other byte is the tell for
+  // UTF-16 (LE or BE) without a BOM on what is otherwise plain ASCII text.
+  const sample = bytes.subarray(0, Math.min(bytes.length, 400));
+  let zerosOdd = 0, zerosEven = 0;
+  for(let i=0;i<sample.length;i++){ if(sample[i]===0){ if(i%2===0) zerosEven++; else zerosOdd++; } }
+  const attempts = [];
+  if(zerosOdd > sample.length*0.2) attempts.push(safeDecode('utf-16le', buffer));
+  else if(zerosEven > sample.length*0.2) attempts.push(safeDecode('utf-16be', buffer));
+  attempts.push(safeDecode('utf-8', buffer));
+  attempts.push(safeDecode('windows-1252', buffer));
+  return attempts.filter(Boolean);
+}
+function safeDecode(encoding, buffer){
+  try{ return new TextDecoder(encoding, {fatal:false}).decode(buffer); }catch(e){ return null; }
+}
+
 let _megImportTarget = null;
 function triggerMegImport(prefix, rowKey){
   _megImportTarget = { prefix, rowKey };
@@ -1348,8 +1376,14 @@ function handleMegImportFile(event){
   const { prefix, rowKey } = _megImportTarget;
   const reader = new FileReader();
   reader.onload = () => {
-    const parsed = parseMegSeriesFile(String(reader.result));
+    const attempts = decodeMegFileAttempts(reader.result);
+    let parsed = null;
+    attempts.forEach(text => {
+      const p = parseMegSeriesFile(text);
+      if(p && (!parsed || p.readingCount > parsed.readingCount)) parsed = p;
+    });
     if(!parsed){
+      console.warn('parseMegSeriesFile: no readings found in any decode attempt', { attemptsTried: attempts.length });
       showNote('❌ File tidak dikenali — pastikan ini file report megger dengan bagian "Series Readings".', 'err');
       return;
     }
@@ -1368,7 +1402,7 @@ function handleMegImportFile(event){
     showNote(msg, missing.length ? 'info' : 'ok');
   };
   reader.onerror = () => showNote('❌ Gagal membaca file.', 'err');
-  reader.readAsText(file);
+  reader.readAsArrayBuffer(file);   // raw bytes, so decodeMegFileAttempts() can sniff the real encoding
 }
 
 function drawLineChart(canvas, values, opts){
