@@ -45,6 +45,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .btn-sm{padding:4px 10px;font-size:12px}
 .btn-outline{background:#fff;border:1.5px solid var(--bdr);color:var(--txt2)}
 .btn-outline:hover{border-color:var(--blue);color:var(--blue)}
+.meg-import-btn{margin-left:6px;padding:1px 6px;font-size:11px;font-weight:400;border:1px solid var(--bdr);
+  border-radius:5px;background:#fff;color:var(--txt2);cursor:pointer;vertical-align:middle}
+.meg-import-btn:hover{border-color:var(--blue);background:#eff6ff}
 
 /* ── PDF SHEET-SELECTION MODAL ── */
 #pdf-modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.65);z-index:9999;
@@ -726,6 +729,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   </div>
 </div>
 
+<!-- MEGGER SERIES IMPORT — one shared hidden picker, only PVR-500's megger
+     matrix (the sole 'hv'-kind asset) uses it, see triggerMegImport() -->
+<input type="file" id="meg-import-file" accept=".txt,text/plain" style="display:none" onchange="handleMegImportFile(event)">
+
 <script>
 // ═══════════════════════════════════════════════════
 //  EMBEDDED LETTERHEAD BACKGROUND IMAGE (base64 — avoids canvas
@@ -1025,7 +1032,9 @@ function chkRowHtml(chk, prefix){
   if(chk.special === 'meggerMatrix'){
     const headCells = MEG_TIMES.map(t=>`<th>${t}</th>`).join('');
     const bodyRows = MEG_ROWS.map(r => `<tr>
-      <td style="font-weight:600;background:var(--bg2);white-space:nowrap;text-align:left;padding-left:8px">${r.label}</td>
+      <td style="font-weight:600;background:var(--bg2);white-space:nowrap;text-align:left;padding-left:8px">${r.label}
+        <button type="button" class="meg-import-btn" onclick="triggerMegImport('${prefix}','${r.key}')" title="Import dari file report megger (.txt) — isi otomatis 15s..10m dari data Series Readings">📥 Import</button>
+      </td>
       ${MEG_TIMES.map(t=>`<td><input class="meas-inp" style="width:52px" id="meg-${prefix}-${r.key}-${t}" type="number" step="0.01" min="0" oninput="updateMeggerChart('${prefix}','${r.key}')"></td>`).join('')}
     </tr>`).join('');
     const chartBoxes = MEG_ROWS.map(r => `
@@ -1264,6 +1273,103 @@ const MEG_ROWS=[
   {key:'r_t',   label:'R - T'},
   {key:'s_t',   label:'S - T'},
 ];
+
+// ═══════════════════════════════════════════════════
+//  MEGGER SERIES IMPORT — auto-fill a row's 13 time points from a megger
+//  tester's own exported report (.txt), instead of typing each one by hand
+//  off the instrument's screen. Only reads the "Series Readings" block —
+//  each line looks like "Aug 20, 2026 08:56:09 216 MΩ" (or "---- Ω" before
+//  the reading settles, or a bare unit-less Ω for very low resistances).
+// ═══════════════════════════════════════════════════
+const MEG_MONTH_ABBR = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+const MEG_TARGET_SECONDS = {'15s':15,'30s':30,'45s':45,'1m':60,'2m':120,'3m':180,'4m':240,'5m':300,'6m':360,'7m':420,'8m':480,'9m':540,'10m':600};
+
+function parseMegTimestampMs(str){
+  const m = str.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if(!m) return null;
+  const mon = MEG_MONTH_ABBR[m[1]];
+  if(mon===undefined) return null;
+  return new Date(parseInt(m[3],10), mon, parseInt(m[2],10), parseInt(m[4],10), parseInt(m[5],10), parseInt(m[6],10)).getTime();
+}
+
+// Elapsed time is measured from the FIRST valid reading in the file (test
+// start), not from any header field — the header's "Capture Date" is when the
+// report was saved, not when the 10-minute ramp began. For each of the 13
+// target points this picks whichever real reading's elapsed time is closest,
+// so it still works even if the tester didn't log a sample at the exact
+// second (megger testers, like this one, log far more than 13 points).
+function parseMegSeriesFile(text){
+  const lineRe = /^([A-Za-z]{3}\s+\d{1,2},\s*\d{4}\s+\d{2}:\d{2}:\d{2})\s+(----|[\d.]+)\s*([a-zA-Z]?)Ω\s*$/;
+  const readings = [];
+  text.split(/\r?\n/).forEach(line => {
+    const m = lineRe.exec(line.trim());
+    if(!m || m[2] === '----') return;
+    const ms = parseMegTimestampMs(m[1]);
+    if(ms === null) return;
+    const val = parseFloat(m[2]);
+    if(isNaN(val)) return;
+    const unit = m[3].toUpperCase();
+    let meg;
+    if(unit === 'G') meg = val * 1000;
+    else if(unit === 'M') meg = val;
+    else if(unit === 'K') meg = val / 1000;
+    else meg = val / 1e6;   // bare ohms
+    readings.push({ ms, meg });
+  });
+  if(!readings.length) return null;
+
+  const t0 = readings[0].ms;
+  const values = {}, warnings = [];
+  Object.entries(MEG_TARGET_SECONDS).forEach(([key, targetSec]) => {
+    let best = null, bestDiff = Infinity;
+    readings.forEach(r => {
+      const diff = Math.abs((r.ms - t0) / 1000 - targetSec);
+      if(diff < bestDiff){ bestDiff = diff; best = r; }
+    });
+    if(best){
+      values[key] = Math.round(best.meg * 100) / 100;
+      if(bestDiff > 5) warnings.push(key);
+    }
+  });
+  return { values, warnings, readingCount: readings.length };
+}
+
+let _megImportTarget = null;
+function triggerMegImport(prefix, rowKey){
+  _megImportTarget = { prefix, rowKey };
+  const inp = document.getElementById('meg-import-file');
+  inp.value = '';   // clear so re-picking the same file still fires 'change'
+  inp.click();
+}
+
+function handleMegImportFile(event){
+  const file = event.target.files && event.target.files[0];
+  if(!file || !_megImportTarget) return;
+  const { prefix, rowKey } = _megImportTarget;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const parsed = parseMegSeriesFile(String(reader.result));
+    if(!parsed){
+      showNote('❌ File tidak dikenali — pastikan ini file report megger dengan bagian "Series Readings".', 'err');
+      return;
+    }
+    Object.entries(parsed.values).forEach(([t, v]) => {
+      const el = document.getElementById('meg-'+prefix+'-'+rowKey+'-'+t);
+      if(el) el.value = v;
+    });
+    updateMeggerChart(prefix, rowKey);
+    autoSaveNow();
+
+    const filled = Object.keys(parsed.values).length;
+    const missing = MEG_TIMES.filter(t => parsed.values[t] === undefined);
+    let msg = '📥 '+filled+'/13 titik waktu terisi dari '+parsed.readingCount+' pembacaan di file.';
+    if(missing.length) msg += ' Tidak ada data untuk: '+missing.join(', ')+'.';
+    else if(parsed.warnings.length) msg += ' (beberapa titik memakai pembacaan terdekat, bukan tepat pada detik target)';
+    showNote(msg, missing.length ? 'info' : 'ok');
+  };
+  reader.onerror = () => showNote('❌ Gagal membaca file.', 'err');
+  reader.readAsText(file);
+}
 
 function drawLineChart(canvas, values, opts){
   opts = opts||{};

@@ -351,6 +351,24 @@ itself, following this same pattern for consistency:
   never visited that tab on screen, and `display:none` on an ancestor does not stop a canvas from
   rendering or being read back, so redrawing is cheap insurance.
 
+- **Importing a megger tester's own exported report to auto-fill the 15s..10m matrix**:
+  `4000_Hours_Mill_PM.html`'s PVR-500 megger matrix (`chk.special==='meggerMatrix'`) has a
+  "📥 Import" button per test-point row (`triggerMegImport(prefix, rowKey)` → the shared hidden
+  `#meg-import-file` picker → `handleMegImportFile()`) that reads the tester's own `.txt` export
+  instead of the technician retyping 13 numbers off the instrument's screen. `parseMegSeriesFile()`
+  only reads the file's "Series Readings" block (lines like `Aug 20, 2026 08:56:09 216 MΩ`, with
+  `----` meaning no reading yet and a bare `Ω` meaning plain ohms) — the summary header above it
+  (Resistance/PI/DAR/etc.) is a report of the FINAL result only, not a source of the 13
+  intermediate points. Elapsed time for each reading is measured from the file's own first valid
+  reading (test start), not the header's "Capture Date" (when the report was *saved*, not when
+  the ramp began); each of the 13 targets (15s/30s/…/10m) takes whichever real logged reading is
+  closest in elapsed time, since the tester logs far more samples than just those 13 checkpoints.
+  Converts GΩ/kΩ/bare-Ω to the MΩ this file's matrix already uses everywhere else. Wired to
+  `updateMeggerChart(prefix, rowKey)` afterward (redraws that row's chart, and recomputes PI/DAR
+  too when `rowKey==='rst_g'`, same as a manual edit would) and `autoSaveNow()` (a JS-set `.value`
+  doesn't fire the `input`/`change` events autosave's delegated listener depends on, so this has
+  to be called explicitly — same reason photo actions do it, see the autosave section above).
+
 - **Never double-escape unicode/JS escapes when a tool writes literal file content.** `Write` and
   `Edit` write the exact bytes you give them — there is no extra string-literal layer to account
   for. If you want the JS source to contain the escape sequence `—` (so the browser renders
