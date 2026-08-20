@@ -137,11 +137,14 @@ This is the part most likely to regress if a check sheet is edited without check
   point at check item 6, "Close the breaker manually…", whose task text has nothing to do with
   overload heater sizing — this looks like an older edit dropped the marker and/or swapped the
   item's text, and untangling which is now ambiguous without more context).
-  **The identical dead-code bug exists in the canonical `HV_Motor_SWGR.html`** (same `CHECKS`
+  **The identical dead-code bug existed in the canonical `HV_Motor_SWGR.html`** (same `CHECKS`
   array, same missing `special:'ol'` marker, same unguarded `selectTag()`) — that file is linked
-  from the portal and technicians hit this same crash today. It hasn't been patched as part of
-  this fix (out of scope of what was asked here); treat it as a known, confirmed, unfixed bug if
-  it comes up.
+  from the portal, so technicians were hitting this same crash. Patched there too with the same
+  `?.`/null-guard treatment (`selectTag`, `refreshOLTable`, `resetForm`, `submitToDb`'s `olData`
+  collection — this file has no `loadLastFromDb()` to begin with, unlike the Mill duplicate, so
+  there was nothing further downstream to unblock). The OL box's own visibility is still not
+  restored, same reasoning as above — the `special:'ol'` marker's correct home in `CHECKS` is
+  still ambiguous.
 
 ## Photos: `img-helper.js` + `photo-kit.js` — never size a photo by hand
 
