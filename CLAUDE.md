@@ -515,8 +515,9 @@ extended to `ESP_7BGPCP800A_B.html` ("ESP Weekly Maintenance") and
 `GEN_BrushGear_PM_Checksheet.html` ("Generator Brush Gear PM") too, see the
 `TREND_SHEET_KEYS` bullet below for what a multi-sheet check sheet like ESP or
 Brush Gear needs that a single-sheet one doesn't — and, for Brush Gear
-specifically, for a sheet that DOESN'T fit this feature at all and was
-deliberately left out. Still not a blanket feature for every check sheet —
+specifically, for a `section`-like field that looked temporal but wasn't
+(read the bullet before assuming a similar field elsewhere is safe to merge
+without checking). Still not a blanket feature for every check sheet —
 extending further means going through the `TREND_ASSETS` checklist below for
 whichever sheet is next.
 
@@ -599,26 +600,39 @@ when changing this.
   narrowed to the right subset once a specific zone's parameter is picked —
   no separate equipment-scoping logic was needed on top of `trendRowKey()`.
 - **`GEN_BrushGear_PM_Checksheet.html` ("Generator Brush Gear PM", assetTag
-  `7TG-GEN-100`) also saves two sheet keys (`sA`, `sB`), but `TREND_SHEET_KEYS`
-  lists only `['sA']` for it — `sB` is deliberately excluded, not just not
-  gotten to yet. `sA` ("Inspection Tasks", 7 rows) fits the standard shape
-  fine: `no`/`desc`/`crit`/`values` keyed by `'Pole + Result'`/`'Pole + Note'`/
+  `7TG-GEN-100`) saves two sheet keys, both wired in — `TREND_SHEET_KEYS` lists
+  `['sA', 'sB']`. `sA` ("Inspection Tasks", 7 rows) fits the standard shape:
+  `no`/`desc`/`crit`/`values` keyed by `'Pole + Result'`/`'Pole + Note'`/
   `'Pole − Result'`/`'Pole − Note'` (the generator's two brush poles). `sB`
-  ("Brush Length & Spring Pressure") does not: confirmed against real
-  submissions that each one already embeds SEVERAL PAST WEEKS' brush
-  measurements (one `raw.brushData` entry per recent week the check sheet's
-  own UI still shows), and every row's `section` field there is a week label
-  like `'Week 2'`, not an equipment/zone name — a completely different use of
-  `section` than `trendMergedRowsFor()`'s stamp-from-sheet-title convention
-  above assumes. Merging `sB` in the same way as ESP's sheets would
-  misattribute those embedded historical readings to whatever date the
-  CONTAINING submission happens to have, silently duplicating or shifting
-  real brush-wear history — exactly the "confidently wrong is worse than no
-  trend at all" failure this file's own `TREND_LEGACY_SOURCE` section already
-  warns about elsewhere. Don't add `'sB'` to this asset's `TREND_SHEET_KEYS`
-  entry without first designing how `onTrendSheetChange()` would derive a
-  point's real date from its embedded week label instead of the containing
-  submission's `executionDate`.
+  ("Brush Length & Spring Pressure") was initially left out on the assumption
+  that its `section` field (`'Week 1'`..`'Week 5'`) was a historical week
+  reference — i.e. that one submission bundles several PAST weeks' readings,
+  which would misattribute old data to today's date if merged. **That
+  assumption was wrong** — reading `getCurrentPMWeek()`/`getActiveMags()`/
+  `getMagsForWeek()` in the check sheet itself (rather than guessing from the
+  field name) shows `week` is a FIXED rotation-slot label: the check sheet
+  inspects only 1/5 of the generator's magazines per visit on a repeating
+  5-week cycle, and `getMagsForWeek()` is a static mag→slot mapping, not a
+  moving date window. So a submission's `sB` rows only ever cover magazines
+  actually inspected on THAT SAME visit, grouped by which of the 5 rotation
+  slots they permanently belong to — this is exactly analogous to ESP's
+  equipment-zone sections, not a different-dates problem at all. Confirmed
+  against real data before re-enabling it: the one real submission containing
+  "Mag #03 / Brush #1" is dated 2026-08-19, and its trend point comes back
+  dated 2026-08-19 too — no shifting, no duplication. Lesson for extending
+  this feature to another sheet: read what a `section`-like field's producing
+  code actually computes it from before deciding it's temporal vs categorical
+  — the field name alone (`'Week N'`) was actively misleading here.
+  One real limitation this asset DOES have: `TREND_UNITS` is keyed by row
+  (parameter), but in `sB` the "row" is the equipment identity (`Mag #NN /
+  Brush #B`) and the actual measured quantity depends on which "equipment"
+  COLUMN is picked (`Length (mm)`, `Spring (lb)`, `Brush Type`, `Replace`) —
+  the opposite of every other sheet wired into this feature, where columns
+  are the equipment and the row fixes the quantity/unit. There's no per-row
+  entry that correctly gives `Length (mm)` a unit without also mislabeling
+  `Spring (lb)`/`Brush Type`/`Replace` series with the same unit, so `sB` has
+  no `TREND_UNITS` entries — its charts render without a unit label rather
+  than a wrong one.
 - **`TREND_UNITS`** exists because `collectSheetData()` in the check sheets never
   saves the unit into `values` (only the technician's raw number — the unit is a
   sibling `<span>` in the DOM, not part of the saved value). The map mirrors each

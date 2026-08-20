@@ -1506,17 +1506,20 @@ const TREND_LEGACY_SOURCE = {
 // with its OWN distinct set of equipment columns (COLS_A..COLS_F never
 // overlap). List every sheet key that should be merged into one trend history
 // per asset tag here; anything not listed defaults to just ['main'].
-// Generator Brush Gear (GEN_BrushGear_PM_Checksheet.html) also saves sA/sB,
-// but ONLY sA ("Inspection Tasks") fits this feature's model — sB ("Brush
-// Length & Spring Pressure") packs several PAST weeks' readings into every
-// single submission (each row's `section` is a week label like 'Week 2', not
-// an equipment group), which would misattribute historical brush-wear data to
-// today's execution date if merged in the same way as ESP's sheets. Leaving
-// sB out of this list is deliberate — see the CLAUDE.md write-up for this
-// asset before ever adding it back in.
+// Generator Brush Gear (GEN_BrushGear_PM_Checksheet.html) also saves sA/sB.
+// sB ("Brush Length & Spring Pressure")'s `section` field ('Week 1'..'Week 5')
+// looks like a historical week reference at first glance, but is actually a
+// FIXED rotation-slot label — getCurrentPMWeek()/getMagsForWeek() in that
+// check sheet map each generator magazine to one of 5 rotation groups on a
+// repeating cycle (a static mag->slot assignment, not a moving date window),
+// so a submission's sB rows only ever cover magazines actually inspected
+// THAT SAME visit, just grouped by which rotation slot they belong to —
+// exactly analogous to ESP's equipment-zone sections, not a different-dates
+// problem. Confirmed by reading getCurrentPMWeek()/getActiveMags() directly
+// rather than assuming from the field name.
 const TREND_SHEET_KEYS = {
   '7BG-PCP-800A/B': ['sA', 'sB', 'sC', 'sD', 'sE', 'sF', 'sF2'],
-  '7TG-GEN-100': ['sA']
+  '7TG-GEN-100': ['sA', 'sB']
 };
 function trendSheetKeysFor(tag) { return TREND_SHEET_KEYS[tag] || ['main']; }
 
