@@ -399,6 +399,18 @@ itself, following this same pattern for consistency:
   every one now returns all 13/13 points with the computed 10-minute value matching that file's
   own reported final resistance.
 
+  **Recognizing a real export set**: this site's megger tester (Model 1555) names each saved
+  report after the two terminals it tested — `T4 gr.txt`/`T5 gr.txt`/`T6 gr.txt` (one terminal to
+  ground) and `T4 T5.txt`/`T4 T6.txt`/`T5 T6.txt` (terminal to terminal) — six files per full test
+  round, one per non-combined `MEG_ROWS` entry (`r_stg`/`s_rtg`/`t_rsg` and `r_s`/`r_t`/`s_t`; no
+  file for `rst_g`, the all-three-combined-to-ground row, since the tester doesn't run that as one
+  test). **`T4`/`T5`/`T6` → R/S/T is this instrument's/site's own terminal labeling, not something
+  confirmed against `MEG_ROWS`'s own R/S/T convention** — the import button is per-row by design
+  specifically so the technician (who knows which physical terminal is R/S/T) picks the matching
+  file when they click a given row's "📥 Import", rather than the code guessing a mapping. Don't
+  hardcode a `T4`→`r`/`T5`→`s`/`T6`→`t` assumption anywhere; if that mapping is ever needed in
+  code (e.g. to auto-suggest a row from a filename), confirm it with the user first.
+
 - **Never double-escape unicode/JS escapes when a tool writes literal file content.** `Write` and
   `Edit` write the exact bytes you give them — there is no extra string-literal layer to account
   for. If you want the JS source to contain the escape sequence `—` (so the browser renders
