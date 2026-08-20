@@ -1430,7 +1430,8 @@ function renderCharts(stats) {
 const TREND_ASSETS = {
   '7EX-XFMR-AT':     'Transformer AT — Without DGA (Weekly)',
   '7EX-XFMR-AT-DGA': 'Transformer AT + DGA (Weekly)',
-  '7BG-PCP-800A/B':  'ESP Weekly Maintenance'
+  '7BG-PCP-800A/B':  'ESP Weekly Maintenance',
+  '7TG-GEN-100':     'Generator Brush Gear PM'
 };
 
 // Firestore only stores the technician's raw typed number (see
@@ -1475,6 +1476,11 @@ const TREND_UNITS = {
     '8||Oil Temperature (°C)': '°C',
     '1||Overheating (°C)': '°C',
     '1||Hopper Heater Current (A)': 'A'
+  },
+  '7TG-GEN-100': {
+    '5||Noise level (brush gear)': 'dB',
+    '6||Operating temperature': '°C',
+    '7||Air flow (cooling air)': 'm/s'
   }
 };
 
@@ -1500,8 +1506,17 @@ const TREND_LEGACY_SOURCE = {
 // with its OWN distinct set of equipment columns (COLS_A..COLS_F never
 // overlap). List every sheet key that should be merged into one trend history
 // per asset tag here; anything not listed defaults to just ['main'].
+// Generator Brush Gear (GEN_BrushGear_PM_Checksheet.html) also saves sA/sB,
+// but ONLY sA ("Inspection Tasks") fits this feature's model — sB ("Brush
+// Length & Spring Pressure") packs several PAST weeks' readings into every
+// single submission (each row's `section` is a week label like 'Week 2', not
+// an equipment group), which would misattribute historical brush-wear data to
+// today's execution date if merged in the same way as ESP's sheets. Leaving
+// sB out of this list is deliberate — see the CLAUDE.md write-up for this
+// asset before ever adding it back in.
 const TREND_SHEET_KEYS = {
-  '7BG-PCP-800A/B': ['sA', 'sB', 'sC', 'sD', 'sE', 'sF', 'sF2']
+  '7BG-PCP-800A/B': ['sA', 'sB', 'sC', 'sD', 'sE', 'sF', 'sF2'],
+  '7TG-GEN-100': ['sA']
 };
 function trendSheetKeysFor(tag) { return TREND_SHEET_KEYS[tag] || ['main']; }
 

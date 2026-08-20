@@ -511,11 +511,14 @@ asset, compared against the immediately preceding submission. Multiple parameter
 can be pinned into the same chart to compare them against each other. It started
 scoped to the two **weekly Transformer AT** sheets only (`Transformer_AT_NoDGA_Weekly.html`
 and `Transformer_AT_DGA_Weekly.html`) as a first rollout on one data set — since
-extended to `ESP_7BGPCP800A_B.html` ("ESP Weekly Maintenance") too, see the
-`TREND_SHEET_KEYS` bullet below for what a multi-sheet check sheet like ESP needs
-that a single-sheet one doesn't. Still not a blanket feature for every check
-sheet — extending further means going through the `TREND_ASSETS` checklist below
-for whichever sheet is next.
+extended to `ESP_7BGPCP800A_B.html` ("ESP Weekly Maintenance") and
+`GEN_BrushGear_PM_Checksheet.html` ("Generator Brush Gear PM") too, see the
+`TREND_SHEET_KEYS` bullet below for what a multi-sheet check sheet like ESP or
+Brush Gear needs that a single-sheet one doesn't — and, for Brush Gear
+specifically, for a sheet that DOESN'T fit this feature at all and was
+deliberately left out. Still not a blanket feature for every check sheet —
+extending further means going through the `TREND_ASSETS` checklist below for
+whichever sheet is next.
 
 **Single vs multi-parameter is a chip builder, not two separate UIs.** The
 Parameter/Equipment selects only ever *stage* a candidate; `TREND_SERIES` (an
@@ -595,6 +598,27 @@ when changing this.
   data for this row" filter (unchanged) is what keeps the Equipment dropdown
   narrowed to the right subset once a specific zone's parameter is picked —
   no separate equipment-scoping logic was needed on top of `trendRowKey()`.
+- **`GEN_BrushGear_PM_Checksheet.html` ("Generator Brush Gear PM", assetTag
+  `7TG-GEN-100`) also saves two sheet keys (`sA`, `sB`), but `TREND_SHEET_KEYS`
+  lists only `['sA']` for it — `sB` is deliberately excluded, not just not
+  gotten to yet. `sA` ("Inspection Tasks", 7 rows) fits the standard shape
+  fine: `no`/`desc`/`crit`/`values` keyed by `'Pole + Result'`/`'Pole + Note'`/
+  `'Pole − Result'`/`'Pole − Note'` (the generator's two brush poles). `sB`
+  ("Brush Length & Spring Pressure") does not: confirmed against real
+  submissions that each one already embeds SEVERAL PAST WEEKS' brush
+  measurements (one `raw.brushData` entry per recent week the check sheet's
+  own UI still shows), and every row's `section` field there is a week label
+  like `'Week 2'`, not an equipment/zone name — a completely different use of
+  `section` than `trendMergedRowsFor()`'s stamp-from-sheet-title convention
+  above assumes. Merging `sB` in the same way as ESP's sheets would
+  misattribute those embedded historical readings to whatever date the
+  CONTAINING submission happens to have, silently duplicating or shifting
+  real brush-wear history — exactly the "confidently wrong is worse than no
+  trend at all" failure this file's own `TREND_LEGACY_SOURCE` section already
+  warns about elsewhere. Don't add `'sB'` to this asset's `TREND_SHEET_KEYS`
+  entry without first designing how `onTrendSheetChange()` would derive a
+  point's real date from its embedded week label instead of the containing
+  submission's `executionDate`.
 - **`TREND_UNITS`** exists because `collectSheetData()` in the check sheets never
   saves the unit into `values` (only the technician's raw number — the unit is a
   sibling `<span>` in the DOM, not part of the saved value). The map mirrors each
