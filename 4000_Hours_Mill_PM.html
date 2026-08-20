@@ -1299,7 +1299,15 @@ function parseMegTimestampMs(str){
 // so it still works even if the tester didn't log a sample at the exact
 // second (megger testers, like this one, log far more than 13 points).
 function parseMegSeriesFile(text){
-  const lineRe = /^([A-Za-z]{3}\s+\d{1,2},\s*\d{4}\s+\d{2}:\d{2}:\d{2})\s+(----|[\d.]+)\s*([a-zA-Z]?)Ω\s*$/;
+  // [ΩΩ]: two Unicode characters render as an IDENTICAL "Ω" glyph
+  // but are different codepoints — U+03A9 GREEK CAPITAL LETTER OMEGA and
+  // U+2126 OHM SIGN (a legacy compatibility character some measurement
+  // instruments' export software specifically uses for the ohm unit). A
+  // regex matching only one of them silently matches zero lines against a
+  // real export using the other — confirmed via a hex dump of a real file
+  // from this exact tester (bytes e2 84 a6 = U+2126, not the more common
+  // U+03A9) after the import reported "file not recognized" against it.
+  const lineRe = /^([A-Za-z]{3}\s+\d{1,2},\s*\d{4}\s+\d{2}:\d{2}:\d{2})\s+(----|[\d.]+)\s*([a-zA-Z]?)[ΩΩ]\s*$/;
   const readings = [];
   text.split(/\r?\n/).forEach(line => {
     const m = lineRe.exec(line.trim());

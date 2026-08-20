@@ -382,6 +382,23 @@ itself, following this same pattern for consistency:
   by round-tripping the same sample data through UTF-8, UTF-16LE+BOM, and UTF-16LE-without-BOM
   encodings and confirming all three parse to identical values.
 
+  **This still wasn't the actual bug the user hit.** Their real export files were already valid
+  UTF-8 — the real problem was a look-alike-character mismatch: `lineRe`'s literal `Ω` was typed
+  as U+03A9 GREEK CAPITAL LETTER OMEGA, but this tester's export software writes U+2126 OHM SIGN
+  instead — a different codepoint that renders as an IDENTICAL glyph in every font, so nothing
+  about looking at the file (even a careful visual diff) would reveal the mismatch. Confirmed via
+  a hex dump of a real file (`xxd`): the bytes after a value are `e2 84 a6`, which is U+2126 in
+  UTF-8, not `ce a9` (U+03A9). Since a regex match against the wrong codepoint fails silently —
+  no exception, just zero matched lines — this produced the exact same "file tidak dikenali"
+  symptom as a genuine encoding problem, and both need checking whenever a text-format import
+  "doesn't recognize" a file that looks correct on screen. Fixed by matching a character class of
+  both codepoints (`[ΩΩ]`), not just changing which one glyph is used in the source —
+  don't revert to a single literal `Ω` even if it "looks right" in an editor, since a different
+  tester/software could just as easily use the other one. Verified against all 6 of the user's
+  real per-terminal-pair export files (T4/T5/T6 × ground, plus the 3 phase-to-phase pairs) —
+  every one now returns all 13/13 points with the computed 10-minute value matching that file's
+  own reported final resistance.
+
 - **Never double-escape unicode/JS escapes when a tool writes literal file content.** `Write` and
   `Edit` write the exact bytes you give them — there is no extra string-literal layer to account
   for. If you want the JS source to contain the escape sequence `—` (so the browser renders
