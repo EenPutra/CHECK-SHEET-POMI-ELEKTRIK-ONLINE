@@ -385,6 +385,8 @@ body::after{
   border:1px solid rgba(245,158,11,0.3);padding:2px 9px;border-radius:20px;
   margin-left:10px;white-space:nowrap;
 }
+.btn-del-dup{background:#fff;color:#be123c;border:1.5px solid rgba(244,63,94,0.4);margin-left:10px;font-size:12px;padding:6px 12px}
+.btn-del-dup:hover{background:var(--rose-soft);border-color:var(--rose)}
 
 .del-bar{display:none;align-items:center;gap:12px;padding:12px 22px;background:var(--rose-soft);border-bottom:1px solid rgba(244,63,94,0.20)}
 .del-bar.show{display:flex}
@@ -929,6 +931,10 @@ table.dtbl tr:last-child td{border-bottom:none}
         <div class="table-hdr-title">Riwayat Check Sheet</div>
         <div class="table-hdr-count" id="tbl-count">Memuat data...</div>
         <div class="dedupe-badge" id="dedupe-badge" style="display:none"></div>
+        <button class="btn btn-del-dup" id="btn-del-duplicates" style="display:none" onclick="confirmDeleteDuplicates()" title="Hapus permanen submission duplikat dari database — data terbaru per visit tetap disimpan">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          Hapus <span id="del-dup-count">0</span> Duplikat
+        </button>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-excel" onclick="exportExcel()">
@@ -1038,6 +1044,7 @@ let filteredData = [];
 let loggedInUser = null;
 let cachedStats = null;
 let showAllHistory = false;   // "Submission terbaru saja" checkbox is checked by default -> this starts false
+let duplicateIds = [];        // ids dedupeSubmissions() would drop from allDataRaw — what "Hapus Duplikat" deletes
 
 // ── DEDUPE: keep only the newest submission per real visit ──
 // Technicians in the field sometimes hit "Submit to Database" more than once
@@ -1090,13 +1097,24 @@ function computeStatsFrom(docs) {
 function applyDedupeToggle() {
   const deduped = dedupeSubmissions(allDataRaw);
   allData = showAllHistory ? allDataRaw : deduped;
-  const hidden = allDataRaw.length - deduped.length;
+  const keptIds = new Set(deduped.map(d => d.id));
+  duplicateIds = allDataRaw.filter(d => d.id && !keptIds.has(d.id)).map(d => d.id);
+  const hidden = duplicateIds.length;
   const badge = document.getElementById('dedupe-badge');
   if (!showAllHistory && hidden > 0) {
     badge.textContent = `${hidden} duplikat disembunyikan`;
     badge.style.display = 'inline';
   } else {
     badge.style.display = 'none';
+  }
+  // Independent of the show/hide toggle above — the duplicate SET is always
+  // the same regardless of whether it's currently hidden from view, so the
+  // delete button stays available either way.
+  const delDupBtn = document.getElementById('btn-del-duplicates');
+  if (delDupBtn) {
+    delDupBtn.style.display = hidden > 0 ? 'inline-flex' : 'none';
+    const cnt = document.getElementById('del-dup-count');
+    if (cnt) cnt.textContent = hidden;
   }
   const stats = computeStatsFrom(allData);
   cachedStats = stats;
@@ -2452,24 +2470,50 @@ function clearSelection() {
   document.getElementById('chk-all').checked = false;
   updateDelBar();
 }
+// Both the manual multi-select delete and "Hapus Duplikat" share this one
+// confirm modal — they just stage a different id list into `pendingDeleteIds`
+// before showing it, so there's one delete code path instead of two.
+let pendingDeleteIds = [];
+
 function confirmDelete() {
   const ids = getSelectedIds();
   if (ids.length === 0) return;
+  pendingDeleteIds = ids;
   document.getElementById('confirm-msg').innerHTML = 'Anda akan menghapus <strong>' + ids.length + '</strong> data yang dipilih. Tindakan ini tidak dapat dibatalkan.';
   document.getElementById('confirm-del').classList.add('show');
 }
-function cancelDelete() { document.getElementById('confirm-del').classList.remove('show'); }
+
+// Deletes exactly the documents dedupeSubmissions()/DB.dedupeLatest() would
+// already hide from the default table view — older resubmits of the SAME
+// visit (same assetTag+woNumber+executionDate, createdAt within
+// CLUSTER_GAP_HOURS of a newer submission). This never touches a document
+// that the clustering logic decided is a genuinely different visit sharing a
+// stale execution date — see DEDUP_LATEST_SUBMISSION.md for why that
+// distinction matters and how it was validated against real data.
+function confirmDeleteDuplicates() {
+  if (!duplicateIds.length) return;
+  pendingDeleteIds = [...duplicateIds];
+  document.getElementById('confirm-msg').innerHTML =
+    'Anda akan menghapus permanen <strong>' + pendingDeleteIds.length + '</strong> submission duplikat ' +
+    '(resubmit lama untuk visit yang sama). Submission <strong>terbaru</strong> dari tiap visit tetap ' +
+    'disimpan, dan visit yang benar-benar berbeda meski berbagi tanggal WO yang sama tidak ikut terhapus. ' +
+    'Tindakan ini tidak dapat dibatalkan.';
+  document.getElementById('confirm-del').classList.add('show');
+}
+
+function cancelDelete() { document.getElementById('confirm-del').classList.remove('show'); pendingDeleteIds = []; }
 async function executeDelete() {
-  const ids = getSelectedIds();
+  const ids = pendingDeleteIds;
   if (ids.length === 0) return;
-  cancelDelete();
-  const btn = document.querySelector('.btn-del');
+  document.getElementById('confirm-del').classList.remove('show');
+  const btn = document.querySelector('#confirm-del .btn-danger');
   const origText = btn.innerHTML;
   btn.innerHTML = '⏳ Menghapus...'; btn.disabled = true;
   try {
     await DB.deleteMultiple(ids);
     DB.showSubmitResult(true, ids.length + ' data berhasil dihapus.');
     clearSelection();
+    pendingDeleteIds = [];
     await loadData();
   } catch (e) {
     console.error('Delete error:', e);

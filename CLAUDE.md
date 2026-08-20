@@ -660,6 +660,28 @@ non-deduped Firestore query, which would silently disagree with what the
 table shows; the stat cards are now driven by `computeStatsFrom(allData)` (a
 local port of the same aggregation logic) so they always match.
 
+**A "Hapus Duplikat" button permanently deletes exactly the documents
+`dedupeSubmissions()` would hide** — next to `#dedupe-badge`, only visible
+when `duplicateIds.length > 0` (computed alongside `allData` inside
+`applyDedupeToggle()`: every `allDataRaw` doc whose `id` isn't in the deduped
+set's id list). This is the one place in this feature that actually writes
+to Firestore, so it shares the SAME confirm dialog as the existing manual
+multi-select delete (`#confirm-del`/`confirm-msg`/`.btn-danger`) rather than
+having its own: both `confirmDelete()` (checkbox selection) and
+`confirmDeleteDuplicates()` just stage a different id list into one
+module-level `pendingDeleteIds` before showing the modal, and `executeDelete()`
+reads `pendingDeleteIds` and calls `DB.deleteMultiple()` — one delete code
+path, two ways to fill it. `confirmDeleteDuplicates()`'s message spells out
+that only older resubmits are deleted and that visits sharing a stale
+`executionDate` are safe, since "duplicate" here means "whatever
+`DB.dedupeLatest()`'s `CLUSTER_GAP_HOURS` clustering decided is a
+duplicate" — the same validated logic the badge/toggle already use, not a
+separate, looser definition. Verified via headless Chrome against real data
+that the button's count matches `allDataRaw.length - allData.length` exactly
+(105 of 191) and that `confirmDeleteDuplicates()` stages the right id list —
+without ever calling `executeDelete()` in that verification, since that
+would actually delete production data.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that
