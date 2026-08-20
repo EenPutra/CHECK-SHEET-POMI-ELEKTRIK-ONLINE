@@ -534,11 +534,14 @@ function selectTag(tag){
   document.getElementById('tag-search').value = m.tag;
   document.getElementById('ss-drop').classList.remove('open');
 
-  // Update OL display only
-  document.getElementById('ol-code').textContent    = m.olHeater   || '—';
+  // Update OL display only (the OL info box isn't currently wired into any
+  // CHECKS row, so these elements may not exist in the DOM — guard with ?.
+  // rather than crashing selectTag() and blocking the DB auto-load below)
+  const olCodeEl = document.getElementById('ol-code'), olPlugEl = document.getElementById('ol-plug'), olSetEl = document.getElementById('ol-setting');
+  if(olCodeEl) olCodeEl.textContent = m.olHeater || '—';
   const validNum = v => (v != null && v !== '-' && v !== '') ? v : null;
-  document.getElementById('ol-plug').textContent    = validNum(m.ratingPlug) ? m.ratingPlug : '—';
-  document.getElementById('ol-setting').textContent = validNum(m.olSetting)  ? m.olSetting + '%' : '—';
+  if(olPlugEl) olPlugEl.textContent = validNum(m.ratingPlug) ? m.ratingPlug : '—';
+  if(olSetEl) olSetEl.textContent = validNum(m.olSetting) ? m.olSetting + '%' : '—';
   olSize = null;
   document.querySelectorAll('.sz-btn').forEach(b => b.classList.remove('active'));
   refreshOLTable();
@@ -567,7 +570,8 @@ function selectSize(n){
 
 function refreshOLTable(){
   const tbody = document.getElementById('ol-range-body');
-  const code = document.getElementById('ol-code').textContent;
+  if(!tbody) return;
+  const code = document.getElementById('ol-code')?.textContent;
   if(olSize === null || !code || code === '—'){
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--txt4);font-style:italic;padding:8px">Select contactor size to see heater ranges</td></tr>';
     return;
@@ -1041,10 +1045,12 @@ async function loadLastFromDb(tag){
     });
 
     // OL heater display + size aren't plain inputs — restore from olData
+    // (elements may not exist in the DOM, see the ?. guard in selectTag())
     if(d.olData){
-      document.getElementById('ol-code').textContent    = d.olData.heaterCode || '—';
-      document.getElementById('ol-plug').textContent    = d.olData.ratingPlug || '—';
-      document.getElementById('ol-setting').textContent = d.olData.olSetting  || '—';
+      const olCodeEl = document.getElementById('ol-code'), olPlugEl = document.getElementById('ol-plug'), olSetEl = document.getElementById('ol-setting');
+      if(olCodeEl) olCodeEl.textContent = d.olData.heaterCode || '—';
+      if(olPlugEl) olPlugEl.textContent = d.olData.ratingPlug || '—';
+      if(olSetEl) olSetEl.textContent = d.olData.olSetting || '—';
       if(d.olData.size !== null && d.olData.size !== undefined) selectSize(d.olData.size);
     }
 
@@ -1066,7 +1072,7 @@ function resetForm(){
   PHOTOS = []; renderPhotos();
   TREND_PHOTOS = []; renderTrendPhotos();
   document.querySelectorAll('.sz-btn').forEach(b => b.classList.remove('active'));
-  ['ol-code','ol-plug','ol-setting'].forEach(id => document.getElementById(id).textContent = '—');
+  ['ol-code','ol-plug','ol-setting'].forEach(id => { const el = document.getElementById(id); if(el) el.textContent = '—'; });
   refreshOLTable();
   updateStats();
 }
@@ -1093,9 +1099,9 @@ async function submitToDb(){
   base.photoCount = PHOTOS.length; base.photoCaptions = PHOTOS.map(p=>p.caption);
   base.trendPhotoCount = TREND_PHOTOS.length;
   base.olData = {
-    heaterCode: document.getElementById('ol-code').textContent,
-    ratingPlug: document.getElementById('ol-plug').textContent,
-    olSetting:  document.getElementById('ol-setting').textContent,
+    heaterCode: document.getElementById('ol-code')?.textContent || '',
+    ratingPlug: document.getElementById('ol-plug')?.textContent || '',
+    olSetting:  document.getElementById('ol-setting')?.textContent || '',
     size: olSize
   };
 

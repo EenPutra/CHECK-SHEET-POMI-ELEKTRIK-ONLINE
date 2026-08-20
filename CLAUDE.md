@@ -113,6 +113,36 @@ This is the part most likely to regress if a check sheet is edited without check
   `7BG-ESP-V1`) kept for compatibility but not linked from the portal — don't treat it as the
   reference implementation.
 
+- **`4000 Hours Mill/Mill 4000 Hours PM.html`** is a second, diverged duplicate — not linked from
+  the portal either, and NOT the same shape as the canonical `4000_Hours_Mill_PM.html` (the
+  5-asset tabbed sheet described below). It's actually a renamed clone of `HV_Motor_SWGR.html`
+  (title still reads "HV Motor SWGR — PM Check Sheet"), single-asset, with its own
+  `loadLastFromDb(tag)` that pulls the most recent Firestore submission for the selected tag and
+  restores it into the form — auto-triggered from `selectTag()` right after a technician picks a
+  motor tag, mirroring the same pattern `HV_Motor_SWGR.html` uses.
+  **This auto-load never actually ran**, because `selectTag()` itself crashed first: it
+  unconditionally sets `.textContent` on `#ol-code`/`#ol-plug`/`#ol-setting` (the OL/overload
+  heater info box), but no entry in the `CHECKS` array carries `special:'ol'` — `chkRowHtml()`'s
+  `if(chk.special==='ol')` branch that would render those elements is dead code, so
+  `document.getElementById('ol-code')` returns `null` and the assignment throws, aborting
+  `selectTag()` before it ever reaches the `loadLastFromDb(tag)` call at the end. Confirmed via a
+  headless-Chrome call to `selectTag('7EB-HV-001')`, which threw `Cannot set properties of null
+  (setting 'textContent')` before the fix and completed cleanly (with a stubbed Firestore response
+  correctly restoring form values) after it. Fixed here by guarding every
+  `ol-code`/`ol-plug`/`ol-setting`/`ol-range-body` DOM access (`selectTag`, `refreshOLTable`,
+  `loadLastFromDb`, `resetForm`, `submitToDb`'s `olData` collection) with `?.`/null checks instead
+  of assuming the elements exist — this only stops the crash, it does not restore the OL box's
+  visibility (that would mean deciding which `CHECKS` item the `special:'ol'` marker belongs on,
+  which isn't obvious from the current data: the OL box's hardcoded `mkSel('c6')`/`rmk-c6` ids
+  point at check item 6, "Close the breaker manually…", whose task text has nothing to do with
+  overload heater sizing — this looks like an older edit dropped the marker and/or swapped the
+  item's text, and untangling which is now ambiguous without more context).
+  **The identical dead-code bug exists in the canonical `HV_Motor_SWGR.html`** (same `CHECKS`
+  array, same missing `special:'ol'` marker, same unguarded `selectTag()`) — that file is linked
+  from the portal and technicians hit this same crash today. It hasn't been patched as part of
+  this fix (out of scope of what was asked here); treat it as a known, confirmed, unfixed bug if
+  it comes up.
+
 ## Photos: `img-helper.js` + `photo-kit.js` — never size a photo by hand
 
 Every check sheet that takes evidence photos now shares one pipeline. **Do not add a
