@@ -1277,19 +1277,38 @@ const MEG_ROWS=[
 // ═══════════════════════════════════════════════════
 //  MEGGER SERIES IMPORT — auto-fill a row's 13 time points from a megger
 //  tester's own exported report (.txt), instead of typing each one by hand
-//  off the instrument's screen. Only reads the "Series Readings" block —
-//  each line looks like "Aug 20, 2026 08:56:09 216 MΩ" (or "---- Ω" before
-//  the reading settles, or a bare unit-less Ω for very low resistances).
+//  off the instrument's screen. Only reads the per-reading log lines —
+//  "Aug 20, 2026 08:56:09 216 MΩ" in English, or "20 Agu 2026 14:38:35 12,9
+//  MΩ" if the tester's own software is set to Indonesian (day-first date,
+//  comma decimal) — or "---- Ω" before a reading settles.
 // ═══════════════════════════════════════════════════
-const MEG_MONTH_ABBR = {Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11};
+// English AND Indonesian month abbreviations in one table — the tester's own
+// software follows the OS/app language setting, so the same instrument can
+// export "Aug 20, 2026 08:56:09" (English) one day and "20 Agu 2026 14:38:35"
+// (Indonesian, day-first, no comma) the next. Most 3-letter abbreviations are
+// identical either way; only the ones that actually differ are listed twice.
+const MEG_MONTH_ABBR = {
+  Jan:0,Feb:1,Mar:2,Apr:3,May:4,Jun:5,Jul:6,Aug:7,Sep:8,Oct:9,Nov:10,Dec:11,
+  Mei:4,Agu:7,Ags:7,Okt:9,Des:11
+};
 const MEG_TARGET_SECONDS = {'15s':15,'30s':30,'45s':45,'1m':60,'2m':120,'3m':180,'4m':240,'5m':300,'6m':360,'7m':420,'8m':480,'9m':540,'10m':600};
 
 function parseMegTimestampMs(str){
-  const m = str.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
-  if(!m) return null;
-  const mon = MEG_MONTH_ABBR[m[1]];
-  if(mon===undefined) return null;
-  return new Date(parseInt(m[3],10), mon, parseInt(m[2],10), parseInt(m[4],10), parseInt(m[5],10), parseInt(m[6],10)).getTime();
+  // English: "Aug 20, 2026 08:56:09" — month first, comma after the day.
+  let m = str.match(/^([A-Za-z]{3})\s+(\d{1,2}),\s*(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if(m){
+    const mon = MEG_MONTH_ABBR[m[1]];
+    if(mon===undefined) return null;
+    return new Date(parseInt(m[3],10), mon, parseInt(m[2],10), parseInt(m[4],10), parseInt(m[5],10), parseInt(m[6],10)).getTime();
+  }
+  // Indonesian: "20 Agu 2026 14:38:35" — day first, no comma.
+  m = str.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\s+(\d{2}):(\d{2}):(\d{2})$/);
+  if(m){
+    const mon = MEG_MONTH_ABBR[m[2]];
+    if(mon===undefined) return null;
+    return new Date(parseInt(m[3],10), mon, parseInt(m[1],10), parseInt(m[4],10), parseInt(m[5],10), parseInt(m[6],10)).getTime();
+  }
+  return null;
 }
 
 // Elapsed time is measured from the FIRST valid reading in the file (test
@@ -1307,14 +1326,21 @@ function parseMegSeriesFile(text){
   // real export using the other — confirmed via a hex dump of a real file
   // from this exact tester (bytes e2 84 a6 = U+2126, not the more common
   // U+03A9) after the import reported "file not recognized" against it.
-  const lineRe = /^([A-Za-z]{3}\s+\d{1,2},\s*\d{4}\s+\d{2}:\d{2}:\d{2})\s+(----|[\d.]+)\s*([a-zA-Z]?)[ΩΩ]\s*$/;
+  // The date/time prefix is captured as a single non-greedy blob (up to the
+  // last HH:MM:SS) instead of one hardcoded layout, because the SAME tester
+  // exports a different layout depending on its language setting: English
+  // "Aug 20, 2026 08:56:09" (month first, comma after day) vs. Indonesian
+  // "20 Agu 2026 14:38:35" (day first, no comma, localized month name) - see
+  // parseMegTimestampMs() for both. The reading itself uses a comma as the
+  // decimal separator in Indonesian too (e.g. "12,9" not "12.9").
+  const lineRe = /^(.+?\d{2}:\d{2}:\d{2})\s+(----|[\d.,]+)\s*([a-zA-Z]?)[ΩΩ]\s*$/;
   const readings = [];
   text.split(/\r?\n/).forEach(line => {
     const m = lineRe.exec(line.trim());
     if(!m || m[2] === '----') return;
     const ms = parseMegTimestampMs(m[1]);
     if(ms === null) return;
-    const val = parseFloat(m[2]);
+    const val = parseFloat(m[2].replace(',', '.'));   // Indonesian locale uses a comma decimal ("12,9")
     if(isNaN(val)) return;
     const unit = m[3].toUpperCase();
     let meg;

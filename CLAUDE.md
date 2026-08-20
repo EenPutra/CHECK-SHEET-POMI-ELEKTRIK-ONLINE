@@ -411,6 +411,26 @@ itself, following this same pattern for consistency:
   hardcode a `T4`→`r`/`T5`→`s`/`T6`→`t` assumption anywhere; if that mapping is ever needed in
   code (e.g. to auto-suggest a row from a filename), confirm it with the user first.
 
+  **The tester's own language setting changes its export's date and number format —
+  handle both, don't pick one.** A second real file from the *same* Model 1555 tester
+  (`measurement_data.txt`, re-exported with the tool set to Indonesian instead of English) broke
+  the parser again after the Ω-codepoint fix, with the identical "file tidak dikenali" symptom
+  but a completely different cause: the whole layout changes with the language, not just labels —
+  `"Aug 20, 2026 08:56:09 216 MΩ"` (English: month first, comma after day, `.` decimal) versus
+  `"20 Agu 2026 14:38:35 12,9 MΩ"` (Indonesian: day first, no comma, localized month
+  abbreviation, `,` decimal). Since the same physical instrument can produce either depending on
+  a setting the technician controls (not the file's origin or age), `lineRe` captures the
+  date/time prefix as one non-greedy blob (`.+?\d{2}:\d{2}:\d{2}`) instead of assuming a layout,
+  and `parseMegTimestampMs()` tries the English pattern first, then the Indonesian one — a single
+  hardcoded format will break again the next time this export happens to come out in the other
+  language. `MEG_MONTH_ABBR` holds both English and Indonesian 3-letter month abbreviations in
+  one table (most months are spelled identically either way; only May/Aug/Oct/Dec differ:
+  Mei/Agu(or Ags)/Okt/Des). The reading value itself also switches decimal separator with the
+  locale (`,` vs `.`) — `val = parseFloat(raw.replace(',', '.'))` handles both since the value
+  ranges seen here never need a thousands separator. Verified against both the English 6-file set
+  and this Indonesian file together: all 7 now return 13/13 points, with `measurement_data.txt`'s
+  computed 10-minute value (22400 MΩ) matching its own header's "Resistance: 22,4 GΩ" exactly.
+
 - **Never double-escape unicode/JS escapes when a tool writes literal file content.** `Write` and
   `Edit` write the exact bytes you give them — there is no extra string-literal layer to account
   for. If you want the JS source to contain the escape sequence `—` (so the browser renders
