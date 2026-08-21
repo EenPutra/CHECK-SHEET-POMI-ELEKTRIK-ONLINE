@@ -458,6 +458,29 @@ itself, following this same pattern for consistency:
   one per phase pair), already collected individually in `_resistance`, not a single item-level
   toggle to pull back in.
 
+  **A second, separate bug hid behind the first one and looked identical from the outside:**
+  after the fix above shipped, the user reported RTD (item 20) "still not showing in the PDF."
+  Re-verifying the exact same checkbox-modal → Preview PDF flow the user actually uses (not just
+  calling `generatePDF()` directly, which is what the first fix was verified against) confirmed
+  the PDF content itself was correct — the real cause was upstream, in `loadDraft()`. RTD rows
+  are created on demand (`addRTDInput(prefix)`, incrementing `rtdCount[prefix]`), so a fresh page
+  load always starts at zero of them; `persistDraft()`'s generic `document.querySelectorAll(...)`
+  sweep saves `rtd-<prefix>-<n>-loc`/`-val` values into the draft fine (the rows exist at save
+  time, from earlier in that session), but `loadDraft()`'s matching generic sweep only sets values
+  on elements that ALREADY exist — with zero RTD rows present after a refresh, it silently found
+  nothing to restore into, and the RTD data effectively vanished (still present in the exported
+  PDF's underlying draft blob if you dug into localStorage directly, but never applied to the
+  page, so a refresh mid-session before downloading was enough to make the PDF's RTD section
+  correctly render as "no readings, just an empty Result/Remark row"). Fixed by pre-creating the
+  right number of rows before the generic sweep runs — same technique `loadLastFromDb()` in this
+  same file already uses to pre-create RTD rows from a Firestore doc, ported to `loadDraft()`'s
+  localStorage draft. Verified against a REAL `Page.reload()` (not a re-navigate, an actual
+  browser refresh) with a genuine draft saved beforehand: `rtdCount['pvr']` and both RTD rows'
+  values come back correctly post-refresh, and the resulting PDF shows real RTD data again.
+  **When a report says "the export is missing X" after a to-storage bug in X was already fixed,
+  verify the FULL real user flow (draft persistence included) before concluding the report is
+  stale or user error — the export code being correct doesn't mean the data reaching it still is.**
+
 - **Never double-escape unicode/JS escapes when a tool writes literal file content.** `Write` and
   `Edit` write the exact bytes you give them — there is no extra string-literal layer to account
   for. If you want the JS source to contain the escape sequence `—` (so the browser renders

@@ -1804,6 +1804,18 @@ function loadDraft(){
     if(!raw) return;
     const d = JSON.parse(raw);
     if(d._mill){ document.getElementById('mill-select').value = d._mill; onMillChange(); }
+    // RTD rows are dynamic ("+ Add RTD") — a fresh page load has zero of them,
+    // so the generic sweep below finds no rtd-<prefix>-<n>-loc/-val elements
+    // to restore into and that data is silently lost on every refresh unless
+    // enough rows are pre-created first (same fix as loadLastFromDb() uses).
+    const rtdMax = {};
+    Object.keys(d).forEach(k => {
+      const m = k.match(/^f_rtd-([a-z0-9]+)-(\d+)-(loc|val)$/);
+      if(m){ const p = m[1], n = parseInt(m[2],10); rtdMax[p] = Math.max(rtdMax[p]||0, n); }
+    });
+    Object.entries(rtdMax).forEach(([prefix, max]) => {
+      while((rtdCount[prefix]||0) < max) addRTDInput(prefix);
+    });
     document.querySelectorAll('input,select,textarea').forEach(el => {
       if(el.id && d['f_'+el.id] !== undefined) el.value = d['f_'+el.id];
     });
