@@ -325,6 +325,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .pdfp-frame-wrap iframe{width:100%;height:100%;border:none;display:block}
 .pdfp-ftr{padding:10px 18px;display:flex;gap:10px;justify-content:flex-end;
   border-top:1px solid var(--bdr2);background:var(--bg2)}
+.pdfp-mobile-hint{display:none;padding:10px 16px;background:#fef3c7;color:#92400e;font-size:11.5px;
+  line-height:1.4;border-bottom:1px solid #fde68a}
+.pdfp-mobile-hint.show{display:block}
+@media(max-width:640px){
+  #pdf-preview-overlay{padding:0}
+  .pdfp-box{width:100%;height:100%;max-height:100dvh;border-radius:0}
+  .pdfp-ftr{flex-wrap:wrap;justify-content:stretch}
+  .pdfp-ftr button{flex:1 1 auto;min-width:0}
+}
 .two-col-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start;padding:16px 16px 4px}
 .two-col-row .col-panel{border:1px solid var(--bdr2);border-radius:10px;overflow:hidden}
 .two-col-row .col-panel .sec-hdr2{background:linear-gradient(90deg,var(--navy),var(--navy2));padding:10px 14px;
@@ -407,7 +416,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
       <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
       <div class="mf"><label>Checked By</label><input type="text" id="checked-by" placeholder="Full name"></div>
-      <div class="mf"><label>NIK</label><input type="text" id="nik" placeholder="NIK"></div>
+      <div class="mf"><label>BN</label><input type="text" id="nik" placeholder="BN"></div>
       <div class="mf"><label>Reviewed By</label><input type="text" id="reviewed-by" placeholder="Full name"></div>
       <div class="mf"><label>Shift</label>
         <select id="shift"><option value="">&mdash;</option><option>Day</option><option>Night</option></select>
@@ -6420,11 +6429,16 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       </div>
       <button class="pdfm-x" onclick="closePdfPreview()">&#10005;</button>
     </div>
+    <div class="pdfp-mobile-hint" id="pdf-preview-mobile-hint">
+      &#9888;&#65039; Preview di dalam halaman ini mungkin tidak tampil di HP. Gunakan tombol
+      "&#128279; Buka di Tab Baru" di bawah untuk melihat PDF di pembaca PDF bawaan HP Anda.
+    </div>
     <div class="pdfp-frame-wrap">
       <iframe id="pdf-preview-frame" title="PDF preview"></iframe>
     </div>
     <div class="pdfp-ftr">
       <button onclick="closePdfPreview()" class="btn btn-outline">&larr; Tutup</button>
+      <button onclick="openPdfPreviewNewTab()" class="btn btn-outline" style="min-width:150px">&#128279; Buka di Tab Baru</button>
       <button onclick="pdfPreviewDownload()" class="btn btn-pdf" style="min-width:150px">&#128229; Unduh PDF</button>
     </div>
   </div>
@@ -7178,14 +7192,32 @@ async function generatePDF(selSet, opts){
   }
 }
 
+// Most mobile browsers (iOS Safari especially, some Android WebViews too)
+// don't render a PDF blob: URL inside an <iframe> — it just shows blank,
+// with no error to detect. Rather than trying to sniff which browsers are
+// actually broken (fragile, false positives hide a WORKING iframe), always
+// show a mobile hint + an explicit "Buka di Tab Baru" button that opens the
+// blob URL in a full tab (where every mobile browser's own native PDF
+// viewer DOES work). Auto-opening that tab here isn't reliable — by this
+// point generatePDF()'s own earlier `await` has already broken the click's
+// user-gesture chain, so a popup-blocker would likely swallow it; a real
+// button click is a fresh gesture and doesn't have that problem.
+function isMobileDevice(){
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
 let _previewPdf = null, _previewName = '';
 function showPdfPreview(pdf, filename){
   _previewPdf = pdf; _previewName = filename;
   const frame = document.getElementById('pdf-preview-frame');
   frame.src = pdf.output('bloburl');
   document.getElementById('pdf-preview-name').textContent = filename;
+  document.getElementById('pdf-preview-mobile-hint').classList.toggle('show', isMobileDevice());
   document.getElementById('pdf-preview-overlay').classList.add('show');
   showNote('👁️ Preview siap — periksa hasil sebelum mengunduh.', 'ok');
+}
+function openPdfPreviewNewTab(){
+  if(!_previewPdf) return;
+  window.open(_previewPdf.output('bloburl'), '_blank');
 }
 function closePdfPreview(){
   document.getElementById('pdf-preview-overlay').classList.remove('show');
