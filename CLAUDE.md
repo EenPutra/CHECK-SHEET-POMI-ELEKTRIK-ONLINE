@@ -431,6 +431,33 @@ itself, following this same pattern for consistency:
   and this Indonesian file together: all 7 now return 13/13 points, with `measurement_data.txt`'s
   computed 10-minute value (22400 MΩ) matching its own header's "Resistance: 22,4 GΩ" exactly.
 
+- **A "special" `HV_CHECKS` row's OWN Result/Remark toggle needs pulling back in separately —
+  `buildCheckRows()` (used by both `submitToDb()` and `generatePDF()`) skips every `chk.special`
+  row unconditionally, since specials need custom rendering instead of the generic Result/Remark
+  columns.** That's correct for the row's *custom content* (the RTD inputs, the 7×13 megger
+  matrix, the motor-protection value table, …) but five of `HV_CHECKS`' special rows ALSO render
+  their own item-level `mkSel(prefix,'cNN')`/`mkRmk(prefix,'cNN')` Result/Remark pair below that
+  custom content (16 meggerMatrix→`c16`, 17 piDar→`c17`, 20 rtdInputs→`c20`, 21
+  motorProtection→`c21`, 22 dcsReadings→`c22`) — and until this was fixed, NONE of those five
+  were captured anywhere: not in `base.sheets` (so never saved to Firestore either, not just
+  missing from the PDF), because each special's own `out[prefix+'_xxx']` sheet in
+  `collectAssetSheets()` only held its custom measurements, never its own Result/Remark. Worse,
+  **RTD (item 20) had no sheet entry AT ALL** — not even its measurements — so the whole "Measure
+  RTD values for winding and bearing" section was silently dropped end to end. Confirmed by
+  filling in all five, rendering a real PDF, and `pdftotext`-ing it: the RTD section was entirely
+  absent, and the other four sheets existed but were missing their Result/Remark rows. Fixed with
+  one small helper, `srr(id) => ({Result: gv('res-'+prefix+'-'+id)||'—', Remark: gv('rmk-'+prefix+'-'+id)||'—'})`,
+  called once per affected item's own crit id and folded into that item's sheet (`_pidar` now
+  also carries item 16's and 17's Result/Remark; `_motorprotection`/`_dcs` each gained a trailing
+  Result/Remark row); a new `_rtd` sheet (columns `Location`/`Value (°C)`, one row per
+  `rtdCount[prefix]` dynamically-added RTD point, plus its own Result/Remark) was added and
+  wired into the PDF's `['_pidar','_resistance','_rtd','_motorprotection','_dcs']` extras loop.
+  **If a future special row gains its own item-level Result/Remark, it needs the same treatment —
+  `buildCheckRows()` skipping it is not enough on its own.** Item 18 (`resistance`) is the one
+  special that's fine as-is: its Result/Remark are genuinely per-test-point (`c12a`/`c12b`/`c12c`,
+  one per phase pair), already collected individually in `_resistance`, not a single item-level
+  toggle to pull back in.
+
 - **Never double-escape unicode/JS escapes when a tool writes literal file content.** `Write` and
   `Edit` write the exact bytes you give them — there is no extra string-literal layer to account
   for. If you want the JS source to contain the escape sequence `—` (so the browser renders

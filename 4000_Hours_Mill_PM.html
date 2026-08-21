@@ -1905,13 +1905,48 @@ function collectAssetSheets(a, tag){
   out[prefix+'_motor']  = {title: tag+' — Basic Motor Data', columns:['Value'], rows: buildMotorDataRows(prefix, a.kind==='hv')};
 
   if(a.kind==='hv'){
+    // Several HV_CHECKS "special" rows (16 meggerMatrix, 17 piDar, 20 rtdInputs,
+    // 21 motorProtection, 22 dcsReadings) each ALSO carry their own item-level
+    // Result/Remark toggle (mkSel/mkRmk with that item's own crit id, e.g.
+    // 'c20') — but buildCheckRows() skips every special row unconditionally
+    // (specials need custom rendering, not the generic Result/Remark columns),
+    // so without pulling these back in here they were silently never saved to
+    // Firestore OR exported to PDF: confirmed by rendering a real PDF with all
+    // five filled in and finding the RTD section entirely absent from the
+    // output text. srr() below is that pull-back — call it once per special
+    // item's own crit id and fold the result into that item's own sheet.
+    const srr = id => ({Result: gv('res-'+prefix+'-'+id)||'—', Remark: gv('rmk-'+prefix+'-'+id)||'—'});
+
     out[prefix+'_megger'] = {title: tag+' — Insulation Resistance Trend (MΩ)', columns: MEG_TIMES, rows:
       MEG_ROWS.map(r => ({no:'',desc:r.label,
         values: Object.fromEntries(MEG_TIMES.map(t => [t, gv('meg-'+prefix+'-'+r.key+'-'+t)||'—']))}))};
+
+    const meggerRR = srr('c16'), piDarRR = srr('c17');
     out[prefix+'_pidar'] = {title: tag+' — PI / DAR', columns:['Value'], rows:[
       {no:'',desc:'PI (10m/1m)',values:{Value:gv('pi-'+prefix+'-val')||'—'}},
       {no:'',desc:'DAR (1m/30s)',values:{Value:gv('dar-'+prefix+'-val')||'—'}},
+      {no:'16',desc:'Megger Test — Result',values:{Value:meggerRR.Result}},
+      {no:'16',desc:'Megger Test — Remark',values:{Value:meggerRR.Remark}},
+      {no:'17',desc:'PI/DAR — Result',values:{Value:piDarRR.Result}},
+      {no:'17',desc:'PI/DAR — Remark',values:{Value:piDarRR.Remark}},
     ]};
+
+    // RTD readings (item 20) — rtdCount[prefix] is how many "+ Add RTD" rows
+    // this asset currently has; each is two dynamic fields (rtd-<prefix>-<n>-loc/-val).
+    const rtdN = rtdCount[prefix] || 0;
+    const rtdRows = [];
+    for(let n=1; n<=rtdN; n++){
+      rtdRows.push({no:String(n), desc:'RTD '+n, values:{
+        Location: gv('rtd-'+prefix+'-'+n+'-loc')||'—',
+        'Value (°C)': gv('rtd-'+prefix+'-'+n+'-val')||'—'
+      }});
+    }
+    const rtdRR = srr('c20');
+    rtdRows.push({no:'',desc:'Result',values:{Location:rtdRR.Result,'Value (°C)':'—'}});
+    rtdRows.push({no:'',desc:'Remark',values:{Location:rtdRR.Remark,'Value (°C)':'—'}});
+    out[prefix+'_rtd'] = {title: tag+' — RTD Readings (Winding & Bearing)', columns:['Location','Value (°C)'], rows: rtdRows};
+
+    const mprRR = srr('c21');
     out[prefix+'_motorprotection'] = {title: tag+' — Motor Protection Relay', columns:['Value'], rows:[
       {no:'1',desc:'Number of motor starts',values:{Value:gv(prefix+'-mpr1')||'—'}},
       {no:'2',desc:'Number of Emergency starts',values:{Value:gv(prefix+'-mpr2')||'—'}},
@@ -1919,13 +1954,19 @@ function collectAssetSheets(a, tag){
       {no:'4',desc:'Motor running hours',values:{Value:gv(prefix+'-mpr4')||'—'}},
       {no:'5',desc:'Cause of last trip',values:{Value:gv(prefix+'-mpr5')||'—'}},
       {no:'6',desc:'Time of last trip',values:{Value:gv(prefix+'-mpr6')||'—'}},
+      {no:'',desc:'Result',values:{Value:mprRR.Result}},
+      {no:'',desc:'Remark',values:{Value:mprRR.Remark}},
     ]};
+
+    const dcsRR = srr('c22');
     out[prefix+'_dcs'] = {title: tag+' — DCS Readings', columns:['Value'], rows:[
       {no:'1',desc:'Stator RTD 1',values:{Value:gv(prefix+'-dcs1')||'—'}},
       {no:'2',desc:'Stator RTD 2',values:{Value:gv(prefix+'-dcs2')||'—'}},
       {no:'3',desc:'Stator RTD 3',values:{Value:gv(prefix+'-dcs3')||'—'}},
       {no:'4',desc:'Bearing DE',values:{Value:gv(prefix+'-dcs4')||'—'}},
       {no:'5',desc:'Bearing NDE',values:{Value:gv(prefix+'-dcs5')||'—'}},
+      {no:'',desc:'Result',values:{Value:dcsRR.Result}},
+      {no:'',desc:'Remark',values:{Value:dcsRR.Remark}},
     ]};
   } else {
     out[prefix+'_megger'] = {title: tag+' — Megger Test (500 Vdc)', columns:['Value (MΩ)','Result','Remark'], rows:[
@@ -2375,7 +2416,7 @@ async function generatePDF(selSet, opts){
       y = pdf.lastAutoTable.finalY + 4;
     }
 
-    ['_pidar','_resistance','_motorprotection','_dcs'].forEach(suf => {
+    ['_pidar','_resistance','_rtd','_motorprotection','_dcs'].forEach(suf => {
       const sh = extras[a.key+suf];
       if(!sh) return;
       checkY(Math.min(BOTTOM_LIMIT-TOP_START, sh.rows.length*7+18));
