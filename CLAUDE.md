@@ -269,42 +269,57 @@ itself, following this same pattern for consistency:
   right:M}` on every `autoTable()` call's theme object — without it, autoTable's own internal
   pagination uses jsPDF's default margins and ignores your safe content band.
 
-  **Never rely on `didDrawPage` to draw the background for autoTable's own internal page
-  breaks.** It's tempting to add `didDrawPage: () => ensureBg()` to the shared table theme so
-  a table that splits mid-page gets the background on its continuation page too — but
-  `didDrawPage` fires *after* that page's rows have already been drawn, not before. jsPDF has no
-  z-index, so `ensureBg()` firing there paints the background **over** the rows that just
-  landed on the new page, silently erasing them (confirmed by instrumenting `data.cursor.y` in
-  `didDrawPage`, which matches `finalY` — i.e. the *end* state, not the start). The page renders
-  as a blank gap under the letterhead followed by whatever content comes after the table in your
-  script, which looks like a layout bug but is actually erased data.
+  **Use `willDrawPage`, not `didDrawPage`, to draw the background for autoTable's own internal
+  page breaks — this is the actual root-cause fix, not just a workaround.** An earlier version of
+  this file used `didDrawPage: () => ensureBg()` on the shared table theme, reasoning that a table
+  splitting mid-page needed the background on its continuation page too — but `didDrawPage` fires
+  *after* that page's rows have already been drawn, not before. jsPDF has no z-index, so
+  `ensureBg()` firing there paints the background **over** the rows that just landed on the new
+  page, silently erasing them (confirmed by instrumenting `data.cursor.y` in `didDrawPage`, which
+  matches `finalY` — i.e. the *end* state, not the start). The page renders as a blank gap under
+  the letterhead, which looks like a layout bug but is actually erased data — this shipped once,
+  was caught, "fixed" by the workaround below, then resurfaced on a real PVR-500 submission long
+  enough that even a single checklist table's own content spanned two pages by itself, no matter
+  how well pre-estimated. **`willDrawPage` fires *before* that page's rows are drawn, for every
+  page a table lands on — including ones autoTable creates via its own internal pagination, not
+  just pages this file's own `checkY()`/`pdf.addPage()` calls create.** Swapping the one hook name
+  (`willDrawPage:()=>ensureBg()` instead of `didDrawPage:()=>ensureBg()` on the shared `kvTheme`)
+  fixes the erasure at its root for every table in the file, permanently, regardless of how long
+  any given table's content turns out to be — confirmed by re-rendering a real submission whose
+  20-row checklist table (with realistic-length remarks) now genuinely spans two pages on its own,
+  and every row on both pages renders correctly with no erased gap.
 
-  The real fix: never let a table paginate internally in the first place. Before every
-  `autoTable()` call whose row count isn't fixed/small, estimate its height and pre-check with
-  `checkY()` so it always starts fresh on a page with enough room for the *whole* table:
+  **The pre-check-and-force-an-early-break approach below is still worth keeping, but only as a
+  compactness optimization now, not as the safety mechanism** — it avoids pointless early page
+  breaks when content is short enough to actually fit, it no longer stands between a long table
+  and losing rows. Before an `autoTable()` call whose row count/content length isn't fixed/small,
+  estimate its height and pre-check with `checkY()` so short content still starts on a page with
+  enough room to stay together:
   ```js
-  checkY(Math.min(BOTTOM_LIMIT-TOP_START, rows.length*9+10));  // force a clean page break first
+  checkY(Math.min(BOTTOM_LIMIT-TOP_START, rows.length*9+10));  // keeps SHORT content compact
   pdf.autoTable({...kvTheme, startY:y, body: rows, ...});
   ```
-  `Math.min(..., BOTTOM_LIMIT-TOP_START)` caps the estimate at one page's usable height so this
-  doesn't loop forever for a table too long to ever fit on a single page. See the per-asset check
-  list table in `4000_Hours_Mill_PM.html` (up to 27 rows) for a worked example — it forces a page
-  break instead of trusting autoTable to split cleanly.
+  A flat `rows.length * average` estimate is fragile against arbitrary real content, though — it
+  was tuned against one real render's remark lengths and silently undershot once a technician
+  typed longer ones, which is what let autoTable's internal pagination fire in the first place
+  (harmless now that `willDrawPage` covers the erasure risk, but still means the estimate's
+  compactness benefit doesn't reliably apply). `estimateTableHeight()` in `4000_Hours_Mill_PM.html`
+  measures the actual wrapped height of a table's real content via `pdf.splitTextToSize()` per
+  column instead of guessing a flat average — reuse that pattern for any table whose cells can
+  hold free text of unpredictable length, rather than a hardcoded rows-length multiplier.
+  `Math.min(..., BOTTOM_LIMIT-TOP_START)` still caps the estimate at one page's usable height so
+  this doesn't loop forever for a table that's never going to fit on a single page.
 
   **A near-miss overflow (content only slightly over one page's budget) is usually better fixed by
-  making it fit than by forcing an earlier break.** On the PVR-500 tab, the motor-data table plus
-  its 20-row checklist measured ~255mm combined against a ~249mm page — over by only ~6mm. Forcing
-  `checkY()` to break earlier just pushed the ENTIRE checklist onto a fresh page, leaving the
-  motor-data table's page mostly blank and the checklist looking orphaned at the top of the next
-  one (confirmed by rendering the actual PDF, not by reasoning about the numbers). The fix was to
-  tighten that one table's `cellPadding` (2.2mm → 1.7mm, via a local `{...kvTheme.styles,
-  cellPadding:1.7}` override passed as `styles:` on just that `autoTable()` call) to reclaim
-  ~1mm/row, closing the gap so both tables render together as originally intended — and updating
-  the `checkY()` row-height estimate to match the tightened padding (`rows.length*8.7+12`) so the
-  pre-check still agrees with what autoTable will actually do. Don't reach for "force a page break
-  sooner" as the default fix for an overflow this small; check whether shaving padding on the
-  oversized table closes the gap first, and only fall back to an earlier break when the content
-  is too long to ever fit on one page no matter how tight the padding gets.
+  making it fit than by forcing an earlier break** — this is still good advice for keeping the
+  document compact, on top of `willDrawPage` making it safe either way. On the PVR-500 tab, the
+  motor-data table plus its 20-row checklist measured ~255mm combined against a ~249mm page — over
+  by only ~6mm for one real render. Tightening that one table's `cellPadding` (2.2mm → 1.7mm, via
+  a local `{...kvTheme.styles, cellPadding:1.7}` override passed as `styles:` on just that
+  `autoTable()` call) reclaimed ~1mm/row, closing the gap so both tables rendered together as
+  originally intended for that particular submission's content — though as above, don't trust a
+  padding tweak alone to guarantee this for every future submission's remark lengths; the safety
+  net is `willDrawPage`, this is only about avoiding an unnecessary early break when possible.
 
 - **Content margins**: reserve roughly the top ~27mm and bottom ~21mm of each A4 page (i.e. keep
   body content between y≈27mm and y≈276mm) so text never overlaps the letterhead's header/footer

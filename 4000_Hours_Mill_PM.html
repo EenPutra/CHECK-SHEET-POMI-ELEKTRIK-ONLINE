@@ -2277,11 +2277,53 @@ async function generatePDF(selSet, opts){
   }
   ensureBg();
 
+  // Precisely estimates an autoTable's total height by measuring how many
+  // lines each row's longest-wrapping cell will actually take (via jsPDF's
+  // own splitTextToSize), instead of a flat "rows.length * average" guess.
+  // A flat guess works for typical short remarks but silently undershoots
+  // once a technician types a longer-than-average one, letting autoTable's
+  // OWN internal pagination fire mid-table — and since that continuation
+  // page's rows get drawn BEFORE this file's didDrawPage->ensureBg()
+  // background repaint runs on the new page, they get silently painted over
+  // and vanish from the rendered PDF (confirmed on a real render: checklist
+  // items 23-26 were present in the extracted PDF text but visually erased).
+  // checkY() must be called with a pre-check estimate that's actually
+  // trustworthy for whatever the technician typed, not a guessed constant.
+  function estimateTableHeight(rows, colWidths, fontSize, cellPadding){
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(fontSize);
+    const lineH = fontSize * 0.3528 * 1.15;   // pt -> mm, with a little line-height slack
+    let total = 0;
+    rows.forEach(row => {
+      let maxLines = 1;
+      row.forEach((cell, i) => {
+        const w = colWidths[i];
+        if(w == null) return;
+        const text = (cell==null) ? '' : String(cell);
+        if(!text) return;
+        maxLines = Math.max(maxLines, pdf.splitTextToSize(text, w - cellPadding*2).length);
+      });
+      total += maxLines*lineH + cellPadding*2;
+    });
+    return total * 1.08;   // small safety margin — an underestimate is what causes the bug above
+  }
+
   const kvTheme = {
     theme:'grid',
     styles:{font:'helvetica',fontSize:8.3,cellPadding:2.2,textColor:DARK,lineColor:LINE,lineWidth:0.2,valign:'middle'},
     margin:{top:TOP_START,bottom:H-BOTTOM_LIMIT,left:M,right:M},
-    didDrawPage:()=>ensureBg(),
+    // willDrawPage (not didDrawPage) — fires BEFORE that page's rows are drawn, for
+    // every page a table lands on, including ones autoTable creates via its OWN
+    // internal pagination (not just pages this file's own checkY()/addPage() calls
+    // create). didDrawPage fires AFTER those rows, so ensureBg() there painted the
+    // background OVER content that had just been drawn, silently erasing it — this
+    // was confirmed on a real PVR-500 submission long enough that even a single
+    // checklist table's own content spanned two pages on its own. Switching to
+    // willDrawPage fixes the erasure at its root for every table in this file,
+    // regardless of how long any given table's content turns out to be — the
+    // pre-check height ESTIMATES elsewhere (see estimateTableHeight()) still matter
+    // for keeping short tables compact and avoiding pointless early page breaks, but
+    // are no longer what stands between a long table and silently losing rows.
+    willDrawPage:()=>ensureBg(),
   };
   const bold = c => ({content:c, styles:{fontStyle:'bold', textColor:BLACK}});
 
@@ -2343,25 +2385,21 @@ async function generatePDF(selSet, opts){
     // OVER by ensureBg() on the next page. Force a clean page break instead so every
     // autoTable call fits entirely within one page's TOP_START..BOTTOM_LIMIT band.
     //
-    // On PVR-500 the motor-data table + this 20-row checklist come to ~255mm
-    // combined (measured from a real render) against a ~249mm page — over by
-    // just ~6mm. Rather than let that tiny overflow force the ENTIRE checklist
-    // onto a fresh page (leaving the motor-data table's page mostly blank and
-    // the checklist looking orphaned at the top of the next one — confirmed by
-    // rendering an actual PDF and inspecting it), tighten this table's own
-    // cellPadding (2.2mm -> 1.7mm) to reclaim ~1mm/row, comfortably closing the
-    // gap so both tables sit together on one page as originally intended. Only
-    // this table's padding changes — every other table on the page keeps
-    // kvTheme's normal spacing.
+    // A flat "rows.length * average" estimate here is what caused real data loss: it
+    // was tuned against one real 20-row render's remark lengths, so it worked for THAT
+    // submission but silently undershot once a technician typed longer remarks —
+    // autoTable then split the table mid-page on its own, and the continuation rows
+    // (confirmed: items 23-26 on a real PVR-500 submission) were erased by the next
+    // page's background repaint, present in the PDF's text but invisible when rendered.
+    // estimateTableHeight() measures the ACTUAL wrapped height of THIS run's real
+    // content (via splitTextToSize), so the pre-check's decision is trustworthy
+    // regardless of how long any given remark is — short remarks still correctly fit
+    // alongside the motor-data table on one page (the original cellPadding tightening
+    // below still helps with that); long ones correctly force the checklist onto its
+    // own fresh page instead of letting autoTable split it mid-table.
+    const checklistColWidths = [10,120,20,36];
     const checklistStyles = {...kvTheme.styles, cellPadding:1.7};
-    // Re-estimate with the tightened padding (~8.7mm/row incl. wrapped lines,
-    // measured from PVR-500's real 20-row render) so this pre-check's decision
-    // still matches what autoTable itself will do — a table that STILL doesn't
-    // fit (a future, even-longer checklist) must still get its own clean page
-    // rather than autoTable splitting it mid-table (see the comment on checkY()
-    // above / CLAUDE.md "PDF export" section for why that's unsafe with this
-    // file's didDrawPage->ensureBg() background repaint).
-    checkY(Math.min(BOTTOM_LIMIT-TOP_START, checkRows.length*8.7+12));
+    checkY(Math.min(BOTTOM_LIMIT-TOP_START, estimateTableHeight(checkRows, checklistColWidths, checklistStyles.fontSize, checklistStyles.cellPadding) + 8));
     pdf.autoTable({
       ...kvTheme, startY:y,
       styles: checklistStyles,
