@@ -384,6 +384,32 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   border-top:1px solid var(--bdr2);background:var(--bg2)}
 .pdfs-count{font-size:11px;color:var(--txt4);font-family:var(--mono)}
 
+/* ── LOAD & MERGE SUBMISSION MODAL (reuses .pdfs-* shell above) ── */
+#load-modal-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,0.85);z-index:10000;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:14px}
+#load-modal-overlay.show{display:flex}
+.ldm-note{font-size:10.5px;color:var(--txt4);padding:0 18px 8px;line-height:1.4}
+.ldm-overwrite{display:flex;align-items:flex-start;gap:8px;padding:8px 10px;margin:0 8px 6px;background:#fef3c7;
+  border:1px solid #fde68a;border-radius:8px;font-size:11px;line-height:1.4;color:#92400e;cursor:pointer}
+.ldm-overwrite input{accent-color:#b45309;margin-top:2px;flex-shrink:0}
+.ldm-item{display:flex;align-items:flex-start;gap:10px;padding:9px 10px;border-radius:8px;cursor:pointer;
+  border:1.5px solid transparent}
+.ldm-item:hover{background:var(--bg2)}
+.ldm-item.on{background:#eff6ff;border-color:var(--blue)}
+.ldm-item input{width:16px;height:16px;accent-color:var(--blue);cursor:pointer;flex-shrink:0;margin-top:3px}
+.ldm-info{flex:1;min-width:0}
+.ldm-title{font-family:var(--raj);font-weight:700;font-size:13px;color:var(--txt);letter-spacing:.3px;
+  display:flex;align-items:center;flex-wrap:wrap}
+.ldm-meta{font-size:10.5px;color:var(--txt4);font-family:var(--mono);margin-top:1px}
+.ldm-cov{display:flex;gap:2px;flex-wrap:wrap;margin-top:6px}
+.ldm-dot{width:17px;height:15px;border-radius:3px;background:var(--idle);color:var(--idle-txt);font-size:8.5px;
+  display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-weight:700}
+.ldm-dot.on{background:var(--ok);color:#fff}
+.ldm-status{font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:10px;margin-left:8px;letter-spacing:.5px}
+.ldm-status.ok{background:var(--ok-bg);color:var(--ok)}
+.ldm-status.ng{background:var(--ng-bg);color:var(--ng)}
+.ldm-empty{padding:30px 10px;text-align:center;color:var(--txt4);font-size:12.5px}
+
 </style>
 </head>
 <body>
@@ -423,8 +449,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       </div>
     </div>
     <div style="padding:0 16px 14px">
-      <button class="btn btn-outline btn-sm" id="btn-load-last" onclick="loadLastFromDb()">&#128229; Tarik Data Terakhir dari Database</button>
-      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Memuat submission terakhir untuk PLTS Ash Disposal (semua inverter &amp; string) ke form ini.</span>
+      <button class="btn btn-outline btn-sm" id="btn-load-last" onclick="openLoadModal()">&#128229; Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini &mdash; berguna saat beberapa teknisi mengisi inverter berbeda secara terpisah.</span>
     </div>
     <span id="doc-id-display" style="font-family:var(--mono);font-size:10px;color:var(--txt4);padding:0 16px 10px;display:block"></span>
   </div>
@@ -6444,6 +6470,39 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   </div>
 </div>
 
+<!-- LOAD & MERGE SUBMISSION MODAL — lets several technicians filling different
+     inverters (in separate sessions, on separate documents) union their data
+     back into one form instead of the newest save silently hiding older
+     inverters' work. See CLAUDE.md-style writeup in the JS below. -->
+<div id="load-modal-overlay">
+  <div class="pdfs-box">
+    <div class="pdfs-hdr">
+      <div>
+        <div class="pdfs-title">PILIH DATA UNTUK DIGABUNG</div>
+        <div class="pdfs-sub" id="load-modal-sub">&mdash;</div>
+      </div>
+      <button class="pdfm-x" onclick="closeLoadModal()">&#10005;</button>
+    </div>
+    <div class="pdfs-quick">
+      <button onclick="toggleAllLoadDocs(true)">Pilih Semua</button>
+      <button onclick="toggleAllLoadDocs(false)">Kosongkan</button>
+    </div>
+    <label class="ldm-overwrite">
+      <input type="checkbox" id="load-overwrite-toggle" onchange="renderLoadModal()">
+      <span>Mode Timpa: ganti field yang <b>sudah diisi</b> di form ini dengan data submission terpilih. Default (tidak dicentang) = Mode Gabung: hanya mengisi field yang masih kosong &mdash; aman, tidak menghapus data yang sedang diketik.</span>
+    </label>
+    <div class="ldm-note">Catatan: foto tidak ikut tersimpan di database (hanya jumlah &amp; caption), jadi foto asli tidak bisa ditarik ulang &mdash; unduh PDF sebagai arsip foto per inverter.</div>
+    <div class="pdfs-body" id="load-modal-list"><div class="ldm-empty">&#8987; Memuat submission...</div></div>
+    <div class="pdfs-ftr">
+      <span class="pdfs-count" id="load-modal-count">0 dipilih</span>
+      <div style="display:flex;gap:10px">
+        <button onclick="closeLoadModal()" class="btn btn-outline">&larr; Batal</button>
+        <button onclick="confirmLoadMerge()" class="btn btn-pdf" id="load-modal-confirm">&#128229; Gabungkan ke Form</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 
 // ═══════════════════════════════════════════════════
@@ -6807,7 +6866,7 @@ async function submitToDb(){
 
   // Section D's per-panel OK/NG/Repair chips aren't scraped by
   // collectCheckSheetData()'s generic inputValues sweep (they're plain divs,
-  // not form fields), so persist them separately for loadLastFromDb() to
+  // not form fields), so persist them separately for confirmLoadMerge() to
   // restore. Keyed by full element id -> 'OK'|'NG'|'REPAIR' (only chips with
   // a set state, to keep the doc small — 11 inverters x 10 strings x up to
   // 21 panels is a lot of possible keys, most left unset on any given visit).
@@ -6836,52 +6895,179 @@ async function submitToDb(){
 }
 
 // ═══════════════════════════════════════════════════
-//  PULL LAST SUBMISSION FROM DATABASE — recalls the newest PLTS Ash
-//  Disposal submission (all 11 inverters, one combined record — see
-//  submitToDb() above) back into this form. Reuses DB.loadLastSubmission()
-//  (db-helper.js) for header fields + every plain input/select via its
-//  d.inputValues sweep; the per-panel OK/NG/Repair chips (Section D) are
-//  restored separately from base.panelStates since collectCheckSheetData()'s
-//  inputValues scrape only covers real form fields, not these plain divs.
+//  LOAD & MERGE FROM DATABASE — replaces the old "always overwrite with the
+//  single newest doc" loadLastFromDb(). Root problem this fixes: DB.save()
+//  always .add()s a brand-new document (see db-helper.js), it never updates
+//  one in place. With 11 inverters split across a big yearly PM, different
+//  technicians naturally each fill a subset and submit separately. If
+//  Technician B opens a FRESH form (didn't pull anything first) and submits
+//  after only filling inv04-06, that new document has blank fields for
+//  inv01-03 — even though Technician A's earlier document already has real
+//  data for them. Because it's the newest doc, dashboard/"load last" then
+//  effectively hides inv01-03's already-saved data. Nothing is actually
+//  deleted in Firestore (every doc is kept), but it becomes unreachable
+//  from the normal single-latest-doc flow.
+//
+//  Fix: let the technician pick ANY set of past submissions (openLoadModal)
+//  and UNION them into the current form (confirmLoadMerge) instead of a
+//  blind single-doc overwrite. Default "Mode Gabung" only fills fields that
+//  are still blank in the DOM — a technician's own in-progress typing is
+//  never clobbered, and picking multiple docs is safe because later-created
+//  docs simply win ties during the merge build step. Whatever the
+//  technician submits afterward is collected fresh from the (now more
+//  complete) DOM by submitToDb(), so the newly-saved document becomes a
+//  superset of what was merged in — over a few submissions the "latest
+//  doc" self-heals back toward covering all 11 inverters. "Mode Timpa" is
+//  kept as an explicit opt-in for the old destructive-overwrite behavior
+//  (e.g. deliberately discarding a bad draft and restoring exactly one
+//  past doc).
 // ═══════════════════════════════════════════════════
-async function loadLastFromDb(){
-  const btn = document.getElementById('btn-load-last');
-  const hasContent = gv('checked-by') || gv('wo-no') ||
-    [...document.querySelectorAll('.r-sel')].some(s=>s.value) ||
-    document.querySelector('.panel-chk[id^="pchk-"][data-state]:not([data-state=""])');
-  if(hasContent && !confirm('Data pada form akan ditimpa dengan submission terakhir dari database. Lanjutkan?')) return;
+function escHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 
+// Which inverters a saved doc actually has data for, inferred from its
+// flat inputValues/panelStates id maps (namespaced res-<key>-/rmk-<key>-/
+// meas-<key>-/par-<key>-/pchk-<key>- — see collectInverterSheets() above).
+// Drives the per-doc coverage dots in the picker so a technician can tell
+// at a glance which past submissions between them cover all 11 inverters.
+function docInverterCoverage(d){
+  const ivKeys = Object.keys(d.inputValues || {});
+  const psKeys = Object.keys(d.panelStates || {});
+  return INVERTERS.filter(inv => {
+    const pfx = ['res-','rmk-','meas-','par-'].map(p => p+inv.key+'-');
+    if(ivKeys.some(k => pfx.some(p => k.startsWith(p)))) return true;
+    const ppfx = 'pchk-'+inv.key+'-';
+    return psKeys.some(k => k.startsWith(ppfx));
+  }).map(inv => inv.key);
+}
+function unionCoverage(docs){
+  const set = new Set();
+  docs.forEach(d => docInverterCoverage(d).forEach(k => set.add(k)));
+  return set;
+}
+
+let _loadModalDocs = [];
+let _loadModalSel = new Set();
+
+async function openLoadModal(){
+  document.getElementById('load-modal-overlay').classList.add('show');
+  document.getElementById('load-overwrite-toggle').checked = false;
+  document.getElementById('load-modal-sub').textContent = 'Memuat submission...';
+  document.getElementById('load-modal-list').innerHTML = '<div class="ldm-empty">&#8987; Memuat submission...</div>';
   try{
-    if(btn) btn.disabled = true;
-    showNote('⏳ Mencari submission terakhir...', 'info');
-    const d = await DB.loadLastSubmission('PLTS-ASHDISPOSAL');
-    if(!d){ showNote('ℹ️ Belum ada submission sebelumnya untuk PLTS Ash Disposal.', 'info'); return; }
-
-    // Clear every panel chip first (a doc from before some panels were ever
-    // marked should not leave stale statuses from the current session).
-    document.querySelectorAll('.panel-chk[id^="pchk-"]').forEach(el => setPanelState(el, ''));
-    if(d.panelStates){
-      Object.entries(d.panelStates).forEach(([id, st]) => {
-        const el = document.getElementById(id);
-        if(el) setPanelState(el, st);
-      });
-    }
-
-    // DB.loadLastSubmission() sets .r-sel's raw DOM value via d.inputValues
-    // but doesn't know about this file's OK/NG/N-A color coding or the
-    // resultState object it feeds — re-sync both, same as loadDraft() does.
-    document.querySelectorAll('.r-sel').forEach(sel => {
-      if(!sel.id.startsWith('res-') || !sel.value) return;
-      onResChange(sel, sel.id.slice(4));
-    });
-
-    showNote('✅ Data terakhir berhasil dimuat'+(d.executionDate?' ('+d.executionDate+')':'')+'.', 'ok');
-    autoSaveNow();
+    const docs = await DB.getAll({assetTag:'PLTS-ASHDISPOSAL'});
+    docs.sort((a,b) => (b.createdAt||'').localeCompare(a.createdAt||''));
+    _loadModalDocs = docs;
+    // Default: just the newest doc pre-checked (mirrors the old single-load
+    // behavior) — the technician adds more via checkboxes or "Pilih Semua".
+    _loadModalSel = new Set(docs.length ? [docs[0].id] : []);
+    document.getElementById('load-modal-sub').textContent =
+      docs.length + ' submission ditemukan · pilih satu atau lebih untuk digabung ke form ini';
   }catch(e){
-    showNote('❌ Gagal memuat data: '+e.message, 'err');
-  }finally{
-    if(btn) btn.disabled = false;
+    _loadModalDocs = [];
+    _loadModalSel = new Set();
+    document.getElementById('load-modal-sub').textContent = 'Gagal memuat: '+e.message;
   }
+  renderLoadModal();
+}
+function closeLoadModal(){
+  document.getElementById('load-modal-overlay').classList.remove('show');
+}
+function toggleLoadDoc(id){
+  if(_loadModalSel.has(id)) _loadModalSel.delete(id); else _loadModalSel.add(id);
+  renderLoadModal();
+}
+function toggleAllLoadDocs(all){
+  _loadModalSel = all ? new Set(_loadModalDocs.map(d=>d.id)) : new Set();
+  renderLoadModal();
+}
+function renderLoadModal(){
+  const wrap = document.getElementById('load-modal-list');
+  if(!_loadModalDocs.length){
+    wrap.innerHTML = '<div class="ldm-empty">Belum ada submission sebelumnya untuk PLTS Ash Disposal.</div>';
+  }else{
+    wrap.innerHTML = _loadModalDocs.map(d => {
+      const cov = docInverterCoverage(d);
+      const dots = INVERTERS.map(inv => `<span class="ldm-dot${cov.includes(inv.key)?' on':''}" title="${inv.tag}">${inv.n}</span>`).join('');
+      const created = d.createdAt ? new Date(d.createdAt).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}) : '—';
+      const stCls = d.overallStatus === 'NG' ? 'ng' : 'ok';
+      const label = 'WO '+escHtml(d.woNumber||'—')+' · '+escHtml(d.executionDate||'tgl —')+' · '+escHtml(d.checkedBy||'—');
+      return `
+      <label class="ldm-item${_loadModalSel.has(d.id)?' on':''}">
+        <input type="checkbox" ${_loadModalSel.has(d.id)?'checked':''} onchange="toggleLoadDoc('${d.id}')">
+        <div class="ldm-info">
+          <div class="ldm-title">${label}<span class="ldm-status ${stCls}">${escHtml(d.overallStatus||'OK')}</span></div>
+          <div class="ldm-meta">Disimpan ${created} · ${cov.length}/${INVERTERS.length} inverter terisi</div>
+          <div class="ldm-cov">${dots}</div>
+        </div>
+      </label>`;
+    }).join('');
+  }
+  const chosen = _loadModalDocs.filter(d => _loadModalSel.has(d.id));
+  const cov = unionCoverage(chosen);
+  document.getElementById('load-modal-count').textContent =
+    _loadModalSel.size+' dipilih · gabungan mencakup '+cov.size+'/'+INVERTERS.length+' inverter';
+  const btn = document.getElementById('load-modal-confirm');
+  btn.disabled = _loadModalSel.size===0;
+  btn.style.opacity = _loadModalSel.size===0 ? '0.5' : '1';
+}
+
+const LOAD_HEADER_MAP = {
+  woNumber:'wo-no', executionDate:'wo-date', timeStart:'time-start', timeEnd:'time-end',
+  checkedBy:'checked-by', nik:'nik', reviewedBy:'reviewed-by', shift:'shift'
+};
+async function confirmLoadMerge(){
+  if(_loadModalSel.size===0) return;
+  const overwrite = document.getElementById('load-overwrite-toggle').checked;
+  const chosen = _loadModalDocs.filter(d => _loadModalSel.has(d.id));
+  if(overwrite && !confirm('Mode Timpa akan mengganti field yang SUDAH diisi di form ini dengan data dari '+chosen.length+' submission terpilih. Lanjutkan?')) return;
+
+  // Build one merged bundle from every selected doc, oldest first, so a
+  // newer selected doc's value wins over an older one for the same field —
+  // then apply it to the DOM in one pass (fill-blank-only unless overwrite).
+  const sorted = [...chosen].sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
+  const header = {}, inputValues = {}, panelStates = {};
+  sorted.forEach(d => {
+    Object.entries(LOAD_HEADER_MAP).forEach(([field, elId]) => { if(d[field]) header[elId] = d[field]; });
+    if(d.inputValues) Object.assign(inputValues, d.inputValues);
+    if(d.panelStates) Object.assign(panelStates, d.panelStates);
+  });
+
+  if(overwrite){
+    // Only in overwrite mode: clear every panel chip first so a doc from
+    // before some panels were ever marked doesn't leave stale statuses
+    // from the current session mixed in with the doc's own data.
+    document.querySelectorAll('.panel-chk[id^="pchk-"]').forEach(el => setPanelState(el, ''));
+  }
+
+  let filled = 0;
+  Object.entries(header).forEach(([elId, val]) => {
+    const el = document.getElementById(elId);
+    if(!el) return;
+    if((overwrite || !el.value) && el.value !== val){ el.value = val; filled++; }
+  });
+  Object.entries(inputValues).forEach(([id, val]) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    if((overwrite || !el.value) && el.value !== val){ el.value = val; filled++; }
+  });
+  // Re-sync .r-sel's OK/NG/N-A color coding + resultState from the raw DOM
+  // value just set, same as loadDraft() does.
+  document.querySelectorAll('.r-sel').forEach(sel => {
+    if(!sel.id.startsWith('res-') || !sel.value) return;
+    onResChange(sel, sel.id.slice(4));
+  });
+  Object.entries(panelStates).forEach(([id, st]) => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    const cur = el.dataset.state || '';
+    if((overwrite || !cur) && cur !== st){ setPanelState(el, st); filled++; }
+  });
+
+  closeLoadModal();
+  showNote('✅ '+chosen.length+' submission digabungkan'+(overwrite?' (mode timpa)':'')+' — '+filled+' field terisi.', 'ok');
+  autoSaveNow();
 }
 
 // ═══════════════════════════════════════════════════
