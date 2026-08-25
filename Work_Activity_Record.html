@@ -7,6 +7,13 @@
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <style>
@@ -385,6 +392,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-ghost btn-sm" onclick="saveDraft()">💾 Draft</button>
     <button class="btn btn-blue btn-sm" onclick="generatePDF()">⬇️ Download PDF</button>
+    <button class="btn btn-green btn-sm" onclick="submitToDb()">🗄️ Submit</button>
   </div>
 </div>
 
@@ -445,6 +453,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <span class="sec-arr">▼</span>
   </div>
   <div class="sec-body">
+    <div style="padding:10px 14px 0">
+      <button class="btn btn-ghost btn-sm" style="background:#eef4ff;color:var(--navy);border:1px solid var(--bdr)"
+        onclick="LoadMergeModal.init({assetTag:'WORK-ACTIVITY-RECORD'});LoadMergeModal.open()">📥 Pilih &amp; Gabung Data dari Database</button>
+    </div>
     <div class="form-grid">
       <div class="mf"><label>Asset Tag No.</label>
         <input type="text" id="asset" placeholder="e.g. CCH-STRC-100A" oninput="syncPrint()"></div>
@@ -536,6 +548,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetAll()">🔄 Reset</button>
   <button class="btn btn-ghost" style="background:var(--navy2);color:#fff" onclick="saveDraft()">💾 Save Draft</button>
   <button class="btn btn-blue" onclick="generatePDF()">⬇️ Download PDF</button>
+  <button class="btn btn-green" onclick="submitToDb()">🗄️ Submit to Database</button>
 </div>
 
 </div><!-- /wrap -->
@@ -1230,9 +1243,10 @@ const WAR_BG_URI="data:image/jpeg;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAYEBAU
 // ═══════════════════════════════════════════════════
 //  PDF GENERATOR  (jsPDF — A4 Portrait)
 // ═══════════════════════════════════════════════════
-async function generatePDF(){
-  if(!window.jspdf){showNotice('❌ Library PDF belum dimuat','err');return;}
-  showNotice('⏳ Membuat PDF…','info');
+async function generatePDF(opts){
+  opts=opts||{};
+  if(!window.jspdf){ if(!opts.silent) showNotice('❌ Library PDF belum dimuat','err'); return; }
+  if(!opts.silent) showNotice('⏳ Membuat PDF…','info');
   await new Promise(r=>setTimeout(r,150));
 
   const{jsPDF}=window.jspdf;
@@ -1436,10 +1450,142 @@ async function generatePDF(){
   }
 
   // ── SAVE FILE ──
-  const wo=gv('wo-no')||'WAR';
-  const dt=gv('wo-date')||new Date().toISOString().split('T')[0];
-  pdf.save(`WAR_${wo}_${dt}.pdf`);
-  showNotice('✅ PDF berhasil diunduh!','ok');
+  // opts.silent: used by submitToDb() to build the archival PDF uploaded for
+  // the review/approval workflow — no download, no toast, just return the
+  // already-built jsPDF object. See CLAUDE.md's PDF export section.
+  if(opts.silent){
+    // no-op — caller (Approvals.submitWithFiles' pdfBuilder) uses the returned pdf directly
+  }else{
+    const wo=gv('wo-no')||'WAR';
+    const dt=gv('wo-date')||new Date().toISOString().split('T')[0];
+    pdf.save(`WAR_${wo}_${dt}.pdf`);
+    showNotice('✅ PDF berhasil diunduh!','ok');
+  }
+  return pdf;
+}
+
+// ═══════════════════════════════════════════════════
+//  SUBMIT TO DATABASE  (review/approval workflow)
+//
+//  This file had NO Firestore integration at all before this — every other
+//  check sheet in this repo saves to the shared 'checksheets' collection via
+//  DB.save() (see CLAUDE.md's data contract), but Work_Activity_Record.html
+//  was purely a local PDF generator. This wires it into the same shared
+//  contract so it can flow through Approvals.submitWithFiles() like every
+//  other sheet, without touching its existing PDF/print/draft behavior.
+//
+//  This file has no fixed physical asset (the 'asset' field is free text
+//  typed per work order — a Work Activity Record can be filed against ANY
+//  equipment), so — mirroring the synthetic per-visit assetTag pattern
+//  documented in CLAUDE.md for the multi-asset Mill sheet — every submission
+//  is tagged with one fixed synthetic assetTag ('WORK-ACTIVITY-RECORD')
+//  identifying "this form type", not the specific equipment named in the
+//  'asset' field (which is still saved verbatim inside inputValues/sheets).
+//  This is what lets Load & Merge / the revision banner find past Work
+//  Activity Records regardless of which equipment they were about.
+// ═══════════════════════════════════════════════════
+const WAR_ASSET_TAG='WORK-ACTIVITY-RECORD';
+const WAR_ASSET_NAME='Work Activity Record — Corrective Maintenance';
+
+function gv(id){const e=document.getElementById(id);return e?e.value.trim():'';}
+
+// LoadMergeModal / Approvals call showNote(msg,'ok'|'err'|'info') if it
+// exists — this file's own toast function is showNotice() with the same
+// (msg,type) signature, so just bridge the name.
+function showNote(msg,type){ showNotice(msg,type); }
+
+async function submitToDb(){
+  const woDate=gv('wo-date'), pic=gv('pic');
+  if(!woDate){ showNotice('❌ Isi tanggal terlebih dahulu.','err'); return; }
+  if(!pic){ showNotice('❌ Isi PIC (nama teknisi) terlebih dahulu.','err'); return; }
+
+  const base=DB.collectCheckSheetData('war', WAR_ASSET_TAG, WAR_ASSET_NAME, 'CORRECTIVE');
+  // collectCheckSheetData() scrapes 'checked-by' by id, which this file
+  // doesn't have — 'pic' (Person In Charge) is the closest equivalent, per
+  // CLAUDE.md's guidance on backfilling mismatched header field ids.
+  base.checkedBy=base.checkedBy||pic;
+  base.recommendations=base.recommendations||gv('recommendations');
+  base.findings=base.findings||gv('conclusion');
+  base.overallStatus='OK'; // no OK/NG checklist concept in this sheet
+
+  base.sheets={
+    info:{
+      title:'A — Work Order Information',
+      columns:['Value'],
+      rows:[
+        {no:'1',desc:'Asset Tag',crit:'',values:{Value:gv('asset')||'—'}},
+        {no:'2',desc:'Asset Description',crit:'',values:{Value:gv('desc')||'—'}},
+        {no:'3',desc:'Work Order No.',crit:'',values:{Value:gv('wo-no')||'—'}},
+        {no:'4',desc:'Date',crit:'',values:{Value:gv('wo-date')||'—'}},
+        {no:'5',desc:'Work Order Type',crit:'',values:{Value:gv('wo-type')||'—'}},
+        {no:'6',desc:'Failure/Work Description',crit:'',values:{Value:gv('failure-desc')||'—'}},
+        {no:'7',desc:'PIC (Person In Charge)',crit:'',values:{Value:gv('pic')||'—'}},
+        {no:'8',desc:'High Level Information / Resume / Recommendations',crit:'',values:{Value:gv('high-level')||'—'}},
+      ],
+    },
+    content:{
+      title:'B — Work Content',
+      columns:['Type','Content'],
+      rows:BLOCKS.map((b,i)=>({
+        no:String(i+1),
+        desc:b.type==='text'?((HTYPE_LABELS[b.headingType]||'Text').replace(/:$/,'')||'Text'):
+             b.type==='image'?'Photo Block':'File Attachment',
+        crit:'',
+        values:{
+          Type:b.type,
+          Content:b.type==='text'?(b.content||'—'):
+                  b.type==='image'?((b.photos||[]).length+' photo(s)'):
+                  (b.name||'—'),
+        },
+      })),
+    },
+    conclusion:{
+      title:'C — Conclusion & Recommendations',
+      columns:['Value'],
+      rows:[
+        {no:'1',desc:'Conclusion',crit:'',values:{Value:gv('conclusion')||'—'}},
+        {no:'2',desc:'Recommendations',crit:'',values:{Value:gv('recommendations')||'—'}},
+      ],
+    },
+  };
+
+  let id;
+  try{
+    showNotice('⏳ Menyimpan ke database...','info');
+    id=await DB.save(base);
+  }catch(e){
+    showNotice('❌ Gagal simpan: '+e.message,'err');
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above. A Storage/Drive
+  // hiccup must never make this look like the whole submission failed — the
+  // work order data the technician actually filled in is already saved.
+  let filesOk=true;
+  try{
+    showNotice('⏳ Mengunggah foto & PDF untuk alur review/approval...','info');
+    const photos={};
+    BLOCKS.forEach((b,i)=>{ if(b.type==='image'&&(b.photos||[]).length) photos['block'+i]=b.photos; });
+    filesOk=await Approvals.submitWithFiles(id,{
+      photos,
+      pdfBuilder:()=>generatePDF({silent:true}),
+      assetTag:WAR_ASSET_TAG,
+      assetName:WAR_ASSET_NAME,
+      checksheetFile:'Work_Activity_Record.html',
+      submittedBy:base.checkedBy,
+      revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+    });
+  }catch(e){
+    filesOk=false;
+    console.error('Approvals.submitWithFiles gagal:',e);
+  }
+
+  if(filesOk){
+    showNotice('✅ Data, foto & PDF berhasil disimpan untuk alur review/approval. ID: '+id,'ok');
+  }else{
+    showNotice('⚠️ Data tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan koneksi stabil, lalu coba submit ulang.','err');
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -1547,6 +1693,8 @@ document.getElementById('wo-date').value=new Date().toISOString().split('T')[0];
 syncPrint();
 PhotoKit.configure({maxWcm:17,maxHcm:9.5,defaultWcm:8.5,defaultHcm:6.5});  // A4 portrait content width
 loadDraft();
+LoadMergeModal.init({assetTag:WAR_ASSET_TAG});
+LoadMergeModal.initRevisionBanner();
 </script>
 </body>
 </html>

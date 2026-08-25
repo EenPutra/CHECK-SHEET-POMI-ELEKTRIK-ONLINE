@@ -88,6 +88,76 @@ const Approvals = {
     await db.collection(this.COLLECTION).doc(id).delete();
   },
 
+  // Generic "wire this check sheet into the review/approval workflow"
+  // entry point — call once from submitToDb()/saveToDatabase() AFTER
+  // DB.save() has already succeeded and returned checksheetId. Uploads
+  // every evidence photo + the archival PDF to Drive (via storage-helper.js
+  // — must be loaded alongside firebase-storage's replacement, see that
+  // file's header), attaches the resulting URLs to the checksheet doc, and
+  // creates the approvals record. This mirrors PLTS_AshDisposal_PM.html's
+  // hand-written version (see CLAUDE.md) but generalized so every other
+  // check sheet can call ONE function instead of re-implementing it.
+  //
+  // opts:
+  //   photos: {groupKey: [{src, caption}, ...]} — same shape PhotoKit /
+  //     hand-rolled PHOTOS objects already use across this codebase. Pass
+  //     null/undefined (or {}) for a sheet with no photo feature yet — the
+  //     upload loop just does nothing, no error.
+  //   pdfBuilder: async () => jsPDF — must return an already-built jsPDF
+  //     object WITHOUT calling .save()/.output() itself (the sheet's own
+  //     generatePDF() called in a "silent"/"no download" mode — see
+  //     PLTS_AshDisposal_PM.html's opts.silent for the pattern). Pass null
+  //     to skip PDF upload (e.g. sheet has no jsPDF export yet).
+  //   assetTag, assetName, checksheetFile, submittedBy, revisionOf: same
+  //     meaning as create()'s meta.
+  //
+  // Returns true if photos/PDF/approval record all succeeded, false if
+  // any part failed (logged to console) — the checksheet doc itself was
+  // ALREADY saved by the caller before this runs, so a false return here
+  // must never be treated as "the whole submission failed."
+  async submitWithFiles(checksheetId, opts = {}) {
+    const { photos, pdfBuilder, assetTag, assetName, checksheetFile, submittedBy, revisionOf } = opts;
+    let ok = true;
+    try {
+      const photoUrls = {};
+      const groups = Object.keys(photos || {});
+      for (const key of groups) {
+        const list = photos[key] || [];
+        if (!list.length) continue;
+        const urls = [];
+        for (let i = 0; i < list.length; i++) {
+          const p = list[i];
+          if (!p || !p.src) continue;
+          const url = await Storage.uploadDataUrl(
+            `checksheets/${checksheetId}/photos/${key}-${i}.jpg`, p.src, 'image/jpeg'
+          );
+          urls.push({ url, caption: p.caption || '' });
+        }
+        if (urls.length) photoUrls[key] = urls;
+      }
+
+      let pdfUrl = null;
+      if (typeof pdfBuilder === 'function') {
+        const pdf = await pdfBuilder();
+        const blob = pdf.output('blob');
+        pdfUrl = await Storage.uploadBlob(`checksheets/${checksheetId}/original.pdf`, blob, 'application/pdf');
+      }
+
+      if (Object.keys(photoUrls).length || pdfUrl) {
+        await DB.attachFiles(checksheetId, {
+          ...(Object.keys(photoUrls).length ? { photoUrls } : {}),
+          ...(pdfUrl ? { pdfUrl } : {}),
+        });
+      }
+
+      await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf });
+    } catch (e) {
+      ok = false;
+      console.error('Approvals.submitWithFiles gagal:', e);
+    }
+    return ok;
+  },
+
   STATUS_LABELS: {
     submitted: 'Menunggu Review',
     reviewed: 'Menunggu Approval',

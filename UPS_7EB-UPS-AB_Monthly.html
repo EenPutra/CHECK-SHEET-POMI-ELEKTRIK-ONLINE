@@ -10,6 +10,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -247,6 +250,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
         </select>
       </div>
       <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
+    </div>
+    <div style="padding:0 16px 14px">
+      <button class="btn btn-sm" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="LoadMergeModal.open()">📥 Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
 </div>
@@ -809,8 +816,12 @@ function showNote(msg,t){
 }
 
 // ── PDF EXPORT ────────────────────────────────────
-async function generatePDF(){
-  showNote('⏳ Membuat PDF…','info');
+// opts.silent: used by submitToDb() (via Approvals.submitWithFiles) to build
+// the archival PDF that gets uploaded to Storage for the review/approval
+// workflow — no download dialog, just hand the built pdf object back.
+async function generatePDF(opts){
+  opts=opts||{};
+  if(!opts.silent) showNote('⏳ Membuat PDF…','info');
   await new Promise(r=>setTimeout(r,200));
   const{jsPDF}=window.jspdf;
   const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
@@ -994,8 +1005,13 @@ async function generatePDF(){
   }
 
   const fname=`UPS_PM_${fv('wo-unit')||'7'}_${(fv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
-  pdf.save(fname);
-  showNote('✅ PDF tersimpan: '+fname,'ok');
+  if(opts.silent){
+    // no-op: caller reads the returned pdf object directly
+  }else{
+    pdf.save(fname);
+    showNote('✅ PDF tersimpan: '+fname,'ok');
+  }
+  return pdf;
 }
 
 // ── PRINT ─────────────────────────────────────────
@@ -1057,8 +1073,45 @@ async function submitToDb(){
 
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
-  try{const id=await DB.save(data);DB.showSubmitResult(true,'Data berhasil disimpan! ID: '+id);}
-  catch(e){DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);}
+
+  let id;
+  try{
+    id=await DB.save(data);
+  }catch(e){
+    DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above. A Storage hiccup
+  // must never make this look like the whole submission failed — the
+  // checklist data the technician actually filled in is already safely
+  // saved by this point. PHOTOS here is a flat array (no per-group keys),
+  // so it's wrapped under one synthetic 'main' group and its `dataUrl` key
+  // is mapped to the `src` key Approvals.submitWithFiles() expects.
+  let filesOk=true;
+  try{
+    if(typeof Approvals!=='undefined'){
+      filesOk=await Approvals.submitWithFiles(id,{
+        photos:{main:PHOTOS.map(p=>({src:p.dataUrl,caption:p.caption||''}))},
+        pdfBuilder:()=>generatePDF({silent:true}),
+        assetTag:'7EB-UPS-A/B',
+        assetName:'1 Monthly PM UPS',
+        checksheetFile:'UPS_7EB-UPS-AB_Monthly.html',
+        submittedBy:data.checkedBy,
+        revisionOf:(typeof LoadMergeModal!=='undefined')?LoadMergeModal.getReviseOfApprovalId():null,
+      });
+    }
+  }catch(e){
+    filesOk=false;
+    console.error('Upload foto/PDF/approval record gagal:',e);
+  }
+
+  if(filesOk){
+    DB.showSubmitResult(true,'Data, foto & PDF berhasil disimpan. ID: '+id);
+  }else{
+    DB.showSubmitResult(false,'⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.');
+  }
 }
 
 // ── INIT ──────────────────────────────────────────
@@ -1071,6 +1124,10 @@ document.getElementById('env-ac').innerHTML=mkTog('env-ac');
 PhotoKit.configure({maxWcm:8.5,maxHcm:9.5,defaultWcm:8.5,defaultHcm:6.1});  // 2-up 85x95mm boxes
 loadDraft();
 updateStats();
+if(typeof LoadMergeModal!=='undefined'){
+  LoadMergeModal.init({assetTag:'7EB-UPS-A/B'});
+  LoadMergeModal.initRevisionBanner();
+}
 
 setTimeout(async()=>{
   if(typeof DB==='undefined')return;

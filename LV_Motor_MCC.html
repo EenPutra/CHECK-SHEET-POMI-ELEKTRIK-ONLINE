@@ -9,6 +9,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -315,6 +318,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Acknowledge Date</label><input type="date" id="ack-date"></div>
       <div class="mf"><label>Acknowledge By</label><input type="text" id="ack-by" placeholder="Full name"></div>
     </div>
+    <div style="padding:0 16px 14px">
+      <button class="btn btn-draft btn-sm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk tag ini dan gabungkan (union, tidak menghapus) ke form ini.</span>
+    </div>
   </div>
 </div>
 
@@ -528,6 +535,10 @@ function selectTag(tag){
   selectedMotor = m;
   document.getElementById('tag-search').value = m.tag;
   document.getElementById('tag-desc').value = m.desc || '';
+  // Keep the Load & Merge modal scoped to whichever motor tag is currently
+  // selected — each submission of this sheet is for one specific tag, not
+  // one fixed asset, so the modal's query target has to move with it.
+  LoadMergeModal.init({ assetTag: m.tag });
   document.getElementById('location').value = m.location || '';
   document.getElementById('compartment').value = m.compartment || '';
   document.getElementById('ss-drop').classList.remove('open');
@@ -879,21 +890,51 @@ async function submitToDb(){
     ]},
   };
 
+  let id;
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    const id = await DB.save(base);
-    showNote('✅ Data berhasil disimpan. ID: '+id, 'ok');
+    id = await DB.save(base);
     document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
     showNote('❌ Gagal simpan: '+e.message, 'err');
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above. A Storage hiccup
+  // must never make this look like the whole submission failed — the
+  // checklist data the technician actually filled in is already safely
+  // saved by this point.
+  let filesOk = true;
+  try{
+    showNote('⏳ Mengunggah foto & PDF untuk alur review/approval...', 'info');
+    filesOk = await Approvals.submitWithFiles(id, {
+      photos: { main: PHOTOS },
+      pdfBuilder: () => generatePDF({ silent: true }),
+      assetTag: tag,
+      assetName: gv('tag-desc') || 'LV Motor MCC PM',
+      checksheetFile: 'LV_Motor_MCC.html',
+      submittedBy: doneBy,
+      revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+    });
+  }catch(e){
+    filesOk = false;
+    console.error('Upload foto/PDF/approval record gagal:', e);
+  }
+
+  if(filesOk){
+    showNote('✅ Data, foto & PDF berhasil disimpan. ID: '+id, 'ok');
+  }else{
+    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.', 'err');
   }
 }
 
 // ═══════════════════════════════════════════════════
 //  PDF GENERATION
 // ═══════════════════════════════════════════════════
-async function generatePDF(){
-  showNote('⏳ Membuat PDF, harap tunggu...', 'info');
+async function generatePDF(opts){
+  opts = opts || {};
+  if(!opts.silent) showNote('⏳ Membuat PDF, harap tunggu...', 'info');
   await new Promise(r => setTimeout(r, 200));
   const {jsPDF} = window.jspdf;
   const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
@@ -1216,8 +1257,16 @@ async function generatePDF(){
 
   const safeTag = tag.replace(/[^A-Za-z0-9_-]/g,'_') || 'UNKNOWN';
   const dateStr = gv('wo-date').replace(/-/g,'') || new Date().toISOString().slice(0,10).replace(/-/g,'');
-  pdf.save('LV_Motor_MCC_'+safeTag+'_'+dateStr+'.pdf');
-  showNote('✅ PDF berhasil dibuat.', 'ok');
+  // opts.silent: used by submitToDb() to build the archival PDF that gets
+  // uploaded to Storage for the review/approval workflow — no download
+  // dialog, just hand the built pdf object back to the caller.
+  if(opts.silent){
+    // no-op: caller reads the returned pdf object directly
+  } else {
+    pdf.save('LV_Motor_MCC_'+safeTag+'_'+dateStr+'.pdf');
+    showNote('✅ PDF berhasil dibuat.', 'ok');
+  }
+  return pdf;
 }
 
 // ═══════════════════════════════════════════════════
@@ -1439,6 +1488,12 @@ function printPage(){
 // ═══════════════════════════════════════════════════
 buildTable();
 PhotoKit.configure({maxWcm:9.0,maxHcm:20,defaultWcm:9.0,defaultHcm:6.5});
+// Default assetTag is empty until a motor tag is picked — selectTag()
+// re-inits LoadMergeModal with the real tag (including via loadDraft()'s
+// own selectTag() call below), this just guarantees _config is non-null
+// so an early click on "Pilih & Gabung" never throws.
+LoadMergeModal.init({ assetTag: document.getElementById('tag-search').value.trim() || '' });
+LoadMergeModal.initRevisionBanner();
 loadDraft();
 updateStats();
 </script>

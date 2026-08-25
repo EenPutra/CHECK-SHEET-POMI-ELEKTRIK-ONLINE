@@ -9,6 +9,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -327,7 +330,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
           <option value="E">4000 Hours Mill E</option>
           <option value="F">4000 Hours Mill F</option>
       </select>
-      <button type="button" class="btn btn-outline btn-sm" id="btn-load-db" onclick="loadLastFromDb()" disabled title="Pilih Mill terlebih dahulu">📥 Tarik Data Terakhir</button>
+      <button type="button" class="btn btn-outline btn-sm" id="btn-load-db" onclick="openLoadMergeModal()" disabled title="Pilih Mill terlebih dahulu">📥 Pilih &amp; Gabung Data dari Database</button>
     </div>
     <div class="tag-summary" id="tag-summary">
       <div class="ss-empty">Pilih Mill di atas untuk melihat 5 asset tag yang akan digunakan.</div>
@@ -2021,6 +2024,20 @@ function collectAssetSheets(a, tag){
 // (assetTag 'MILL-<letter>-4000H') and restores it into the form — mirrors
 // loadDraft()'s own restore logic (same generic-sweep-by-id approach) but
 // sources values from Firestore instead of localStorage.
+// Opens the generic multi-submission Load & Merge modal (load-merge-modal.js)
+// scoped to whichever Mill is currently selected — this file's asset tag
+// (e.g. 'MILL-B-4000H') is per-Mill, not a fixed constant, so LoadMergeModal
+// is (re)configured with the current tag right before every open() instead
+// of once at page load. Replaces the old "always overwrite with the single
+// newest doc" behavior below (loadLastFromDb()) with the same pick-and-union
+// flow every other check sheet on this feature now uses; loadLastFromDb()
+// itself is left in place, unused, rather than deleted.
+function openLoadMergeModal(){
+  if(!selectedMillLetter){ showNote('❌ Pilih Mill (A–F) terlebih dahulu.', 'err'); return; }
+  LoadMergeModal.init({ assetTag: 'MILL-'+selectedMillLetter+'-4000H' });
+  LoadMergeModal.open();
+}
+
 async function loadLastFromDb(){
   if(!selectedMillLetter){ showNote('❌ Pilih Mill (A–F) terlebih dahulu.', 'err'); return; }
   // Only warn on real user-entered progress — tag/desc/motor-data fields are
@@ -2130,13 +2147,46 @@ async function submitToDb(){
     Object.assign(base.sheets, collectAssetSheets(a, tag));
   });
 
+  let id;
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    const id = await DB.save(base);
-    showNote('✅ Data berhasil disimpan. ID: '+id, 'ok');
+    id = await DB.save(base);
     document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
     showNote('❌ Gagal simpan: '+e.message, 'err');
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above (same pattern as
+  // PLTS_AshDisposal_PM.html's submitToDb() — see CLAUDE.md). A Storage
+  // hiccup must never make this look like the whole submission failed — the
+  // checklist data the technician actually filled in is already safely
+  // saved by this point. Approvals.submitWithFiles() already catches its
+  // own internal errors and returns false rather than throwing, but this is
+  // wrapped again here too so a genuinely unexpected throw (e.g. PHOTOS in
+  // an unexpected shape) still can't make submitToDb() itself look crashed.
+  let filesOk = true;
+  try{
+    showNote('⏳ Mengunggah foto & PDF untuk alur review/approval...', 'info');
+    filesOk = await Approvals.submitWithFiles(id, {
+      photos: PHOTOS,
+      pdfBuilder: () => generatePDF(new Set(PDF_SHEETS.map(s=>s.key)), {silent:true}),
+      assetTag: millTag,
+      assetName: millName,
+      checksheetFile: '4000_Hours_Mill_PM.html',
+      submittedBy: checkedBy,
+      revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+    });
+  }catch(e){
+    filesOk = false;
+    console.error('Upload foto/PDF/approval record gagal:', e);
+  }
+
+  if(filesOk){
+    showNote('✅ Data, foto & PDF berhasil disimpan. ID: '+id, 'ok');
+  }else{
+    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.', 'err');
   }
 }
 
@@ -2162,6 +2212,13 @@ document.getElementById('wo-date').value = new Date().toISOString().split('T')[0
 PhotoKit.configure({maxWcm:18,maxHcm:18,defaultWcm:9,defaultHcm:8.5});  // 2-up grid on portrait A4
 loadDraft();
 updateStats();
+// This file's asset tag is per-Mill (e.g. 'MILL-B-4000H'), not a fixed
+// constant, and isn't known yet at this point in page load (the technician
+// hasn't picked a Mill) — init() here just wires up the modal/banner DOM and
+// a safe default; openLoadMergeModal() re-inits with the real tag right
+// before every open() once a Mill is selected.
+LoadMergeModal.init({ assetTag: '' });
+LoadMergeModal.initRevisionBanner();
 
 
 // ═══════════════════════════════════════════════════
@@ -2254,7 +2311,7 @@ async function generatePDF(selSet, opts){
   if(!selectedMillLetter){ showNote('❌ Pilih Mill (A–F) terlebih dahulu.', 'err'); return; }
   if(!window.jspdf){ showNote('❌ Library PDF belum dimuat', 'err'); return; }
   if(!selSet) selSet = new Set(PDF_SHEETS.map(s=>s.key));
-  showNote(opts.preview ? '⏳ Menyiapkan preview…' : '⏳ Membuat PDF…', 'info');
+  if(!opts.silent) showNote(opts.preview ? '⏳ Menyiapkan preview…' : '⏳ Membuat PDF…', 'info');
   await new Promise(r=>setTimeout(r,150));
 
   const{jsPDF} = window.jspdf;
@@ -2552,12 +2609,19 @@ async function generatePDF(selSet, opts){
   const wo = gv('wo-no') || 'MILL'+selectedMillLetter;
   const dt = gv('wo-date') || new Date().toISOString().split('T')[0];
   const filename = `4000H_Mill${selectedMillLetter}_${wo}_${dt}.pdf`;
-  if(opts.preview){
+  // opts.silent: used by submitToDb() (via Approvals.submitWithFiles's
+  // pdfBuilder) to build the archival PDF that gets uploaded to Storage for
+  // the review/approval workflow — no download dialog, no preview modal,
+  // just hand the built pdf object back to the caller.
+  if(opts.silent){
+    // no-op: caller reads the returned pdf object directly
+  } else if(opts.preview){
     showPdfPreview(pdf, filename);
   } else {
     pdf.save(filename);
     showNote('✅ PDF berhasil diunduh!', 'ok');
   }
+  return pdf;
 }
 
 </script>

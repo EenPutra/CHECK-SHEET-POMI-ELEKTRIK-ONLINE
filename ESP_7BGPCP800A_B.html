@@ -10,6 +10,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -262,6 +265,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
         <select id="shift"><option>Shift 1 (07:00–15:00)</option><option>Shift 2 (15:00–23:00)</option><option>Shift 3 (23:00–07:00)</option><option>Normal Hours</option></select>
       </div>
       <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
+    </div>
+    <div style="padding:0 16px 14px">
+      <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="LoadMergeModal.open()">&#128229; Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
 </div>
@@ -718,9 +725,11 @@ function getInpVal(id){const e=document.getElementById(id);return e&&e.value?e.v
 function getSelVal(id){const e=document.getElementById(id);return e&&e.value?e.value:'—';}
 
 // ── PDF ────────────────────────────────────────────
-async function generatePDF(){
-  showNote('⏳ Membuat PDF, harap tunggu…','info');
-  await new Promise(r=>setTimeout(r,200));
+async function generatePDF(opts={}){
+  if(!opts.silent){
+    showNote('⏳ Membuat PDF, harap tunggu…','info');
+    await new Promise(r=>setTimeout(r,200));
+  }
   const{jsPDF}=window.jspdf||{};
   if(!jsPDF){showNote('❌ jsPDF gagal dimuat. Pastikan koneksi internet aktif.','err');return;}
   const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -899,8 +908,17 @@ async function generatePDF(){
   }
 
   const fn=`ESP_PM_${v('wo-unit')||'7'}_${(v('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
-  pdf.save(fn);
-  showNote('✅ PDF tersimpan: '+fn,'ok');
+  // opts.silent: used by submitToDb() (via Approvals.submitWithFiles' pdfBuilder)
+  // to build the archival PDF that gets uploaded to Storage for the
+  // review/approval workflow — no download dialog, just hand back the built
+  // pdf object.
+  if(opts.silent){
+    // no-op: caller reads the returned pdf object directly
+  }else{
+    pdf.save(fn);
+    showNote('✅ PDF tersimpan: '+fn,'ok');
+  }
+  return pdf;
 }
 
 
@@ -1007,6 +1025,9 @@ buildF();
 loadDraft();
 updateStats();
 
+LoadMergeModal.init({ assetTag: '7BG-PCP-800A/B' });
+LoadMergeModal.initRevisionBanner();
+
 // Auto-load last submission from database
 setTimeout(async()=>{
   const d=await DB.loadLastSubmission('7BG-PCP-800A/B');
@@ -1093,11 +1114,37 @@ async function submitToDb(){
     },
   };
 
+  let id;
   try{
-    const id=await DB.save(base);
+    id=await DB.save(base);
     DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
   }catch(e){
     DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above (see
+  // Approvals.submitWithFiles() in approval-helper.js). A Storage hiccup
+  // here must never make this look like the whole submission failed — the
+  // checklist data the technician actually filled in is already safely
+  // saved by this point.
+  try{
+    const filesOk=await Approvals.submitWithFiles(id,{
+      photos:{main:PHOTOS},
+      pdfBuilder:()=>generatePDF({silent:true}),
+      assetTag:'7BG-PCP-800A/B',
+      assetName:'ESP Weekly Maintenance',
+      checksheetFile:'ESP_7BGPCP800A_B.html',
+      submittedBy:base.checkedBy,
+      revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+    });
+    if(!filesOk){
+      showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review/approval — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.','err');
+    }
+  }catch(e){
+    console.error('Approvals.submitWithFiles gagal:',e);
+    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review/approval.','err');
   }
 }
 </script>

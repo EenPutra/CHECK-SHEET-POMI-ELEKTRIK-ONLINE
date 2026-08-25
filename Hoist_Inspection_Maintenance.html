@@ -9,6 +9,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -280,6 +283,10 @@ input[type=range].esl::-webkit-slider-thumb{-webkit-appearance:none;width:14px;h
 }
 .btn-back{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:1px;text-decoration:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);transition:background .15s;white-space:nowrap;cursor:pointer;flex-shrink:0}
 .btn-back:hover{background:rgba(255,255,255,0.2);color:#fff}
+.btn-load-merge{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:6px;
+  background:var(--bg2);color:var(--navy);border:1.5px solid var(--bdr);cursor:pointer;
+  font-family:var(--raj);font-size:12.5px;font-weight:600;letter-spacing:.5px;transition:all .15s}
+.btn-load-merge:hover{border-color:var(--blue);color:var(--blue)}
 </style>
 </head>
 <body>
@@ -334,6 +341,9 @@ input[type=range].esl::-webkit-slider-thumb{-webkit-appearance:none;width:14px;h
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
+    <div style="padding:14px 16px 0">
+      <button class="btn-load-merge" id="btn-load-merge" onclick="openLoadMergeModal()">&#128229; Pilih &amp; Gabung Data dari Database</button>
+    </div>
     <div class="wo-grid">
       <div class="mf"><label>Tag Number</label><input type="text" id="tag-no" placeholder="e.g. 7CRN-001"></div>
       <div class="mf mf-wide"><label>Tag Description</label><input type="text" id="tag-desc" placeholder="e.g. Overhead Crane 5T — Bay A"></div>
@@ -1460,12 +1470,69 @@ async function submitToDb(){
     sPanel:itemSheet('Panel & Mechanical Inspection',PANEL_ITEMS,'pnl'),
   };
 
+  let id;
   try{
-    const id=await DB.save(base);
-    showNotice('Data berhasil disimpan ke database! ID: '+id,'ok');
+    showNotice('⏳ Menyimpan ke database...','info');
+    id=await DB.save(base);
   }catch(e){
     showNotice('Gagal submit: '+e.message,'err');
+    return;
   }
+
+  // Photos + the review/approval workflow record are best-effort ON TOP of
+  // the checksheet doc saved above — a failure here must never make the
+  // whole submit look like it failed, since the checklist data the
+  // technician actually filled in is already safely saved by this point.
+  // pdfBuilder is null: this file's "Print / PDF" button uses
+  // window.print(), it has no jsPDF-based generatePDF() to call in a
+  // silent mode — Approvals.submitWithFiles explicitly supports skipping
+  // PDF upload this way (see its JSDoc in approval-helper.js).
+  let filesOk=true;
+  try{
+    showNotice('⏳ Mengunggah foto & memproses alur review/approval...','info');
+    filesOk=await Approvals.submitWithFiles(id, {
+      photos:{all:PHOTOS}, // PHOTOS here is a flat array, not grouped by key — wrapped under one group so it matches submitWithFiles' {groupKey:[...]} shape
+      pdfBuilder:null,
+      assetTag:tagNo,
+      assetName:document.getElementById('tag-desc')?.value.trim()||'Hoist Inspection & Maintenance',
+      checksheetFile:'Hoist_Inspection_Maintenance.html',
+      submittedBy:base.checkedBy,
+      revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+    });
+  }catch(e){
+    filesOk=false;
+    console.error('Upload foto/approval record gagal:', e);
+  }
+
+  if(filesOk){
+    showNotice('✅ Data & foto berhasil disimpan ke database! ID: '+id,'ok');
+  }else{
+    showNotice('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/proses approval gagal diunggah — pastikan koneksi stabil, lalu coba submit ulang.','err');
+  }
+}
+
+/* ══════════════════════════════════════════════════
+   LOAD & MERGE FROM DATABASE
+   Unlike single-asset check sheets, this file's "assetTag" is not a fixed
+   constant — it's whatever Tag Number the technician typed for the hoist
+   unit being inspected (see submitToDb()'s DB.collectCheckSheetData(...,
+   tagNo, ...) call above). So LoadMergeModal is re-init'd with the
+   CURRENT tag-no value right before opening, rather than once at page
+   load with a hardcoded tag.
+══════════════════════════════════════════════════ */
+// This file's header uses 'done-by' where the LoadMergeModal default map
+// expects 'checked-by' (see CLAUDE.md's data-contract note on this id
+// mismatch) — override headerMap so a merged submission's checkedBy value
+// actually lands somewhere. This file has no time-start/time-end/nik/
+// reviewed-by/shift fields at all, so those default map entries are just
+// omitted rather than pointed at nonexistent ids.
+const HOIST_HEADER_MAP={woNumber:'wo-no',executionDate:'wo-date',checkedBy:'done-by'};
+
+function openLoadMergeModal(){
+  const tag=document.getElementById('tag-no').value.trim();
+  if(!tag){showNotice('Isi Tag Number terlebih dahulu sebelum memuat data dari database','err');return;}
+  LoadMergeModal.init({assetTag:tag,headerMap:HOIST_HEADER_MAP});
+  LoadMergeModal.open();
 }
 
 /* ── NOTICE ─────────────────────────────────────── */
@@ -1484,6 +1551,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   loadDraft();
   updateStats();
   renderPhotos();
+  LoadMergeModal.init({assetTag:document.getElementById('tag-no').value.trim(),headerMap:HOIST_HEADER_MAP});
+  LoadMergeModal.initRevisionBanner();
 });
 </script>
 </body>

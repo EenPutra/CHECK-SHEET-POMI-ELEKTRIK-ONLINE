@@ -9,6 +9,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -42,6 +45,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .btn-draft:hover{background:rgba(255,255,255,0.2)}
 .btn-pdf{background:var(--blue);color:#fff}.btn-pdf:hover{background:#1d4ed8}
 .btn-submit{background:#16a34a;color:#fff}.btn-submit:hover{background:#15803d}
+.btn-outline{background:#fff;border:1.5px solid var(--bdr);color:var(--txt2)}
+.btn-outline:hover{border-color:var(--blue);color:var(--blue)}
 .btn-sm{padding:4px 10px;font-size:12px}
 .hero{background:var(--navy);padding:24px 20px 20px;color:#fff}
 .hero-eyebrow{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:3px;
@@ -296,6 +301,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Acknowledge Date</label><input type="date" id="ack-date"></div>
       <div class="mf"><label>Acknowledge By</label><input type="text" id="ack-by" placeholder="Full name"></div>
       <div class="mf"><label>Signature</label><input type="text" id="ack-sign" placeholder="Sign or initial"></div>
+    </div>
+    <div style="padding:0 16px 14px">
+      <button class="btn btn-outline btn-sm" id="btn-load-merge" onclick="openLoadMerge()">📥 Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih Plant Tag No. dahulu, lalu pilih satu atau lebih submission sebelumnya untuk tag tersebut untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
 </div>
@@ -665,21 +674,52 @@ async function submitToDb(){
     ]},
   };
 
+  let id;
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    const id = await DB.save(base);
-    showNote('✅ Data berhasil disimpan. ID: '+id, 'ok');
+    id = await DB.save(base);
     document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
     showNote('❌ Gagal simpan: '+e.message, 'err');
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc already saved above (same
+  // pattern as PLTS_AshDisposal_PM.html's submitToDb() — see CLAUDE.md). A
+  // Storage hiccup here must never make this look like the whole submission
+  // failed — the checklist data the technician actually filled in is already
+  // safely saved by this point.
+  let filesOk = true;
+  try{
+    showNote('⏳ Mengunggah foto & PDF untuk alur review/approval...', 'info');
+    filesOk = await Approvals.submitWithFiles(id, {
+      photos: {main: PHOTOS},
+      pdfBuilder: () => generatePDF(null, {silent:true}),
+      assetTag: tag,
+      assetName: gv('tag-desc') || 'HV Motor 6-Monthly PM',
+      checksheetFile: 'HV_Motor_6Monthly_PM.html',
+      submittedBy: doneBy,
+      revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+    });
+  }catch(e){
+    filesOk = false;
+    console.error('Upload foto/PDF/approval record gagal:', e);
+  }
+
+  if(filesOk){
+    showNote('✅ Data, foto & PDF berhasil disimpan. ID: '+id, 'ok');
+  }else{
+    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.', 'err');
   }
 }
 
 // ═══════════════════════════════════════════════════
 //  PDF GENERATION
 // ═══════════════════════════════════════════════════
-async function generatePDF(selectedSections){
-  showNote('⏳ Membuat PDF, harap tunggu...', 'info');
+async function generatePDF(selectedSections, opts){
+  opts = opts || {};
+  if(!opts.silent) showNote('⏳ Membuat PDF, harap tunggu...', 'info');
   await new Promise(r => setTimeout(r, 200));
   const {jsPDF} = window.jspdf;
   const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
@@ -918,8 +958,18 @@ async function generatePDF(selectedSections){
 
   const safeTag = tag.replace(/[^A-Za-z0-9_-]/g,'_') || 'UNKNOWN';
   const dateStr = gv('wo-date').replace(/-/g,'') || new Date().toISOString().slice(0,10).replace(/-/g,'');
-  pdf.save('HV_Motor_6MonthlyPM_'+safeTag+'_'+dateStr+'.pdf');
-  showNote('✅ PDF berhasil dibuat.', 'ok');
+  // opts.silent: used by submitToDb() (via Approvals.submitWithFiles's
+  // pdfBuilder) to build the archival PDF that gets uploaded to Storage for
+  // the review/approval workflow — no download dialog, just hand the built
+  // pdf object back. See PLTS_AshDisposal_PM.html's generatePDF() for the
+  // reference pattern.
+  if(opts.silent){
+    // no-op: caller reads the returned pdf object directly
+  } else {
+    pdf.save('HV_Motor_6MonthlyPM_'+safeTag+'_'+dateStr+'.pdf');
+    showNote('✅ PDF berhasil dibuat.', 'ok');
+  }
+  return pdf;
 }
 
 // ═══════════════════════════════════════════════════
@@ -1160,10 +1210,37 @@ async function exportSelectedPDF(){
 }
 
 // ═══════════════════════════════════════════════════
+//  LOAD & MERGE FROM DATABASE
+// ═══════════════════════════════════════════════════
+// This sheet's header ids diverge from LoadMergeModal's default map
+// (checked-by -> done-by here, see CLAUDE.md's "data contract" section) so
+// every open() supplies the corrected headerMap explicitly.
+//
+// Unlike PLTS_AshDisposal_PM.html (one fixed asset tag for the whole
+// sheet), this file covers a family of HV motors (HV_MOTORS) selected via
+// the Plant Tag No. picker — there is no single static assetTag to scope
+// the merge picker to at page load. LoadMergeModal.init() is cheap and
+// idempotent (it just replaces the stored config + guards its own DOM
+// injection), so re-init with whichever tag is currently selected right
+// before every open() instead of a single init() call up front.
+const LMM_HEADER_MAP = {
+  woNumber:'wo-no', executionDate:'wo-date', timeStart:'time-start', timeEnd:'time-end',
+  checkedBy:'done-by', nik:'nik', reviewedBy:'reviewed-by', shift:'shift'
+};
+function openLoadMerge(){
+  const tag = document.getElementById('tag-search').value.trim();
+  if(!tag){ showNote('❌ Pilih Plant Tag No. terlebih dahulu.', 'err'); return; }
+  LoadMergeModal.init({assetTag: tag, headerMap: LMM_HEADER_MAP});
+  LoadMergeModal.open();
+}
+
+// ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════
 buildTable();
 PhotoKit.configure({maxWcm:9.0,maxHcm:20,defaultWcm:9.0,defaultHcm:6.5});
+LoadMergeModal.init({assetTag:'', headerMap: LMM_HEADER_MAP});
+LoadMergeModal.initRevisionBanner();
 loadDraft();
 updateStats();
 </script>

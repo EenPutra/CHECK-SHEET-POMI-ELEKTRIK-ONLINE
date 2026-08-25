@@ -8,12 +8,17 @@ A set of standalone HTML "PM check sheet" forms for POMI's Electric Unit 7/8 ele
 maintenance team (motors, transformers, switchgear, UPS, batteries, ESP, hoists, generator
 brush gear, etc.), plus a shared `dashboard.html` that reads every submission back out of
 Firestore for review, Excel export, and a Transformer PM parameter trend chart (see the
-`dashboard.html` section below). There is **no build step, no bundler, no package.json,
-no test suite** — every page is a single self-contained `.html` file with inline `<style>`
-and `<script>`, sharing four small JS files (`firebase-config.js`, `db-helper.js`,
-`img-helper.js`, `photo-kit.js` — the last two are the shared evidence-photo pipeline, see
-"Photos" below) and a couple of PNG assets (`LOGO POMI.png`, `brush_magazine_diagram.png`) via
-plain `<script src>`/`<img src>` tags.
+`dashboard.html` section below), and `Review_Approval_Dashboard.html`, a TechOp2 → Supervisor
+sign-off workflow layered on top of every check sheet's submissions (see "Review & Approval
+Workflow" below). There is **no build step, no bundler, no package.json, no test suite** —
+every page is a single self-contained `.html` file with inline `<style>` and `<script>`,
+sharing seven small JS files via plain `<script src>` tags: `firebase-config.js`,
+`db-helper.js` (the Firestore data contract), `img-helper.js` + `photo-kit.js` (the shared
+evidence-photo pipeline, see "Photos" below), and `storage-helper.js` + `approval-helper.js` +
+`load-merge-modal.js` (the Review & Approval workflow's file-storage/approvals-collection/
+merge-modal layer — not every check sheet needs these last three, but all 22 currently do) —
+plus a couple of PNG assets (`LOGO POMI.png`, `brush_magazine_diagram.png`) via plain
+`<img src>` tags.
 
 ## Running / testing changes
 
@@ -931,6 +936,208 @@ that the button's count matches `allDataRaw.length - allData.length` exactly
 (105 of 191) and that `confirmDeleteDuplicates()` stages the right id list —
 without ever calling `executeDelete()` in that verification, since that
 would actually delete production data.
+
+## Review & Approval Workflow (`Review_Approval_Dashboard.html`)
+
+A TechOp2-review → Supervisor-approval sign-off flow layered on top of check sheet
+submissions, so a submitted PM check sheet can be reviewed with comments/recommendations,
+then approved with a digital signature, producing a final signed PDF ready for Maximo
+upload — all trackable from `dashboard.html` via a status badge. Rolled out to **every**
+check sheet in this repo (22 as of this writing) via three shared library files, not
+copy-pasted per file. If you're adding a brand-new check sheet, wire it into this system
+the same way — see "Adding this to a new check sheet" below.
+
+### Why Google Drive instead of Firebase Storage
+
+Firebase Storage now requires the paid **Blaze** plan just to *enable* it at all (confirmed
+directly in the Firebase Console — the Storage page shows "To use Storage, upgrade your
+project's pricing plan" with no way around it on Spark), even though actual usage would stay
+within the free tier. Rather than take on a billing account, evidence photos and generated
+PDFs are persisted to **Google Drive** instead, reached through a small **Google Apps Script
+Web App proxy** (`google-apps-script/drive-proxy.gs`) — genuinely free, no billing account,
+generous quota (15GB+ on a personal account). See that file's own header comment for the
+one-time deployment steps (create a Drive folder, paste the script into script.google.com,
+deploy as a Web App). Two non-obvious things that cost real debugging time and are baked into
+the current design — **do not "simplify" these away**:
+
+- **`doGet` must always return JSON + base64, never a raw binary passthrough.** An earlier
+  version tried `return file.getBlob();` directly from `doGet`, on the assumption (matching
+  several online examples) that Apps Script would serve it as a real image/PDF response.
+  Confirmed by hand via `curl` with `redirect:'manual'`/`redirect:'follow'` that this is
+  **wrong** — the actual HTTP response Google sends back is a generic ~5KB HTML wrapper page,
+  not the file's bytes, so both `<img src>` and `fetch()` silently fail (no error, just doesn't
+  render/decode). The fix: `doGet` always returns `{dataBase64, mimeType, filename}` as JSON;
+  the client (`storage-helper.js`) decodes that into a `blob:` URL via `URL.createObjectURL()`
+  before using it as an `<img src>`, `<a href>` target, or feeding it to `pdf-lib`. Every URL
+  this system stores in Firestore (`pdfUrl`, entries inside `photoUrls`, `finalPdfUrl`) is a
+  Drive-proxy JSON-API URL, never a raw `drive.google.com` link.
+- **`file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, ...)` is blocked for unverified Apps
+  Script projects — even with the full Drive OAuth scope explicitly granted.** Confirmed by
+  isolating each `DriveApp` call in a dedicated test function run directly in the Apps Script
+  editor: `getFolderById()` and `createFile()` both succeed, `setSharing()` alone throws
+  `Access denied: DriveApp.` — reproduced consistently across multiple redeploys and even a
+  from-scratch OAuth re-authorization (revoking the app's access at
+  myaccount.google.com/permissions and re-granting it from a clean state). This is Google
+  treating "an app can programmatically make files public" as a more sensitive capability than
+  plain read/write, gated behind app verification this project deliberately isn't pursuing (it's
+  a small internal tool, not a published product). **The workaround**: `doPost` never calls
+  `setSharing()` at all — instead, `ROOT_FOLDER_ID` itself is shared "Anyone with the link →
+  Viewer" **once, manually, through the normal Google Drive UI** (right-click the folder →
+  Share). Every file the script creates *inside* that folder tree inherits the same link-access
+  permission automatically, because Drive's permission model is folder-hierarchy-inherited
+  regardless of whether the file was created via the UI or the API. This is documented as step
+  1b in `drive-proxy.gs`'s own header comment — don't skip it, a freshly (re)deployed proxy
+  with an unshared root folder will upload files successfully but nothing will be able to
+  *view* them.
+
+### Firestore setup this system needs (Console-side, not in this repo)
+
+- **Security rules must explicitly allow the `approvals` collection.** This project's
+  Firestore rules are collection-allowlisted (`match /checksheets/{doc} { allow read, write: if
+  true; }` etc., all under one fully-open trust model — no real per-request auth exists
+  anywhere in this app, consistent with the public API key already committed in
+  `firebase-config.js`), so a brand-new collection with no matching `match` block is
+  **denied by default**, not allowed by default. Confirmed the hard way: a real submit through
+  `PLTS_AshDisposal_PM.html` saved the checksheet doc and attached photo/PDF URLs to it fine
+  (both hit the already-allowed `checksheets` collection), but `Approvals.create()` threw
+  `Missing or insufficient permissions` because the `approvals` collection had no rule yet. Add
+  `match /approvals/{doc} { allow read, write: if true; }` alongside the existing blocks.
+- **A composite index is needed for `Approvals.getByChecksheetId()`** (`where('checksheetId',
+  '==', ...).orderBy('createdAt', 'desc')` — a compound query needing a composite index in
+  Firestore, unlike a single-field `orderBy` alone, which is auto-indexed). Firestore's own
+  error message includes a direct "create this index" Console link when the query first runs
+  without it; `Approvals.getAll()`'s plain `orderBy('createdAt','desc')` (no `where`, used by
+  the review dashboard's inbox listing) does NOT need this — only `getByChecksheetId()`
+  (used by the revision banner and `dashboard.html`'s status-column join) does.
+
+### The three shared library files
+
+- **`storage-helper.js`** (`window.Storage`) — the Drive-proxy client. `uploadDataUrl(path,
+  dataUrl, contentType)` / `uploadBlob(path, blob, contentType)` upload and return a
+  Drive-proxy URL (`path` is a virtual slash-separated path — everything before the last `/`
+  becomes nested Drive folders, e.g. `checksheets/<id>/photos/inv01-0.jpg`).
+  `fetchAsBytes(url)` / `toObjectUrl(url)` read one back (raw `ArrayBuffer`, or a `blob:` URL
+  ready for `<img src>`/`<a href>`/`window.open()`) — always via the JSON+base64 path, per the
+  gotcha above. `deleteByUrl(url)` is best-effort, dev/test cleanup only. **`DRIVE_PROXY_URL`**
+  at the top of this file is the one deployment-specific value — must match whatever Web App
+  URL `drive-proxy.gs` is actually deployed at (ends in `/exec`); if it still contains the
+  literal string `PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE`, every upload throws a clear error
+  telling you so rather than failing silently or hitting a dead URL.
+- **`approval-helper.js`** (`window.Approvals`) — the `approvals` Firestore collection, kept
+  **deliberately separate** from `checksheets` (never a field bolted onto a checksheet doc) so
+  the append-only `checksheets` collection that `dashboard.html`'s trend charts/dedupe/exports
+  all rely on (see "The data contract" above) never has to be mutated for workflow state — one
+  `approvals` doc per submission, referencing `checksheetId`, and unlike `DB.save()` this
+  collection genuinely IS mutated in place as status changes (`submitted` → `reviewed` →
+  `approved`, or → `returned_to_technician` from either stage — see `returnedNote.stage` for
+  which). `create()`/`getAll()`/`getById()`/`getByChecksheetId()`/`submitReview()`/
+  `returnToTechnician()`/`approve()`/`deleteById()` are the low-level CRUD. **The one a check
+  sheet's `submitToDb()` actually calls is `submitWithFiles(checksheetId, opts)`** — a single
+  best-effort entry point that uploads every evidence photo + the archival PDF, attaches the
+  resulting URLs onto the checksheet doc via `DB.attachFiles()` (see below), and creates the
+  `approvals` record, all in one call. Read its JSDoc comment in the file for the exact `opts`
+  shape (`photos`, `pdfBuilder`, `assetTag`, `assetName`, `checksheetFile`, `submittedBy`,
+  `revisionOf`) — `photos: null` and `pdfBuilder: null` are both valid for a sheet with no
+  photo feature / no jsPDF export (e.g. `Hoist_Inspection_Maintenance.html`, which only has
+  `window.print()`).
+- **`load-merge-modal.js`** (`window.LoadMergeModal`) — the generic "pull from database" +
+  multi-submission merge picker + revision banner, reused across every check sheet instead of
+  the ~150-line bespoke version originally hand-written for the `PLTS_AshDisposal_PM.html`
+  pilot (still in that file as-is, not retrofitted to the shared module — it was already
+  shipped and tested, not worth the regression risk of touching working code just for
+  consistency). **Injects its own DOM (modal + revision banner) and `<style>` on first use** —
+  a check sheet only needs `LoadMergeModal.init({assetTag: '...'})` once at init,
+  `LoadMergeModal.initRevisionBanner()` once at init, and a button calling
+  `LoadMergeModal.open()`. See the file's own header comment for the full usage snippet.
+  Solves the same root problem PLTS's original merge feature solved: `DB.save()` always
+  `.add()`s a new document, never updates one in place, so when different technicians each
+  fill part of a check sheet in separate sessions, a later partial save can make an earlier
+  save's data look "lost" from a naive single-latest-doc "load last" flow — this lets a
+  technician pick ANY past submission(s) and union them into the current form (fill-blank-only
+  by default; an explicit "Mode Timpa" checkbox force-overwrites). `buildMergedBundle()` /
+  `applyMergedBundleToForm()` are exposed on the module in case a check sheet needs to compose
+  them directly (e.g. a multi-asset sheet re-running `init()` with a different `assetTag` per
+  selection — see below).
+  - **Merge behavior across the two different OK/NG toggle conventions this codebase uses**
+    (see "Per-file conventions worth matching" below): header fields and `inputValues` (the
+    generic `<input>`/`<select>`/`<textarea>` sweep — where most of a technician's actual typed
+    work lives) are fill-blank-only in merge mode, never overwritten if already non-empty.
+    `.r-sel`-style results additionally get their color/`resultState` resynced via
+    `onResChange()` if the host page defines it. `ST`-object/`.rb`-button-style toggles are
+    restored via the *same* 3-strategy DOM matcher `DB.loadLastSubmission()` already uses in
+    `db-helper.js` — but deliberately **always applied**, even in merge mode, not fill-blank-only
+    like text fields. Reliably detecting "is this specific toggle button already set" varies
+    across at least 3 different DOM conventions found across these 22 files (plain `.rb[data-v]`
+    class-swap, `[data-id]` + `.a` class, `.r-btn[data-type]` + `.active` class — none of them
+    identical to either pattern CLAUDE.md's "Per-file conventions" section originally
+    documented), so this was a deliberate, documented trade-off rather than an oversight:
+    OK/NG toggles are coarse enough that refreshing them from a merged bundle is acceptable,
+    while the measurement/remark text fields where real typed effort lives are never silently
+    clobbered.
+
+### Adding this to a new check sheet
+
+1. Add three script includes right after `db-helper.js`, before `img-helper.js`/`photo-kit.js`:
+   `<script src="storage-helper.js">`, `<script src="approval-helper.js">`,
+   `<script src="load-merge-modal.js">`.
+2. Add (or repurpose an existing) button calling `LoadMergeModal.open()`.
+3. Near the file's own init code (often right next to an existing `loadDraft()` call), add
+   `LoadMergeModal.init({ assetTag: '<this sheet's assetTag>' });` and
+   `LoadMergeModal.initRevisionBanner();`.
+4. In the submit function, immediately after `DB.save(base)` succeeds (and only after — the
+   checksheet doc must already be safely saved before any of this best-effort work runs), add:
+   ```js
+   let filesOk = true;
+   try {
+     showNote('⏳ Mengunggah foto & PDF untuk alur review/approval...', 'info');
+     filesOk = await Approvals.submitWithFiles(id, {
+       photos: PHOTOS,                                   // or null — see below
+       pdfBuilder: () => generatePDF(/*...*/, {silent:true}),  // or null — see below
+       assetTag: '<assetTag>', assetName: '<assetName>',
+       checksheetFile: '<this file's own name>.html',
+       submittedBy: checkedBy,
+       revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+     });
+   } catch (e) { filesOk = false; console.error('Approvals.submitWithFiles gagal:', e); }
+   showNote(filesOk ? '✅ ...' : '⚠️ Data checklist tersimpan, tapi foto/PDF gagal diunggah...', filesOk?'ok':'err');
+   ```
+   This must never make a successful checksheet save look like a failed submit — a Drive/network
+   hiccup here is a warning, not an error, exactly like PLTS_AshDisposal_PM.html's reference
+   implementation.
+5. **If `generatePDF()` (or equivalent) doesn't already support a "silent" no-save/no-preview
+   mode that returns the built `jsPDF` object**, add one the same minimal way PLTS does: an
+   `opts.silent` branch that skips the `pdf.save()`/preview call, plus `return pdf;` at the very
+   end of the function. Don't otherwise touch the PDF's layout/content.
+6. **Photo shape**: `Approvals.submitWithFiles()` expects `photos` as `{groupKey: [{src,
+   caption}, ...]}`. Not every check sheet's photo state already matches this — some use a flat
+   array (`[{src,caption,...}]`, wrap as `{main: PHOTOS}`), some use fixed named slots
+   (`photoStore[slotId]` / `PS`/`PE`/`PSD` triples, one photo per slot — write a small
+   `collectPhotosForUpload()` helper that maps the slots into `{main:[{src,caption}]}` or one
+   group per logical zone), some have two separate photo arrays for different purposes (e.g.
+   `HV_Motor_SWGR.html`'s `PHOTOS` + `TREND_PHOTOS` — pass both as separate keys:
+   `{main: PHOTOS, trend: TREND_PHOTOS}`). Pass `photos: null` for a sheet with no photo
+   feature at all.
+7. **Multi-asset / no-fixed-tag sheets** (a dropdown of many possible tags, one submission per
+   selection — e.g. `DMH_Motor_PM_Checksheet.html`'s 8 units, `HV_Motor_SWGR.html`'s searchable
+   HV motor list, `LV_Motor_MCC.html`'s MCC motor list, `4000_Hours_Mill_PM.html`'s per-Mill
+   tag): `LoadMergeModal.init({assetTag})` only supports one static config at a time, so these
+   files re-call `.init()` with the *currently selected* tag immediately before every
+   `.open()` (wrap it, e.g. `function openLoadMergeModal(){ LoadMergeModal.init({assetTag:
+   currentTag}); LoadMergeModal.open(); }`), and also re-call `.init()` inside whatever
+   `onchange` handler fires when the technician picks a different asset/unit — not once at
+   page load with a hardcoded tag.
+8. **Header field id mismatches** (e.g. some files use `done-by` instead of `checked-by` — see
+   "The data contract" above): pass a custom `headerMap` to `LoadMergeModal.init({assetTag,
+   headerMap: {...}})`, overriding just the mismatched keys — the module's own default already
+   covers `wo-no`/`wo-date`/`time-start`/`time-end`/`checked-by`/`nik`/`reviewed-by`/`shift`.
+9. **A sheet that builds its Firestore doc manually instead of via
+   `DB.collectCheckSheetData()`** (rare, but e.g. `Transformer_AT_NoDGA_Weekly.html`) won't have
+   `inputValues`/`toggleStates` saved at all by default — LoadMergeModal's merge/revision-restore
+   depends on both to bring back anything beyond the WO header fields. Add them to the saved doc
+   the same way `db-helper.js`'s own `collectCheckSheetData()` does (a `querySelectorAll`
+   sweep over every `<input>`/`<select>`/`<textarea>` with an id, plus a snapshot of the page's
+   `ST` toggle-state object) — purely additive, doesn't change or remove any existing field, and
+   has no effect on `dashboard.html` (which never reads either of these two fields).
 
 ## Per-file conventions worth matching
 

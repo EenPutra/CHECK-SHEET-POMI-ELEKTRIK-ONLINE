@@ -10,6 +10,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -187,6 +190,10 @@ canvas.sig-canvas{border:1.5px solid var(--panel-border);border-radius:8px;backg
     <div class="meta-grid-2" style="margin-top:10px">
       <div class="meta-field"><label>Equipment Tag</label><input type="text" id="equip-tag" value="7EB-BYC-125 A/B"></div>
       <div class="meta-field"><label>Unit / Plant Location</label><input type="text" id="location" placeholder="e.g. Unit 8 - DC System Room"></div>
+    </div>
+    <div style="margin-top:12px">
+      <button class="btn btn-outline btn-sm" id="btn-load-merge" onclick="LoadMergeModal.open()">&#128229; Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--text3);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
 
@@ -603,8 +610,12 @@ function getResult(id){
 function getMV(id){var e=document.getElementById(id);return e&&e.value?e.value:'-';}
 
 // PDF GENERATION
-async function generatePDF(){
-  showNotice('Generating PDF, please wait...','info');
+// opts.silent: used by submitToDb() to build the archival PDF uploaded to
+// Storage for the review/approval workflow — no download dialog/notice, just
+// hand the built pdf object back to the caller (see Approvals.submitWithFiles).
+async function generatePDF(opts){
+  opts=opts||{};
+  if(!opts.silent) showNotice('Generating PDF, please wait...','info');
   await new Promise(function(r){setTimeout(r,300);});
   try{
     var jsPDF=(window.jspdf||{}).jsPDF;
@@ -839,8 +850,13 @@ async function generatePDF(){
     }
 
     var fn='PM_BYC125_'+(gv('wo-no')||'NoWO')+'_'+((gv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,''))+'.pdf';
-    doc.save(fn);
-    showNotice('PDF saved: '+fn,'ok');
+    if(opts.silent){
+      // no-op: caller reads the returned pdf object directly
+    }else{
+      doc.save(fn);
+      showNotice('PDF saved: '+fn,'ok');
+    }
+    return doc;
   }catch(err){
     console.error('PDF Error:',err);
     showNotice('Error: '+err.message,'err');
@@ -854,6 +870,9 @@ initSig('sig-tech');initSig('sig-super');
 PhotoKit.configure({maxWcm:8.5,maxHcm:20,defaultWcm:8.5,defaultHcm:6});
 pkWireDrops();
 loadDraft();updateStats();
+
+LoadMergeModal.init({assetTag:'7EB-BYC-125 A/B'});
+LoadMergeModal.initRevisionBanner();
 
 // Auto-load last submission from database
 setTimeout(async()=>{
@@ -898,6 +917,23 @@ function printPage(){
 
 function rv(id){var t=resultState[id];return t==='ok'?'OK':t==='ng'?'NG':t==='na'?'N/A':'—';}
 function rmkList(tbodyId){return [...document.querySelectorAll('#'+tbodyId+' input[placeholder="Remark..."]')].map(el=>el.value.trim()||'—');}
+
+// Photos live one-per-fixed-slot here (photoStore[slotId]), not a free
+// gallery array like most other sheets — collect them into the
+// {groupKey:[{src,caption}]} shape Approvals.submitWithFiles() expects.
+function collectPhotosForUpload(){
+  var slots=[
+    {id:'pd-room1',capId:'cap-room1'},{id:'pd-room2',capId:'cap-room2'},
+    {id:'pd-condA',capId:'cap-condA'},{id:'pd-condB',capId:'cap-condB'},
+    {id:'pd-thermA',capId:'cap-thermA'},{id:'pd-thermB',capId:'cap-thermB'},
+  ];
+  var list=[];
+  slots.forEach(function(s){
+    var p=photoStore[s.id];
+    if(p&&p.src)list.push({src:p.src,caption:gv(s.capId)});
+  });
+  return {main:list};
+}
 
 async function submitToDb(){
   const data=DB.collectCheckSheetData('byc125','7EB-BYC-125 A/B','Battery Charger Unit 125 A/B','2 YEARLY');
@@ -960,11 +996,40 @@ async function submitToDb(){
 
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+
+  let id;
   try{
-    const id=await DB.save(data);
-    DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
+    id=await DB.save(data);
   }catch(e){
     DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above. A Storage/Drive
+  // hiccup here must never make this look like the whole submission failed
+  // — the checklist data the technician actually filled in is already
+  // safely saved by this point.
+  let filesOk=true;
+  try{
+    filesOk=await Approvals.submitWithFiles(id,{
+      photos:collectPhotosForUpload(),
+      pdfBuilder:()=>generatePDF({silent:true}),
+      assetTag:'7EB-BYC-125 A/B',
+      assetName:'Battery Charger Unit 125 A/B',
+      checksheetFile:'PM_CheckSheet_BYC125.html',
+      submittedBy:data.checkedBy,
+      revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+    });
+  }catch(e){
+    filesOk=false;
+    console.error('Upload foto/PDF/approval record gagal:',e);
+  }
+
+  if(filesOk){
+    DB.showSubmitResult(true,'Data, foto & PDF berhasil disimpan ke database! ID: '+id);
+  }else{
+    DB.showSubmitResult(false,'Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.');
   }
 }
 </script>

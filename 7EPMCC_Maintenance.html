@@ -10,6 +10,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -252,6 +255,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Voltage</label><input type="text" id="voltage" placeholder="Voltage rating"></div>
       <div class="mf"><label>Capacity</label><input type="text" id="capacity" placeholder="Capacity"></div>
       <div class="mf"><label>Location</label><input type="text" id="location" placeholder="MCC location"></div>
+    </div>
+    <div style="padding:0 14px 14px">
+      <button class="btn btn-ol btn-sm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Pilih & Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini &mdash; berguna saat beberapa teknisi mengisi bagian berbeda secara terpisah.</span>
     </div>
   </div>
 </div>
@@ -557,6 +564,22 @@ function refreshBadge(type){
   document.getElementById('h-photos').textContent=totalFilled;
 }
 
+// Adapts photoStore (flat, keyed by slot id like "activity_1") into the
+// {groupKey: [{src, caption}, ...]} shape Approvals.submitWithFiles() expects
+// (same shape PhotoKit/hand-rolled PHOTOS objects use elsewhere in this repo)
+// — grouped by the "activity"/"cleaning" prefix each slot id already carries.
+function buildPhotosForUpload(){
+  var out={};
+  Object.keys(photoStore).forEach(function(id){
+    var p=photoStore[id];
+    if(!p||!p.src)return;
+    var type=id.split('_')[0];
+    if(!out[type])out[type]=[];
+    out[type].push({src:p.src,caption:gv('cap_'+id)});
+  });
+  return out;
+}
+
 // ── HELPERS ────────────────────────────────────────
 function gv(id){var e=document.getElementById(id);return e?e.value.trim():'';}
 function gT(id){return ST[id]||'—';}
@@ -618,9 +641,17 @@ function showNote(msg,t){
 }
 
 // ── PDF GENERATION ─────────────────────────────────
-async function generatePDF(){
-  showNote('Membuat PDF, harap tunggu...','info');
-  await new Promise(function(r){setTimeout(r,300);});
+// opts.silent:true builds and returns the jsPDF object without calling
+// .save()/showNote() — used by Approvals.submitWithFiles()'s pdfBuilder to
+// generate the archival PDF for upload without triggering a browser
+// download or the normal user-facing progress notice. See
+// PLTS_AshDisposal_PM.html / CLAUDE.md for the reference pattern.
+async function generatePDF(opts){
+  opts=opts||{};
+  if(!opts.silent){
+    showNote('Membuat PDF, harap tunggu...','info');
+    await new Promise(function(r){setTimeout(r,300);});
+  }
 
   try{
     var jsPDF=(window.jspdf||{}).jsPDF;
@@ -908,11 +939,16 @@ async function generatePDF(){
     var tag=(gv('tag-no')||'MCC').replace(/[^a-zA-Z0-9]/g,'-');
     var dt=(gv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'');
     var fname='MCC_PM_'+tag+'_'+dt+'.pdf';
+    if(opts.silent){
+      return doc;
+    }
     doc.save(fname);
     showNote('PDF berhasil disimpan: '+fname,'ok');
+    return doc;
 
   }catch(err){
     console.error('PDF Error:',err);
+    if(opts.silent) throw err;
     showNote('Error membuat PDF: '+err.message,'err');
   }
 }
@@ -922,6 +958,8 @@ PhotoKit.configure({maxWcm:8.5,maxHcm:20,defaultWcm:8.5,defaultHcm:6});
 buildCheckTable();
 loadDraft();
 updateStats();
+LoadMergeModal.init({assetTag:'7EP-MCC'});
+LoadMergeModal.initRevisionBanner();
 
 // Auto-load last submission from database
 setTimeout(async()=>{
@@ -987,11 +1025,40 @@ async function submitToDb(){
 
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+  let id;
   try{
-    const id=await DB.save(data);
+    id=await DB.save(data);
     DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
   }catch(e){
     DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above. A Storage hiccup
+  // (e.g. Storage not yet enabled, or a slow connection dropping mid-upload)
+  // must never make this look like the whole submission failed — the
+  // checklist data the technician actually filled in is already safely
+  // saved by this point. Mirrors PLTS_AshDisposal_PM.html's submitToDb().
+  try{
+    showNote('⏳ Mengunggah foto & PDF untuk alur review/approval...','info');
+    const filesOk=await Approvals.submitWithFiles(id,{
+      photos:buildPhotosForUpload(),
+      pdfBuilder:()=>generatePDF({silent:true}),
+      assetTag:'7EP-MCC',
+      assetName:'MCC Switchboard PM',
+      checksheetFile:'7EPMCC_Maintenance.html',
+      submittedBy:data.checkedBy,
+      revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+    });
+    if(filesOk){
+      showNote('✅ Foto, PDF & alur review/approval berhasil disiapkan.','ok');
+    }else{
+      showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.','err');
+    }
+  }catch(e){
+    console.error('Upload foto/PDF/approval record gagal:',e);
+    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi terjadi error saat menyiapkan alur review/approval: '+e.message,'err');
   }
 }
 </script>

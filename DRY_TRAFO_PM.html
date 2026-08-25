@@ -10,6 +10,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -249,6 +252,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Voltage</label><input type="text" id="voltage" value="13800 / 416 Y / 240 V"></div>
       <div class="mf"><label>Capacity</label><input type="text" id="capacity" value="1500 / 2000 KVA"></div>
       <div class="mf"><label>Cooling Type</label><input type="text" id="cooling" value="AA/FA"></div>
+    </div>
+    <div style="padding:0 16px 14px">
+      <button class="btn btn-outline btn-sm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
 </div>
@@ -936,14 +943,15 @@ const gT=id=>ST[id]||'—';
 const tr2=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'—');
 
 // ── PDF ────────────────────────────────────────────
-async function generatePDF(){
+async function generatePDF(opts){
+  opts = opts || {};
   try{
-    showNote('⏳ Membuat PDF…','info');
+    if(!opts.silent) showNote('⏳ Membuat PDF…','info');
     await new Promise(r=>setTimeout(r,200));
     const { jsPDF } = window.jspdf || {};
     if(!jsPDF){
-      showNote('❌ jsPDF gagal dimuat. Pastikan koneksi internet aktif saat membuka file ini.','err');
-      return;
+      if(!opts.silent) showNote('❌ jsPDF gagal dimuat. Pastikan koneksi internet aktif saat membuka file ini.','err');
+      return null;
     }
     const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
 
@@ -1203,11 +1211,15 @@ async function generatePDF(){
     pdf.text('Dry Transformer 2 Yearly PM',M,H-5);
   }
   const fn=`DRY_TRAFO_PM_${(v('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
-    pdf.save(fn);
-    showNote('✅ PDF tersimpan: '+fn,'ok');
+    if(!opts.silent){
+      pdf.save(fn);
+      showNote('✅ PDF tersimpan: '+fn,'ok');
+    }
+    return pdf;
   }catch(err){
     console.error(err);
-    showNote('❌ Gagal membuat PDF: '+(err && err.message ? err.message : err),'err');
+    if(!opts.silent) showNote('❌ Gagal membuat PDF: '+(err && err.message ? err.message : err),'err');
+    return null;
   }
 }
 
@@ -1218,6 +1230,9 @@ PhotoKit.configure({maxWcm:9.2,maxHcm:20,defaultWcm:9.2,defaultHcm:6.5});
 pkWireDrops();
 loadDraft();
 updateStats();
+
+LoadMergeModal.init({ assetTag: 'DRY-XFMR-USST' });
+LoadMergeModal.initRevisionBanner();
 
 // Auto-load last submission from database
 setTimeout(async()=>{
@@ -1331,12 +1346,58 @@ async function submitToDb(){
 
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+  let id;
   try{
-    const id=await DB.save(data);
-    DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
+    id=await DB.save(data);
   }catch(e){
     DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+    return;
   }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above. A Storage hiccup
+  // must never make this look like the whole submission failed — the
+  // checklist data the technician actually filled in is already safely
+  // saved by this point (see CLAUDE.md / PLTS_AshDisposal_PM.html for the
+  // same pattern).
+  let filesOk = true;
+  try{
+    const photos = collectApprovalPhotos();
+    filesOk = await Approvals.submitWithFiles(id, {
+      photos,
+      pdfBuilder: () => generatePDF({silent:true}),
+      assetTag: 'DRY-XFMR-USST',
+      assetName: 'Dry Transformer USST',
+      checksheetFile: 'DRY_TRAFO_PM.html',
+      submittedBy: data.checkedBy,
+      revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+    });
+  }catch(e){
+    filesOk = false;
+    console.error('Upload foto/PDF/approval record gagal:', e);
+  }
+
+  if(filesOk){
+    DB.showSubmitResult(true,'Data, foto & PDF berhasil disimpan. ID: '+id);
+  }else{
+    DB.showSubmitResult(false,'Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.');
+  }
+}
+
+// Builds the {groupKey: [{src, caption}]} shape Approvals.submitWithFiles()
+// expects, from this file's own PhotoKit-backed single-photo drop zones
+// (photoStore[id] -> data URL, one slot per PHOTO_IDS entry — see the
+// "PhotoKit layer" section above). Each slot holds at most one photo, so
+// each group is a 0- or 1-element array.
+function collectApprovalPhotos(){
+  const photos = {};
+  PHOTO_IDS.forEach(id=>{
+    const src = photoStore[id];
+    if(!src) return;
+    const capId = 'cap-' + id.slice(3); // 'pd-megger-hv' -> 'cap-megger-hv'
+    photos[id] = [{src, caption: v(capId) || ''}];
+  });
+  return photos;
 }
 </script>
 </body>

@@ -9,6 +9,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -340,6 +343,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Acknowledge Date</label><input type="date" id="ack-date"></div>
       <div class="mf"><label>Acknowledge By</label><input type="text" id="ack-by" placeholder="Full name"></div>
       <div class="mf"><label>Signature</label><input type="text" id="ack-sign" placeholder="Sign or initial"></div>
+    </div>
+    <div style="padding:0 16px 14px">
+      <button class="btn btn-draft btn-sm" id="btn-load-last" onclick="openLoadMergeModal()">📥 Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih Plant Tag No. dulu, lalu pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
 </div>
@@ -1094,13 +1101,43 @@ async function submitToDb(){
     ]},
   };
 
+  let id;
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    const id = await DB.save(base);
-    showNote('✅ Data berhasil disimpan. ID: '+id, 'ok');
+    id = await DB.save(base);
     document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
     showNote('❌ Gagal simpan: '+e.message, 'err');
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above. A Storage hiccup
+  // must never make this look like the whole submission failed — the
+  // checklist data the technician actually filled in is already safely
+  // saved by this point. See CLAUDE.md / PLTS_AshDisposal_PM.html's
+  // submitToDb() for the reference version of this pattern.
+  let filesOk = true;
+  try{
+    showNote('⏳ Mengunggah foto & PDF untuk alur review/approval...', 'info');
+    filesOk = await Approvals.submitWithFiles(id, {
+      photos: { main: PHOTOS, trend: TREND_PHOTOS },
+      pdfBuilder: () => generatePDF(null, {silent:true}),
+      assetTag: tag,
+      assetName: gv('tag-desc') || 'HV Motor SWGR PM',
+      checksheetFile: 'HV_Motor_SWGR.html',
+      submittedBy: doneBy,
+      revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+    });
+  }catch(e){
+    filesOk = false;
+    console.error('Upload foto/PDF/approval record gagal:', e);
+  }
+
+  if(filesOk){
+    showNote('✅ Data, foto & PDF berhasil disimpan. ID: '+id, 'ok');
+  }else{
+    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Storage sudah aktif, lalu coba submit ulang.', 'err');
   }
 }
 
@@ -1166,8 +1203,14 @@ function chkPdfRows(chk){
     default: return chk.crit.map((c,i) => [i===0?chk.no:'', task + (chk.crit.length>1?` (${sanitizeText(c.lbl)})`:''), resOf(c.id), rmkOf(c.id)]);
   }
 }
-async function generatePDF(selectedSections){
-  showNote('⏳ Membuat PDF, harap tunggu...', 'info');
+async function generatePDF(selectedSections, opts){
+  opts = opts || {};
+  // opts.silent: used by submitToDb() (via Approvals.submitWithFiles) to build
+  // the archival PDF uploaded for the review/approval workflow — no download
+  // dialog, just hand the built pdf object back. See CLAUDE.md's PDF export
+  // section / PLTS_AshDisposal_PM.html's generatePDF() for the reference
+  // pattern this mirrors.
+  if(!opts.silent) showNote('⏳ Membuat PDF, harap tunggu...', 'info');
   await new Promise(r => setTimeout(r, 200));
   const logoImg = await imgToDataUrl('LOGO POMI.png');
   const {jsPDF} = window.jspdf;
@@ -1520,8 +1563,14 @@ async function generatePDF(selectedSections){
 
   const safeTag = tag.replace(/[^A-Za-z0-9_-]/g,'_') || 'UNKNOWN';
   const dateStr = gv('wo-date').replace(/-/g,'') || new Date().toISOString().slice(0,10).replace(/-/g,'');
-  pdf.save('HV_Motor_SWGR_'+safeTag+'_'+dateStr+'.pdf');
-  showNote('✅ PDF berhasil dibuat.', 'ok');
+  if(opts.silent){
+    // no-op: caller (Approvals.submitWithFiles's pdfBuilder) reads the
+    // returned pdf object directly instead of triggering a download.
+  } else {
+    pdf.save('HV_Motor_SWGR_'+safeTag+'_'+dateStr+'.pdf');
+    showNote('✅ PDF berhasil dibuat.', 'ok');
+  }
+  return pdf;
 }
 
 // ═══════════════════════════════════════════════════
@@ -1689,12 +1738,37 @@ async function exportSelectedPDF(){
 }
 
 // ═══════════════════════════════════════════════════
+//  LOAD & MERGE FROM DATABASE (review/approval workflow)
+// ═══════════════════════════════════════════════════
+// This file covers several distinct HV motor tags picked from a searchable
+// dropdown (HV_MOTORS), not one fixed assetTag like PLTS_AshDisposal_PM.html
+// — so LoadMergeModal.init() has to be re-run with whichever tag is
+// currently in the Plant Tag No. field right before opening the modal,
+// rather than once at page load with a hardcoded tag.
+// 'checked-by' isn't used by this file (see submitToDb()'s `doneBy`), so
+// the shared module's default headerMap is overridden to restore into
+// 'done-by' instead — otherwise a merged submission's technician name would
+// silently fail to land in the form.
+const HV_LMM_HEADER_MAP = {
+  woNumber:'wo-no', executionDate:'wo-date', timeStart:'time-start', timeEnd:'time-end',
+  checkedBy:'done-by', nik:'nik', reviewedBy:'reviewed-by', shift:'shift',
+};
+function openLoadMergeModal(){
+  const tag = document.getElementById('tag-search').value.trim();
+  if(!tag){ showNote('❌ Isi/pilih Plant Tag No. terlebih dahulu.', 'err'); return; }
+  LoadMergeModal.init({ assetTag: tag, headerMap: HV_LMM_HEADER_MAP });
+  LoadMergeModal.open();
+}
+
+// ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════
 buildTable();
 PhotoKit.configure({maxWcm:9.0,maxHcm:20,defaultWcm:9.0,defaultHcm:6.5});
 loadDraft();
 updateStats();
+LoadMergeModal.init({ assetTag: document.getElementById('tag-search').value.trim(), headerMap: HV_LMM_HEADER_MAP });
+LoadMergeModal.initRevisionBanner();
 </script>
 </body>
 </html>

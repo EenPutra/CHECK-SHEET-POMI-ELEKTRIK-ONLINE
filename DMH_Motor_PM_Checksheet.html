@@ -10,6 +10,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -288,6 +291,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Shift</label>
         <select id="shift"><option>Shift 1 (07:00–15:00)</option><option>Shift 2 (15:00–23:00)</option><option>Shift 3 (23:00–07:00)</option><option>Normal Hours</option></select>
       </div>
+    </div>
+    <div style="padding:0 16px 14px">
+      <button class="btn btn-sm" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya (untuk unit yang sedang dipilih) untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
 </div>
@@ -938,6 +945,10 @@ function onUnitChange(){
     applyAllFieldValues(null);
   }
   renderTagLabels();
+  // Each DMH unit is its own assetTag (see UNITS) — re-point the Load &
+  // Merge modal at whichever unit is now selected so "Pilih & Gabung Data"
+  // pulls that unit's own submission history, not the previous unit's.
+  if(typeof LoadMergeModal!=='undefined')LoadMergeModal.init({assetTag:UNITS[newL]});
   showNote('📂 Beralih ke '+UNITS[newL]+'.','info');
 }
 
@@ -1169,19 +1180,53 @@ async function submitToDb(){
   base.countNa=0;
   base.overallStatus=v('overall')!=='—'?v('overall'):(base.countNg>0?'NG':'OK');
 
+  let id;
   try{
-    const id=await DB.save(base);
-    showNote('✅ Data berhasil disimpan ke database! ID: '+id,'ok');
+    showNote('⏳ Menyimpan ke database...','info');
+    id=await DB.save(base);
   }catch(e){
     showNote('❌ Gagal menyimpan: '+e.message,'err');
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above. A Storage hiccup
+  // must never make this look like the whole submission failed — the
+  // checklist data the technician actually filled in is already safely
+  // saved by this point. Mirrors PLTS_AshDisposal_PM.html's submitToDb()
+  // (see CLAUDE.md).
+  let filesOk=true;
+  try{
+    showNote('⏳ Mengunggah foto & PDF untuk alur review/approval...','info');
+    const imgAttach=ATTACH.filter(a=>a.type==='image'&&a.dataUrl);
+    const photosForUpload=imgAttach.length?{evidence:imgAttach.map(a=>({src:a.dataUrl,caption:a.caption||''}))}:null;
+    filesOk=await Approvals.submitWithFiles(id,{
+      photos:photosForUpload,
+      pdfBuilder:()=>generatePDF({silent:true}),
+      assetTag:assetTag,
+      assetName:'DMH Conveyor Motor & Safety Device PM',
+      checksheetFile:'DMH_Motor_PM_Checksheet.html',
+      submittedBy:base.checkedBy,
+      revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+    });
+  }catch(e){
+    filesOk=false;
+    console.error('Upload foto/PDF/approval record gagal:',e);
+  }
+
+  if(filesOk){
+    showNote('✅ Data, foto & PDF berhasil disimpan. ID: '+id,'ok');
+  }else{
+    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.','err');
   }
 }
 
 // ══════════════════════════════════════════════════
 //  PDF EXPORT — mirrors the Excel check sheet layout
 // ══════════════════════════════════════════════════
-async function generatePDF(){
-  showNote('⏳ Membuat PDF…','info');
+async function generatePDF(opts){
+  opts=opts||{};
+  if(!opts.silent) showNote('⏳ Membuat PDF…','info');
   await new Promise(r=>setTimeout(r,150));
   const{jsPDF}=window.jspdf||{};
   if(!jsPDF){showNote('❌ jsPDF gagal dimuat. Pastikan koneksi internet aktif.','err');return;}
@@ -1448,8 +1493,16 @@ async function generatePDF(){
   }
 
   const fn=`DMH_${UNITS[L].replace(/\s+/g,'')}_${pm}_${(v('wo-date')!=='—'?v('wo-date'):new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
-  pdf.save(fn);
-  showNote('✅ PDF tersimpan: '+fn,'ok');
+  // opts.silent: used by submitToDb() to build the archival PDF that gets
+  // uploaded via Approvals.submitWithFiles() for the review/approval
+  // workflow — no download dialog, just hand the built pdf object back.
+  if(opts.silent){
+    // no-op: caller reads the returned pdf object directly
+  } else {
+    pdf.save(fn);
+    showNote('✅ PDF tersimpan: '+fn,'ok');
+  }
+  return pdf;
 }
 
 // ══════════════════════════════════════════════════
@@ -1473,6 +1526,8 @@ renderTagLabels();
 PhotoKit.configure({maxWcm:6,maxHcm:18,defaultWcm:6,defaultHcm:4.3});  // 3-up grid on portrait A4
 loadDraft();
 renderEvdGrid();
+LoadMergeModal.init({assetTag:UNITS[document.getElementById('sel-unit').value]});
+LoadMergeModal.initRevisionBanner();
 document.getElementById('wo-date').value=document.getElementById('wo-date').value||new Date().toISOString().slice(0,10);
 updateStats();
 

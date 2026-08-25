@@ -10,6 +10,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -250,6 +253,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
         </select>
       </div>
       <div class="mf"><label>Date Acknowledge</label><input type="date" id="ack-date"></div>
+    </div>
+    <div style="padding:0 16px 14px">
+      <button class="btn btn-sm" style="background:#fff;color:var(--navy);border:1.5px solid var(--bdr)" onclick="LoadMergeModal.open()">&#128229; Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini &mdash; berguna saat beberapa teknisi mengisi kompartemen berbeda secara terpisah.</span>
     </div>
   </div>
 </div>
@@ -673,15 +680,20 @@ const v=id=>{const e=document.getElementById(id);return e?e.value.trim():'';};
 const gT=id=>ST[id]||'—';
 
 // ── PDF ────────────────────────────────────────────
-async function generatePDF(){
+// opts.silent: used by submitToDb() to build the archival PDF that gets
+// uploaded to Storage for the review/approval workflow (via
+// Approvals.submitWithFiles's pdfBuilder) — no download dialog, just hand
+// the built pdf object back. Mirrors PLTS_AshDisposal_PM.html's pattern.
+async function generatePDF(opts){
+  opts=opts||{};
   try{
-    showNote('⏳ Membuat PDF…','info');
+    if(!opts.silent) showNote('⏳ Membuat PDF…','info');
     await new Promise(r=>setTimeout(r,200));
 
     const { jsPDF } = window.jspdf || {};
     if(!jsPDF){
-      showNote('❌ jsPDF gagal dimuat. Pastikan koneksi internet aktif saat membuka file ini.','err');
-      return;
+      if(!opts.silent) showNote('❌ jsPDF gagal dimuat. Pastikan koneksi internet aktif saat membuka file ini.','err');
+      return opts.silent ? null : undefined;
     }
 
     const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -818,11 +830,18 @@ async function generatePDF(){
   }
 
   const fn=`LCB4_Maintenance_${(v('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
-    pdf.save(fn);
-    showNote('✅ PDF tersimpan: '+fn,'ok');
+    if(opts.silent){
+      // no-op: caller (Approvals.submitWithFiles's pdfBuilder) reads the
+      // returned pdf object directly, no download dialog here.
+    } else {
+      pdf.save(fn);
+      showNote('✅ PDF tersimpan: '+fn,'ok');
+    }
+    return pdf;
   }catch(err){
     console.error(err);
-    showNote('❌ Gagal membuat PDF: '+(err && err.message ? err.message : err),'err');
+    if(!opts.silent) showNote('❌ Gagal membuat PDF: '+(err && err.message ? err.message : err),'err');
+    if(opts.silent) throw err;
   }
 }
 
@@ -838,6 +857,18 @@ PhotoKit.configure({maxWcm:8.8,maxHcm:15,defaultWcm:8.8,defaultHcm:5.6});
 pkWireDrops();
 loadDraft();
 updateStats();
+
+// Review & Approval workflow: multi-submission "load & merge" picker +
+// revision banner (see approval-helper.js / load-merge-modal.js). This
+// file's Checked By field is `done-by`, not the generic `checked-by` id
+// db-helper.js's collectCheckSheetData()/LoadMergeModal's default headerMap
+// expect — remap it so a merged submission's checkedBy value lands in the
+// right input.
+LoadMergeModal.init({
+  assetTag:'7EP-LC-B4',
+  headerMap:{woNumber:'wo-no', executionDate:'wo-date', checkedBy:'done-by', reviewedBy:'reviewed-by', shift:'shift'}
+});
+LoadMergeModal.initRevisionBanner();
 
 // Auto-load last submission from database
 setTimeout(async()=>{
@@ -919,11 +950,47 @@ async function submitToDb(){
 
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+
+  let id;
   try{
-    const id=await DB.save(data);
-    DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
+    id=await DB.save(data);
   }catch(e){
     DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
+    return;
+  }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above. A Storage hiccup
+  // (e.g. Storage not yet enabled in the Firebase console, or a slow
+  // connection dropping mid-upload) must never make this look like the
+  // whole submission failed — the checklist data the technician actually
+  // filled in is already safely saved by this point.
+  const photos={};
+  COMPS.forEach(c=>{
+    const entry=PE['photo_'+c];
+    if(entry) photos[c]=[{...entry, caption:v('cap_'+c)}];
+  });
+
+  let filesOk=true;
+  try{
+    filesOk=await Approvals.submitWithFiles(id,{
+      photos,
+      pdfBuilder:()=>generatePDF({silent:true}),
+      assetTag:'7EP-LC-B4',
+      assetName:'Load Center B4 Switchgear',
+      checksheetFile:'7EPLCB4_Maintenance.html',
+      submittedBy:data.checkedBy,
+      revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+    });
+  }catch(e){
+    filesOk=false;
+    console.error('Upload foto/PDF/approval record gagal:', e);
+  }
+
+  if(filesOk){
+    DB.showSubmitResult(true,'Data, foto & PDF berhasil disimpan ke database! ID: '+id);
+  }else{
+    DB.showSubmitResult(false,'Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.');
   }
 }
 </script>

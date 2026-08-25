@@ -10,6 +10,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="load-merge-modal.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -259,6 +262,10 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;wi
       <div class="mf"><label>Reviewed By</label><input type="text" id="reviewed-by" placeholder="Supervisor name"></div>
       <div class="mf"><label>Shift</label><select id="shift"><option>Shift 1 (07:00–15:00)</option><option>Shift 2 (15:00–23:00)</option><option>Shift 3 (23:00–07:00)</option><option>Normal Hours</option></select></div>
     </div>
+    <div style="margin-top:10px">
+      <button class="btn bo bsm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Pilih &amp; Gabung Data dari Database</button>
+      <span style="font-size:11px;color:var(--t3);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini.</span>
+    </div>
   </div>
 
   <div class="tabbar">
@@ -418,6 +425,10 @@ function resetForm(){if(!confirm('Reset all data?'))return;document.querySelecto
 
 // NOTICE
 function note(msg,t){const n=document.getElementById('notice');n.textContent=msg;n.className='notice '+t;setTimeout(()=>n.className='notice',3500);}
+// LoadMergeModal / Approvals call showNote(msg,type) — alias it onto this
+// file's own note() so their status messages surface through the existing
+// #notice UI instead of silently doing nothing.
+function showNote(msg,t){note(msg,t);}
 const vv=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
 const trunc=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'');
 
@@ -446,10 +457,11 @@ async function imgToDataUrl(src){
   });
 }
 
-async function generatePDF(selSet){
+async function generatePDF(selSet, opts){
+  opts=opts||{};
   if(!selSet)selSet=new Set(PDF_SHEETS.map(s=>s.key));
-  note('⏳ Generating PDF…','info');await new Promise(r=>setTimeout(r,200));
-  if(!window.jspdf||!window.jspdf.jsPDF){note('❌ jsPDF library tidak tersedia.','err');return;}
+  if(!opts.silent){note('⏳ Generating PDF…','info');await new Promise(r=>setTimeout(r,200));}
+  if(!window.jspdf||!window.jspdf.jsPDF){if(!opts.silent)note('❌ jsPDF library tidak tersedia.','err');return;}
   const logoImg=await imgToDataUrl('LOGO POMI.png');
   const{jsPDF}=window.jspdf;
   const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
@@ -577,7 +589,12 @@ async function generatePDF(selSet){
   for(let pg=1;pg<=pages;pg++){pdf.setPage(pg);pdf.setFont(BASE_FONT,'normal');pdf.setFontSize(6.5);pdf.setTextColor(150);pdf.text(`Page ${pg}/${pages}`,W-M,H-5,{align:'right'});pdf.text(sanitizeText('PLTU - GIS SF6 Gas Pressure Monitoring'),M,H-5);}
 
   const fn=`transformer_gis_sf6_${(vv('wo-no')||'workorder')}_${(vv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
-  pdf.save(fn);note('✅ PDF saved: '+fn,'ok');
+  if(opts.silent){
+    // no-op: caller (Approvals.submitWithFiles) reads the returned pdf object directly
+  } else {
+    pdf.save(fn);note('✅ PDF saved: '+fn,'ok');
+  }
+  return pdf;
 }
 
 // PDF MODAL
@@ -603,6 +620,8 @@ mkGIS('tb-g150','g150');
 mkGIS('tb-g500','g500');
 PhotoKit.configure({maxWcm:8.8,maxHcm:15,defaultWcm:8.8,defaultHcm:5.6});  // 3-up grid on a landscape A4 page: one column is 8.8cm wide
 mkPhotos();initSig('sig-tech');initSig('sig-super');loadDraft();upStats();loadLastSubmission();
+LoadMergeModal.init({ assetTag: 'GIS-SF6' });
+LoadMergeModal.initRevisionBanner();
 
 function collectSheetData(tbId, columns, pfx) {
   const tb = document.getElementById(tbId);
@@ -686,12 +705,52 @@ async function submitToDb(){
 
   if (!data.executionDate) { DB.showSubmitResult(false, 'Isi tanggal eksekusi terlebih dahulu.'); return; }
   if (!data.checkedBy) { DB.showSubmitResult(false, 'Isi nama teknisi terlebih dahulu.'); return; }
+
+  let id;
   try {
-    const id = await DB.save(data);
+    id = await DB.save(data);
     DB.showSubmitResult(true, 'Data berhasil disimpan ke database! ID: ' + id);
   } catch(e) {
     DB.showSubmitResult(false, 'Gagal menyimpan: ' + e.message);
+    return;
   }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above — a failure here
+  // (thrown or filesOk===false) must never make the whole submission look
+  // like it failed, since the checklist data is already safely saved.
+  try {
+    const filesOk = await Approvals.submitWithFiles(id, {
+      photos: collectPhotosForApproval(),
+      pdfBuilder: () => generatePDF(new Set(PDF_SHEETS.map(s=>s.key)), {silent:true}),
+      assetTag: 'GIS-SF6',
+      assetName: 'GIS SF₆ Gas Pressure Monitoring',
+      checksheetFile: 'Transformer_GIS_SF6.html',
+      submittedBy: data.checkedBy,
+      revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+    });
+    if (filesOk) {
+      note('✅ Foto & PDF untuk alur review/approval berhasil diunggah.', 'ok');
+    } else {
+      note('⚠️ Data checklist tersimpan (ID: ' + id + '), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.', 'err');
+    }
+  } catch(e) {
+    console.error('Approvals.submitWithFiles gagal:', e);
+    note('⚠️ Data checklist tersimpan (ID: ' + id + '), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.', 'err');
+  }
+}
+
+// Builds the {groupKey: [{src, caption}]} shape Approvals.submitWithFiles
+// expects, from this file's own per-slot photo state (PS/PE keyed by
+// PSLOTS[].id — a fixed slot each, not a free-count gallery).
+function collectPhotosForApproval(){
+  const photos = {};
+  PSLOTS.forEach(p => {
+    if (!PS[p.id]) return;
+    const capEl = document.getElementById(p.id + '-cap');
+    photos[p.id] = [{ src: PS[p.id], caption: capEl ? capEl.value.trim() : '' }];
+  });
+  return photos;
 }
 
 async function loadLastSubmission() {
