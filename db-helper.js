@@ -84,6 +84,19 @@ const DB = {
     return doc.exists ? { id: doc.id, ...doc.data() } : null;
   },
 
+  // The ONE place a checksheet doc is ever touched after save() — every
+  // other write in this codebase is an immutable .add(). This exists only
+  // for the review/approval workflow to attach Storage URLs (photoUrls,
+  // pdfUrl) onto a doc once its id is known post-save (Storage paths are
+  // keyed by doc id, so the upload can only happen after save() returns).
+  // {merge:true} so it can ONLY add/overwrite the exact keys passed in —
+  // it can never accidentally drop or replace the rest of a submission's
+  // data, keeping every existing reader (dashboard trend charts, exports,
+  // dedupe) safe against a field set they don't know about.
+  async attachFiles(id, patch) {
+    await db.collection(this.COLLECTION).doc(id).set(patch, { merge: true });
+  },
+
   async deleteById(id) {
     await db.collection(this.COLLECTION).doc(id).delete();
     return true;

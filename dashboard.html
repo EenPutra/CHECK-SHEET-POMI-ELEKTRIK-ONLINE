@@ -13,6 +13,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="approval-helper.js"></script>
 <style>
 :root{
   --bg:#f4f7fb;
@@ -746,6 +747,10 @@ table.dtbl tr:last-child td{border-bottom:none}
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m7 14 4-4 4 4 5-5"/></svg>
       Dashboard
     </a>
+    <a href="Review_Approval_Dashboard.html">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+      Review &amp; Approval
+    </a>
   </div>
   <div class="tb-right">
     <span class="tb-time" id="clock">--:--:--</span>
@@ -990,6 +995,7 @@ table.dtbl tr:last-child td{border-bottom:none}
             <th style="text-align:center">OK</th>
             <th style="text-align:center">NG</th>
             <th>Status</th>
+            <th>Approval</th>
             <th>Detail</th>
           </tr>
         </thead>
@@ -1228,7 +1234,22 @@ async function loadData() {
     console.error('Load error:', e);
     document.getElementById('tbl-loading').textContent = 'Gagal memuat data. Pastikan Firebase sudah dikonfigurasi.';
   }
+
+  // Review/approval status is a separate, best-effort overlay — only the
+  // pilot check sheet (PLTS Ash Disposal) creates 'approvals' docs today,
+  // so most rows simply have none and the column shows '—'. A failure here
+  // (e.g. the collection doesn't exist yet) must never block the main
+  // table above, which is why it's a second, independent try/catch.
+  try {
+    const approvals = await Approvals.getAll();
+    approvalsByChecksheetId = {};
+    approvals.forEach(a => { approvalsByChecksheetId[a.checksheetId] = a; });
+    renderTable(allData); // re-render so the Approval column picks up the fresh map
+  } catch (e) {
+    console.error('Approval status load error:', e);
+  }
 }
+let approvalsByChecksheetId = {};
 
 function renderStats(stats) {
   const total=stats.total||0;
@@ -2249,6 +2270,7 @@ function renderTable(data) {
       <td style="text-align:center;color:var(--ok);font-weight:700;font-family:var(--mono)">${d.countOk || 0}</td>
       <td style="text-align:center;color:var(--rose);font-weight:700;font-family:var(--mono)">${d.countNg || 0}</td>
       <td><span class="tag ${d.overallStatus === 'OK' ? 'tag-ok' : 'tag-ng'}">${d.overallStatus || '-'}</span></td>
+      <td>${approvalBadge(d.id)}</td>
       <td><a href="#" class="link-btn" onclick="showDetail('${d.id}');return false">Lihat</a></td>
     </tr>
   `).join('');
@@ -2257,6 +2279,22 @@ function renderTable(data) {
 }
 
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+const APPROVAL_BADGE_COLORS = {
+  submitted: '#6366f1', reviewed: '#92400e', approved: '#047857', returned_to_technician: '#f43f5e',
+};
+const APPROVAL_BADGE_BG = {
+  submitted: '#e0e7ff', reviewed: '#fef3c7', approved: '#d1fae5', returned_to_technician: '#ffe4e6',
+};
+function approvalBadge(checksheetId) {
+  const a = approvalsByChecksheetId[checksheetId];
+  if (!a) return '<span style="font-size:11px;color:var(--txt-3)">&mdash;</span>';
+  const label = Approvals.STATUS_LABELS[a.status] || a.status;
+  const fg = APPROVAL_BADGE_COLORS[a.status] || 'var(--txt-2)';
+  const bg = APPROVAL_BADGE_BG[a.status] || 'var(--surf-2)';
+  return `<a href="Review_Approval_Dashboard.html?id=${a.id}" target="_blank" rel="noopener"
+    style="display:inline-block;font-size:10.5px;font-weight:700;padding:3px 10px;border-radius:20px;text-decoration:none;color:${fg};background:${bg}">${esc(label)}</a>`;
+}
 
 async function showDetail(id) {
   const d = allData.find(x => x.id === id);

@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Review &amp; Approval — ELECTRIC 7 POMI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<style>
+:root{
+  --bg:#f4f7fb; --bg-2:#eaf0f7; --surf:#ffffff; --surf-2:#f8fafc;
+  --bdr:#e3e8f0; --bdr-2:#d6dde7;
+  --txt:#0b1220; --txt-2:#475569; --txt-3:#94a3b8;
+  --pri:#2563eb; --pri-soft:#dbeafe; --pri-deep:#1d4ed8;
+  --acc:#f59e0b; --acc-soft:#fef3c7;
+  --ind:#6366f1; --ind-soft:#e0e7ff;
+  --ok:#10b981; --ok-soft:#d1fae5;
+  --ng:#f43f5e; --ng-soft:#ffe4e6;
+  --display:'Space Grotesk',system-ui,sans-serif;
+  --body:'Manrope',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --shadow:0 2px 8px rgba(15,23,42,0.06),0 1px 2px rgba(15,23,42,0.04);
+  --shadow-lg:0 14px 40px -10px rgba(37,99,235,0.18),0 4px 12px rgba(15,23,42,0.06);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--body);background:var(--bg);color:var(--txt);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font-family:var(--body);cursor:pointer}
+textarea,input{font-family:var(--body)}
+
+/* LOGIN (mirrors dashboard.html) */
+.login-overlay{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;transition:opacity .4s}
+.login-overlay.hide{opacity:0;pointer-events:none}
+.login-box{position:relative;z-index:1;background:var(--surf);border:1px solid var(--bdr);border-radius:20px;padding:42px 38px;max-width:420px;width:100%;box-shadow:0 30px 80px -20px rgba(37,99,235,.25),0 10px 30px rgba(15,23,42,.08);text-align:center;overflow:hidden}
+.login-box::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--pri),var(--ind),var(--pri))}
+.login-mark{width:56px;height:56px;border-radius:16px;margin:0 auto 16px;background:linear-gradient(135deg,var(--pri) 0%,var(--ind) 100%);display:grid;place-items:center;color:#fff;font-family:var(--display);font-weight:700;font-size:20px;box-shadow:0 10px 24px -6px rgba(37,99,235,.5)}
+.login-logo{font-family:var(--display);font-size:22px;font-weight:700;color:var(--txt);margin-bottom:6px;letter-spacing:-.4px}
+.login-logo span{color:var(--pri)}
+.login-sub{font-size:13px;color:var(--txt-2);margin-bottom:26px}
+.login-field{width:100%;background:var(--surf-2);border:1px solid var(--bdr);border-radius:12px;padding:13px 16px;color:var(--txt);font-size:14px;font-weight:500;outline:none;margin-bottom:12px;transition:all .15s}
+.login-field:focus{border-color:var(--pri);background:var(--surf);box-shadow:0 0 0 4px rgba(37,99,235,.10)}
+.login-btn{width:100%;padding:13px;border:none;border-radius:12px;background:linear-gradient(135deg,var(--pri) 0%,var(--pri-deep) 100%);color:#fff;font-size:15px;font-weight:700;letter-spacing:.4px;transition:all .15s;margin-top:6px;box-shadow:0 8px 20px -6px rgba(37,99,235,.45)}
+.login-btn:hover{transform:translateY(-1px)}
+.login-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
+.login-err{font-size:13px;color:var(--ng);margin-top:14px;min-height:20px;font-weight:500}
+.login-info{font-size:11px;color:var(--txt-3);margin-top:20px;line-height:1.6}
+
+/* TOPBAR */
+.topbar{position:sticky;top:0;z-index:100;background:var(--surf);border-bottom:1px solid var(--bdr);height:56px;display:flex;align-items:center;padding:0 20px;gap:16px}
+.tb-brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:15px;flex-shrink:0}
+.tb-logo-mark{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--pri),var(--ind));color:#fff;display:grid;place-items:center;font-size:12px}
+.tb-brand .accent{color:var(--pri)}
+.tb-nav{display:flex;gap:4px;flex:1}
+.tb-nav a{display:flex;align-items:center;gap:6px;padding:8px 14px;border-radius:9px;color:var(--txt-2);text-decoration:none;font-size:13px;font-weight:600;transition:all .15s}
+.tb-nav a:hover{background:var(--surf-2);color:var(--txt)}
+.tb-nav a.active{background:var(--pri-soft);color:var(--pri-deep)}
+.tb-right{display:flex;align-items:center;gap:10px}
+.user-pill{background:var(--surf-2);border:1px solid var(--bdr);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--txt-2)}
+.role-pill{border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.role-pill.techop2{background:var(--ind-soft);color:var(--ind)}
+.role-pill.supervisor{background:var(--acc-soft);color:#92400e}
+.role-pill.admin{background:var(--ok-soft);color:#047857}
+.role-pill.none{background:var(--ng-soft);color:var(--ng)}
+.logout-btn{background:none;border:1px solid var(--bdr);color:var(--txt-2);padding:6px 14px;border-radius:9px;font-size:12px;font-weight:600}
+.logout-btn:hover{border-color:var(--bdr-2);color:var(--txt)}
+
+/* MAIN */
+.main{max-width:1100px;margin:0 auto;padding:28px 20px 60px}
+.page-hdr{margin-bottom:20px}
+.eyebrow-d{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--pri);margin-bottom:6px}
+.pip{width:6px;height:6px;border-radius:50%;background:var(--pri)}
+.page-title{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:-.5px}
+.page-sub{font-size:13px;color:var(--txt-2);margin-top:4px}
+
+.role-note{display:none;align-items:center;gap:10px;background:var(--acc-soft);border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+
+/* TABS */
+.tabs{display:flex;gap:6px;border-bottom:1px solid var(--bdr);margin-bottom:16px}
+.tab-btn{background:none;border:none;padding:10px 4px;margin-right:18px;font-size:13.5px;font-weight:700;color:var(--txt-3);border-bottom:2.5px solid transparent;position:relative;top:1px}
+.tab-btn.active{color:var(--pri);border-color:var(--pri)}
+.tab-count{display:inline-block;background:var(--bdr);color:var(--txt-2);border-radius:10px;padding:1px 7px;font-size:10.5px;margin-left:5px;font-family:var(--mono)}
+.tab-btn.active .tab-count{background:var(--pri-soft);color:var(--pri-deep)}
+
+.toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.filter-sel{background:var(--surf);border:1px solid var(--bdr);border-radius:9px;padding:8px 12px;font-size:12.5px;color:var(--txt-2);font-weight:600}
+.btn{padding:9px 16px;border-radius:9px;border:1px solid var(--bdr);background:var(--surf);color:var(--txt-2);font-size:12.5px;font-weight:700;transition:all .15s}
+.btn:hover{border-color:var(--bdr-2);color:var(--txt)}
+.btn-pri{background:var(--pri);border-color:var(--pri);color:#fff}
+.btn-pri:hover{background:var(--pri-deep)}
+.btn-ok{background:var(--ok);border-color:var(--ok);color:#fff}
+.btn-ok:hover{background:#059669}
+.btn-danger{background:#fff1f2;border-color:#fecdd3;color:#be123c}
+.btn-danger:hover{background:#ffe4e6}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn-sm{padding:6px 12px;font-size:11.5px}
+
+/* LIST */
+.list-empty,.list-loading{text-align:center;padding:60px 20px;color:var(--txt-3)}
+.list-empty .msg,.list-loading .msg{font-family:var(--display);font-size:15px;font-weight:600;color:var(--txt);margin-bottom:6px}
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:16px 18px;margin-bottom:10px;box-shadow:var(--shadow);display:flex;align-items:center;gap:16px;flex-wrap:wrap;transition:border-color .15s}
+.card:hover{border-color:var(--bdr-2)}
+.card-main{flex:1;min-width:220px}
+.card-title{font-family:var(--display);font-weight:700;font-size:14.5px}
+.card-meta{font-size:11.5px;color:var(--txt-3);font-family:var(--mono);margin-top:3px}
+.card-badge{font-size:10.5px;font-weight:800;letter-spacing:.4px;padding:4px 11px;border-radius:20px;text-transform:uppercase;white-space:nowrap}
+.card-badge.submitted{background:var(--ind-soft);color:var(--ind)}
+.card-badge.reviewed{background:var(--acc-soft);color:#92400e}
+.card-badge.approved{background:var(--ok-soft);color:#047857}
+.card-badge.returned_to_technician{background:var(--ng-soft);color:var(--ng)}
+
+/* DETAIL OVERLAY */
+#detail-overlay{display:none;position:fixed;inset:0;background:rgba(11,18,32,.55);z-index:600;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(3px)}
+#detail-overlay.show{display:flex}
+.detail-box{background:var(--surf);border-radius:18px;width:min(820px,100%);box-shadow:var(--shadow-lg);overflow:hidden;margin-bottom:30px}
+.detail-hdr{background:linear-gradient(120deg,var(--pri),var(--ind));padding:20px 24px;color:#fff;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.detail-hdr h2{font-family:var(--display);font-size:19px;font-weight:700}
+.detail-hdr .sub{font-size:12px;opacity:.85;margin-top:3px;font-family:var(--mono)}
+.detail-x{background:rgba(255,255,255,.15);border:none;color:#fff;width:30px;height:30px;border-radius:8px;font-size:16px;flex-shrink:0}
+.detail-x:hover{background:rgba(255,255,255,.28)}
+.detail-body{padding:22px 24px}
+.dsec{margin-bottom:22px}
+.dsec-title{font-family:var(--display);font-size:12.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--txt-2);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.info-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.info-cell{background:var(--surf-2);border:1px solid var(--bdr);border-radius:10px;padding:10px 12px}
+.info-cell .k{font-size:10.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px}
+.info-cell .v{font-size:13px;font-weight:700;word-break:break-word}
+.file-links{display:flex;gap:10px;flex-wrap:wrap}
+.photo-groups{display:flex;flex-direction:column;gap:10px}
+.photo-group-lbl{font-size:11.5px;font-weight:700;color:var(--txt-2);font-family:var(--mono)}
+.photo-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.photo-thumbs img{width:78px;height:78px;object-fit:cover;border-radius:8px;border:1px solid var(--bdr)}
+.note-box{background:var(--surf-2);border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6;white-space:pre-wrap}
+.note-box.returned{background:var(--ng-soft);border-color:#fecdd3;color:#9f1239}
+.sig-preview{margin-top:8px}
+.sig-preview img{max-width:220px;max-height:100px;border:1px solid var(--bdr);border-radius:8px;background:#fff}
+textarea.dinput{width:100%;border:1px solid var(--bdr);border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;min-height:70px;outline:none}
+textarea.dinput:focus{border-color:var(--pri)}
+.field-lbl{font-size:12px;font-weight:700;color:var(--txt-2);margin-bottom:5px;display:block}
+.sig-pad-wrap{margin-top:10px}
+canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background:#fff;touch-action:none;cursor:crosshair;width:100%;max-width:330px;height:150px}
+.sig-actions{margin-top:6px}
+.action-row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
+.readonly-hint{font-size:12px;color:var(--txt-3);font-style:italic}
+
+@media(max-width:640px){
+  .detail-hdr{flex-direction:column}
+  .action-row{justify-content:stretch}
+  .action-row button{flex:1}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN OVERLAY -->
+<div class="login-overlay" id="login-overlay">
+  <div class="login-box">
+    <div class="login-mark">R&amp;A</div>
+    <div class="login-logo">REVIEW &amp; <span>APPROVAL</span></div>
+    <div class="login-sub">🔒 Login memakai akun dashboard yang sama</div>
+    <form onsubmit="doLogin(event)">
+      <input type="text" class="login-field" id="login-user" placeholder="Username" autocomplete="username" required>
+      <input type="password" class="login-field" id="login-pass" placeholder="Password" autocomplete="current-password" required>
+      <button type="submit" class="login-btn" id="login-btn">SIGN IN</button>
+    </form>
+    <div class="login-err" id="login-err"></div>
+    <div class="login-info">Hubungi admin untuk akses &amp; role (TechOp2 / Supervisor).</div>
+  </div>
+</div>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="tb-brand"><div class="tb-logo-mark">E7</div><span>ELECTRIC <span class="accent">7</span></span></div>
+  <div class="tb-nav">
+    <a href="index.html">Portal</a>
+    <a href="dashboard.html">Dashboard</a>
+    <a href="Review_Approval_Dashboard.html" class="active">Review &amp; Approval</a>
+  </div>
+  <div class="tb-right">
+    <span class="role-pill" id="role-label" style="display:none"></span>
+    <span class="user-pill" id="user-label" style="display:none"></span>
+    <button class="logout-btn" id="logout-btn" onclick="doLogout()" style="display:none">Sign out</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="page-hdr">
+    <div class="eyebrow-d"><span class="pip"></span>Review &amp; Approval Workflow</div>
+    <div class="page-title">Review &amp; Approval Check Sheet</div>
+    <div class="page-sub">Pilot: PLTS Ash Disposal PM. Submit &rarr; Review (TechOp2) &rarr; Approve (Supervisor) &rarr; PDF final untuk Maximo.</div>
+  </div>
+
+  <div class="role-note" id="role-note"></div>
+
+  <div class="tabs" id="tabs-bar">
+    <button class="tab-btn active" data-tab="inbox" onclick="switchTab('inbox')">Menunggu Saya <span class="tab-count" id="count-inbox">0</span></button>
+    <button class="tab-btn" data-tab="returned" onclick="switchTab('returned')">Dikembalikan <span class="tab-count" id="count-returned">0</span></button>
+    <button class="tab-btn" data-tab="all" onclick="switchTab('all')">Semua Riwayat <span class="tab-count" id="count-all">0</span></button>
+  </div>
+
+  <div class="toolbar">
+    <select class="filter-sel" id="status-filter" style="display:none" onchange="renderList()">
+      <option value="">Semua status</option>
+      <option value="submitted">Menunggu Review</option>
+      <option value="reviewed">Menunggu Approval</option>
+      <option value="approved">Disetujui</option>
+      <option value="returned_to_technician">Dikembalikan</option>
+    </select>
+    <button class="btn btn-sm" onclick="loadAll()">&#8635; Refresh</button>
+  </div>
+
+  <div id="list-area"><div class="list-loading"><div class="msg">Memuat...</div></div></div>
+</div>
+
+<!-- DETAIL OVERLAY -->
+<div id="detail-overlay">
+  <div class="detail-box">
+    <div class="detail-hdr">
+      <div>
+        <h2 id="d-title">&mdash;</h2>
+        <div class="sub" id="d-sub">&mdash;</div>
+      </div>
+      <button class="detail-x" onclick="closeDetail()">&#10005;</button>
+    </div>
+    <div class="detail-body" id="d-body"></div>
+  </div>
+</div>
+
+<script>
+/* ── AUTH (mirrors dashboard.html's login, plus a role lookup) ── */
+let loggedInUser = null, loggedInRole = null;
+
+async function hashPass(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function doLogin(e){
+  e.preventDefault();
+  const user = document.getElementById('login-user').value.trim().toLowerCase();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-err');
+  const btn = document.getElementById('login-btn');
+  if(!user || !pass){ errEl.textContent='Masukkan username dan password.'; return; }
+  btn.disabled = true; btn.textContent = 'Memverifikasi...'; errEl.textContent = '';
+  try{
+    const hashed = await hashPass(pass);
+    const snap = await db.collection('dashboard_users').where('username','==',user).limit(1).get();
+    if(snap.empty){ errEl.textContent='Username tidak ditemukan.'; btn.disabled=false; btn.textContent='SIGN IN'; return; }
+    const userData = snap.docs[0].data();
+    if(userData.password !== hashed){ errEl.textContent='Password salah.'; btn.disabled=false; btn.textContent='SIGN IN'; return; }
+    loggedInUser = userData.username;
+    loggedInRole = userData.role || null;
+    sessionStorage.setItem('dashboard_user', loggedInUser);
+    sessionStorage.setItem('dashboard_login_time', Date.now().toString());
+    sessionStorage.setItem('dashboard_role', loggedInRole || '');
+    showApp();
+  }catch(err){
+    console.error('Login error:', err);
+    errEl.textContent = 'Gagal terhubung ke database.';
+    btn.disabled=false; btn.textContent='SIGN IN';
+  }
+}
+function doLogout(){
+  sessionStorage.removeItem('dashboard_user');
+  sessionStorage.removeItem('dashboard_login_time');
+  sessionStorage.removeItem('dashboard_role');
+  location.reload();
+}
+function checkSession(){
+  const saved = sessionStorage.getItem('dashboard_user');
+  const loginTime = parseInt(sessionStorage.getItem('dashboard_login_time')||'0');
+  const elapsed = Date.now() - loginTime;
+  if(saved && elapsed < 8*60*60*1000){
+    loggedInUser = saved;
+    loggedInRole = sessionStorage.getItem('dashboard_role') || null;
+    showApp();
+  }
+}
+function showApp(){
+  document.getElementById('login-overlay').classList.add('hide');
+  setTimeout(()=>{ document.getElementById('login-overlay').style.display='none'; }, 400);
+  document.getElementById('user-label').textContent = '👤 ' + loggedInUser;
+  document.getElementById('user-label').style.display = '';
+  document.getElementById('logout-btn').style.display = '';
+  const roleEl = document.getElementById('role-label');
+  const roleKey = loggedInRole || 'none';
+  roleEl.textContent = ROLE_LABELS[roleKey] || roleKey;
+  roleEl.className = 'role-pill ' + roleKey;
+  roleEl.style.display = '';
+  if(!loggedInRole){
+    const note = document.getElementById('role-note');
+    note.style.display = 'flex';
+    note.innerHTML = '&#9888;&#65039; Akun Anda belum memiliki role (TechOp2/Supervisor) — Anda hanya bisa melihat riwayat, tidak bisa review/approve. Hubungi admin untuk menambahkan field <code>role</code> pada dokumen user ini di collection <code>dashboard_users</code>.';
+  }
+  loadAll();
+}
+const ROLE_LABELS = { techop2:'TechOp2', supervisor:'Supervisor', admin:'Admin', none:'Tanpa Role' };
+
+/* ── DATA ── */
+let _allApprovals = [];
+const _checksheetCache = {};
+async function loadAll(){
+  document.getElementById('list-area').innerHTML = '<div class="list-loading"><div class="msg">Memuat...</div></div>';
+  try{
+    _allApprovals = await Approvals.getAll();
+  }catch(e){
+    document.getElementById('list-area').innerHTML = '<div class="list-empty"><div class="msg">Gagal memuat data</div><div>'+e.message+'</div></div>';
+    return;
+  }
+  updateTabCounts();
+  renderList();
+  maybeOpenFromUrl();
+}
+async function getChecksheet(id){
+  if(_checksheetCache[id]) return _checksheetCache[id];
+  const doc = await DB.getById(id);
+  _checksheetCache[id] = doc;
+  return doc;
+}
+
+/* ── TABS / LIST ── */
+let _activeTab = 'inbox';
+function switchTab(tab){
+  _activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
+  document.getElementById('status-filter').style.display = tab==='all' ? '' : 'none';
+  renderList();
+}
+function updateTabCounts(){
+  document.getElementById('count-inbox').textContent = inboxItems().length;
+  document.getElementById('count-returned').textContent = _allApprovals.filter(a=>a.status==='returned_to_technician').length;
+  document.getElementById('count-all').textContent = _allApprovals.length;
+}
+function inboxItems(){
+  if(loggedInRole==='techop2') return _allApprovals.filter(a=>a.status==='submitted');
+  if(loggedInRole==='supervisor') return _allApprovals.filter(a=>a.status==='reviewed');
+  if(loggedInRole==='admin') return _allApprovals.filter(a=>a.status==='submitted'||a.status==='reviewed');
+  return [];
+}
+function renderList(){
+  let items;
+  if(_activeTab==='inbox') items = inboxItems();
+  else if(_activeTab==='returned') items = _allApprovals.filter(a=>a.status==='returned_to_technician');
+  else {
+    const f = document.getElementById('status-filter').value;
+    items = f ? _allApprovals.filter(a=>a.status===f) : _allApprovals;
+  }
+  const wrap = document.getElementById('list-area');
+  if(!items.length){
+    wrap.innerHTML = '<div class="list-empty"><div class="msg">Tidak ada submission</div><div>'+
+      (_activeTab==='inbox' ? (loggedInRole ? 'Tidak ada yang menunggu tindakan Anda saat ini.' : 'Login dengan role TechOp2/Supervisor untuk melihat kotak masuk.') : 'Belum ada data pada kategori ini.')+
+      '</div></div>';
+    return;
+  }
+  wrap.innerHTML = items.map(a => `
+    <div class="card">
+      <div class="card-main">
+        <div class="card-title">${escHtml(a.assetName||a.assetTag||'—')}</div>
+        <div class="card-meta">${escHtml(a.submittedBy||'—')} · disubmit ${fmtDate(a.createdAt)}${a.revisionOf?' · <span title="Ini revisi dari submission sebelumnya">↻ revisi</span>':''}</div>
+      </div>
+      <span class="card-badge ${a.status}">${Approvals.STATUS_LABELS[a.status]||a.status}</span>
+      <button class="btn btn-sm btn-pri" onclick="openDetail('${a.id}')">Buka</button>
+    </div>`).join('');
+}
+function fmtDate(iso){
+  if(!iso) return '—';
+  try{ return new Date(iso).toLocaleString('id-ID',{dateStyle:'medium',timeStyle:'short'}); }catch(e){ return iso; }
+}
+function escHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function maybeOpenFromUrl(){
+  const id = new URLSearchParams(location.search).get('id');
+  if(id) openDetail(id);
+}
+
+/* ── DETAIL ── */
+let _curApproval = null, _curChecksheet = null;
+async function openDetail(id){
+  const overlay = document.getElementById('detail-overlay');
+  overlay.classList.add('show');
+  document.getElementById('d-title').textContent = 'Memuat...';
+  document.getElementById('d-sub').textContent = '';
+  document.getElementById('d-body').innerHTML = '<div class="list-loading"><div class="msg">Memuat detail...</div></div>';
+  try{
+    const approval = await Approvals.getById(id);
+    if(!approval){ document.getElementById('d-body').innerHTML = '<div class="list-empty"><div class="msg">Data tidak ditemukan</div></div>'; return; }
+    const checksheet = await getChecksheet(approval.checksheetId);
+    _curApproval = approval; _curChecksheet = checksheet;
+    renderDetail(approval, checksheet);
+  }catch(e){
+    document.getElementById('d-body').innerHTML = '<div class="list-empty"><div class="msg">Gagal memuat</div><div>'+e.message+'</div></div>';
+  }
+}
+function closeDetail(){
+  document.getElementById('detail-overlay').classList.remove('show');
+  _curApproval = null; _curChecksheet = null;
+  // Drop ?id= so a refresh doesn't keep re-opening the same item.
+  if(new URLSearchParams(location.search).has('id')){
+    history.replaceState(null, '', location.pathname);
+  }
+}
+
+function renderDetail(a, cs){
+  document.getElementById('d-title').textContent = (cs && (cs.assetName||cs.assetTag)) || a.assetName || a.assetTag || 'Submission';
+  document.getElementById('d-sub').textContent = 'WO '+(cs?.woNumber||'—')+' · '+(cs?.executionDate||'—')+' · '+Approvals.STATUS_LABELS[a.status];
+
+  let html = '';
+
+  html += `<div class="dsec"><div class="dsec-title">Info Submission</div>
+    <div class="info-grid">
+      <div class="info-cell"><div class="k">Checked By</div><div class="v">${escHtml(cs?.checkedBy||'—')}</div></div>
+      <div class="info-cell"><div class="k">Tanggal Eksekusi</div><div class="v">${escHtml(cs?.executionDate||'—')}</div></div>
+      <div class="info-cell"><div class="k">Shift</div><div class="v">${escHtml(cs?.shift||'—')}</div></div>
+      <div class="info-cell"><div class="k">Status Checklist</div><div class="v">${escHtml(cs?.overallStatus||'—')} (${cs?.countOk||0} OK / ${cs?.countNg||0} NG)</div></div>
+      <div class="info-cell"><div class="k">Disubmit</div><div class="v">${fmtDate(a.createdAt)}</div></div>
+    </div></div>`;
+
+  html += `<div class="dsec"><div class="dsec-title">Dokumen</div><div class="file-links">
+    ${cs?.pdfUrl ? `<button class="btn btn-sm" onclick="openRemoteFile('${cs.pdfUrl}')">&#128196; Buka PDF Asli</button>` : '<span class="readonly-hint">PDF asli belum tersedia (upload mungkin gagal/belum selesai).</span>'}
+    ${a.finalPdfUrl ? `<button class="btn btn-sm btn-ok" onclick="openRemoteFile('${a.finalPdfUrl}')">&#9989; Unduh PDF Final (Approved)</button>` : ''}
+  </div></div>`;
+
+  const photoUrls = cs?.photoUrls || {};
+  const groups = Object.keys(photoUrls).filter(k => (photoUrls[k]||[]).length);
+  html += `<div class="dsec"><div class="dsec-title">Foto Evidence</div>`;
+  if(!groups.length){
+    html += `<span class="readonly-hint">Tidak ada foto, atau belum berhasil diunggah.</span>`;
+  }else{
+    // Thumbnails start on a blank placeholder — drive-proxy.gs's endpoint
+    // is a JSON API, not a directly displayable image URL (see
+    // storage-helper.js's fetchMeta), so each real src is resolved
+    // asynchronously below via Storage.toObjectUrl() once this HTML is in
+    // the DOM.
+    html += `<div class="photo-groups">` + groups.map(g => `
+      <div><div class="photo-group-lbl">${escHtml(g)}</div>
+        <div class="photo-thumbs">${photoUrls[g].map(p => `<a href="#" onclick="openRemoteFile('${p.url}');return false;"><img class="pk-thumb" data-remote-url="${p.url}" src="${BLANK_PIXEL}" title="${escHtml(p.caption||'')}"></a>`).join('')}</div>
+      </div>`).join('') + `</div>`;
+  }
+  html += `</div>`;
+
+  if(a.returnedNote){
+    html += `<div class="dsec"><div class="dsec-title">&#9888;&#65039; Dikembalikan</div>
+      <div class="note-box returned">Oleh <b>${escHtml(a.returnedNote.by||'—')}</b> pada tahap <b>${a.returnedNote.stage==='approval'?'Approval':'Review'}</b> (${fmtDate(a.returnedNote.returnedAt)}):<br>"${escHtml(a.returnedNote.note||'—')}"</div>
+      ${a.checksheetFile ? `<div style="margin-top:8px"><a class="btn btn-sm" target="_blank" rel="noopener" href="${a.checksheetFile}?reviseOf=${a.id}">&#9999;&#65039; Buka Check Sheet untuk Revisi</a></div>` : ''}
+    </div>`;
+  }
+
+  if(a.review){
+    html += `<div class="dsec"><div class="dsec-title">Review — TechOp2</div>
+      <div class="info-grid" style="margin-bottom:10px">
+        <div class="info-cell"><div class="k">Direview oleh</div><div class="v">${escHtml(a.review.reviewedBy||'—')}</div></div>
+        <div class="info-cell"><div class="k">Tanggal</div><div class="v">${fmtDate(a.review.reviewedAt)}</div></div>
+      </div>
+      <div class="field-lbl">Komentar</div><div class="note-box">${escHtml(a.review.comments||'—')}</div>
+      <div class="field-lbl" style="margin-top:10px">Rekomendasi / Future Work</div><div class="note-box">${escHtml(a.review.recommendations||'—')}</div>
+      ${a.review.signature ? `<div class="sig-preview"><img src="${a.review.signature}"></div>` : ''}
+    </div>`;
+  }
+  if(a.approval){
+    html += `<div class="dsec"><div class="dsec-title">Approval — Supervisor</div>
+      <div class="info-grid" style="margin-bottom:10px">
+        <div class="info-cell"><div class="k">Disetujui oleh</div><div class="v">${escHtml(a.approval.approvedBy||'—')}</div></div>
+        <div class="info-cell"><div class="k">Tanggal</div><div class="v">${fmtDate(a.approval.approvedAt)}</div></div>
+      </div>
+      <div class="field-lbl">Catatan Supervisor</div><div class="note-box">${escHtml(a.approval.notes||'—')}</div>
+      ${a.approval.signature ? `<div class="sig-preview"><img src="${a.approval.signature}"></div>` : ''}
+    </div>`;
+  }
+
+  html += renderActionSection(a, cs);
+
+  document.getElementById('d-body').innerHTML = html;
+  if(document.getElementById('sig-canvas-review')) attachSignaturePad('sig-canvas-review');
+  if(document.getElementById('sig-canvas-approval')) attachSignaturePad('sig-canvas-approval');
+
+  document.querySelectorAll('.pk-thumb[data-remote-url]').forEach(img => {
+    Storage.toObjectUrl(img.dataset.remoteUrl)
+      .then(objUrl => { img.src = objUrl; })
+      .catch(() => { img.title = 'Gagal memuat foto'; });
+  });
+}
+
+const BLANK_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+
+// Opens window immediately (still inside the click's user-gesture context,
+// so popup blockers allow it) with a loading placeholder, then swaps in
+// the real blob: URL once Storage.toObjectUrl() resolves — see
+// storage-helper.js: a drive-proxy URL is a JSON API, not something a
+// browser can navigate to directly.
+function openRemoteFile(url){
+  const win = window.open('', '_blank');
+  if(win) win.document.write('Memuat file...');
+  Storage.toObjectUrl(url).then(objUrl => {
+    if(win) win.location.href = objUrl;
+    else window.open(objUrl, '_blank');
+  }).catch(e => {
+    if(win) win.document.write('Gagal memuat file: '+escHtml(e.message));
+    else alert('Gagal memuat file: '+e.message);
+  });
+}
+
+function renderActionSection(a, cs){
+  const canReview = loggedInRole==='techop2' && a.status==='submitted';
+  const canApprove = (loggedInRole==='supervisor') && a.status==='reviewed';
+  if(canReview){
+    return `<div class="dsec"><div class="dsec-title">Tindakan — Review</div>
+      <label class="field-lbl">Komentar</label>
+      <textarea class="dinput" id="in-comments" placeholder="Catatan hasil review..."></textarea>
+      <label class="field-lbl" style="margin-top:10px">Rekomendasi / Future Work</label>
+      <textarea class="dinput" id="in-recommendations" placeholder="Rekomendasi tindak lanjut..."></textarea>
+      <div class="sig-pad-wrap">
+        <label class="field-lbl">Tanda Tangan</label>
+        <canvas class="sig-canvas" id="sig-canvas-review" width="330" height="150"></canvas>
+        <div class="sig-actions"><button class="btn btn-sm" onclick="clearSignature('sig-canvas-review')">Hapus Tanda Tangan</button></div>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-danger" onclick="doReturnToTechnician('review')">&#8617; Kembalikan ke Teknisi</button>
+        <button class="btn btn-pri" onclick="doSubmitReview()">Teruskan ke Supervisor &rarr;</button>
+      </div>
+    </div>`;
+  }
+  if(canApprove){
+    return `<div class="dsec"><div class="dsec-title">Tindakan — Approval</div>
+      <label class="field-lbl">Catatan Supervisor</label>
+      <textarea class="dinput" id="in-notes" placeholder="Catatan approval..."></textarea>
+      <div class="sig-pad-wrap">
+        <label class="field-lbl">Tanda Tangan</label>
+        <canvas class="sig-canvas" id="sig-canvas-approval" width="330" height="150"></canvas>
+        <div class="sig-actions"><button class="btn btn-sm" onclick="clearSignature('sig-canvas-approval')">Hapus Tanda Tangan</button></div>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-danger" onclick="doReturnToTechnician('approval')">&#8617; Kembalikan ke Teknisi</button>
+        <button class="btn btn-ok" id="btn-approve" onclick="doApprove()">&#9989; Approve &amp; Buat PDF Final</button>
+      </div>
+    </div>`;
+  }
+  return '';
+}
+
+/* ── SIGNATURE PAD ── */
+const _sigState = {};
+function attachSignaturePad(id){
+  const canvas = document.getElementById(id);
+  if(!canvas || _sigState[id]) return; // avoid double-binding on re-render
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#0b1220'; ctx.lineWidth = 2.4; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  _sigState[id] = {drawing:false, hasInk:false};
+  function pos(e){
+    const r = canvas.getBoundingClientRect();
+    const sx = canvas.width / r.width, sy = canvas.height / r.height;
+    return {x:(e.clientX-r.left)*sx, y:(e.clientY-r.top)*sy};
+  }
+  canvas.addEventListener('pointerdown', e => {
+    canvas.setPointerCapture(e.pointerId);
+    _sigState[id].drawing = true;
+    const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if(!_sigState[id].drawing) return;
+    const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke();
+    _sigState[id].hasInk = true;
+  });
+  ['pointerup','pointerleave','pointercancel'].forEach(evt => canvas.addEventListener(evt, () => { _sigState[id].drawing = false; }));
+}
+function clearSignature(id){
+  const canvas = document.getElementById(id);
+  canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+  if(_sigState[id]) _sigState[id].hasInk = false;
+}
+function getSignatureDataUrl(id){
+  if(!_sigState[id] || !_sigState[id].hasInk) return null;
+  return document.getElementById(id).toDataURL('image/png');
+}
+
+/* ── ACTIONS ── */
+async function doReturnToTechnician(stage){
+  if(!_curApproval) return;
+  const note = prompt('Alasan pengembalian ke teknisi:');
+  if(note==null || !note.trim()){ return; }
+  try{
+    await Approvals.returnToTechnician(_curApproval.id, {note:note.trim(), by:loggedInUser, stage});
+    alert('Submission dikembalikan ke teknisi.');
+    closeDetail();
+    await loadAll();
+  }catch(e){
+    alert('Gagal mengembalikan: '+e.message);
+  }
+}
+
+async function doSubmitReview(){
+  if(!_curApproval) return;
+  const comments = document.getElementById('in-comments').value.trim();
+  const recommendations = document.getElementById('in-recommendations').value.trim();
+  const signature = getSignatureDataUrl('sig-canvas-review');
+  if(!comments){ alert('Isi komentar terlebih dahulu.'); return; }
+  if(!signature){ alert('Tanda tangan diperlukan sebelum diteruskan ke Supervisor.'); return; }
+  try{
+    await Approvals.submitReview(_curApproval.id, {comments, recommendations, signature, reviewedBy: loggedInUser});
+    alert('Review terkirim, diteruskan ke Supervisor.');
+    closeDetail();
+    await loadAll();
+  }catch(e){
+    alert('Gagal mengirim review: '+e.message);
+  }
+}
+
+async function doApprove(){
+  if(!_curApproval || !_curChecksheet) return;
+  const notes = document.getElementById('in-notes').value.trim();
+  const signature = getSignatureDataUrl('sig-canvas-approval');
+  if(!signature){ alert('Tanda tangan diperlukan sebelum approve.'); return; }
+  const btn = document.getElementById('btn-approve');
+  btn.disabled = true; btn.textContent = '⏳ Membuat PDF final...';
+  try{
+    const approvedBy = loggedInUser;
+    const approvalForPdf = {
+      ..._curApproval,
+      approval: {notes, signature, approvedBy, approvedAt: new Date().toISOString()},
+    };
+    const blob = await buildFinalPdf(approvalForPdf, _curChecksheet);
+    const finalPdfUrl = await Storage.uploadBlob(`approvals/${_curApproval.id}/final.pdf`, blob, 'application/pdf');
+    await Approvals.approve(_curApproval.id, {notes, signature, approvedBy, finalPdfUrl});
+    alert('Submission disetujui. PDF final siap diunduh.');
+    closeDetail();
+    await loadAll();
+  }catch(e){
+    alert('Gagal approve: '+e.message);
+  }finally{
+    btn.disabled = false; btn.textContent = '✅ Approve & Buat PDF Final';
+  }
+}
+
+/* ── FINAL PDF: original (from Storage) + a jsPDF addendum page, merged
+   with pdf-lib. See CLAUDE.md-style rationale in the project chat — jsPDF
+   alone can't merge an already-built PDF, only draw a fresh one. ── */
+async function buildFinalPdf(approval, cs){
+  if(!cs.pdfUrl) throw new Error('PDF asli tidak ditemukan pada submission ini.');
+  // Storage.fetchAsBytes(), not a plain fetch() — the original PDF is
+  // hosted via the Drive proxy (drive-proxy.gs), and a JS-initiated
+  // cross-origin read of its raw binary response isn't reliably
+  // CORS-permitted; the proxy's ?mode=json path is. See storage-helper.js.
+  const origBytes = await Storage.fetchAsBytes(cs.pdfUrl);
+
+  const {jsPDF} = window.jspdf;
+  const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
+  const M = 14; let y = 22;
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(16);
+  pdf.text('LEMBAR REVIEW & APPROVAL', 105, y, {align:'center'});
+  y += 6;
+  pdf.setDrawColor(180); pdf.line(M, y, 210-M, y);
+  y += 10;
+
+  pdf.autoTable({
+    startY:y, theme:'plain', styles:{fontSize:10, cellPadding:1.6},
+    columnStyles:{0:{cellWidth:45, fontStyle:'bold'}},
+    body:[
+      ['Asset', cs.assetName || cs.assetTag || '-'],
+      ['WO Number', cs.woNumber || '-'],
+      ['Tanggal Eksekusi', cs.executionDate || '-'],
+      ['Checked By', cs.checkedBy || '-'],
+    ],
+  });
+  y = pdf.lastAutoTable.finalY + 8;
+
+  function section(title, rows, sigDataUrl, signerLabel){
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(30,58,95);
+    pdf.text(title, M, y); y += 6;
+    pdf.setTextColor(0,0,0);
+    pdf.autoTable({
+      startY:y, theme:'grid', styles:{fontSize:9.5, cellPadding:3},
+      columnStyles:{0:{cellWidth:42, fontStyle:'bold', fillColor:[240,247,255]}},
+      body: rows,
+    });
+    y = pdf.lastAutoTable.finalY + 4;
+    if(sigDataUrl){
+      pdf.setFontSize(9);
+      pdf.text(signerLabel, M, y + 4);
+      pdf.addImage(sigDataUrl, 'PNG', M, y + 6, 55, 25); // canvas is drawn at a matching 2.2:1 ratio — no stretch
+      y += 36;
+    }
+    y += 6;
+  }
+
+  if(approval.review){
+    section('REVIEW — TechOp2', [
+      ['Komentar', approval.review.comments || '-'],
+      ['Rekomendasi / Future Work', approval.review.recommendations || '-'],
+      ['Direview oleh', approval.review.reviewedBy || '-'],
+      ['Tanggal', approval.review.reviewedAt ? new Date(approval.review.reviewedAt).toLocaleString('id-ID') : '-'],
+    ], approval.review.signature, 'Tanda tangan: '+(approval.review.reviewedBy||'-'));
+  }
+  if(approval.approval){
+    section('APPROVAL — Supervisor', [
+      ['Catatan', approval.approval.notes || '-'],
+      ['Disetujui oleh', approval.approval.approvedBy || '-'],
+      ['Tanggal', approval.approval.approvedAt ? new Date(approval.approval.approvedAt).toLocaleString('id-ID') : '-'],
+    ], approval.approval.signature, 'Tanda tangan: '+(approval.approval.approvedBy||'-'));
+  }
+
+  pdf.setFontSize(8.5); pdf.setTextColor(140);
+  pdf.text('Dokumen dibuat otomatis oleh sistem Review & Approval — ELECTRIC 7 POMI.', M, 289);
+
+  const addendumBytes = pdf.output('arraybuffer');
+
+  const { PDFDocument } = PDFLib;
+  const origDoc = await PDFDocument.load(origBytes);
+  const addendumDoc = await PDFDocument.load(addendumBytes);
+  const copiedPages = await origDoc.copyPages(addendumDoc, addendumDoc.getPageIndices());
+  copiedPages.forEach(p => origDoc.addPage(p));
+  const mergedBytes = await origDoc.save();
+  return new Blob([mergedBytes], {type:'application/pdf'});
+}
+
+checkSession();
+</script>
+</body>
+</html>

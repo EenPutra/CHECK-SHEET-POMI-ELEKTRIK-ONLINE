@@ -6,9 +6,10 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -438,6 +439,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <div class="sec-hdr-icon">&#127970;</div><div class="sec-hdr-title">PM Selection &amp; Work Order Info</div><span class="sec-hdr-arrow">&#9660;</span>
   </div>
   <div class="sec-body">
+    <div id="revision-banner" style="display:none;align-items:flex-start;gap:10px;margin:0 16px 14px;padding:12px 14px;
+      background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;font-size:12.5px;color:#92400e;line-height:1.5">
+      <span style="font-size:18px;flex-shrink:0">&#9888;&#65039;</span>
+      <div style="flex:1">
+        <b>Form ini dibuka untuk merevisi submission yang dikembalikan.</b>
+        <div id="revision-banner-note" style="margin-top:3px">Memuat catatan revisi...</div>
+        <button class="btn btn-outline btn-sm" style="margin-top:8px" onclick="loadRevisionSource()">&#128229; Muat Data Submission untuk Direvisi</button>
+      </div>
+    </div>
     <div class="wo-grid">
       <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
       <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
@@ -6884,14 +6894,76 @@ async function submitToDb(){
   base.sheets = {};
   INVERTERS.forEach(inv => Object.assign(base.sheets, collectInverterSheets(inv)));
 
+  let id;
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    const id = await DB.save(base);
-    showNote('✅ Data berhasil disimpan. ID: '+id, 'ok');
+    id = await DB.save(base);
     document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
     showNote('❌ Gagal simpan: '+e.message, 'err');
+    return;
   }
+
+  // Photos + archival PDF + the review/approval workflow record are all
+  // best-effort ON TOP of the checksheet doc saved above. A Storage hiccup
+  // (e.g. Storage not yet enabled in the Firebase console, or a slow
+  // connection dropping mid-upload) must never make this look like the
+  // whole submission failed — the checklist data the technician actually
+  // filled in is already safely saved by this point.
+  let filesOk = true;
+  try{
+    showNote('⏳ Mengunggah foto & PDF untuk alur review/approval...', 'info');
+    const photoUrls = await uploadAllPhotosToStorage(id);
+    const pdfUrl = await uploadArchivalPdfToStorage(id);
+    await DB.attachFiles(id, {photoUrls, pdfUrl});
+    await Approvals.create(id, {
+      assetTag: 'PLTS-ASHDISPOSAL',
+      assetName: 'PV Ash Disposal 689 kWp — PM Check Sheet',
+      checksheetFile: 'PLTS_AshDisposal_PM.html',
+      submittedBy: checkedBy,
+      revisionOf: _reviseOfApprovalId || null,
+    });
+  }catch(e){
+    filesOk = false;
+    console.error('Upload foto/PDF/approval record gagal:', e);
+  }
+
+  if(filesOk){
+    showNote('✅ Data, foto & PDF berhasil disimpan. ID: '+id, 'ok');
+  }else{
+    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.', 'err');
+  }
+}
+
+// Uploads every evidence photo (per inverter) to Firebase Storage, keyed
+// under the just-saved checksheet doc's own id — this is why upload can
+// only happen AFTER DB.save() returns, not before. Returns the same shape
+// dashboard/review code expects: {invKey: [{url, caption}, ...]}.
+async function uploadAllPhotosToStorage(checksheetId){
+  const photoUrls = {};
+  for(const inv of INVERTERS){
+    const photos = PHOTOS[inv.key] || [];
+    if(!photos.length) continue;
+    const urls = [];
+    for(let i=0;i<photos.length;i++){
+      const p = photos[i];
+      const url = await Storage.uploadDataUrl(
+        `checksheets/${checksheetId}/photos/${inv.key}-${i}.jpg`, p.src, 'image/jpeg'
+      );
+      urls.push({url, caption: p.caption || ''});
+    }
+    photoUrls[inv.key] = urls;
+  }
+  return photoUrls;
+}
+
+// Builds the full (all-sheets) PDF exactly like "Download PDF" would, but
+// silently (no save/preview dialog — see generatePDF()'s opts.silent) and
+// uploads it as the archival copy the review/approval dashboard opens.
+async function uploadArchivalPdfToStorage(checksheetId){
+  const pdf = await generatePDF(new Set(PDF_SHEETS.map(s=>s.key)), {silent:true});
+  const blob = pdf.output('blob');
+  return await Storage.uploadBlob(`checksheets/${checksheetId}/original.pdf`, blob, 'application/pdf');
 }
 
 // ═══════════════════════════════════════════════════
@@ -7017,23 +7089,26 @@ const LOAD_HEADER_MAP = {
   woNumber:'wo-no', executionDate:'wo-date', timeStart:'time-start', timeEnd:'time-end',
   checkedBy:'checked-by', nik:'nik', reviewedBy:'reviewed-by', shift:'shift'
 };
-async function confirmLoadMerge(){
-  if(_loadModalSel.size===0) return;
-  const overwrite = document.getElementById('load-overwrite-toggle').checked;
-  const chosen = _loadModalDocs.filter(d => _loadModalSel.has(d.id));
-  if(overwrite && !confirm('Mode Timpa akan mengganti field yang SUDAH diisi di form ini dengan data dari '+chosen.length+' submission terpilih. Lanjutkan?')) return;
-
-  // Build one merged bundle from every selected doc, oldest first, so a
-  // newer selected doc's value wins over an older one for the same field —
-  // then apply it to the DOM in one pass (fill-blank-only unless overwrite).
-  const sorted = [...chosen].sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
+// Builds one merged bundle from a set of docs, oldest first, so a newer
+// doc's value wins over an older one for the same field. Shared by the
+// multi-doc merge modal (confirmLoadMerge) and the single-doc "load for
+// revision" flow (loadRevisionSource) below.
+function buildMergedBundle(docs){
+  const sorted = [...docs].sort((a,b) => (a.createdAt||'').localeCompare(b.createdAt||''));
   const header = {}, inputValues = {}, panelStates = {};
   sorted.forEach(d => {
     Object.entries(LOAD_HEADER_MAP).forEach(([field, elId]) => { if(d[field]) header[elId] = d[field]; });
     if(d.inputValues) Object.assign(inputValues, d.inputValues);
     if(d.panelStates) Object.assign(panelStates, d.panelStates);
   });
+  return {header, inputValues, panelStates};
+}
 
+// Applies a merged bundle to the DOM: fill-blank-only by default (merge),
+// or force-replace every field when overwrite=true. Returns how many
+// fields actually changed, for the caller's confirmation toast.
+function applyMergedBundleToForm(bundle, overwrite){
+  const {header, inputValues, panelStates} = bundle;
   if(overwrite){
     // Only in overwrite mode: clear every panel chip first so a doc from
     // before some panels were ever marked doesn't leave stale statuses
@@ -7064,10 +7139,70 @@ async function confirmLoadMerge(){
     const cur = el.dataset.state || '';
     if((overwrite || !cur) && cur !== st){ setPanelState(el, st); filled++; }
   });
+  return filled;
+}
+
+async function confirmLoadMerge(){
+  if(_loadModalSel.size===0) return;
+  const overwrite = document.getElementById('load-overwrite-toggle').checked;
+  const chosen = _loadModalDocs.filter(d => _loadModalSel.has(d.id));
+  if(overwrite && !confirm('Mode Timpa akan mengganti field yang SUDAH diisi di form ini dengan data dari '+chosen.length+' submission terpilih. Lanjutkan?')) return;
+
+  const bundle = buildMergedBundle(chosen);
+  const filled = applyMergedBundleToForm(bundle, overwrite);
 
   closeLoadModal();
   showNote('✅ '+chosen.length+' submission digabungkan'+(overwrite?' (mode timpa)':'')+' — '+filled+' field terisi.', 'ok');
   autoSaveNow();
+}
+
+// ═══════════════════════════════════════════════════
+//  REVISION FLOW — opened via ?reviseOf=<approvalId> from
+//  Review_Approval_Dashboard.html when TechOp2/Supervisor returns a
+//  submission. Shows the reviewer's/supervisor's note up front and offers
+//  a one-click load of that exact submission's data (reusing the same
+//  merge machinery as the picker modal above), so the technician fixes it
+//  in place rather than re-typing 11 inverters from scratch. On submit,
+//  submitToDb() tags the new checksheet's approvals record with
+//  revisionOf so the chain stays traceable in both dashboards.
+// ═══════════════════════════════════════════════════
+const _reviseOfApprovalId = new URLSearchParams(location.search).get('reviseOf') || null;
+
+async function initRevisionBanner(){
+  if(!_reviseOfApprovalId) return;
+  const banner = document.getElementById('revision-banner');
+  if(!banner) return;
+  banner.style.display = 'flex';
+  document.getElementById('revision-banner-note').textContent = 'Memuat catatan revisi...';
+  try{
+    const approval = await Approvals.getById(_reviseOfApprovalId);
+    if(!approval){
+      document.getElementById('revision-banner-note').textContent = 'Submission rujukan tidak ditemukan (mungkin sudah dihapus).';
+      return;
+    }
+    _reviseOfChecksheetId = approval.checksheetId;
+    const n = approval.returnedNote;
+    document.getElementById('revision-banner-note').textContent = n
+      ? `Dikembalikan oleh ${n.by||'—'} (tahap ${n.stage==='approval'?'Approval':'Review'}): "${n.note||'—'}"`
+      : 'Submission ini dikembalikan untuk direvisi.';
+  }catch(e){
+    document.getElementById('revision-banner-note').textContent = 'Gagal memuat catatan revisi: '+e.message;
+  }
+}
+let _reviseOfChecksheetId = null;
+async function loadRevisionSource(){
+  if(!_reviseOfChecksheetId){ showNote('❌ Data submission untuk direvisi belum siap dimuat.', 'err'); return; }
+  try{
+    showNote('⏳ Memuat data submission sebelumnya...', 'info');
+    const doc = await DB.getById(_reviseOfChecksheetId);
+    if(!doc){ showNote('❌ Submission sebelumnya tidak ditemukan.', 'err'); return; }
+    const bundle = buildMergedBundle([doc]);
+    const filled = applyMergedBundleToForm(bundle, true); // overwrite: this is meant to fully restore the flagged submission, not merge with a blank form
+    showNote('✅ Data submission dimuat ('+filled+' field) — perbaiki sesuai catatan lalu Submit.', 'ok');
+    autoSaveNow();
+  }catch(e){
+    showNote('❌ Gagal memuat: '+e.message, 'err');
+  }
 }
 
 // ═══════════════════════════════════════════════════
@@ -7126,7 +7261,7 @@ async function generatePDF(selSet, opts){
   opts = opts || {};
   if(!window.jspdf){ showNote('❌ Library PDF belum dimuat', 'err'); return; }
   if(selSet.size===0){ showNote('❌ Pilih minimal satu sheet untuk PDF.', 'err'); return; }
-  showNote(opts.preview ? '⏳ Menyiapkan preview…' : '⏳ Membuat PDF…', 'info');
+  if(!opts.silent) showNote(opts.preview ? '⏳ Menyiapkan preview…' : '⏳ Membuat PDF…', 'info');
   await new Promise(r=>setTimeout(r,150));
 
   const{jsPDF} = window.jspdf;
@@ -7370,12 +7505,18 @@ async function generatePDF(selSet, opts){
   const wo = gv('wo-no') || 'PLTS-ASH';
   const dt = gv('wo-date') || new Date().toISOString().split('T')[0];
   const filename = `PLTS_AshDisposal_${wo}_${dt}.pdf`;
-  if(opts.preview){
+  // opts.silent: used by submitToDb() to build the archival PDF that gets
+  // uploaded to Storage for the review/approval workflow — no download
+  // dialog, no preview modal, just hand the built pdf object back.
+  if(opts.silent){
+    // no-op: caller reads the returned pdf object directly
+  } else if(opts.preview){
     showPdfPreview(pdf, filename);
   } else {
     pdf.save(filename);
     showNote('✅ PDF berhasil diunduh!', 'ok');
   }
+  return pdf;
 }
 
 // Most mobile browsers (iOS Safari especially, some Android WebViews too)
@@ -7419,6 +7560,7 @@ function pdfPreviewDownload(){
 }
 
 loadDraft();
+initRevisionBanner();
 </script>
 </body>
 </html>
