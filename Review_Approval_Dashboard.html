@@ -510,8 +510,10 @@ function openRemoteFile(url){
 }
 
 function renderActionSection(a, cs){
-  const canReview = loggedInRole==='techop2' && a.status==='submitted';
-  const canApprove = (loggedInRole==='supervisor') && a.status==='reviewed';
+  // 'admin' can do both — matches inboxItems() above, which already shows
+  // an admin both the submitted and reviewed queues.
+  const canReview = (loggedInRole==='techop2' || loggedInRole==='admin') && a.status==='submitted';
+  const canApprove = (loggedInRole==='supervisor' || loggedInRole==='admin') && a.status==='reviewed';
   if(canReview){
     return `<div class="dsec"><div class="dsec-title">Tindakan — Review</div>
       <label class="field-lbl">Komentar</label>
