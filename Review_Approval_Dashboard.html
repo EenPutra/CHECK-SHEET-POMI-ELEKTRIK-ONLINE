@@ -147,7 +147,7 @@ textarea.dinput:focus{border-color:var(--pri)}
 .field-lbl{font-size:12px;font-weight:700;color:var(--txt-2);margin-bottom:5px;display:block}
 .sig-pad-wrap{margin-top:10px}
 canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background:#fff;touch-action:none;cursor:crosshair;width:100%;max-width:330px;height:150px}
-.sig-actions{margin-top:6px}
+.sig-actions{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap}
 .action-row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
 .readonly-hint{font-size:12px;color:var(--txt-3);font-style:italic}
 
@@ -523,7 +523,11 @@ function renderActionSection(a, cs){
       <div class="sig-pad-wrap">
         <label class="field-lbl">Tanda Tangan</label>
         <canvas class="sig-canvas" id="sig-canvas-review" width="330" height="150"></canvas>
-        <div class="sig-actions"><button class="btn btn-sm" onclick="clearSignature('sig-canvas-review')">Hapus Tanda Tangan</button></div>
+        <div class="sig-actions">
+          <button class="btn btn-sm" onclick="clearSignature('sig-canvas-review')">Hapus Tanda Tangan</button>
+          <button class="btn btn-sm" onclick="document.getElementById('sig-file-review').click()">&#128193; Upload Gambar</button>
+          <input type="file" id="sig-file-review" accept="image/png,image/jpeg" style="display:none" onchange="handleSignatureFile('sig-canvas-review', this)">
+        </div>
       </div>
       <div class="action-row">
         <button class="btn btn-danger" onclick="doReturnToTechnician('review')">&#8617; Kembalikan ke Teknisi</button>
@@ -538,7 +542,11 @@ function renderActionSection(a, cs){
       <div class="sig-pad-wrap">
         <label class="field-lbl">Tanda Tangan</label>
         <canvas class="sig-canvas" id="sig-canvas-approval" width="330" height="150"></canvas>
-        <div class="sig-actions"><button class="btn btn-sm" onclick="clearSignature('sig-canvas-approval')">Hapus Tanda Tangan</button></div>
+        <div class="sig-actions">
+          <button class="btn btn-sm" onclick="clearSignature('sig-canvas-approval')">Hapus Tanda Tangan</button>
+          <button class="btn btn-sm" onclick="document.getElementById('sig-file-approval').click()">&#128193; Upload Gambar</button>
+          <input type="file" id="sig-file-approval" accept="image/png,image/jpeg" style="display:none" onchange="handleSignatureFile('sig-canvas-approval', this)">
+        </div>
       </div>
       <div class="action-row">
         <button class="btn btn-danger" onclick="doReturnToTechnician('approval')">&#8617; Kembalikan ke Teknisi</button>
@@ -582,6 +590,37 @@ function clearSignature(id){
 function getSignatureDataUrl(id){
   if(!_sigState[id] || !_sigState[id].hasInk) return null;
   return document.getElementById(id).toDataURL('image/png');
+}
+
+// "Upload Gambar" — an alternative to drawing: load a PNG/JPG signature
+// file, draw it onto the SAME canvas the pad uses (fit-to-box, aspect
+// ratio preserved — never stretched, same anti-distortion principle as
+// PhotoKit elsewhere in this project) so getSignatureDataUrl() and the
+// PDF embed in buildFinalPdf() need no separate code path.
+function handleSignatureFile(canvasId, inputEl){
+  const file = inputEl.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const img = new Image();
+    img.onload = () => { drawImageFitted(canvasId, img); };
+    img.onerror = () => alert('Gagal membaca gambar. Pastikan file PNG/JPG yang valid.');
+    img.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+  inputEl.value = ''; // allow re-selecting the same file later
+}
+function drawImageFitted(canvasId, img){
+  const canvas = document.getElementById(canvasId);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  const scale = Math.min(canvas.width / img.width, canvas.height / img.height);
+  const w = img.width * scale, h = img.height * scale;
+  ctx.drawImage(img, (canvas.width - w) / 2, (canvas.height - h) / 2, w, h);
+  if(!_sigState[canvasId]) _sigState[canvasId] = { drawing: false, hasInk: false };
+  _sigState[canvasId].hasInk = true;
 }
 
 /* ── ACTIONS ── */
