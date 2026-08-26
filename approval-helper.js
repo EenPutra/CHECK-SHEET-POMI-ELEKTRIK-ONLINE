@@ -110,17 +110,36 @@ const Approvals = {
   //     to skip PDF upload (e.g. sheet has no jsPDF export yet).
   //   assetTag, assetName, checksheetFile, submittedBy, revisionOf: same
   //     meaning as create()'s meta.
+  //   existingApprovalId: set by submit-guard.js when the technician chose
+  //     "Overwrite" over a fresh submission (see that file) — updates that
+  //     SAME approvals doc in place (refreshing its photoUrls/pdfUrl-linked
+  //     checksheet, submittedBy, and updatedAt) instead of calling create(),
+  //     so overwriting a submission never leaves a second, duplicate
+  //     approvals doc behind. submit-guard.js only ever offers this when
+  //     the target approval's status is still 'submitted' (nothing reviewed
+  //     yet), so this never overwrites real review/approval history — the
+  //     status is deliberately reset to 'submitted' here regardless of what
+  //     it already was, since an overwrite always means "the technician has
+  //     new data for you to look at."
+  //   onProgress: optional (pct:0-100, label:string) => void, called as
+  //     photos upload (proportional to count), then the PDF, then the
+  //     approvals record — lets the caller drive a real progress bar
+  //     instead of a guessed animation. Never called if omitted.
   //
   // Returns true if photos/PDF/approval record all succeeded, false if
   // any part failed (logged to console) — the checksheet doc itself was
   // ALREADY saved by the caller before this runs, so a false return here
   // must never be treated as "the whole submission failed."
   async submitWithFiles(checksheetId, opts = {}) {
-    const { photos, pdfBuilder, assetTag, assetName, checksheetFile, submittedBy, revisionOf } = opts;
+    const { photos, pdfBuilder, assetTag, assetName, checksheetFile, submittedBy, revisionOf, existingApprovalId, onProgress } = opts;
+    const report = (pct, label) => { if (typeof onProgress === 'function') onProgress(pct, label); };
     let ok = true;
     try {
       const photoUrls = {};
       const groups = Object.keys(photos || {});
+      const totalPhotos = groups.reduce((n, k) => n + (photos[k] || []).length, 0);
+      let uploadedPhotos = 0;
+      if (totalPhotos) report(0, 'Mengunggah foto...');
       for (const key of groups) {
         const list = photos[key] || [];
         if (!list.length) continue;
@@ -146,25 +165,40 @@ const Approvals = {
             ...(p.widthCm != null ? { widthCm: p.widthCm } : {}),
             ...(p.heightCm != null ? { heightCm: p.heightCm } : {}),
           });
+          uploadedPhotos++;
+          if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Mengunggah foto ${uploadedPhotos}/${totalPhotos}...`);
         }
         if (urls.length) photoUrls[key] = urls;
       }
 
       let pdfUrl = null;
       if (typeof pdfBuilder === 'function') {
+        report(72, 'Membuat PDF arsip...');
         const pdf = await pdfBuilder();
         const blob = pdf.output('blob');
+        report(80, 'Mengunggah PDF...');
         pdfUrl = await Storage.uploadBlob(`checksheets/${checksheetId}/original.pdf`, blob, 'application/pdf');
       }
 
       if (Object.keys(photoUrls).length || pdfUrl) {
+        report(90, 'Menyimpan tautan file...');
         await DB.attachFiles(checksheetId, {
           ...(Object.keys(photoUrls).length ? { photoUrls } : {}),
           ...(pdfUrl ? { pdfUrl } : {}),
         });
       }
 
-      await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf });
+      report(95, 'Mencatat status approval...');
+      if (existingApprovalId) {
+        await db.collection(this.COLLECTION).doc(existingApprovalId).set({
+          assetTag: assetTag || '', assetName: assetName || '', checksheetFile: checksheetFile || '',
+          submittedBy: submittedBy || '', status: 'submitted',
+          updatedAt: new Date().toISOString(),
+        }, { merge: true });
+      } else {
+        await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf });
+      }
+      report(100, 'Selesai');
     } catch (e) {
       ok = false;
       console.error('Approvals.submitWithFiles gagal:', e);

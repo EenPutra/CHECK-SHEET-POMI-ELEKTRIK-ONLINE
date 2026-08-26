@@ -66,6 +66,27 @@ const DB = {
     return ref.id;
   },
 
+  // The "Overwrite" half of submit-guard.js's insert-vs-overwrite prompt —
+  // the only other place (besides attachFiles) an existing checksheet doc
+  // is ever mutated rather than .add()'d. Deliberately preserves the
+  // ORIGINAL createdAt (fetched from the doc being replaced) rather than
+  // stamping a new one: the whole point of choosing "overwrite" is "this is
+  // still the same visit, just corrected data", so anything that reads
+  // createdAt to mean "when did this visit happen" (dedupe clustering,
+  // dashboard trend charts, sort order) keeps working correctly across an
+  // overwrite. `updatedAt` records when the overwrite itself happened.
+  // Full replace via .set() (no {merge:true}) — an overwrite is meant to
+  // wholly replace what's there, same as re-submitting the form from
+  // scratch would, not patch a few fields.
+  async update(id, data) {
+    const existing = await this.getById(id);
+    data.createdAt = existing?.createdAt || new Date().toISOString();
+    data.submittedAt = firebase.firestore.FieldValue.serverTimestamp();
+    data.updatedAt = new Date().toISOString();
+    await db.collection(this.COLLECTION).doc(id).set(data);
+    return id;
+  },
+
   async getAll(filters = {}) {
     let query = db.collection(this.COLLECTION).orderBy('createdAt', 'desc');
     if (filters.assetTag) query = query.where('assetTag', '==', filters.assetTag);

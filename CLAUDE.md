@@ -151,6 +151,76 @@ This is the part most likely to regress if a check sheet is edited without check
   restored, same reasoning as above — the `special:'ol'` marker's correct home in `CHECKS` is
   still ambiguous.
 
+## Submit Guard: `submit-guard.js` — insert-vs-overwrite prompt + real upload progress bar
+
+Built to attack the duplicate-submission problem at its SOURCE, rather than only cleaning up
+after the fact like the `approvals`-collection dedup work above — a technician resubmitting the
+same visit (unsure if the first click saved, or just impatient) used to always create a brand-new
+`checksheets` doc with no way to know a near-identical one already exists. Rolled out to
+**`UPS_7EB-UPS-AB_Monthly.html` as a pilot only** — this was an explicit, deliberate choice
+(discussed and confirmed before writing any code) to build the shared module + verify it
+thoroughly on one file before touching the other ~23, given how invasive and easy to get subtly
+wrong a change to every check sheet's `submitToDb()` is. **Do not assume this has been rolled out
+anywhere else until CLAUDE.md says so** — check a given file's own script includes for
+`submit-guard.js` before assuming it has this behavior.
+
+Two independent pieces, both self-injecting DOM/CSS like `load-merge-modal.js`/
+`technician-auth.js`:
+
+- **Insert-vs-overwrite prompt** (`SubmitGuard.resolveSubmitTarget(woNumber)`, called BEFORE
+  `DB.save()`). Finds a "same visit, probably a resubmit" candidate two ways, cheapest first: (1)
+  session-local — this exact tab already submitted for this asset earlier (`markSubmitted()`
+  after a prior successful submit, no network round-trip needed), or (2) Firestore — a doc already
+  exists for this asset tag with the same WO number (covers reopening the sheet in a fresh tab).
+  **Overwrite is only ever OFFERED when the candidate's own `approvals` record (if any) is still
+  at status `'submitted'`** — nothing already reviewed/approved/returned is ever at risk, an
+  explicit safety decision confirmed with the user up front (mirrors the same
+  never-touch-real-history rule the `approvals`-dedup work above already established). No
+  candidate found, or overwrite isn't safe → resolves straight to `{mode:'insert'}` with **no
+  prompt at all** — the common case (a genuinely new visit) is never interrupted. The modal's
+  three outcomes: `{mode:'insert'}`, `{mode:'overwrite', targetId, approvalId}`, or
+  `{mode:'cancel'}` (caller must `return` immediately on cancel — see the usage snippet in
+  `submit-guard.js`'s own header comment).
+- **Real, honest progress bar** (`showProgress()`/`setProgress(pct,label)`/`hideProgress()`), not
+  a guessed animation — another explicit, confirmed-up-front choice. `Approvals.submitWithFiles()`
+  gained an `onProgress(pct,label)` callback that reports its OWN 0–100 internally (0–70%
+  proportional to photos uploaded so far, 72–80% building/uploading the PDF, 90–100% attaching
+  file links and writing the approval record) — the calling check sheet blends that into its own
+  overall bar (e.g. `10 + Math.round(pct*0.85)`, reserving the first ~10% for the `DB.save()`/
+  `DB.update()` step that runs before `submitWithFiles()` is even called). The overlay has no
+  close button and the submit button(s) are explicitly `.disabled` for the duration
+  (`[...document.querySelectorAll('[onclick="submitToDb()"]')]` — no id needed, works even when a
+  file has more than one Submit button, as `UPS_7EB-UPS-AB_Monthly.html` does) — this is the literal
+  fix for "technicians re-clicking Submit out of impatience," not just a cosmetic nicety.
+
+**New capabilities added to support this, both backward-compatible (every existing caller keeps
+working unmodified):**
+- `DB.update(id, data)` (db-helper.js) — the "Overwrite" half. Full replace via `.set()` (an
+  overwrite means "this is corrected data for the same visit," not a partial patch), but
+  deliberately **preserves the original `createdAt`** (fetched from the doc being replaced) so
+  anything reading `createdAt` to mean "when did this visit happen" — dedupe clustering, trend
+  charts, sort order — keeps working correctly across an overwrite; only `updatedAt` reflects when
+  the overwrite itself happened.
+- `Approvals.submitWithFiles()` gained `existingApprovalId` (approval-helper.js) — when set
+  (overwrite path), updates that SAME approval doc in place (`status` reset to `'submitted'`,
+  since new data always means "please look at this again") instead of calling `create()`, so
+  overwriting a submission never leaves a second, duplicate approval behind.
+
+**A real near-miss while testing this, worth remembering for next time**: an early test run's
+mock for `db.collection()` had a bug (missing methods in the chained-call shape it returned) that
+caused it to silently fail and fall through to calling the REAL Firestore/Drive APIs — writing
+several fake test documents into the actual production `checksheets`/`approvals` collections
+before being caught and cleaned up. The fix going forward: any headless-Chrome test that mocks
+`db.collection`/`Storage.uploadDataUrl`/`Storage.uploadBlob` for this kind of test should make the
+mock **fail loudly** for any collection/method it doesn't explicitly handle (`throw new
+Error(...)` instead of silently returning `undefined` or falling through) — a thrown error during
+a test is cheap and obvious; a silent real write to production is not. Verify the mock's own
+chain shape carefully against the REAL method being tested (e.g. `Approvals.getByChecksheetId()`
+calls `.where().orderBy().limit().get()` — a mock missing `orderBy()` in that chain throws
+`orderBy is not a function`, which — if the surrounding code has its own try/catch, as
+`resolveSubmitTarget()`'s safety fallback does — can silently produce a *plausible-looking but
+wrong* test result instead of an obvious failure).
+
 ## Photos: `img-helper.js` + `photo-kit.js` — never size a photo by hand
 
 Every check sheet that takes evidence photos now shares one pipeline. **Do not add a
