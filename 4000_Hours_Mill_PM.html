@@ -11,6 +11,7 @@
 <script src="db-helper.js"></script>
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
+<script src="submit-guard.js"></script>
 <script src="load-merge-modal.js"></script>
 <script src="technician-auth.js"></script>
 <script src="img-helper.js"></script>
@@ -2198,12 +2199,21 @@ async function submitToDb(){
     Object.assign(base.sheets, collectAssetSheets(a, tag));
   });
 
+  // Multi-asset sheet: re-init with the currently selected Mill's synthetic
+  // per-visit tag right before resolving, so the duplicate-check queries
+  // THIS Mill's history, not a stale tag from a previously selected Mill.
+  SubmitGuard.init({ assetTag: millTag });
+  const target = await SubmitGuard.resolveSubmitTarget(base.woNumber);
+  if(target.mode==='cancel') return;
+
   let id;
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    id = await DB.save(base);
+    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
+    id = target.mode==='overwrite' ? await DB.update(target.targetId,base) : await DB.save(base);
     document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
+    SubmitGuard.hideProgress();
     showNote('❌ Gagal simpan: '+e.message, 'err');
     return;
   }
@@ -2228,11 +2238,17 @@ async function submitToDb(){
       checksheetFile: '4000_Hours_Mill_PM.html',
       submittedBy: checkedBy,
       revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId: target.mode==='overwrite' ? target.approvalId : null,
+      onProgress: (pct,label) => SubmitGuard.setProgress(10+Math.round(pct*0.85),label),
     });
   }catch(e){
     filesOk = false;
     console.error('Upload foto/PDF/approval record gagal:', e);
   }
+
+  SubmitGuard.markSubmitted(id, {woNumber: base.woNumber, executionDate: base.executionDate, checkedBy});
+  SubmitGuard.setProgress(100,'Selesai!');
+  setTimeout(()=>SubmitGuard.hideProgress(),500);
 
   if(filesOk){
     showNote('✅ Data, foto & PDF berhasil disimpan. ID: '+id, 'ok');
@@ -2271,6 +2287,7 @@ updateStats();
 LoadMergeModal.init({ assetTag: '' });
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "checked-by" });
+SubmitGuard.init({ assetTag: selectedMillLetter ? 'MILL-'+selectedMillLetter+'-4000H' : '' });
 
 
 // ═══════════════════════════════════════════════════
