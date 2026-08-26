@@ -12,6 +12,7 @@
 <script src="db-helper.js"></script>
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
+<script src="submit-guard.js"></script>
 <script src="load-merge-modal.js"></script>
 <script src="technician-auth.js"></script>
 <script src="img-helper.js"></script>
@@ -1049,10 +1050,13 @@ async function saveToDatabase(){
   const gv2=id=>{const e=document.getElementById(id);return e?e.value.trim():''};
   if(!gv2('wo-date')){showNotice('⚠️ Isi tanggal terlebih dahulu.','err');return;}
   if(!gv2('checked-by')){showNotice('⚠️ Isi nama teknisi terlebih dahulu.','err');return;}
-  showNotice('⏳ Menyimpan ke database…','info');
-  let docId;
+  let docId, target;
   try{
     const raw=collectFormData();
+    target=await SubmitGuard.resolveSubmitTarget(raw.woNo);
+    if(target.mode==='cancel') return;
+    showNotice('⏳ Menyimpan ke database…','info');
+    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
 
     // Build items array from inspection results (for dashboard detail view)
     const items=[];
@@ -1108,8 +1112,8 @@ async function saveToDatabase(){
       toggleStates:Object.assign({},ST),
       createdAt:new Date().toISOString(),
     };
-    docId=await DB.save(payload);
-  }catch(e){showNotice('❌ Gagal menyimpan: '+e.message,'err');return;}
+    docId = target.mode==='overwrite' ? await DB.update(target.targetId,payload) : await DB.save(payload);
+  }catch(e){SubmitGuard.hideProgress();showNotice('❌ Gagal menyimpan: '+e.message,'err');return;}
 
   // Photos + archival PDF + the review/approval workflow record are all
   // best-effort ON TOP of the checksheet doc saved above. A Storage hiccup
@@ -1130,11 +1134,16 @@ async function saveToDatabase(){
       checksheetFile:'GEN_BrushGear_PM_Checksheet.html',
       submittedBy:gv2('checked-by'),
       revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId: target.mode==='overwrite' ? target.approvalId : null,
+      onProgress:(pct,label)=>SubmitGuard.setProgress(10+Math.round(pct*0.85),label),
     });
   }catch(e){
     filesOk=false;
     console.error('Upload foto/PDF/approval record gagal:',e);
   }
+  SubmitGuard.markSubmitted(docId,{woNumber:gv2('wo-no'),executionDate:gv2('wo-date'),checkedBy:gv2('checked-by')});
+  SubmitGuard.setProgress(100,'Selesai!');
+  setTimeout(()=>SubmitGuard.hideProgress(),500);
 
   if(filesOk){
     showNotice('✅ Data, foto & PDF berhasil disimpan. ID: '+docId,'ok');
@@ -1478,6 +1487,7 @@ updateFileCountLabel();
 LoadMergeModal.init({assetTag:'7TG-GEN-100'});
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "checked-by" });
+SubmitGuard.init({ assetTag:'7TG-GEN-100', submitFnName:'saveToDatabase' });
 
 // Set default date/time
 const now=new Date();
