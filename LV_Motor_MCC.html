@@ -11,6 +11,7 @@
 <script src="db-helper.js"></script>
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
+<script src="submit-guard.js"></script>
 <script src="load-merge-modal.js"></script>
 <script src="technician-auth.js"></script>
 <script src="img-helper.js"></script>
@@ -891,12 +892,21 @@ async function submitToDb(){
     ]},
   };
 
+  // Multi-asset sheet: re-init with the currently searched/selected tag
+  // right before resolving, so the duplicate-check queries THIS motor's
+  // history, not a stale tag from a previous search this session.
+  SubmitGuard.init({ assetTag: tag });
+  const target = await SubmitGuard.resolveSubmitTarget(base.woNumber);
+  if(target.mode==='cancel') return;
+
   let id;
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    id = await DB.save(base);
+    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
+    id = target.mode==='overwrite' ? await DB.update(target.targetId,base) : await DB.save(base);
     document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
+    SubmitGuard.hideProgress();
     showNote('❌ Gagal simpan: '+e.message, 'err');
     return;
   }
@@ -917,11 +927,17 @@ async function submitToDb(){
       checksheetFile: 'LV_Motor_MCC.html',
       submittedBy: doneBy,
       revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId: target.mode==='overwrite' ? target.approvalId : null,
+      onProgress: (pct,label) => SubmitGuard.setProgress(10+Math.round(pct*0.85),label),
     });
   }catch(e){
     filesOk = false;
     console.error('Upload foto/PDF/approval record gagal:', e);
   }
+
+  SubmitGuard.markSubmitted(id, {woNumber: base.woNumber, executionDate: base.executionDate, checkedBy: doneBy});
+  SubmitGuard.setProgress(100,'Selesai!');
+  setTimeout(()=>SubmitGuard.hideProgress(),500);
 
   if(filesOk){
     showNote('✅ Data, foto & PDF berhasil disimpan. ID: '+id, 'ok');
@@ -1537,6 +1553,7 @@ PhotoKit.configure({maxWcm:9.0,maxHcm:20,defaultWcm:9.0,defaultHcm:6.5});
 // own selectTag() call below), this just guarantees _config is non-null
 // so an early click on "Pilih & Gabung" never throws.
 LoadMergeModal.init({ assetTag: document.getElementById('tag-search').value.trim() || '' });
+SubmitGuard.init({ assetTag: document.getElementById('tag-search').value.trim() || '' });
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "done-by" });
 loadDraft();
