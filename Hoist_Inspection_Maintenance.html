@@ -11,6 +11,7 @@
 <script src="db-helper.js"></script>
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
+<script src="submit-guard.js"></script>
 <script src="load-merge-modal.js"></script>
 <script src="technician-auth.js"></script>
 <script src="img-helper.js"></script>
@@ -1520,11 +1521,19 @@ async function submitToDb(){
     sPanel:itemSheet('Panel & Mechanical Inspection',PANEL_ITEMS,'pnl'),
   };
 
+  // Multi-asset sheet: re-init with the currently typed tag right before
+  // resolving, so the duplicate-check queries THIS hoist's history.
+  SubmitGuard.init({ assetTag: tagNo });
+  const target=await SubmitGuard.resolveSubmitTarget(base.woNumber);
+  if(target.mode==='cancel') return;
+
   let id;
   try{
     showNotice('⏳ Menyimpan ke database...','info');
-    id=await DB.save(base);
+    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
+    id = target.mode==='overwrite' ? await DB.update(target.targetId,base) : await DB.save(base);
   }catch(e){
+    SubmitGuard.hideProgress();
     showNotice('Gagal submit: '+e.message,'err');
     return;
   }
@@ -1548,11 +1557,17 @@ async function submitToDb(){
       checksheetFile:'Hoist_Inspection_Maintenance.html',
       submittedBy:base.checkedBy,
       revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId: target.mode==='overwrite' ? target.approvalId : null,
+      onProgress:(pct,label)=>SubmitGuard.setProgress(10+Math.round(pct*0.85),label),
     });
   }catch(e){
     filesOk=false;
     console.error('Upload foto/approval record gagal:', e);
   }
+
+  SubmitGuard.markSubmitted(id,{woNumber:base.woNumber,executionDate:base.executionDate,checkedBy:base.checkedBy});
+  SubmitGuard.setProgress(100,'Selesai!');
+  setTimeout(()=>SubmitGuard.hideProgress(),500);
 
   if(filesOk){
     showNotice('✅ Data & foto berhasil disimpan ke database! ID: '+id,'ok');
@@ -1602,8 +1617,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   updateStats();
   renderPhotos();
   LoadMergeModal.init({assetTag:document.getElementById('tag-no').value.trim(),headerMap:HOIST_HEADER_MAP});
+  SubmitGuard.init({ assetTag:document.getElementById('tag-no').value.trim() });
   LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "done-by" });
+SubmitGuard.init({ assetTag: document.getElementById('tag-no')?.value.trim() || '' });
 });
 </script>
 </body>
