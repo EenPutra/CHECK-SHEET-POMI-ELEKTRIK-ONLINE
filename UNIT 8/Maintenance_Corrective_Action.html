@@ -241,7 +241,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">📋</div>
-    <div><div class="sec-hdr-title">A — WO &amp; Asset Identification</div></div>
+    <div><div class="sec-hdr-title">A. WORK ORDER &amp; ASSET IDENTIFICATION</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -272,7 +272,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">⚠️</div>
-    <div><div class="sec-hdr-title">B — Failure / Problem Description</div></div>
+    <div><div class="sec-hdr-title">B. FAILURE / PROBLEM DESCRIPTION</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -283,11 +283,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Failure Mode</label><input type="text" id="failure-mode" placeholder="cth. Bearing seized, Insulation breakdown"></div>
       <div class="mf"><label>Detection Method</label>
         <select id="detection-method" onchange="toggleDetectionOther()">
-          <option>Operator Report</option>
-          <option>Routine Inspection</option>
-          <option>Alarm / SCADA</option>
-          <option>Vibration Monitoring</option>
-          <option>Thermography</option>
+          <option>Operator round</option>
+          <option>Alarm / Trip</option>
+          <option>PM Inspection</option>
+          <option>Condition Monitoring</option>
           <option>Other</option>
         </select>
       </div>
@@ -300,7 +299,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">📊</div>
-    <div><div class="sec-hdr-title">C — Impact Assessment &amp; Severity</div></div>
+    <div><div class="sec-hdr-title">C. IMPACT ASSESSMENT &amp; SEVERITY</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -319,7 +318,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">👷</div>
-    <div><div class="sec-hdr-title">D — Maintenance Action Team</div></div>
+    <div><div class="sec-hdr-title">D. MAINTENANCE ACTION TEAM</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -337,7 +336,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">🕐</div>
-    <div><div class="sec-hdr-title">E — Chronology of Event</div></div>
+    <div><div class="sec-hdr-title">E. CHRONOLOGY OF EVENT</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -357,7 +356,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">🔍</div>
-    <div><div class="sec-hdr-title">F — Findings / Inspection Results</div></div>
+    <div><div class="sec-hdr-title">F. FINDINGS / INSPECTION RESULTS</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -377,7 +376,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">🛠️</div>
-    <div><div class="sec-hdr-title">G — Immediate / Corrective Action Taken</div></div>
+    <div><div class="sec-hdr-title">G. IMMEDIATE / CORRECTIVE ACTION ALREADY DONE</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -397,7 +396,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">🧩</div>
-    <div><div class="sec-hdr-title">H — Root Cause Analysis</div></div>
+    <div><div class="sec-hdr-title">H. ROOT CAUSE ANALYSIS</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body" style="padding:0">
@@ -468,7 +467,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">✅</div>
-    <div><div class="sec-hdr-title">I — Recommendation / Further Action</div></div>
+    <div><div class="sec-hdr-title">I. RECOMMENDATION FURTHER ACTION TO PREVENT REOCCURED EVENT</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -486,7 +485,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">🔧</div>
-    <div><div class="sec-hdr-title">J — Main Parts / Consumables / Tools Used</div></div>
+    <div><div class="sec-hdr-title">J. MAIN PARTS / CONSUMABLES / TOOLS USED</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -504,7 +503,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">📎</div>
-    <div><div class="sec-hdr-title">K — Attachments / Evidence Log</div></div>
+    <div><div class="sec-hdr-title">K. ATTACHMENTS / EVIDENCE LOG</div></div>
     <span class="sec-hdr-cnt" id="photo-cnt-attachments">0 foto</span>
     <span class="sec-hdr-arrow">▼</span>
   </div>
@@ -521,7 +520,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">🖋️</div>
-    <div><div class="sec-hdr-title">L — Report Authorization</div></div>
+    <div><div class="sec-hdr-title">L. REPORT AUTHORIZATION</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -801,10 +800,10 @@ function updateStats(){
 // ═══════════════════════════════════════════════════
 const PHOTO_KEYS = ['chronology','findings','corrective_action','attachments'];
 const PHOTO_LABELS = {
-  chronology: 'E — Chronology of Event',
-  findings: 'F — Findings / Inspection Results',
-  corrective_action: 'G — Immediate/Corrective Action',
-  attachments: 'K — Attachments / Evidence Log',
+  chronology: 'E. CHRONOLOGY OF EVENT',
+  findings: 'F. FINDINGS / INSPECTION RESULTS',
+  corrective_action: 'G. IMMEDIATE / CORRECTIVE ACTION ALREADY DONE',
+  attachments: 'K. ATTACHMENTS / EVIDENCE LOG',
 };
 const PHOTOS = {};
 PHOTO_KEYS.forEach(k => PHOTOS[k] = []);
@@ -1099,7 +1098,9 @@ async function generatePDF(opts){
   const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
   const W=210, H=297, M=12, CW=186;
   const TOP_START=27, BOTTOM_LIMIT=276;
-  const BLACK=[0,0,0], DARK=[15,23,42], NAVY=[30,58,95], LINE=[90,90,90];
+  const BLACK=[0,0,0], DARK=[15,23,42];
+  const TITLE_NAVY=[31,56,100], SECTION_NAVY=[47,84,150], LABEL_BG=[220,230,241], BORDER=[150,150,150];
+  const LABEL_W=42;
   let y = TOP_START;
 
   const bgPagesDrawn = new Set();
@@ -1116,17 +1117,100 @@ async function generatePDF(opts){
 
   const kvTheme = {
     theme:'grid',
-    styles:{font:'helvetica',fontSize:8.3,cellPadding:2.2,textColor:DARK,lineColor:LINE,lineWidth:0.2,valign:'middle'},
-    headStyles:{fillColor:[240,247,255], textColor:NAVY, fontStyle:'bold', lineColor:LINE, lineWidth:0.2},
+    styles:{font:'helvetica',fontSize:8.3,cellPadding:2.2,textColor:DARK,lineColor:BORDER,lineWidth:0.2,valign:'middle'},
+    headStyles:{fillColor:LABEL_BG, textColor:BLACK, fontStyle:'bold', lineColor:BORDER, lineWidth:0.2},
     margin:{top:TOP_START,bottom:H-BOTTOM_LIMIT,left:M,right:M},
     willDrawPage:()=>ensureBg(),
   };
-  const bold = c => ({content:c, styles:{fontStyle:'bold', textColor:BLACK}});
+
   function sectionHeader(label){
     checkY(11);
-    pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,7,'F');
+    pdf.setFillColor(...SECTION_NAVY); pdf.rect(M,y,CW,7,'F');
     pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(10);
-    pdf.text(label, M+3, y+5); y += 10;
+    pdf.text(label, M+3, y+5); y += 9;
+  }
+
+  // ── Simple bordered label/value row (matches the reference template's
+  // shaded-label + white-value row look) — used for one-line fields in A/B/C.
+  function formRow(label, drawValue, opts){
+    opts = opts || {};
+    const h = opts.height || 7;
+    checkY(h);
+    const rowY = y;
+    pdf.setFillColor(...LABEL_BG);
+    pdf.rect(M, rowY, LABEL_W, h, 'F');
+    pdf.setDrawColor(...BORDER); pdf.setLineWidth(0.15);
+    pdf.rect(M, rowY, LABEL_W, h, 'D');
+    pdf.rect(M+LABEL_W, rowY, CW-LABEL_W, h, 'D');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8.3); pdf.setTextColor(...BLACK);
+    pdf.text(label, M+2.5, rowY+h/2+1.1, {maxWidth:LABEL_W-4});
+    if(drawValue) drawValue(M+LABEL_W+2.5, rowY, CW-LABEL_W-4, h);
+    y = rowY + h;
+  }
+  function valueText(text, opts){
+    opts = opts || {};
+    return function(x,rowY,w,h){
+      pdf.setFont('helvetica', opts.italic?'italic':'normal'); pdf.setFontSize(opts.fontSize||8.3);
+      pdf.setTextColor(...(opts.color||DARK));
+      pdf.text(text, x, rowY+h/2+1.1, {maxWidth:w});
+    };
+  }
+  // Draws one checkbox (small square, filled solid when checked) + its label.
+  function drawChk(x, ymid, checked, label, fontSize){
+    const s=3.0, by=ymid-2.3;
+    pdf.setDrawColor(0); pdf.setLineWidth(0.3);
+    pdf.rect(x,by,s,s,'D');
+    if(checked){ pdf.setFillColor(...SECTION_NAVY); pdf.rect(x+0.5,by+0.5,s-1,s-1,'F'); }
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(fontSize||7.6); pdf.setTextColor(...BLACK);
+    pdf.text(label, x+s+1.6, ymid);
+  }
+  // Lays out a row of checkbox+label pairs left-to-right, wrapping to a new
+  // line when they would overflow maxWidth. Returns the number of lines used
+  // (call once with measureOnly to size the row before drawing for real).
+  function drawChkGroup(x0, y0, maxWidth, items, selected, fontSize, measureOnly, trailing){
+    fontSize = fontSize || 7.6;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(fontSize);
+    const lineH = 4.3;
+    let cx = x0, cy = y0, lines = 1;
+    items.forEach(([val,label])=>{
+      const w = 3.0+1.6+pdf.getTextWidth(label)+5;
+      if(cx-x0+w > maxWidth && cx > x0){ cx = x0; cy += lineH; lines++; }
+      if(!measureOnly) drawChk(cx, cy, selected===val, label, fontSize);
+      cx += w;
+    });
+    if(trailing){
+      const tw = pdf.getTextWidth(trailing);
+      if(cx-x0+tw > maxWidth && cx > x0){ cx = x0; cy += lineH; lines++; }
+      if(!measureOnly){ pdf.setFont('helvetica','normal'); pdf.setFontSize(fontSize); pdf.setTextColor(...BLACK); pdf.text(trailing, cx, cy); }
+    }
+    return lines;
+  }
+  function chkGroupRow(label, items, selected, opts){
+    opts = opts || {};
+    const maxWidth = CW-LABEL_W-4;
+    const lines = drawChkGroup(0,0,maxWidth,items,selected,opts.fontSize,true,opts.trailing);
+    const h = Math.max(7, lines*4.3+3);
+    formRow(label, (x,rowY,w,rh)=>{
+      drawChkGroup(x, rowY+ (lines>1?5:rh/2+1.3), maxWidth, items, selected, opts.fontSize, false, opts.trailing);
+    }, {height:h});
+  }
+  // Tall free-text box (Failure Description / Chronology / Findings /
+  // Corrective Action) — italic gray hint when empty, matching the printed
+  // template's placeholder look; real dark text once the technician fills it.
+  function textBox(text, hint, minH){
+    const h = Math.max(minH||18, 10);
+    checkY(h);
+    const rowY = y;
+    pdf.setDrawColor(...BORDER); pdf.setLineWidth(0.15);
+    pdf.rect(M, rowY, CW, h, 'D');
+    if(text){
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8.6); pdf.setTextColor(...DARK);
+      pdf.text(pdf.splitTextToSize(text, CW-6), M+3, rowY+5);
+    }else if(hint){
+      pdf.setFont('helvetica','italic'); pdf.setFontSize(8); pdf.setTextColor(120,120,120);
+      pdf.text(hint, M+3, rowY+5, {maxWidth:CW-6});
+    }
+    y = rowY + h;
   }
   function drawPhotoGrid(key){
     const photos = PHOTOS[key] || [];
@@ -1144,7 +1228,7 @@ async function generatePDF(opts){
       pair.forEach((p,ci)=>{
         const px = M + ci*(PW+GAP), f = fits[ci];
         PhotoKit.draw(pdf, p, px+f.dx, rowY, f.w, f.h, {align:'center'});
-        pdf.setDrawColor(...LINE); pdf.setLineWidth(0.2); pdf.rect(px+f.dx,rowY,f.w,f.h,'D');
+        pdf.setDrawColor(...BORDER); pdf.setLineWidth(0.2); pdf.rect(px+f.dx,rowY,f.w,f.h,'D');
         if(p.caption){
           pdf.setFont('helvetica','italic'); pdf.setFontSize(7); pdf.setTextColor(100,116,139);
           pdf.text(p.caption, px+PW/2, rowY+rowH+3.5, {align:'center',maxWidth:PW-2});
@@ -1153,87 +1237,116 @@ async function generatePDF(opts){
       y = rowY + rowH + 8;
     }
   }
-  function narrativeSection(label, textVal, photoKey){
+  function narrativeSection(label, textVal, hint, photoKey){
     sectionHeader(label);
-    pdf.autoTable({...kvTheme, startY:y, body:[[textVal||'Tidak ada catatan.']], styles:{...kvTheme.styles,fontSize:9,cellPadding:3}});
-    y = pdf.lastAutoTable.finalY + 3;
+    textBox(textVal, hint, 24);
+    y += 3;
     const photos = PHOTOS[photoKey] || [];
     if(photos.length){
       checkY(6);
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(...NAVY);
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(...SECTION_NAVY);
       pdf.text('Evidence Photos ('+photos.length+')', M, y+3); y += 6;
       drawPhotoGrid(photoKey);
     }
     y += 3;
   }
 
-  // ── COVER TITLE ──
-  pdf.setTextColor(...BLACK); pdf.setFont('helvetica','bold'); pdf.setFontSize(15);
-  pdf.text('MAINTENANCE CORRECTIVE ACTION REPORT', W/2, y+5, {align:'center'});
-  y += 11;
+  // ── TITLE BANNER ──
+  checkY(16);
+  pdf.setFillColor(...TITLE_NAVY); pdf.rect(M, y, CW, 16, 'F');
+  pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(10.5);
+  pdf.text('PT PAITON OPERATION AND MAINTENANCE INDONESIA (POMI)', W/2, y+6.5, {align:'center'});
+  pdf.setFontSize(14.5);
+  pdf.text('MAINTENANCE CORRECTIVE ACTION REPORT', W/2, y+13, {align:'center'});
+  y += 16 + 5;
 
-  // ── A ──
-  pdf.autoTable({...kvTheme, startY:y, body:[
-    [bold('WO No.'), gv('wo-no')||'—', bold('Unit'), gv('unit')||'—'],
-    [bold('System/Area'), gv('system-area')||'—', bold('Asset Tag'), gv('asset-tag')||'—'],
-    [bold('Asset Description'), {content: gv('asset-desc')||'—', colSpan:3}],
-    [bold('Criticality'), gv('criticality')||'—', bold('WO Type'), gv('wo-type')||'—'],
-    [bold('Permit/PAS No.'), gv('permit-no')||'—', bold('Date/Time of Failure'), (gv('failure-date')||'—')+' '+(gv('failure-time')||'')],
-    [bold('Date of Report'), fmtDatePdf(gv('wo-date'))||'—', bold('Prepared By'), gv('checked-by')||'—'],
-  ], columnStyles:{0:{cellWidth:36,fontStyle:'bold'},1:{cellWidth:57},2:{cellWidth:36,fontStyle:'bold'},3:{cellWidth:57}}});
-  y = pdf.lastAutoTable.finalY + 5;
+  // ── A. WORK ORDER & ASSET IDENTIFICATION ──
+  sectionHeader('A. WORK ORDER & ASSET IDENTIFICATION');
+  formRow('WO No.', valueText(gv('wo-no')||'From Maximo work order record', {italic:!gv('wo-no'), color:gv('wo-no')?DARK:[120,120,120]}));
+  chkGroupRow('Unit', [['Unit 7','Unit 7'],['Unit 8','Unit 8'],['Common Plant','Common Plant']], gv('unit'));
+  formRow('System / Area', valueText(gv('system-area')||''));
+  formRow('Asset Tag', valueText(gv('asset-tag')||''));
+  formRow('Asset Description', valueText(gv('asset-desc')||''));
+  chkGroupRow('Equipment Criticality', [['Critical','Critical'],['Essential','Essential'],['Non-Critical','Non-Critical']], gv('criticality'));
+  chkGroupRow('Work Order Type', [['CPM','CPM (Corrective Preventive)'],['CM','CM (Corrective)'],['AH','AH (Ad-Hoc)']], gv('wo-type'), {fontSize:7.2});
+  formRow('Permit / PAS No.', valueText(gv('permit-no')||''));
+  formRow('Date / Time of Failure', valueText(((gv('failure-date')?fmtDatePdf(gv('failure-date')):'')+' '+(gv('failure-time')||'')).trim()));
+  formRow('Date of Report', valueText(fmtDatePdf(gv('wo-date'))||''));
+  y += 4;
 
-  // ── B ──
-  sectionHeader('B — Failure / Problem Description');
-  pdf.autoTable({...kvTheme, startY:y, body:[
-    [bold('Failure Description'), gv('failure-desc')||'—'],
-    [bold('Failure Mode'), gv('failure-mode')||'—'],
-    [bold('Detection Method'), detectionMethodText()||'—'],
-  ], columnStyles:{0:{cellWidth:38}}});
-  y = pdf.lastAutoTable.finalY + 5;
+  // ── B. FAILURE / PROBLEM DESCRIPTION ──
+  sectionHeader('B. FAILURE / PROBLEM DESCRIPTION');
+  checkY(16);
+  {
+    const rowY = y;
+    pdf.setFillColor(...LABEL_BG); pdf.rect(M, rowY, LABEL_W, 16, 'F');
+    pdf.setDrawColor(...BORDER); pdf.setLineWidth(0.15);
+    pdf.rect(M, rowY, LABEL_W, 16, 'D'); pdf.rect(M+LABEL_W, rowY, CW-LABEL_W, 16, 'D');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8.3); pdf.setTextColor(...BLACK);
+    pdf.text('Failure Description', M+2.5, rowY+6, {maxWidth:LABEL_W-4});
+    const fd = gv('failure-desc');
+    if(fd){
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8.3); pdf.setTextColor(...DARK);
+      pdf.text(pdf.splitTextToSize(fd, CW-LABEL_W-6), M+LABEL_W+2.5, rowY+5);
+    }else{
+      pdf.setFont('helvetica','italic'); pdf.setFontSize(7.8); pdf.setTextColor(120,120,120);
+      pdf.text('Summarise the failure identified from the work order.', M+LABEL_W+2.5, rowY+6, {maxWidth:CW-LABEL_W-6});
+    }
+    y = rowY + 16;
+  }
+  formRow('Failure Mode', valueText(gv('failure-mode')||'How the failure manifested (e.g. trip, overheat, no output, leak)', {italic:!gv('failure-mode'), color:gv('failure-mode')?DARK:[120,120,120]}));
+  chkGroupRow('Detection Method', [['Operator round','Operator round'],['Alarm / Trip','Alarm / Trip'],['PM Inspection','PM Inspection'],['Condition Monitoring','Condition Monitoring'],['Other','Other']], gv('detection-method'), {fontSize:7.2, trailing: gv('detection-method')==='Other' ? ('  '+ (gv('detection-method-other')||'')) : ''});
+  y += 4;
 
-  // ── C ──
-  sectionHeader('C — Impact Assessment & Severity');
-  pdf.autoTable({...kvTheme, startY:y, body:[
-    [bold('Safety Impact'), gv('safety-impact')+(gv('safety-notes')?(' — '+gv('safety-notes')):'')],
-    [bold('Environmental Impact'), gv('env-impact')+(gv('env-notes')?(' — '+gv('env-notes')):'')],
-    [bold('Derating'), (gv('derating-mw')||'0')+' MW'],
-    [bold('Force Outage/Shutdown Duration'), (gv('outage-hours')||'0')+' jam'],
-  ], columnStyles:{0:{cellWidth:48}}});
-  y = pdf.lastAutoTable.finalY + 5;
+  // ── C. IMPACT ASSESSMENT & SEVERITY ──
+  sectionHeader('C. IMPACT ASSESSMENT & SEVERITY');
+  chkGroupRow('Safety Impact', [['None','None'],['Potential','Potential'],['Actual','Actual']], gv('safety-impact'), {fontSize:7.4, trailing:'  — Notes: '+(gv('safety-notes')||'________________')});
+  chkGroupRow('Environmental Impact', [['None','None'],['Potential','Potential'],['Actual','Actual']], gv('env-impact'), {fontSize:7.4, trailing:'  — Notes: '+(gv('env-notes')||'________________')});
+  formRow('Availability Impact', valueText('Derating: '+(gv('derating-mw')||'0')+' MW      Force Outage/Shutdown duration: '+(gv('outage-hours')||'0')+' hours', {fontSize:8}));
+  y += 4;
 
-  // ── D ──
-  sectionHeader('D — Maintenance Action Team');
-  const teamRowsPdf = collectTeamRows().map(r=>[r.no, r.values['Nama'], r.values['Posisi/Role']]);
-  pdf.autoTable({...kvTheme, startY:y, head:[['No','Nama','Posisi/Role']], body:teamRowsPdf.length?teamRowsPdf:[['—','Belum ada data tim.','—']],
+  // ── D. MAINTENANCE ACTION TEAM ──
+  sectionHeader('D. MAINTENANCE ACTION TEAM');
+  const teamRowsPdf = collectTeamRows().map(r=>[r.no, r.values['Nama']==='—'?'':r.values['Nama'], r.values['Posisi/Role']==='—'?'':r.values['Posisi/Role']]);
+  pdf.autoTable({...kvTheme, startY:y, head:[['No.','Name','Position / Role']], body:teamRowsPdf.length?teamRowsPdf:[['1','','']],
     columnStyles:{0:{cellWidth:12}}});
   y = pdf.lastAutoTable.finalY + 5;
 
   // ── E / F / G ── narrative + in-context photos
-  narrativeSection('E — Chronology of Event', gv('chronology-text'), 'chronology');
-  narrativeSection('F — Findings / Inspection Results', gv('findings-text'), 'findings');
-  narrativeSection('G — Immediate / Corrective Action Taken', gv('corrective-text'), 'corrective_action');
+  narrativeSection('E. CHRONOLOGY OF EVENT', gv('chronology-text'), 'Time-ordered sequence of what happened, from detection to make-safe.', 'chronology');
+  narrativeSection('F. FINDINGS / INSPECTION RESULTS', gv('findings-text'), 'Physical condition observed, measurements, test results.', 'findings');
+  narrativeSection('G. IMMEDIATE / CORRECTIVE ACTION ALREADY DONE', gv('corrective-text'), 'Actions taken to restore the asset or make it safe.', 'corrective_action');
 
-  // ── H — Root Cause Analysis ──
-  sectionHeader('H — Root Cause Analysis');
+  // ── H. ROOT CAUSE ANALYSIS ──
+  sectionHeader('H. ROOT CAUSE ANALYSIS');
   const method = gv('rca-method');
-  const methodLabel = rcaMethodLabel();
-  pdf.autoTable({...kvTheme, startY:y, body:[[bold('Metode RCA'), methodLabel]], columnStyles:{0:{cellWidth:38}}});
-  y = pdf.lastAutoTable.finalY + 3;
+  checkY(7);
+  {
+    const rowY = y;
+    pdf.setDrawColor(...BORDER); pdf.setLineWidth(0.15); pdf.rect(M, rowY, CW, 7, 'D');
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.3); pdf.setTextColor(...BLACK);
+    pdf.text('Method used:', M+2.5, rowY+4.6);
+    const mx = M+2.5+pdf.getTextWidth('Method used:')+3;
+    drawChkGroup(mx, rowY+4.6, CW-(mx-M)-4,
+      [['5why','5-Why'],['fishbone','Fishbone (Ishikawa)'],['fmea','FMEA'],['other','Other: '+(method==='other'?(gv('rca-other-label')||'________'):'________')]],
+      method, 7.6, false);
+    y = rowY + 7;
+  }
 
-  if(method==='5why'){
-    const rows = [1,2,3,4,5].map(n=>[bold('Why '+n), gv('why'+n)||'—']);
-    pdf.autoTable({...kvTheme, startY:y, body:rows, columnStyles:{0:{cellWidth:22}}});
-    y = pdf.lastAutoTable.finalY + 3;
-  }else if(method==='fishbone'){
+  // Shaded analysis box (matches the reference template's light blue-gray
+  // RCA panel) — content depends on the selected method.
+  if(method==='fishbone'){
+    // Keep the structured 6M tables (more useful than a single free-text
+    // box) rather than the reference's single shaded panel.
     const CATS=[['fb-man','Man (Manusia)'],['fb-machine','Machine (Mesin/Alat)'],['fb-method','Method (Metode/Prosedur)'],
       ['fb-material','Material'],['fb-measurement','Measurement (Pengukuran)'],['fb-environment','Environment (Lingkungan)']];
     CATS.forEach(([id,label])=>{
-      checkY(13);
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.setTextColor(...NAVY);
-      pdf.text(label, M, y+3); y += 5;
-      pdf.autoTable({...kvTheme, startY:y, body:[[gv(id)||'—']], styles:{...kvTheme.styles,fontSize:8.3,cellPadding:2}});
-      y = pdf.lastAutoTable.finalY + 3;
+      checkY(12);
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(8.3); pdf.setTextColor(...SECTION_NAVY);
+      pdf.text(label, M+2, y+3);
+      y += 4.5;
+      pdf.autoTable({...kvTheme, startY:y, body:[[gv(id)||'—']], styles:{...kvTheme.styles,fontSize:8.2,cellPadding:2}, margin:{...kvTheme.margin}});
+      y = pdf.lastAutoTable.finalY + 2.5;
     });
   }else if(method==='fmea'){
     const fmeaRows = collectFmeaRows().map(r=>[r.no, r.desc, r.values['Failure Mode'], r.values['Effect'], r.values['S'],
@@ -1257,51 +1370,121 @@ async function generatePDF(opts){
       });
       y = pdf.lastAutoTable.finalY + 3;
     }
-  }
-
-  checkY(8);
-  pdf.autoTable({...kvTheme, startY:y, body:[
-    [bold('Root Cause'), gv('rca-root-cause')||'—'],
-    [bold('Contributing Factors'), gv('rca-contributing')||'—'],
-  ], columnStyles:{0:{cellWidth:38}}});
-  y = pdf.lastAutoTable.finalY + 5;
-
-  // ── I ──
-  sectionHeader('I — Recommendation / Further Action');
-  const recoRowsPdf = collectRecoRows().map(r=>[r.no, r.desc, r.values.Type, r.values.PIC, r.values['Due Date'], r.values.Status]);
-  if(recoRowsPdf.length){
-    checkY(Math.min(BOTTOM_LIMIT-TOP_START, recoRowsPdf.length*9+14));
-    pdf.autoTable({...kvTheme, startY:y, head:[['No','Rekomendasi','Type','PIC','Due Date','Status']], body:recoRowsPdf,
-      columnStyles:{0:{cellWidth:9},2:{cellWidth:14,halign:'center'},4:{cellWidth:22,halign:'center'}}});
   }else{
-    pdf.autoTable({...kvTheme, startY:y, body:[['Tidak ada rekomendasi tambahan.']]});
+    // 5-Why (and "Other", which has no structured fields of its own) —
+    // shaded box with bold inline labels, matching the reference exactly.
+    const whyLines = (method==='5why') ? [1,2,3,4,5].map(n=>['Why '+n+'?', gv('why'+n)]) : [];
+    const boxLines = whyLines.length ? whyLines : [];
+    const lineH = 5.2;
+    const boxH = Math.max(10, boxLines.length*lineH + 4);
+    checkY(boxH);
+    const boxY = y;
+    pdf.setFillColor(...LABEL_BG); pdf.rect(M, boxY, CW, boxH, 'F');
+    pdf.setDrawColor(...BORDER); pdf.rect(M, boxY, CW, boxH, 'D');
+    let ly = boxY + 5;
+    boxLines.forEach(([lbl,val])=>{
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(8.3); pdf.setTextColor(...BLACK);
+      pdf.text(lbl, M+3, ly);
+      const lblW = pdf.getTextWidth(lbl);
+      pdf.setFont('helvetica','normal'); pdf.setTextColor(...DARK);
+      pdf.text(val||'', M+3+lblW+3, ly, {maxWidth:CW-lblW-9});
+      ly += lineH;
+    });
+    y = boxY + boxH;
   }
+
+  // Shared Root Cause / Contributing Factors — always shown, same shaded
+  // bold-label-inline style as the 5-Why box above.
+  {
+    const rc = gv('rca-root-cause'), cf = gv('rca-contributing');
+    const lineH = 5.2;
+    const rcLines = pdf.splitTextToSize(rc||'', CW-40).length;
+    const cfLines = pdf.splitTextToSize(cf||'', CW-40).length;
+    const boxH = Math.max(12, (rcLines+cfLines)*lineH + 4);
+    checkY(boxH);
+    const boxY = y;
+    pdf.setFillColor(...LABEL_BG); pdf.rect(M, boxY, CW, boxH, 'F');
+    pdf.setDrawColor(...BORDER); pdf.rect(M, boxY, CW, boxH, 'D');
+    let ly = boxY + 5;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8.3); pdf.setTextColor(...BLACK);
+    pdf.text('ROOT CAUSE', M+3, ly);
+    let lblW = pdf.getTextWidth('ROOT CAUSE');
+    pdf.setFont('helvetica','normal'); pdf.setTextColor(...DARK);
+    pdf.text(pdf.splitTextToSize(rc||'', CW-lblW-9), M+3+lblW+3, ly);
+    ly += rcLines*lineH;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8.3); pdf.setTextColor(...BLACK);
+    pdf.text('Contributing Factors', M+3, ly);
+    lblW = pdf.getTextWidth('Contributing Factors');
+    pdf.setFont('helvetica','normal'); pdf.setTextColor(...DARK);
+    pdf.text(pdf.splitTextToSize(cf||'', CW-lblW-9), M+3+lblW+3, ly);
+    y = boxY + boxH + 5;
+  }
+
+  // ── I. RECOMMENDATION FURTHER ACTION TO PREVENT REOCCURED EVENT ──
+  sectionHeader('I. RECOMMENDATION FURTHER ACTION TO PREVENT REOCCURED EVENT');
+  checkY(6);
+  pdf.setFont('helvetica','italic'); pdf.setFontSize(7.6); pdf.setTextColor(90,90,90);
+  pdf.text('Type: C = Corrective, P = Preventive.   Status: Open / In-Progress / Completed / Verified.', M+1, y+4);
+  y += 7;
+  const recoRowsPdf = collectRecoRows().map(r=>[r.no, r.desc==='—'?'':r.desc, r.values.Type, r.values.PIC==='—'?'':r.values.PIC, r.values['Due Date']==='—'?'':r.values['Due Date'], r.values.Status]);
+  pdf.autoTable({...kvTheme, startY:y, head:[['No','Rekomendasi','Type','PIC','Due Date','Status']], body:recoRowsPdf.length?recoRowsPdf:[['1','','','','','Open']],
+    columnStyles:{0:{cellWidth:9},2:{cellWidth:14,halign:'center'},4:{cellWidth:22,halign:'center'}}});
   y = pdf.lastAutoTable.finalY + 5;
 
-  // ── J ──
-  sectionHeader('J — Main Parts / Consumables / Tools Used');
-  const partRowsPdf = collectPartsRows().map(r=>[r.no, r.desc, r.values.Category, r.values['Qty/Unit'], r.values.Remarks]);
-  if(partRowsPdf.length){
-    checkY(Math.min(BOTTOM_LIMIT-TOP_START, partRowsPdf.length*9+14));
-    pdf.autoTable({...kvTheme, startY:y, head:[['No','Item/Description','Category','Qty/Unit','Remarks']], body:partRowsPdf,
-      columnStyles:{0:{cellWidth:9}}});
-  }else{
-    pdf.autoTable({...kvTheme, startY:y, body:[['Tidak ada part/consumable yang digunakan.']]});
-  }
+  // ── J. MAIN PARTS / CONSUMABLES / TOOLS USED ──
+  sectionHeader('J. MAIN PARTS / CONSUMABLES / TOOLS USED');
+  const partRowsPdf = collectPartsRows().map(r=>[r.no, r.desc==='—'?'':r.desc, r.values.Category==='—'?'':r.values.Category, r.values['Qty/Unit']==='—'?'':r.values['Qty/Unit'], r.values.Remarks==='—'?'':r.values.Remarks]);
+  pdf.autoTable({...kvTheme, startY:y, head:[['No.','Item Description','Category','Qty / Unit','Remarks']], body:partRowsPdf.length?partRowsPdf:[['1','','','','']],
+    columnStyles:{0:{cellWidth:9}}});
   y = pdf.lastAutoTable.finalY + 5;
 
-  // ── K ──
+  // ── K. ATTACHMENTS / EVIDENCE LOG ──
+  sectionHeader('K. ATTACHMENTS / EVIDENCE LOG');
   if((PHOTOS.attachments||[]).length){
-    sectionHeader('K — Attachments / Evidence Log');
     drawPhotoGrid('attachments');
-    y += 3;
+  }else{
+    checkY(7);
+    pdf.setFont('helvetica','italic'); pdf.setFontSize(8); pdf.setTextColor(120,120,120);
+    pdf.rect(M,y,CW,7,'D');
+    pdf.text('Belum ada lampiran/foto tambahan.', M+2.5, y+4.6);
+    y += 7;
   }
+  y += 4;
 
-  // ── L — Report Authorization note ──
-  checkY(14);
-  pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(100,116,139);
-  pdf.text('L - Report Authorization: Verified By (TechOp2) & Approved By (Supervisor) signatures are captured via the Review & Approval workflow after submission.', M, y+3, {maxWidth:CW});
-  y += 8;
+  // ── L. REPORT AUTHORIZATION ──
+  sectionHeader('L. REPORT AUTHORIZATION');
+  const colW = CW/3;
+  checkY(28);
+  const boxY = y;
+  const headers = ['Prepared By (TECH OP 1/2)','Verified By (TECH OP 2/3)','Approved By (MAINT. SPV)'];
+  pdf.setFillColor(...LABEL_BG);
+  pdf.rect(M, boxY, CW, 6, 'F');
+  pdf.setDrawColor(...BORDER); pdf.setLineWidth(0.15);
+  headers.forEach((h,i)=>{
+    pdf.rect(M+i*colW, boxY, colW, 6, 'D');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(7.6); pdf.setTextColor(...BLACK);
+    pdf.text(h, M+i*colW+2, boxY+4, {maxWidth:colW-4});
+  });
+  const sigH = 14;
+  headers.forEach((h,i)=>{ pdf.rect(M+i*colW, boxY+6, colW, sigH, 'D'); });
+  const infoY = boxY+6+sigH;
+  const infoH = 14;
+  const cols = [
+    {name: gv('checked-by')||'', pos:'', date: fmtDatePdf(gv('wo-date'))||''},
+    {name:'', pos:'', date:''},
+    {name:'', pos:'', date:''},
+  ];
+  cols.forEach((c,i)=>{
+    pdf.rect(M+i*colW, infoY, colW, infoH, 'D');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(7.6); pdf.setTextColor(...BLACK);
+    pdf.text('Name: '+c.name, M+i*colW+2, infoY+4.5, {maxWidth:colW-4});
+    pdf.text('Position: '+c.pos, M+i*colW+2, infoY+9, {maxWidth:colW-4});
+    pdf.text('Date: '+c.date, M+i*colW+2, infoY+13.5, {maxWidth:colW-4});
+  });
+  y = infoY + infoH + 3;
+  pdf.setFont('helvetica','italic'); pdf.setFontSize(7); pdf.setTextColor(100,116,139);
+  pdf.text('Verified By and Approved By signatures are captured digitally via the Review & Approval Dashboard after this report is submitted.', M, y+3, {maxWidth:CW});
+  y += 7;
 
   // ── SAVE / SILENT ──
   const wo = (gv('wo-no') || 'MCA').replace(/[^A-Za-z0-9_-]/g,'_');
@@ -1350,11 +1533,11 @@ async function submitToDb(){
       {no:'3', desc:'Derating', values:{Value: (gv('derating-mw')||'0')+' MW'}},
       {no:'4', desc:'Force Outage/Shutdown Duration', values:{Value: (gv('outage-hours')||'0')+' jam'}},
     ]},
-    team: {title:'D — Maintenance Action Team', columns:['Nama','Posisi/Role'], rows: collectTeamRows()},
-    chronology: {title:'E — Chronology of Event', columns:['Value'], rows:[{no:'', desc:'', values:{Value: gv('chronology-text')||'—'}}]},
+    team: {title:'D. MAINTENANCE ACTION TEAM', columns:['Nama','Posisi/Role'], rows: collectTeamRows()},
+    chronology: {title:'E. CHRONOLOGY OF EVENT', columns:['Value'], rows:[{no:'', desc:'', values:{Value: gv('chronology-text')||'—'}}]},
     findings: {title:'F — Findings/Inspection Results', columns:['Value'], rows:[{no:'', desc:'', values:{Value: gv('findings-text')||'—'}}]},
     corrective: {title:'G — Immediate/Corrective Action', columns:['Value'], rows:[{no:'', desc:'', values:{Value: gv('corrective-text')||'—'}}]},
-    rca: {title:'H — Root Cause Analysis ('+rcaMethodLabel()+')', columns:['Value'], rows: (function(){
+    rca: {title:'H. ROOT CAUSE ANALYSIS ('+rcaMethodLabel()+')', columns:['Value'], rows: (function(){
       const rows = [{no:'', desc:'Metode RCA', values:{Value: rcaMethodLabel()}}];
       const method = gv('rca-method');
       if(method==='5why'){

@@ -1385,6 +1385,62 @@ default `headerMap`, and `TechnicianAuth.init({checkedByFieldId:'checked-by'})` 
 zero per-file overrides — no `done-by`/`pic`-style mismatch to work around here, unlike several
 older sheets (see "The data contract" above).
 
+**`generatePDF()`'s layout deliberately mirrors the client's own Word-exported blank template**
+(`UNIT 8/MAINTENNACE CORRECTIVE ACTION.pdf` — a reference file the user dropped in that folder,
+not something this repo generates or should overwrite), rather than the `kvTheme` autoTable
+label/value look every other check sheet in this repo uses. This was an explicit user request
+("buat tampilan download pdf sama persis seperti ini") made after the sheet was first built —
+colours were sampled directly from that reference PDF's rendered pixels (`TITLE_NAVY=[31,56,100]`
+for the title banner, `SECTION_NAVY=[47,84,150]` for the "A./B./C.…" section bars,
+`LABEL_BG=[220,230,241]` for label cells and table headers), and every section header's exact
+text/casing (`'A. WORK ORDER & ASSET IDENTIFICATION'`, letter+period+ALL-CAPS, not the em-dash
+`'A — …'` style used elsewhere) was copied verbatim from `pdftotext -layout` on that file — both
+the on-screen `.sec-hdr-title` labels and the PDF's `sectionHeader()` calls were updated together
+so the tool and the printed report never disagree. If the reference PDF is ever regenerated with
+different wording/colours, re-derive these constants from it again rather than guessing.
+
+- **Checkboxes are hand-drawn vectors, never a text glyph.** `drawChk()`/`drawChkGroup()` render
+  a bordered square that fills solid `SECTION_NAVY` when checked, exactly like the `drawChk()`
+  helper already established in `Work_Activity_Record.html` (see CLAUDE.md's PDF export section
+  for why: jsPDF's built-in helvetica has no reliable ☐/☑ glyph, and a font-based checkbox
+  silently prints as garbage the same way `▶` did). `drawChkGroup()` lays out checkbox+label
+  pairs left-to-right and wraps to a second line if the row would overflow the value column
+  width — call it once with `measureOnly:true` to size the row's height before drawing the
+  row's background, then again for real, matching a two-pass measure/draw split rather than
+  guessing a fixed row height.
+- **Detection Method's dropdown options were changed to match the reference exactly**
+  (`Operator round` / `Alarm / Trip` / `PM Inspection` / `Condition Monitoring` / `Other`,
+  replacing an earlier invented 6-option list) once the authoritative template surfaced — this
+  was a real data-model fix, not just a rendering tweak, since the earlier options didn't
+  correspond to any category in the client's own form.
+- **Section A/B/C's one-line fields use a manually-bordered `formRow()`/`chkGroupRow()` pair**
+  (shaded label cell + white value cell, drawn with `pdf.rect()`, not `autoTable`) instead of
+  `kvTheme`'s grid theme — needed because a checkbox row's content is vector-drawn, which
+  `autoTable` cells can't host directly without a `didDrawCell` hook per row (see
+  `Work_Activity_Record.html`'s own `_chk`/`didDrawCell` pattern, which only handles one
+  checkbox-group column per table, not this sheet's many independent single-row groups).
+  `formRow()`'s empty-value hint text (`'From Maximo work order record'`, etc.) is copied
+  verbatim from the reference template's own placeholder copy — shown in italic grey only when
+  that field is actually empty, real dark text once the technician fills it in.
+- **Section H's Fishbone/FMEA methods keep their own structured tables** (the 6M category
+  tables / the FMEA grid with RPN) instead of collapsing into the reference's one generic shaded
+  box — the reference's blank template shows the same box regardless of method since a human
+  fills it by hand, but this sheet has real per-method structured data, and a table is strictly
+  more useful than free text for a 10-column FMEA row. Only 5-Why (whose data really is 5 flat
+  Q&A lines) and the shared Root Cause/Contributing Factors fields use the reference's exact
+  shaded-box, bold-label-inline-value look.
+- **Section K keeps the PhotoKit gallery** (real embedded photos) rather than reverting to the
+  reference's blank `No./Description/Reference File` text table — that table shape predates the
+  photo-gallery decision already made earlier in this project (see the narrative-photo bullet
+  above); matching the reference's visual chrome (section bar colour/text) doesn't mean
+  reverting a decision the user already made about K's actual content.
+- **Section L renders the reference's exact 3-column signature table** (`Prepared By (TECH OP
+  1/2)` / `Verified By (TECH OP 2/3)` / `Approved By (MAINT. SPV)`, with Name/Position/Date rows
+  under each) but only fills in `Name`/`Date` for the Prepared By column, from `checked-by`/
+  `wo-date` — Verified By and Approved By stay blank with a footnote below the table, since (per
+  the design decision earlier in this section) those signatures are genuinely captured elsewhere
+  via the Review & Approval workflow, not re-collected here.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that
