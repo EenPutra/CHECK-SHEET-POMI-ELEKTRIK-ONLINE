@@ -12,6 +12,7 @@
 <script src="db-helper.js"></script>
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
+<script src="submit-guard.js"></script>
 <script src="load-merge-modal.js"></script>
 <script src="technician-auth.js"></script>
 <script src="img-helper.js"></script>
@@ -1028,6 +1029,7 @@ buildCheckTable();
 loadDraft();
 updateStats();
 LoadMergeModal.init({assetTag:'7EP-MCC'});
+SubmitGuard.init({ assetTag:'7EP-MCC' });
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "done-by" });
 
@@ -1095,11 +1097,17 @@ async function submitToDb(){
 
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+
+  const target=await SubmitGuard.resolveSubmitTarget(data.woNumber);
+  if(target.mode==='cancel') return;
+
   let id;
   try{
-    id=await DB.save(data);
+    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
+    id = target.mode==='overwrite' ? await DB.update(target.targetId,data) : await DB.save(data);
     DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
   }catch(e){
+    SubmitGuard.hideProgress();
     DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
     return;
   }
@@ -1110,9 +1118,10 @@ async function submitToDb(){
   // must never make this look like the whole submission failed — the
   // checklist data the technician actually filled in is already safely
   // saved by this point. Mirrors PLTS_AshDisposal_PM.html's submitToDb().
+  let filesOk=true;
   try{
     showNote('⏳ Mengunggah foto & PDF untuk alur review/approval...','info');
-    const filesOk=await Approvals.submitWithFiles(id,{
+    filesOk=await Approvals.submitWithFiles(id,{
       photos:buildPhotosForUpload(),
       pdfBuilder:()=>generatePDF({silent:true}),
       assetTag:'7EP-MCC',
@@ -1120,15 +1129,22 @@ async function submitToDb(){
       checksheetFile:'7EPMCC_Maintenance.html',
       submittedBy:data.checkedBy,
       revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId: target.mode==='overwrite' ? target.approvalId : null,
+      onProgress:(pct,label)=>SubmitGuard.setProgress(10+Math.round(pct*0.85),label),
     });
-    if(filesOk){
-      showNote('✅ Foto, PDF & alur review/approval berhasil disiapkan.','ok');
-    }else{
-      showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.','err');
-    }
   }catch(e){
+    filesOk=false;
     console.error('Upload foto/PDF/approval record gagal:',e);
-    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi terjadi error saat menyiapkan alur review/approval: '+e.message,'err');
+  }
+
+  SubmitGuard.markSubmitted(id,{woNumber:data.woNumber,executionDate:data.executionDate,checkedBy:data.checkedBy});
+  SubmitGuard.setProgress(100,'Selesai!');
+  setTimeout(()=>SubmitGuard.hideProgress(),500);
+
+  if(filesOk){
+    showNote('✅ Foto, PDF & alur review/approval berhasil disiapkan.','ok');
+  }else{
+    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.','err');
   }
 }
 </script>
