@@ -1191,6 +1191,44 @@ preserved, two real distinct visits 40h apart both kept, one unrelated unique en
 and that no `checksheets`-collection delete was ever attempted (the mock's `checksheets` collection
 exposes no `delete` method at all, so any accidental attempt would have thrown).
 
+**A third case — ORPHANED approvals — had to be added after this shipped, because duplicates kept
+piling up in production anyway.** Real example that surfaced it: a "1 Monthly PM UPS"
+(`7EB-UPS-A/B`) visit had 8 `approvals` entries, 7 of them still sitting there after multiple
+`loadAll()`s. Root-caused via a **read-only** headless-Chrome session against real Firestore data
+(bypass the login overlay, call `Approvals.getAll()`/`DB.getById()` directly — same technique
+documented under "Running / testing changes" above — never call `loadAll()` itself this way,
+since it would trigger the real cleanup/delete path against production): 7 of the 8 approvals'
+`checksheetId` resolved to **`null`** — the checksheet document was simply gone. The cause is
+`dashboard.html`'s own admin "Hapus Duplikat" button: it correctly deletes duplicate
+**checksheets**, by design (see that section above) — but it has no way to know a matching
+`approvals` doc exists, since it only ever touches the checksheets collection. The grouping logic
+above depends on reading each approval's linked checksheet to get its WO number/execution date —
+once that checksheet is gone, the approval can never be matched into a cluster, so it was
+invisible to the original logic **forever**, no matter how many times the page loaded.
+
+Fixed by treating "checksheet confirmed does not exist" as its own always-safe-to-delete
+condition, independent of clustering — an approval pointing at a deleted checksheet is
+unreviewable on its own merits (there's nothing left to review), so there's no need to match it
+against a sibling first. Still gated on `status==='submitted'` only, same reasoning as the
+clustering rule. The one thing this required real care about: `DB.getById()` resolves to `null`
+for "confirmed does not exist" but *throws* for a genuine network/permission error — confirmed by
+hand against real data (`DB.getById()` on a known-missing id resolved to `null`, did not throw) —
+so `cleanupDuplicateApprovals()` tracks `orphaned` as true ONLY when the fetch resolved (not
+threw) and returned `null`; a thrown fetch is treated as inconclusive and that entry is just
+skipped for the round, never marked orphaned. Without this distinction, a transient Firestore
+hiccup on any single fetch could have caused a perfectly valid, still-in-progress submission to
+be misidentified as an orphan and deleted. Also fixed a related cache bug in `getChecksheet()`
+while touching this: `if(_checksheetCache[id])` is falsy for a legitimately-cached `null`, so an
+orphan's checksheet was being re-fetched from Firestore on every single call instead of being
+cached — changed to `id in _checksheetCache`.
+
+Verified against a mock reproducing the exact real UPS shape (7 orphans across two status values,
+1 genuinely valid submission, plus regression coverage for the pre-existing clustering case and a
+simulated network error): all 6 `submitted`-status orphans were deleted, the one
+`returned_to_technician` orphan among them survived untouched (real history, orphaned checksheet
+notwithstanding), the genuinely valid submission was untouched, the pre-existing duplicate-cluster
+case still worked exactly as before, and the simulated network-error entry was never deleted.
+
 ### Admin manual delete + monthly recap chart (`Review_Approval_Dashboard.html`)
 
 - **Admin can manually delete a single `approvals` entry from its detail view** — a `danger-zone`

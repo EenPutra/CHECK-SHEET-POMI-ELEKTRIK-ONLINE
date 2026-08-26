@@ -482,8 +482,10 @@ function showDedupeNote(n){
   note.innerHTML = '&#129529; '+n+' submission duplikat (resubmit yang belum sempat direview) otomatis dibersihkan — hanya submission terbaru per kunjungan yang ditampilkan di sini. Riwayat lengkap tetap tersimpan di database dan bisa dilihat di Dashboard.';
 }
 async function getChecksheet(id){
-  if(_checksheetCache[id]) return _checksheetCache[id];
-  const doc = await DB.getById(id);
+  // `id in cache` (not a truthy check) — a genuinely-missing checksheet
+  // caches as `null`, and a truthy-only check would re-fetch it every call.
+  if(id in _checksheetCache) return _checksheetCache[id];
+  const doc = await DB.getById(id); // resolves to null for "doesn't exist" — only throws on a real network/permission error, see cleanupDuplicateApprovals()
   _checksheetCache[id] = doc;
   return doc;
 }
@@ -515,21 +517,51 @@ async function getChecksheet(id){
 // dashboard.html reads the checksheets collection directly and needs the
 // full, undeleted history for Load & Merge, per explicit instruction: this
 // cleanup is scoped to the approvals collection only.
+//
+// ORPHANED approvals — a THIRD case, found in production after the above
+// shipped and duplicates kept piling up anyway (real example: 8 approvals
+// for the same UPS monthly visit, 7 of them pointing at a checksheetId that
+// no longer exists in Firestore at all). Root cause: dashboard.html's own
+// admin "Hapus Duplikat" button deletes duplicate CHECKSHEETS (correctly,
+// by design — see its own section above), but has no way to know a
+// matching `approvals` doc exists to clean up alongside it, since that
+// button only ever touches the checksheets collection. The result is an
+// approvals doc whose `checksheetId` resolves to nothing — and since the
+// WO-number/execution-date grouping above depends on reading THAT
+// checksheet, an orphan can never be matched into a cluster and was
+// silently invisible to the logic above forever, no matter how many times
+// loadAll() ran. Fixed by treating "checksheet confirmed deleted" as its
+// own always-safe-to-delete condition (still gated on status==='submitted'
+// — same reasoning as the clustering rule) — an approval pointing at a
+// deleted checksheet is unreviewable on its own merits regardless of
+// timing, there is nothing left to cluster it against.
+//
+// `getChecksheet()` resolving to `null` (a real DB.getById() result — see
+// its own comment) means "confirmed does not exist"; it THROWING means a
+// network/permission hiccup, which must never be treated as an orphan —
+// `orphaned` below is only ever true for the former, so a transient fetch
+// error just skips that entry this round rather than risking a false
+// delete of a perfectly valid submission.
 async function cleanupDuplicateApprovals(approvals){
   const withKey = await Promise.all(approvals.map(async a => {
-    let cs = null;
-    try{ cs = await getChecksheet(a.checksheetId); }catch(e){}
+    let cs, fetchFailed = false;
+    try{ cs = await getChecksheet(a.checksheetId); }
+    catch(e){ fetchFailed = true; }
     return {
       a,
       tag: (cs?.assetTag || a.assetTag || '').trim(),
       wo: (cs?.woNumber || '').trim(),
       date: (cs?.executionDate || '').trim(),
       createdAt: a.createdAt || '',
+      orphaned: !fetchFailed && cs === null,
     };
   }));
 
+  const orphanDeletes = withKey.filter(x => x.orphaned && x.a.status === 'submitted').map(x => x.a);
+
   const groups = new Map();
   withKey.forEach(x => {
+    if(x.orphaned) return; // handled above (or its checksheet fetch failed) — never groupable
     if(!x.tag || !x.wo) return; // can't group safely — same rule DB.dedupeLatest() uses
     const key = x.tag+'||'+x.wo+'||'+x.date;
     if(!groups.has(key)) groups.set(key, []);
@@ -537,7 +569,7 @@ async function cleanupDuplicateApprovals(approvals){
   });
 
   const gapMs = (DB.CLUSTER_GAP_HOURS || 24) * 3600 * 1000;
-  const toDelete = [];
+  const toDelete = [...orphanDeletes];
   groups.forEach(list => {
     if(list.length < 2) return;
     const sorted = [...list].sort((p,q) => (p.createdAt||'').localeCompare(q.createdAt||''));
