@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
@@ -98,6 +99,26 @@ textarea,input{font-family:var(--body)}
 
 .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
 .filter-sel{background:var(--surf);border:1px solid var(--bdr);border-radius:9px;padding:8px 12px;font-size:12.5px;color:var(--txt-2);font-weight:600}
+
+/* RECAP TAB */
+.recap-filters{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.recap-field{display:flex;flex-direction:column;gap:5px}
+.recap-field label{font-size:10.5px;color:var(--txt-3);font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+.recap-card{background:var(--surf);border:1px solid var(--bdr);border-radius:14px;padding:20px;box-shadow:var(--shadow);margin-bottom:18px}
+.recap-card-title{font-family:var(--display);font-size:15px;font-weight:700;margin-bottom:14px}
+.recap-legend{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:12px}
+.recap-legend-item{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--txt-2);font-weight:600}
+.recap-legend-swatch{width:10px;height:10px;border-radius:3px}
+.recap-chart-body{position:relative;height:320px}
+.recap-empty{text-align:center;padding:50px 20px;color:var(--txt-3);font-size:13px}
+.recap-table-wrap{overflow-x:auto}
+.recap-table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
+.recap-table th{background:var(--surf-2);color:var(--txt-2);text-align:center;padding:8px 10px;font-weight:700;border-bottom:1px solid var(--bdr)}
+.recap-table th:first-child{text-align:left}
+.recap-table td{text-align:center;padding:7px 10px;border-bottom:1px solid var(--bdr-2)}
+.recap-table td:first-child{text-align:left;font-weight:600;font-family:var(--mono);font-size:11.5px}
+.danger-zone{border:1px solid var(--ng-soft);background:#fff5f6;border-radius:12px;padding:14px 16px}
+.danger-zone .dsec-title{color:var(--ng)}
 .btn{padding:9px 16px;border-radius:9px;border:1px solid var(--bdr);background:var(--surf);color:var(--txt-2);font-size:12.5px;font-weight:700;transition:all .15s}
 .btn:hover{border-color:var(--bdr-2);color:var(--txt)}
 .btn-pri{background:var(--pri);border-color:var(--pri);color:#fff}
@@ -230,9 +251,10 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
     <button class="tab-btn active" data-tab="inbox" onclick="switchTab('inbox')">Menunggu Saya <span class="tab-count" id="count-inbox">0</span></button>
     <button class="tab-btn" data-tab="returned" onclick="switchTab('returned')">Dikembalikan <span class="tab-count" id="count-returned">0</span></button>
     <button class="tab-btn" data-tab="all" onclick="switchTab('all')">Semua Riwayat <span class="tab-count" id="count-all">0</span></button>
+    <button class="tab-btn" data-tab="recap" onclick="switchTab('recap')">&#128202; Rekap Bulanan</button>
   </div>
 
-  <div class="toolbar">
+  <div class="toolbar" id="list-toolbar">
     <select class="filter-sel" id="status-filter" style="display:none" onchange="renderList()">
       <option value="">Semua status</option>
       <option value="submitted">Menunggu Review</option>
@@ -244,6 +266,44 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   </div>
 
   <div id="list-area"><div class="list-loading"><div class="msg">Memuat...</div></div></div>
+
+  <!-- REKAP BULANAN — Submitted/Reviewed/Approved per bulan, opsional
+       difilter ke satu submitter atau satu reviewer TechOp2 -->
+  <div id="recap-area" style="display:none">
+    <div class="recap-filters">
+      <div class="recap-field">
+        <label>Filter Orang</label>
+        <select class="filter-sel" id="recap-person-type" onchange="onRecapPersonTypeChange()">
+          <option value="">Semua (org-wide)</option>
+          <option value="submitter">Submitter tertentu</option>
+          <option value="reviewer">TechOp2 Reviewer tertentu</option>
+        </select>
+      </div>
+      <div class="recap-field" id="recap-person-name-wrap" style="display:none">
+        <label>Nama</label>
+        <select class="filter-sel" id="recap-person-name" onchange="renderRecapChart()"></select>
+      </div>
+    </div>
+    <div class="recap-card">
+      <div class="recap-card-title" id="recap-title">Rekap Bulanan — Semua Data</div>
+      <div class="recap-legend">
+        <span class="recap-legend-item"><span class="recap-legend-swatch" style="background:var(--pri)"></span>Submitted</span>
+        <span class="recap-legend-item"><span class="recap-legend-swatch" style="background:var(--acc)"></span>Reviewed</span>
+        <span class="recap-legend-item"><span class="recap-legend-swatch" style="background:var(--ok)"></span>Approved</span>
+      </div>
+      <div class="recap-chart-body"><canvas id="chartRecap"></canvas></div>
+      <div class="recap-empty" id="recap-empty" style="display:none">Belum ada data untuk direkap.</div>
+    </div>
+    <div class="recap-card">
+      <div class="recap-card-title">Tabel Rekap</div>
+      <div class="recap-table-wrap">
+        <table class="recap-table" id="recap-table">
+          <thead><tr><th>Bulan</th><th>Submitted</th><th>Reviewed</th><th>Approved</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- DETAIL OVERLAY -->
@@ -412,7 +472,8 @@ async function loadAll(){
     }
   }catch(e){ console.error('Cleanup duplikat approval gagal:', e); }
   updateTabCounts();
-  renderList();
+  if(_activeTab === 'recap'){ populateRecapPersonOptions(); renderRecapChart(); }
+  else renderList();
   maybeOpenFromUrl();
 }
 function showDedupeNote(n){
@@ -502,7 +563,16 @@ function switchTab(tab){
   _activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
   document.getElementById('status-filter').style.display = tab==='all' ? '' : 'none';
-  renderList();
+  const isRecap = tab === 'recap';
+  document.getElementById('list-toolbar').style.display = isRecap ? 'none' : '';
+  document.getElementById('list-area').style.display = isRecap ? 'none' : '';
+  document.getElementById('recap-area').style.display = isRecap ? '' : 'none';
+  if(isRecap){
+    populateRecapPersonOptions();
+    renderRecapChart();
+  }else{
+    renderList();
+  }
 }
 function updateTabCounts(){
   document.getElementById('count-inbox').textContent = inboxItems().length;
@@ -552,6 +622,141 @@ function maybeOpenFromUrl(){
   if(id) openDetail(id);
 }
 
+/* ── REKAP BULANAN ── */
+// Three independent monthly counts, each keyed off the timestamp that
+// actually belongs to that stage (not all three off createdAt) — Submitted
+// from createdAt, Reviewed from review.reviewedAt, Approved from
+// approval.approvedAt — so each bar reflects real activity in that month,
+// not just when the item was first submitted. An approval only contributes
+// to the Reviewed/Approved counts once it actually has that stage's data;
+// an item still sitting at 'submitted' only ever shows up in the Submitted
+// series.
+function monthKey(iso){
+  if(!iso) return null;
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return null;
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+}
+function monthLabel(key){
+  const [y,m] = key.split('-');
+  const names = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  return names[parseInt(m,10)-1]+' '+y;
+}
+// Person filter narrows the SET of approvals first (submitter: theirs only;
+// reviewer: only what they personally reviewed), then the three monthly
+// counts are computed from that filtered set — so a reviewer's chart shows
+// "of what I reviewed, when was it submitted / when did I review it / did
+// it go on to be approved and when", a coherent per-person recap rather
+// than three unrelated org-wide numbers.
+function filteredApprovalsForRecap(){
+  const type = document.getElementById('recap-person-type').value;
+  const name = document.getElementById('recap-person-name').value;
+  if(!type || !name) return _allApprovals;
+  if(type === 'submitter') return _allApprovals.filter(a => (a.submittedBy||'') === name);
+  if(type === 'reviewer') return _allApprovals.filter(a => a.review && a.review.reviewedBy === name);
+  return _allApprovals;
+}
+function computeRecapData(list){
+  const months = new Set();
+  const sub = {}, rev = {}, appr = {};
+  list.forEach(a => {
+    const mSub = monthKey(a.createdAt);
+    if(mSub){ months.add(mSub); sub[mSub] = (sub[mSub]||0)+1; }
+    if(a.review && a.review.reviewedAt){
+      const mRev = monthKey(a.review.reviewedAt);
+      if(mRev){ months.add(mRev); rev[mRev] = (rev[mRev]||0)+1; }
+    }
+    if(a.approval && a.approval.approvedAt){
+      const mAppr = monthKey(a.approval.approvedAt);
+      if(mAppr){ months.add(mAppr); appr[mAppr] = (appr[mAppr]||0)+1; }
+    }
+  });
+  const sortedMonths = [...months].sort();
+  return {
+    months: sortedMonths,
+    submitted: sortedMonths.map(m => sub[m]||0),
+    reviewed: sortedMonths.map(m => rev[m]||0),
+    approved: sortedMonths.map(m => appr[m]||0),
+  };
+}
+function populateRecapPersonOptions(){
+  const type = document.getElementById('recap-person-type').value;
+  const nameSel = document.getElementById('recap-person-name');
+  let names;
+  if(type === 'submitter'){
+    names = [...new Set(_allApprovals.map(a => a.submittedBy).filter(Boolean))];
+  }else if(type === 'reviewer'){
+    names = [...new Set(_allApprovals.filter(a => a.review && a.review.reviewedBy).map(a => a.review.reviewedBy))];
+  }else{
+    names = [];
+  }
+  names.sort((a,b) => a.localeCompare(b));
+  nameSel.innerHTML = names.map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('');
+}
+function onRecapPersonTypeChange(){
+  const type = document.getElementById('recap-person-type').value;
+  document.getElementById('recap-person-name-wrap').style.display = type ? '' : 'none';
+  populateRecapPersonOptions();
+  renderRecapChart();
+}
+let _chartRecap = null;
+function renderRecapChart(){
+  const type = document.getElementById('recap-person-type').value;
+  const name = document.getElementById('recap-person-name').value;
+  const titleEl = document.getElementById('recap-title');
+  if(type && name){
+    titleEl.textContent = 'Rekap Bulanan — '+(type==='submitter'?'Submitter':'Reviewer')+': '+name;
+  }else{
+    titleEl.textContent = 'Rekap Bulanan — Semua Data';
+  }
+
+  const list = filteredApprovalsForRecap();
+  const data = computeRecapData(list);
+  const emptyEl = document.getElementById('recap-empty');
+  const canvas = document.getElementById('chartRecap');
+
+  // Table always reflects the same filtered/aggregated data as the chart.
+  const tbody = document.querySelector('#recap-table tbody');
+  if(!data.months.length){
+    tbody.innerHTML = '';
+  }else{
+    tbody.innerHTML = data.months.map((m,i) => `<tr><td>${monthLabel(m)}</td><td>${data.submitted[i]}</td><td>${data.reviewed[i]}</td><td>${data.approved[i]}</td></tr>`).join('');
+  }
+
+  if(!data.months.length){
+    canvas.style.display = 'none';
+    emptyEl.style.display = 'block';
+    if(_chartRecap){ _chartRecap.destroy(); _chartRecap = null; }
+    return;
+  }
+  canvas.style.display = '';
+  emptyEl.style.display = 'none';
+
+  const cs = getComputedStyle(document.documentElement);
+  const cPri = cs.getPropertyValue('--pri').trim();
+  const cAcc = cs.getPropertyValue('--acc').trim();
+  const cOk = cs.getPropertyValue('--ok').trim();
+
+  const cfg = {
+    type: 'bar',
+    data: {
+      labels: data.months.map(monthLabel),
+      datasets: [
+        {label:'Submitted', data:data.submitted, backgroundColor:cPri, borderRadius:4},
+        {label:'Reviewed', data:data.reviewed, backgroundColor:cAcc, borderRadius:4},
+        {label:'Approved', data:data.approved, backgroundColor:cOk, borderRadius:4},
+      ],
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{display:false}, tooltip:{mode:'index', intersect:false} },
+      scales:{ y:{beginAtZero:true, ticks:{precision:0}} },
+    },
+  };
+  if(_chartRecap){ _chartRecap.destroy(); }
+  _chartRecap = new Chart(canvas, cfg);
+}
+
 /* ── DETAIL ── */
 let _curApproval = null, _curChecksheet = null;
 async function openDetail(id){
@@ -576,6 +781,22 @@ function closeDetail(){
   // Drop ?id= so a refresh doesn't keep re-opening the same item.
   if(new URLSearchParams(location.search).has('id')){
     history.replaceState(null, '', location.pathname);
+  }
+}
+
+async function doDeleteApproval(){
+  if(loggedInRole !== 'admin' || !_curApproval) return;
+  const label = (_curChecksheet && (_curChecksheet.assetName||_curChecksheet.assetTag)) || _curApproval.assetName || _curApproval.assetTag || 'submission ini';
+  if(!confirm('Hapus "'+label+'" dari alur Review & Approval?\n\nData checklist asli TETAP tersimpan di database (tidak terhapus dari Dashboard). Tindakan ini hanya menghapus entri review/approval-nya dan tidak dapat dibatalkan.')) return;
+  const id = _curApproval.id;
+  try{
+    await Approvals.deleteById(id);
+    _allApprovals = _allApprovals.filter(a => a.id !== id);
+    closeDetail();
+    updateTabCounts();
+    if(_activeTab === 'recap') renderRecapChart(); else renderList();
+  }catch(e){
+    alert('Gagal menghapus: '+e.message);
   }
 }
 
@@ -647,6 +868,19 @@ function renderDetail(a, cs){
   }
 
   html += renderActionSection(a, cs);
+
+  // Admin-only: remove this entry from the Review & Approval workflow.
+  // Scoped to the `approvals` collection ONLY — same boundary
+  // cleanupDuplicateApprovals() already uses (see CLAUDE.md) — the
+  // underlying checksheet doc is never touched, so dashboard.html's
+  // history/Load & Merge are unaffected.
+  if(loggedInRole === 'admin'){
+    html += `<div class="dsec danger-zone">
+      <div class="dsec-title">&#9888;&#65039; Admin — Hapus dari Approval Sheet</div>
+      <div class="readonly-hint" style="margin-bottom:10px">Menghapus entri ini dari alur Review &amp; Approval saja. Data checklist asli TETAP tersimpan di database dan tetap terlihat di Dashboard.</div>
+      <button class="btn btn-danger" onclick="doDeleteApproval()">&#128465;&#65039; Hapus dari Approval Sheet</button>
+    </div>`;
+  }
 
   document.getElementById('d-body').innerHTML = html;
   if(document.getElementById('sig-canvas-review')) attachSignaturePad('sig-canvas-review');

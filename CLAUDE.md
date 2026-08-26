@@ -1191,6 +1191,51 @@ preserved, two real distinct visits 40h apart both kept, one unrelated unique en
 and that no `checksheets`-collection delete was ever attempted (the mock's `checksheets` collection
 exposes no `delete` method at all, so any accidental attempt would have thrown).
 
+### Admin manual delete + monthly recap chart (`Review_Approval_Dashboard.html`)
+
+- **Admin can manually delete a single `approvals` entry from its detail view** — a `danger-zone`
+  section (`renderDetail()`, gated on `loggedInRole==='admin'`) with a `confirm()`-gated
+  `doDeleteApproval()`. Same collection boundary as `cleanupDuplicateApprovals()` above: only
+  `Approvals.deleteById()` is called, the underlying checksheet doc is never touched, so
+  `dashboard.html`'s history and Load & Merge are unaffected — explicit user requirement, not an
+  oversight. Unlike the automatic duplicate cleanup, this one is a manual, confirm-gated action
+  (an admin can delete anything, including entries with real review/approval history, so it needs
+  the human-in-the-loop confirmation the automatic cleanup deliberately avoids needing).
+- **"Rekap Bulanan" is a 4th tab, not a panel bolted above the existing list** — `switchTab()`
+  now also toggles `#list-toolbar`/`#list-area` vs `#recap-area` visibility (`display:none` on
+  whichever isn't active) alongside the existing tab-button/active-class logic, and calls
+  `renderRecapChart()` instead of `renderList()` when switching into it. `loadAll()` (called on
+  page load and every Refresh) checks `_activeTab` the same way, so refreshing while already on
+  the Rekap tab re-renders the chart instead of pointlessly re-rendering a hidden list.
+- **The three monthly counts are each keyed off their OWN stage's timestamp, not all off
+  `createdAt`** — Submitted from `createdAt`, Reviewed from `review.reviewedAt`, Approved from
+  `approval.approvedAt` (`computeRecapData()`). This was an explicit choice over the simpler "all
+  three grouped by submission month" alternative, confirmed with the user before building: a
+  submission made in month N but reviewed in month N+1 correctly shows as a Submitted bar in N
+  and a Reviewed bar in N+1, so each bar reflects real activity in that month rather than
+  everything being pinned to when the item first arrived.
+- **The person filter (`#recap-person-type`: none/submitter/reviewer) narrows the approval SET
+  first, then the same three-stage monthly computation runs on that filtered set** —
+  `filteredApprovalsForRecap()`. A submitter filter keeps entries where `submittedBy` matches; a
+  reviewer filter keeps entries where `review.reviewedBy` matches (an entry never reviewed by
+  anyone is correctly excluded from every reviewer's view, not just from the Reviewed series).
+  This makes a reviewer's chart a coherent "of what I reviewed, when was it submitted / when did
+  I review it / did it go on to be approved" recap, not three independently-filtered numbers that
+  don't relate to the same underlying items. `populateRecapPersonOptions()` rebuilds the name
+  dropdown from `_allApprovals` itself (deduped, sorted) whenever the type selector changes, so it
+  never goes stale relative to who's actually in the data.
+- **Chart.js was not previously loaded on this page** — added the same `chart.js@4.4.4` CDN
+  build `dashboard.html` already uses, for one shared version across the two dashboards rather
+  than a second one. Colors are pulled from the page's own CSS custom properties at render time
+  (`getComputedStyle(document.documentElement)` for `--pri`/`--acc`/`--ok`) instead of hardcoded
+  hex, so the chart always matches this file's own palette if it's ever retthemed.
+- Verified via headless Chrome with a mocked 4-entry dataset spanning two months and two
+  submitters/reviewers: org-wide monthly totals, a submitter-filtered view, and a
+  reviewer-filtered view (including that an entry outside a given reviewer's own review history
+  is correctly excluded) all matched hand-computed expected values exactly; confirmed the delete
+  button is present only for `loggedInRole==='admin'` and that deleting only ever calls
+  `.delete()` on the `approvals` mock, never on `checksheets`.
+
 ### Adding this to a new check sheet
 
 1. Add three script includes right after `db-helper.js`, before `img-helper.js`/`photo-kit.js`:
