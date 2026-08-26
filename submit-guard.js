@@ -36,11 +36,16 @@
 //    <script src="submit-guard.js"></script>
 //    ...
 //    <script> SubmitGuard.init({ assetTag: 'XXX-TAG' }); </script>
+//  (pass submitFnName:'yourFnName' too if the submit button isn't
+//  onclick="submitToDb()" — see GEN_BrushGear_PM_Checksheet.html's
+//  saveToDatabase() for the one file in this repo that needs it)
 //
-//  Then inside submitToDb(), BEFORE calling DB.save():
+//  Then inside submitToDb(), BEFORE calling DB.save() — note the button
+//  lock + progress overlay are already handled INSIDE resolveSubmitTarget()/
+//  hideProgress(), so the caller doesn't need its own
+//  document.querySelectorAll(...).disabled=true dance:
 //    const target = await SubmitGuard.resolveSubmitTarget(base.woNumber);
 //    if(target.mode === 'cancel') return;
-//    SubmitGuard.showProgress();
 //    let id;
 //    try{
 //      SubmitGuard.setProgress(5, 'Menyimpan data checklist...');
@@ -149,17 +154,23 @@ const SubmitGuard = (function () {
     document.body.appendChild(progressOverlay);
   }
 
+  // submitFnName: most check sheets' submit button is onclick="submitToDb()"
+  // — a handful (e.g. GEN_BrushGear_PM_Checksheet.html's saveToDatabase())
+  // use a different name, so this is overridable per file rather than
+  // hardcoded.
   function init(config) {
-    _config = Object.assign({ assetTag: null }, config);
+    _config = Object.assign({ assetTag: null, submitFnName: 'submitToDb' }, config);
     injectDom();
   }
 
-  const SUBMIT_BTN_SELECTOR = '[onclick="submitToDb()"]';
+  function _submitBtnSelector() {
+    return '[onclick="' + ((_config && _config.submitFnName) || 'submitToDb') + '()"]';
+  }
   function _lockButtons() {
-    document.querySelectorAll(SUBMIT_BTN_SELECTOR).forEach(b => b.disabled = true);
+    document.querySelectorAll(_submitBtnSelector()).forEach(b => b.disabled = true);
   }
   function _unlockButtons() {
-    document.querySelectorAll(SUBMIT_BTN_SELECTOR).forEach(b => b.disabled = false);
+    document.querySelectorAll(_submitBtnSelector()).forEach(b => b.disabled = false);
   }
 
   // Decides insert vs. overwrite vs. cancel. See the file header for the
