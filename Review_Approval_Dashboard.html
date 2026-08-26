@@ -53,6 +53,10 @@ textarea,input{font-family:var(--body)}
 .login-btn:disabled{opacity:.6;cursor:not-allowed;transform:none}
 .login-err{font-size:13px;color:var(--ng);margin-top:14px;min-height:20px;font-weight:500}
 .login-info{font-size:11px;color:var(--txt-3);margin-top:20px;line-height:1.6}
+.auth-switch{font-size:12.5px;color:var(--txt-2);margin-top:14px}
+.auth-switch a{color:var(--pri);font-weight:700;text-decoration:none;cursor:pointer}
+.auth-switch a:hover{text-decoration:underline}
+.login-hint{font-size:11px;color:var(--txt-3);margin:-6px 0 12px;text-align:left;line-height:1.4}
 
 /* TOPBAR */
 .topbar{position:sticky;top:0;z-index:100;background:var(--surf);border-bottom:1px solid var(--bdr);height:56px;display:flex;align-items:center;padding:0 20px;gap:16px}
@@ -69,6 +73,7 @@ textarea,input{font-family:var(--body)}
 .role-pill.techop2{background:var(--ind-soft);color:var(--ind)}
 .role-pill.supervisor{background:var(--acc-soft);color:#92400e}
 .role-pill.admin{background:var(--ok-soft);color:#047857}
+.role-pill.technician{background:#e2e8f0;color:#334155}
 .role-pill.none{background:var(--ng-soft);color:var(--ng)}
 .logout-btn{background:none;border:1px solid var(--bdr);color:var(--txt-2);padding:6px 14px;border-radius:9px;font-size:12px;font-weight:600}
 .logout-btn:hover{border-color:var(--bdr-2);color:var(--txt)}
@@ -165,14 +170,31 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   <div class="login-box">
     <div class="login-mark">R&amp;A</div>
     <div class="login-logo">REVIEW &amp; <span>APPROVAL</span></div>
-    <div class="login-sub">🔒 Login memakai akun dashboard yang sama</div>
-    <form onsubmit="doLogin(event)">
-      <input type="text" class="login-field" id="login-user" placeholder="Username" autocomplete="username" required>
-      <input type="password" class="login-field" id="login-pass" placeholder="Password" autocomplete="current-password" required>
-      <button type="submit" class="login-btn" id="login-btn">SIGN IN</button>
-    </form>
-    <div class="login-err" id="login-err"></div>
-    <div class="login-info">Hubungi admin untuk akses &amp; role (TechOp2 / Supervisor).</div>
+
+    <div id="login-panel">
+      <div class="login-sub">🔒 Login memakai akun dashboard yang sama</div>
+      <form onsubmit="doLogin(event)">
+        <input type="text" class="login-field" id="login-user" placeholder="Username" autocomplete="username" required>
+        <input type="password" class="login-field" id="login-pass" placeholder="Password" autocomplete="current-password" required>
+        <button type="submit" class="login-btn" id="login-btn">SIGN IN</button>
+      </form>
+      <div class="login-err" id="login-err"></div>
+      <div class="login-info">Hubungi admin untuk akses role TechOp2 / Supervisor / Admin.</div>
+      <div class="auth-switch">Teknisi baru? <a onclick="toggleAuthMode('register')">Daftar akun di sini</a></div>
+    </div>
+
+    <div id="register-panel" style="display:none">
+      <div class="login-sub">📝 Daftar akun Technician baru</div>
+      <div class="login-hint">Akun baru otomatis mendapat role <b>Technician</b> (untuk submit check sheet) — role lain (TechOp2/Supervisor/Admin) hanya bisa diberikan oleh admin lewat Firestore.</div>
+      <form onsubmit="doRegister(event)">
+        <input type="text" class="login-field" id="reg-user" placeholder="Pilih username" autocomplete="username" required>
+        <input type="password" class="login-field" id="reg-pass" placeholder="Pilih password" autocomplete="new-password" required minlength="4">
+        <input type="password" class="login-field" id="reg-pass2" placeholder="Ulangi password" autocomplete="new-password" required minlength="4">
+        <button type="submit" class="login-btn" id="register-btn">DAFTAR</button>
+      </form>
+      <div class="login-err" id="register-err"></div>
+      <div class="auth-switch">Sudah punya akun? <a onclick="toggleAuthMode('login')">Login di sini</a></div>
+    </div>
   </div>
 </div>
 
@@ -269,6 +291,58 @@ async function doLogin(e){
     btn.disabled=false; btn.textContent='SIGN IN';
   }
 }
+function toggleAuthMode(mode){
+  document.getElementById('login-panel').style.display = mode==='login' ? '' : 'none';
+  document.getElementById('register-panel').style.display = mode==='register' ? '' : 'none';
+  document.getElementById('login-err').textContent = '';
+  document.getElementById('register-err').textContent = '';
+}
+
+// Self-registration: ALWAYS role:'technician', never chosen by the form —
+// letting a self-service signup pick its own role (even via a hidden field
+// someone edits in devtools) would let anyone grant themselves
+// TechOp2/Supervisor/Admin. TechOp2/Supervisor/Admin accounts stay
+// admin-provisioned directly in Firestore (see CLAUDE.md).
+async function doRegister(e){
+  e.preventDefault();
+  const user = document.getElementById('reg-user').value.trim().toLowerCase();
+  const pass = document.getElementById('reg-pass').value;
+  const pass2 = document.getElementById('reg-pass2').value;
+  const errEl = document.getElementById('register-err');
+  const btn = document.getElementById('register-btn');
+  errEl.textContent = '';
+
+  if(!user || !pass){ errEl.textContent='Isi username dan password.'; return; }
+  if(!/^[a-z0-9._-]+$/.test(user)){ errEl.textContent='Username hanya boleh huruf kecil, angka, titik, garis bawah/strip (tanpa spasi).'; return; }
+  if(pass.length < 4){ errEl.textContent='Password minimal 4 karakter.'; return; }
+  if(pass !== pass2){ errEl.textContent='Konfirmasi password tidak cocok.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Mendaftarkan...';
+  try{
+    const existing = await db.collection('dashboard_users').where('username','==',user).limit(1).get();
+    if(!existing.empty){ errEl.textContent='Username sudah dipakai, pilih yang lain.'; btn.disabled=false; btn.textContent='DAFTAR'; return; }
+
+    const hashed = await hashPass(pass);
+    await db.collection('dashboard_users').add({
+      username: user,
+      password: hashed,
+      role: 'technician',
+      createdAt: new Date().toISOString(),
+    });
+
+    loggedInUser = user;
+    loggedInRole = 'technician';
+    sessionStorage.setItem('dashboard_user', loggedInUser);
+    sessionStorage.setItem('dashboard_login_time', Date.now().toString());
+    sessionStorage.setItem('dashboard_role', loggedInRole);
+    showApp();
+  }catch(err){
+    console.error('Register error:', err);
+    errEl.textContent = 'Gagal mendaftar: ' + err.message;
+    btn.disabled = false; btn.textContent = 'DAFTAR';
+  }
+}
+
 function doLogout(){
   sessionStorage.removeItem('dashboard_user');
   sessionStorage.removeItem('dashboard_login_time');
@@ -303,7 +377,7 @@ function showApp(){
   }
   loadAll();
 }
-const ROLE_LABELS = { techop2:'TechOp2', supervisor:'Supervisor', admin:'Admin', none:'Tanpa Role' };
+const ROLE_LABELS = { techop2:'TechOp2', supervisor:'Supervisor', admin:'Admin', technician:'Technician', none:'Tanpa Role' };
 
 /* ── DATA ── */
 let _allApprovals = [];
