@@ -12,6 +12,7 @@
 <script src="../db-helper.js"></script>
 <script src="../storage-helper.js"></script>
 <script src="../approval-helper.js"></script>
+<script src="../submit-guard.js"></script>
 <script src="../load-merge-modal.js"></script>
 <script src="../technician-auth.js"></script>
 <script src="../img-helper.js"></script>
@@ -1349,11 +1350,16 @@ async function submitToDb(){
   TABS.forEach(t => { base.photoCounts[t] = (PHOTOS[t]||[]).length; });
   base.photoCount = Object.values(base.photoCounts).reduce((n,c)=>n+c,0);
 
+  const target = await SubmitGuard.resolveSubmitTarget(base.woNumber);
+  if(target.mode==='cancel') return;
+
   let id;
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    id = await DB.save(base);
+    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
+    id = target.mode==='overwrite' ? await DB.update(target.targetId,base) : await DB.save(base);
   }catch(e){
+    SubmitGuard.hideProgress();
     showNote('❌ Gagal simpan: '+e.message, 'err');
     return;
   }
@@ -1367,6 +1373,8 @@ async function submitToDb(){
       checksheetFile: 'UNIT 8/Lighting_Grounding_Etc_Checksheet.html',
       submittedBy: checkedBy,
       revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId: target.mode==='overwrite' ? target.approvalId : null,
+      onProgress: (pct,label) => SubmitGuard.setProgress(10+Math.round(pct*0.85),label),
     });
     if(filesOk){
       showNote('✅ Data, foto & PDF berhasil disimpan. ID: '+id, 'ok');
@@ -1377,6 +1385,9 @@ async function submitToDb(){
     console.error('Approvals.submitWithFiles gagal:', e);
     showNote('⚠️ Data tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review/approval.', 'err');
   }
+  SubmitGuard.markSubmitted(id, {woNumber: base.woNumber, executionDate: base.executionDate, checkedBy});
+  SubmitGuard.setProgress(100,'Selesai!');
+  setTimeout(()=>SubmitGuard.hideProgress(),500);
 }
 
 // ═══════════════════════════════════════════════════
@@ -1392,6 +1403,7 @@ TABS.forEach(t => renderPhotos(t));
 loadDraft();
 updateStats();
 LoadMergeModal.init({ assetTag: LGE_ASSET_TAG });
+SubmitGuard.init({ assetTag: LGE_ASSET_TAG });
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: 'checked-by' });
 </script>
