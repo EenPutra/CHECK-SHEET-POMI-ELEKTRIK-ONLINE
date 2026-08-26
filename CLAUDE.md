@@ -160,22 +160,44 @@ same visit (unsure if the first click saved, or just impatient) used to always c
 `UPS_7EB-UPS-AB_Monthly.html` first — an explicit, deliberate choice (discussed and confirmed
 before writing any code) to build the shared module + verify it thoroughly on one file before
 touching the other ~23, given how invasive and easy to get subtly wrong a change to every check
-sheet's `submitToDb()` is. **Being rolled out incrementally, one file at a time, since** — check a
-given file's own script includes for `submit-guard.js` before assuming it has this behavior; don't
-assume every check sheet has it just because this section exists. Done so far:
-`UPS_7EB-UPS-AB_Monthly.html` (pilot), `Battery_7EB-BY-125-250.html`. Each new file gets the same
-treatment: add `<script src="submit-guard.js"></script>` after `approval-helper.js`, call
+sheet's `submitToDb()` is.
+
+**Now rolled out to all 25 active, portal-linked check sheets** (every file in "The three shared
+library files" list under Review & Approval Workflow, plus `Battery_7EB-BY-125-250.html` and
+`UPS_7EB-UPS-AB_Monthly.html`) — check a given file's own script includes for `submit-guard.js`
+if in doubt, but as of this writing every non-legacy check sheet has it. The 3 files that do NOT
+have it are the documented legacy duplicates, deliberately skipped since they're not linked from
+the portal and not the reference implementation for anything: `esp_checksheet.html`,
+`4000 Hours Mill/LV_Motor_MCC.html`, `4000 Hours Mill/Mill 4000 Hours PM.html`. If a brand-new
+check sheet is ever added, give it the same treatment: add
+`<script src="submit-guard.js"></script>` after `approval-helper.js`, call
 `SubmitGuard.init({assetTag:'...'})` near the file's existing `LoadMergeModal.init()`/
-`TechnicianAuth.init()` calls, then rewrite `submitToDb()` to call `resolveSubmitTarget()` before
-saving, disable its submit button(s) and show the progress bar for the duration, branch
-`DB.update()` vs `DB.save()` on the resolved mode, thread `existingApprovalId`/`onProgress` into
-`Approvals.submitWithFiles()`, and call `markSubmitted()` on success — adapting to that file's own
-field-id/asset-tag/photo-shape quirks per the per-file variance already documented elsewhere in
-this file (e.g. `done-by` vs `checked-by`, different `PHOTOS` shapes). Verify each with the same
-fail-loud-mock headless-Chrome technique described below (insert path, overwrite path via the real
-choice modal, and the progress bar/button-disable timing under an artificially slowed mock) before
-committing — a copy-paste field-id or asset-tag mistake here fails the same way a `checkedBy`
-mismatch does elsewhere in this codebase: silently, not with a thrown error.
+`TechnicianAuth.init()` calls (pass `submitFnName:'yourFnName'` too if the submit button isn't
+`onclick="submitToDb()"` — `GEN_BrushGear_PM_Checksheet.html`'s `saveToDatabase()` is the one file
+in this repo that needs this), then wire `submitToDb()` to call `resolveSubmitTarget()` before
+saving (the button lock + progress overlay are handled INSIDE `resolveSubmitTarget()`/
+`hideProgress()` now — see the reentrancy bullet below — so the caller does NOT need its own
+`document.querySelectorAll(...).disabled=true` dance), branch `DB.update()` vs `DB.save()` on the
+resolved mode, thread `existingApprovalId`/`onProgress` into `Approvals.submitWithFiles()`, and
+call `markSubmitted()` on success — adapting to that file's own field-id/asset-tag/photo-shape
+quirks per the per-file variance already documented elsewhere in this file (e.g. `done-by` vs
+`checked-by`, different `PHOTOS` shapes). **A multi-asset / no-fixed-tag sheet (a dropdown/search
+box picking one of many possible tags — `4000_Hours_Mill_PM.html`, `DMH_Motor_PM_Checksheet.html`,
+`HV_Motor_6Monthly_PM.html`, `HV_Motor_SWGR.html`, `Hoist_Inspection_Maintenance.html`,
+`LV_Motor_MCC.html`) must re-call `SubmitGuard.init({assetTag: <current tag>})` immediately before
+`resolveSubmitTarget()` inside `submitToDb()` itself** (not just once at page load) — the module
+is a page-level singleton, so without this the duplicate-check would silently query whichever
+tag was selected first, not whichever asset the technician is actually submitting right now.
+Verify each new file with the same fail-loud-mock headless-Chrome technique described below
+(insert path, overwrite path via the real choice modal, and the progress bar/button-disable
+timing under an artificially slowed mock) before committing — a copy-paste field-id or asset-tag
+mistake here fails the same way a `checkedBy` mismatch does elsewhere in this codebase: silently,
+not with a thrown error. `PLTS_AshDisposal_PM.html` is a partial exception: it predates
+`Approvals.submitWithFiles()` and has its own hand-written photo/PDF-upload + `Approvals.create()`
+sequence (see CLAUDE.md's Review & Approval Workflow section), so its overwrite path replicates
+`submitWithFiles()`'s "merge into the SAME approval doc" behavior manually via a direct
+`db.collection('approvals').doc(id).set({...},{merge:true})` call instead of passing
+`existingApprovalId` — same end result, just not routed through the shared helper.
 
 Two independent pieces, both self-injecting DOM/CSS like `load-merge-modal.js`/
 `technician-auth.js`:
