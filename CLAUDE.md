@@ -1441,6 +1441,85 @@ different wording/colours, re-derive these constants from it again rather than g
   the design decision earlier in this section) those signatures are genuinely captured elsewhere
   via the Review & Approval workflow, not re-collected here.
 
+## `UNIT 8/LV_Motor_Bearing_Replacement.html` — motor rebuild/bearing check sheet
+
+Ported from the client's own `LV Motor Bearing Replacement.xlsx`. Single-asset (one submission per
+bearing-replacement job), asset picked from an embedded **82-motor master list** (`MOTOR_LIST`,
+via a `<datalist>`-backed free-typed input, `selectMotor()` auto-fills Rated Voltage/Power/Full
+Load Ampere/Speed/Service Factor from whichever row matches). **Several master-list rows have no
+electrical rating data at all** (`v`/`kw`/`a`/`rpm`/`sf` all `null`) — these are breaker/feeder/tie
+cubicles the source workbook listed alongside the real motors (e.g. `XXXXX` "TIE TO 8EM-SWGR-A"),
+not a data-entry gap to "fix"; `selectMotor()` leaves those fields blank on selection, which is
+correct. Despite the filename, the master list's own voltage column is mostly 6600/13200 V
+(HV/MV, not LV) — this is the source document's own data, left as-is rather than corrected,
+since it's not this repo's place to second-guess the client's master asset list.
+
+The checklist (`CHECKS`) reuses the same **flat array + occasional `extra` fields** pattern as
+this file pioneered no special-row registry needed: most rows are a plain OK/NG toggle, a handful
+carry an `extra: [{id,label,unit}]` array rendered as a small inline field group right below that
+row (`renderChecks()`'s `extra-row` handling) for things like Shaft Ø DE/NDE, stator resistance
+T1-T2/T2-T3/T3-T1, DAR/PI, RTD Type. Three measurements didn't fit that shape and got their own
+small fixed-layout widgets instead of `extra` fields: `rtdTableHtml()` (RTD1-3 + DE/NDE bearing
+readings + heater resistance), `cableTableHtml()` (phase-to-phase R-S/S-T/R-T and phase-to-ground
+R/S/T-Ground, each at 30s and 1min), and the Solo Run panel's `renderTempTable()` (5 locations ×
+Initial/1'/15'/30' — a genuine time-series table, not worth generalizing into `extra` since
+nothing else in this file needs a 2-D grid). A `sectionBreak` marker in `CHECKS` (used once, for
+the source's own "ELECTRICAL TEST" sub-heading partway through the continuous checklist) renders
+as a full-width navy divider row without incrementing the item counter.
+
+## `UNIT 8/Lighting_Grounding_Etc_Checksheet.html` — 7-in-1 tabbed BOP check sheet
+
+Ported from `LIGHTING , GROUNDING , ETC CHECK SHEET.xlsx`, which bundles 7 unrelated equipment
+types as separate worksheet tabs (Lightning Arrester, Grounding, Stentofon intercom, Lighting,
+Emergency Lighting, Panel/DB, Socket Outlets). **Built as ONE combined tabbed check sheet, one
+submission per visit covering all 7 areas** — an explicit user choice (asked directly: 7 separate
+files vs. one tabbed file, matching `4000_Hours_Mill_PM.html`'s pattern) over the repo's more
+common "one file per equipment type" default, so don't split this back into 7 files without
+re-confirming. Each tab still has its **own** `Equipment Tag & Description` / `Building / Area`
+fields (unlike `4000_Hours_Mill_PM.html`'s single cascading asset selector) — the 7 areas
+inspected in one visit are physically different pieces of equipment in different
+buildings/locations, not variants of the same asset, so there's no shared tag to cascade.
+
+- **Toggle buttons are labelled PASS/FAIL on screen** (matching the source workbook's own
+  "Pass / Fail" column header verbatim) **but still use `data-v="OK"`/`"NG"` and
+  `.ok-act`/`.ng-act` classes internally** — same `ST` object, same `mkTog()`/`setTog()` shape
+  every other check sheet in this repo uses. This is deliberate: `DB.collectCheckSheetData()`'s
+  generic `.rb.ok-act`/`.rb.ng-act` scraper, `DB.loadLastSubmission()`'s 3-strategy toggle
+  restore, and `LoadMergeModal`'s matching restore logic all key off those exact class names and
+  `data-v` values — relabelling the button *text* costs nothing, but changing the underlying
+  `data-v`/class convention would silently break Load & Merge and the revision-restore flow for
+  this one file. If a future check sheet needs different on-screen wording again, relabel the
+  button text only, never the `data-v`/class pair.
+- **`pdfSafe()` strips glyphs jsPDF's built-in helvetica can't render** (Ω, ≤, ≥, →, ±, · — to
+  `ohm`/`<=`/`>=`/`->`/`+/-`/`-`) **applied only inside `generatePDF()`**, never to the shared
+  `TAB_SECTIONS` data itself — the source criteria text is genuinely full of these (`"≤ 5 Ω"`,
+  `"air terminal → earth"`, `"± tolerance"`), and they render correctly on screen (real browser
+  Unicode) and in Firestore/`dashboard.html` (also a browser), so only the jsPDF text path needs
+  sanitising. This is the same class of bug CLAUDE.md's PDF-export section already documents for
+  `▶` — confirmed by rendering a real PDF before the fix (`Ω` prints as `©`, `≤` as `"d`, both
+  silently, no exception) and after (`ohm`, `<=`). Any new criteria text added to `TAB_SECTIONS`
+  with one of these symbols needs no special handling — `pdfSafe()` already covers it — but a
+  *new* unsupported symbol would need adding to `pdfSafe()`'s replace chain, not worked around by
+  editing the source text.
+- **One PDF, one sub-report per tab, each starting on its own page** (same "no shared assetIdx
+  guard needed since every tab always renders" simplification `4000_Hours_Mill_PM.html`'s
+  `firstSection` flag exists for — here all 7 tabs always print, so a plain `if(!firstTab)
+  pdf.addPage()` per tab suffices), followed by **one consolidated Report Authorization page at
+  the very end** covering the whole visit (Inspected By/Witnessed By/Reviewed By) — the source
+  workbook repeats this same 3-role signature block on every one of its 7 sheets, but since this
+  file is one combined submission, one authorization block for the whole visit is correct, not
+  seven copies. Follows the same pattern as `Maintenance_Corrective_Action.html`'s Section L:
+  Inspected By is auto-filled from `checked-by`/`wo-date`; Witnessed By (Foreman) and Reviewed By
+  (Maint. SPV) are left blank with a footnote, since those are captured via the Review & Approval
+  workflow after submission, not re-collected on this form.
+- **Photos are one gallery per tab** (`PHOTOS[tab]`, same keyed-object pattern as every other
+  multi-gallery sheet in this repo), matching each tab's own "Document" section in the source.
+- **Dynamic tables exist only where the source has them**: LUX measurement (`lux-body`, Lighting
+  tab only), additional earth test points (`addl-point-body`, Grounding tab only), and
+  Finding/Abnormality (`TABS_WITH_FINDINGS` = Stentofon/Lighting/Emergency Lighting/Panel-DB/
+  Socket Outlets — Lightning Arrester and Grounding have no Finding table in the source, don't add
+  one for "consistency").
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that
