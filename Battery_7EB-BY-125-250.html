@@ -1020,6 +1020,62 @@ function loadPhotoDraft(){
   }catch(e){}
 }
 
+// Review & Approval hook: load-merge-modal.js calls this after a Load & Merge
+// or a revision-banner "load for revision" restore, handing back every photo
+// that was uploaded to Drive for the selected submission(s) as
+// {groupKey:[{url,caption,w,h,widthCm,heightCm}, ...]}. This file only ever
+// uploads under one group key ('main', see submitToDb()'s
+// `photos:{main:PHOTOS}`), so every group's photos land in the same flat
+// PHOTOS[] array here — but the loop stays generic over all groupKeys rather
+// than hardcoding 'main', in case that ever changes.
+// overwrite=true: replace PHOTOS entirely with the restored set.
+// overwrite=false (merge): only restore if PHOTOS is CURRENTLY EMPTY — a
+// technician's own in-progress photos must never be silently overwritten.
+// Returns the number of photos actually written into PHOTOS.
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls)return 0;
+  const allEntries=[];
+  for(const key of Object.keys(photoUrls)){
+    const list=photoUrls[key];
+    if(Array.isArray(list))allEntries.push(...list);
+  }
+  if(!allEntries.length)return 0;
+
+  if(!overwrite && PHOTOS.length){
+    // Merge mode, but the gallery already has photos from this session — leave it alone.
+    return 0;
+  }
+
+  const restored=[];
+  for(const entry of allEntries){
+    if(!entry||!entry.url)continue;
+    try{
+      const dataUrl=await Storage.toDataUrl(entry.url);
+      restored.push({
+        src:dataUrl,
+        dataUrl:dataUrl,
+        caption:entry.caption||'',
+        w:entry.w,
+        h:entry.h,
+        widthCm:entry.widthCm,
+        heightCm:entry.heightCm,
+      });
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal memuat 1 foto, lanjut ke foto berikutnya:',e);
+    }
+  }
+  if(!restored.length)return 0;
+
+  if(overwrite){
+    PHOTOS=restored;
+  }else{
+    PHOTOS=PHOTOS.concat(restored);
+  }
+  renderPhotos();
+  savePhotoDraft();
+  return restored.length;
+}
+
 // ── INIT ───────────────────────────────────────────
 PhotoKit.configure({maxWcm:9,maxHcm:11,defaultWcm:9,defaultHcm:6.4});  // 2-up grid on portrait A4
 renderPhotos();

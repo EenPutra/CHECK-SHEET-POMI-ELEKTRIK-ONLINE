@@ -627,6 +627,58 @@ function pkWireDrops(){
   });
 }
 
+// ── Review & Approval: restore photos from Drive ────
+// Called by load-merge-modal.js's restorePhotosIfSupported() after a Load &
+// Merge confirm or a revision-banner "load for revision" (see that file's
+// header comment for the exact {groupKey:[{url,caption,w,h,widthCm,heightCm}]}
+// contract). This sheet's own photo state is one FIXED slot per compartment
+// — PE[id]/photoStore[id]/photoDims[id] with id='photo_'+comp, comp one of
+// COMPS — not a free-count gallery, so `groupKey` here is a compartment code
+// (e.g. '102B') and each group can only ever hold ONE restored photo even if
+// the merged bundle's array has more than one entry. buildMergedBundle()
+// folds oldest-first, so when a group's array has >1 entry (multiple selected
+// submissions each had a photo for the same compartment) the LAST entry is
+// the newest one — that's the one used here, matching "newer wins" for every
+// other field this same merge does.
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls) return 0;
+  let restored=0;
+  for(const key of Object.keys(photoUrls)){
+    const list=photoUrls[key];
+    if(!Array.isArray(list)||!list.length) continue;
+    if(!COMPS.includes(key)) continue; // not a compartment this sheet has a slot for
+    const id='photo_'+key;
+    if(!overwrite && photoStore[id]) continue; // fill-blank-only: slot already has a photo
+    const chosen=list[list.length-1];
+    if(!chosen||!chosen.url) continue;
+    let dataUrl;
+    try{
+      dataUrl=await Storage.toDataUrl(chosen.url);
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal memuat foto '+key+':',e);
+      continue; // one bad fetch must not abort the rest of the restore
+    }
+    if(!dataUrl) continue;
+    // widthCm/heightCm may be absent on older entries — setPhoto() below
+    // reads them directly for its on-screen "Print W x H cm" label, so they
+    // must be numeric. Fall back to an aspect-correct fit inside this
+    // sheet's own configured default box (8.8 x 5.6cm, see PhotoKit.configure
+    // below) via the shared IMG.fit letterbox helper rather than guessing.
+    let wcm=chosen.widthCm,hcm=chosen.heightCm;
+    if(wcm==null||hcm==null){
+      const box=(typeof IMG!=='undefined'&&IMG.fit)?IMG.fit(8.8,5.6,{w:chosen.w,h:chosen.h}):{w:8.8,h:5.6};
+      wcm=box.w;hcm=box.h;
+    }
+    setPhoto(id,{src:dataUrl,dataUrl:dataUrl,w:chosen.w,h:chosen.h,widthCm:wcm,heightCm:hcm});
+    const capEl=document.getElementById('cap_'+key);
+    if(capEl && chosen.caption && (overwrite||!capEl.value)) capEl.value=chosen.caption;
+    restored++;
+  }
+  if(typeof updateStats==='function') updateStats();
+  return restored;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
 // ── STATS ──────────────────────────────────────────
 function updateStats(){
   const vals=Object.values(ST);

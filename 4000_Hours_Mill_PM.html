@@ -1743,6 +1743,56 @@ function removePhoto(key, idx){
   autoSaveNow();
 }
 
+// Review & Approval hook (see load-merge-modal.js's restorePhotosIfSupported)
+// — called after a Load & Merge confirm or a revision-banner "load for
+// revision" with photoUrls: {groupKey: [{url,caption,w,h,widthCm,heightCm}]}
+// (groupKey is one of ASSET_DEFS[].key, the same key PHOTOS is keyed by —
+// see submitToDb()'s `photos: PHOTOS` passed into Approvals.submitWithFiles).
+// Converts each Drive-proxy URL back to a real data: URL via
+// Storage.toDataUrl() and pushes a PhotoKit-shaped entry ({src, dataUrl, w,
+// h, widthCm, heightCm, caption}) into PHOTOS[key] — the exact shape
+// pickPhotos()/recropPhotoAt() already produce — then re-renders that
+// asset's gallery so the restored photos actually show up on screen.
+// overwrite=false (merge mode): a group the technician has already added
+// photos to in this session is left untouched — never appended to or
+// replaced — mirroring the fill-blank-only rule the rest of the merge
+// system already applies to text fields. overwrite=true (revision load):
+// each group's photos are replaced wholesale with the restored set.
+// Resilient by design: one photo's failed Storage.toDataUrl() (network
+// hiccup, deleted Drive file) is skipped, not allowed to abort the rest.
+async function restorePhotosFromUrls(photoUrls, overwrite){
+  if(!photoUrls) return 0;
+  let restored = 0;
+  for(const key of Object.keys(photoUrls)){
+    const list = photoUrls[key];
+    if(!Array.isArray(list) || !list.length) continue;
+    if(!PHOTOS[key]) PHOTOS[key] = [];
+    if(!overwrite && PHOTOS[key].length) continue; // already has photos — fill-blank-only
+    const rebuilt = [];
+    for(const entry of list){
+      if(!entry || !entry.url) continue;
+      try{
+        const dataUrl = await Storage.toDataUrl(entry.url);
+        if(!dataUrl) continue;
+        const p = { src: dataUrl, dataUrl: dataUrl, caption: entry.caption || '' };
+        if(entry.w != null) p.w = entry.w;
+        if(entry.h != null) p.h = entry.h;
+        if(entry.widthCm != null) p.widthCm = entry.widthCm;
+        if(entry.heightCm != null) p.heightCm = entry.heightCm;
+        rebuilt.push(p);
+        restored++;
+      }catch(e){
+        console.error('restorePhotosFromUrls: gagal ambil foto', key, entry && entry.url, e);
+      }
+    }
+    if(rebuilt.length){
+      PHOTOS[key] = overwrite ? rebuilt : PHOTOS[key].concat(rebuilt);
+      renderPhotos(key);
+    }
+  }
+  return restored;
+}
+
 // ═══════════════════════════════════════════════════
 //  DRAFT (localStorage — generic sweep of every id'd field)
 //

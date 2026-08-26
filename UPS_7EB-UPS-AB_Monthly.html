@@ -810,6 +810,42 @@ function resetForm(){
   document.querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
   PHOTOS.length=0;renderPhotos();updateStats();
 }
+// ── LOAD & MERGE: restore evidence photos ──────────
+// Called by load-merge-modal.js after a Load & Merge / revision-banner
+// restore, if it finds a photoUrls bundle on the source document(s).
+// photoUrls: {groupKey: [{url, caption, w, h, widthCm, heightCm}, ...]}.
+// PHOTOS in this file is one flat array (no per-group galleries) — every
+// submitToDb() upload here goes under a single synthetic 'main' group (see
+// submitToDb() below), so every group found here is flattened into the
+// same PHOTOS array. That collapses the per-group fill-blank-only rule
+// into a single check: PHOTOS itself is either empty or it isn't.
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls||typeof Storage==='undefined')return 0;
+  const groups=Object.keys(photoUrls);
+  if(!groups.length)return 0;
+  // Fill-blank-only: never touch photos the technician already added this session.
+  if(!overwrite&&PHOTOS.length>0)return 0;
+  if(overwrite)PHOTOS.length=0;
+  let count=0;
+  for(const g of groups){
+    const list=photoUrls[g]||[];
+    for(const entry of list){
+      if(!entry||!entry.url)continue;
+      try{
+        const dataUrl=await Storage.toDataUrl(entry.url);
+        if(!dataUrl)continue;
+        PHOTOS.push({dataUrl,caption:entry.caption||'',w:entry.w||0,h:entry.h||0,widthCm:entry.widthCm,heightCm:entry.heightCm});
+        count++;
+      }catch(e){
+        console.error('restorePhotosFromUrls: gagal memuat foto',entry.url,e);
+      }
+    }
+  }
+  if(count>0)renderPhotos();
+  return count;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
 function showNote(msg,t){
   const n=document.getElementById('notice');n.textContent=msg;n.className='notice '+t;
   setTimeout(()=>n.className='notice',4500);

@@ -1138,6 +1138,90 @@ the current design — **do not "simplify" these away**:
    sweep over every `<input>`/`<select>`/`<textarea>` with an id, plus a snapshot of the page's
    `ST` toggle-state object) — purely additive, doesn't change or remove any existing field, and
    has no effect on `dashboard.html` (which never reads either of these two fields).
+10. **Implement `window.restorePhotosFromUrls(photoUrls, overwrite)`** so a Load & Merge / a
+    returned-for-revision restore brings evidence photos back too, not just text fields — see
+    the dedicated section right below for the full contract and why every check sheet needs its
+    own implementation of this one function.
+
+### Restoring photos on merge/revision — `restorePhotosFromUrls(photoUrls, overwrite)`
+
+Without this, a technician whose submission was returned for revision (or who picks a past
+submission via Load & Merge) gets every text/measurement/toggle field back, but an **empty
+photo gallery** — they'd have to re-take/re-upload every evidence photo from scratch even
+though the exact same photos already exist in Drive from the original submission. Fixed by:
+
+- **`Approvals.submitWithFiles()`** now carries `w`/`h`/`widthCm`/`heightCm` alongside each
+  photo's `url`/`caption` in the saved `photoUrls` (previously URL + caption only) — this is
+  what lets a restored photo come back at its original crop/print size instead of falling back
+  to PhotoKit's default box.
+- **`Storage.toDataUrl(url)`** (`storage-helper.js`) converts a Drive-proxy URL back into a real
+  `'data:image/jpeg;base64,...'` string — not a `blob:` URL, since check sheets' photo state
+  expects a data: URL (PhotoKit's own `src`/`dataUrl` convention, and what `pdf.addImage()`/
+  `PhotoKit.draw()` need).
+- **`buildMergedBundle()`** (`load-merge-modal.js`) now also folds `photoUrls` from every
+  selected/source document into the merge bundle — photos are **unioned per group** across
+  selected docs (concatenated, oldest-first), never "newest wins overwrite" like a scalar field,
+  since two different submissions' photos for the same group aren't competing values, they're
+  both real evidence that should survive a multi-select merge.
+- **After the text-field merge completes, `_confirm()`/`loadRevisionSource()` call
+  `window.restorePhotosFromUrls(photoUrls, overwrite)` if the host page defines one.** This
+  module cannot generically restore photos itself — the 22 check sheets in this repo use at
+  least 6 different in-memory photo-state shapes:
+  - a `{groupKey: [...]}` dict, one array per logical sub-asset (`PLTS_AshDisposal_PM.html`'s
+    `PHOTOS` keyed by inverter, `4000_Hours_Mill_PM.html`'s `PHOTOS` keyed by per-tab asset —
+    note the latter is keyed by the FIXED asset key, not by which Mill letter is selected, since
+    `submitToDb()` already saves it that way regardless of Mill)
+  - a flat array with no grouping (`ESP_7BGPCP800A_B.html`, `UPS_7EB-UPS-AB_Monthly.html`) —
+    `photoUrls`' groups get flattened into one list, and the fill-blank-only check collapses to
+    "is the whole array non-empty", not per-group
+  - fixed single-photo-per-slot triples keyed by a slot id (`PE`/`photoStore`/`PS`+`PSD`+`PE` —
+    the six `Transformer_*` weekly/monthly sheets, `7EPLCB4_Maintenance.html`) — only the FIRST
+    entry of a slot's array can be kept if a merge ever produces more than one (there's only one
+    physical slot), and the newest-contributing submission's photo wins for that slot
+  - `FILES`, a flat array of mixed image+file attachments with a `type` field
+    (`GEN_BrushGear_PM_Checksheet.html`) — restore only touches entries whose `type` starts with
+    `image/`
+  - `BLOCKS[i].photos`, a free-form reorderable block list (`Work_Activity_Record.html`) — since
+    blocks can be added/removed/reordered between the original submission and a later revision
+    session, the saved `'block'+i` group key may no longer point at an image block by the time a
+    restore runs; rather than silently drop those photos when the index doesn't line up anymore,
+    a fresh image block is appended to hold them (preserves every photo, just not necessarily in
+    its original position — recoverable by the technician reordering, unlike a silently dropped
+    photo)
+  - a fixed compartment/photo-drop-zone id keyed by a domain code, one photo each
+    (`7EPLCB4_Maintenance.html`'s `COMPS`)
+
+  A sheet with no photo feature, or one that hasn't implemented the hook, silently restores 0
+  photos — every other field still merges/restores normally, it just leaves the gallery empty
+  like before this feature existed. **Every check sheet in this repo already implements this
+  hook** (see each file's own `restorePhotosFromUrls()` for the concrete pattern closest to a
+  new sheet's own photo-state shape) — when adding a new check sheet, copy whichever existing
+  implementation matches its photo widget most closely rather than writing one from scratch.
+
+  **The contract every implementation follows:**
+  1. Takes `photoUrls`: `{groupKey: [{url, caption, w, h, widthCm, heightCm}, ...]}` (w/h/
+     widthCm/heightCm may be absent on older entries saved before this feature — treat as
+     optional, and consider measuring via `PhotoKit.prepare([entry])` if missing, so
+     `PhotoKit.fit()`/`.draw()` still has real pixel dimensions instead of silently falling back
+     to a stretched/default box).
+  2. For each relevant entry, calls `await Storage.toDataUrl(entry.url)`, wrapped in its own
+     try/catch so **one failed fetch (expired/deleted Drive link, network hiccup) never aborts
+     restoring the rest** — skip that one photo, keep going.
+  3. Respects `overwrite`: `true` replaces a group/slot's current photo(s) entirely; `false`
+     (default merge mode) only fills a group/slot that's **currently empty in this session** —
+     never touches one the technician already has photos in, mirroring the same fill-blank-only
+     spirit the rest of the merge system already applies to text fields.
+  4. Calls the file's own gallery-render function afterward so restored photos actually become
+     visible, not just sitting in a JS variable.
+  5. Returns the number of photos actually written (not counting skipped/failed ones) —
+     `load-merge-modal.js` shows this count in its toast (e.g. "3 field terisi, 2 foto
+     dipulihkan").
+  6. If the sheet has its own localStorage-based photo-draft persistence, it does NOT need to
+     call it itself — `load-merge-modal.js` already calls the host page's `autoSaveNow()` right
+     after `restorePhotosFromUrls()` resolves, if one is defined. (One exception:
+     `ESP_7BGPCP800A_B.html` has no `autoSaveNow()` at all, so its implementation calls its own
+     `savePhotoDraft()` directly instead — check whether a sheet actually defines `autoSaveNow`
+     before assuming the generic path covers it.)
 
 ## Per-file conventions worth matching
 

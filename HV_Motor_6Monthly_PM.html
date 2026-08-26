@@ -1117,6 +1117,67 @@ function removePhoto(idx){
 }
 
 // ═══════════════════════════════════════════════════
+//  LOAD & MERGE: PHOTO RESTORE HOOK
+// ═══════════════════════════════════════════════════
+// Called by load-merge-modal.js after a "Load & Merge" confirm, or a
+// revision-banner "load for revision", with every photo it uploaded to
+// Drive on a PAST submission's submitToDb() (see Approvals.submitWithFiles's
+// `photos: {main: PHOTOS}` call above) as {url, caption, w, h, widthCm,
+// heightCm}. This file's own photo state is a single flat array (PHOTOS,
+// saved under the one group key 'main'), so restoring is a straight fill of
+// that array -- fill-blank-only in merge mode (never clobber photos the
+// technician already added this session), full replace in overwrite mode.
+// One bad Storage.toDataUrl() (network hiccup, deleted Drive file) must
+// never abort the rest of the photos -- see CLAUDE.md's Photos section for
+// why a data: URL (not a blob: URL) is what this file's own PhotoKit-based
+// entries and pdf.addImage()/PhotoKit.draw() expect.
+//
+// This file has exactly one photo gallery (no per-slot/per-group concept of
+// its own) and only ever SAVES its photos under the single group key 'main'
+// -- but photoUrls is flattened across EVERY key it contains here, not just
+// 'main', so this stays correct even if a caller ever hands back a
+// differently-keyed bundle: every entry, whatever its group key, is a photo
+// for this one gallery.
+async function restorePhotosFromUrls(photoUrls, overwrite){
+  const list = [];
+  if(photoUrls){
+    Object.keys(photoUrls).forEach(k => {
+      if(Array.isArray(photoUrls[k])) list.push(...photoUrls[k]);
+    });
+  }
+  if(!list.length) return 0;
+
+  // Fill-blank-only: this sheet has one photo group ('main'/PHOTOS), so
+  // "already has content" just means PHOTOS is non-empty.
+  if(!overwrite && PHOTOS.length > 0) return 0;
+
+  const restored = [];
+  for(const entry of list){
+    try{
+      const dataUrl = await Storage.toDataUrl(entry.url);
+      if(!dataUrl) continue;
+      restored.push({
+        src: dataUrl,
+        dataUrl: dataUrl,
+        caption: entry.caption || '',
+        w: entry.w,
+        h: entry.h,
+        widthCm: entry.widthCm,
+        heightCm: entry.heightCm,
+      });
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal memulihkan satu foto, dilewati:', e);
+    }
+  }
+  if(!restored.length) return 0;
+
+  PHOTOS = overwrite ? restored : PHOTOS.concat(restored); // PHOTOS confirmed empty above when !overwrite
+  renderPhotos();
+  return restored.length;
+}
+window.restorePhotosFromUrls = restorePhotosFromUrls;
+
+// ═══════════════════════════════════════════════════
 //  PRINT / SAVE AS PDF
 // ═══════════════════════════════════════════════════
 function printPage(){

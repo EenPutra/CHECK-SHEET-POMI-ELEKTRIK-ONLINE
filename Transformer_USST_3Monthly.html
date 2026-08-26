@@ -418,6 +418,51 @@ function pickPhoto(el,id){PhotoKit.upload(el,{},entry=>{if(entry)setPhoto(id,ent
 function recropPhoto(id,e){e.stopPropagation();if(!PE[id])return;PhotoKit.recrop(PE[id],entry=>{if(entry)setPhoto(id,entry);});}
 function dpx(id,e){e.stopPropagation();const s=document.getElementById(id);const img=s.querySelector('img');if(img)img.remove();s.classList.remove('hp');s.querySelector('.phi').style.display='';s.querySelector('.pht').style.display='';const sz=document.getElementById(id+'-sz');if(sz)sz.textContent='';delete PS[id];delete PSD[id];delete PE[id];}
 
+// Restore photos from Drive-proxy URLs (Load & Merge / revision-banner path).
+// photoUrls: {slotId: [{url,caption,w,h,widthCm,heightCm}, ...]} — this sheet
+// only ever has ONE photo per slot, so only arr[0] is used per slot.
+async function restorePhotosFromUrls(photoUrls, overwrite){
+  if(!photoUrls)return 0;
+  let count=0;
+  for(const slotId of Object.keys(photoUrls)){
+    const arr=photoUrls[slotId];
+    if(!arr||!arr.length)continue;
+    // Merge mode (overwrite=false) must never touch a slot the technician
+    // already filled in this session — only backfill empty slots.
+    if(!overwrite && PS[slotId])continue;
+    const item=arr[0];
+    let dataUrl;
+    try{
+      dataUrl=await Storage.toDataUrl(item.url);
+    }catch(e){
+      // One bad fetch (network hiccup, deleted Drive file) must not abort
+      // restoring the rest of the slots.
+      console.error('restorePhotosFromUrls: gagal memuat foto untuk slot',slotId,e);
+      continue;
+    }
+    if(!dataUrl)continue;
+    const entry={src:dataUrl,dataUrl:dataUrl,caption:item.caption||'',w:item.w,h:item.h,widthCm:item.widthCm,heightCm:item.heightCm};
+    // Older saved entries may not carry widthCm/heightCm — setPhoto() needs
+    // both to render the on-screen print-size label, so derive them the same
+    // aspect-ratio-safe way PhotoKit itself would (never stretched, just
+    // fitted into this sheet's configured default box).
+    if(entry.widthCm==null||entry.heightCm==null){
+      try{
+        const d=PhotoKit.fit(entry,Infinity,Infinity);
+        entry.widthCm=d.w/10;entry.heightCm=d.h/10;
+      }catch(e){
+        entry.widthCm=entry.widthCm||8.8;entry.heightCm=entry.heightCm||5.6;
+      }
+    }
+    setPhoto(slotId,entry);
+    const capEl=document.getElementById(slotId+'-cap');
+    if(capEl)capEl.value=entry.caption;
+    count++;
+  }
+  return count;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
 // SIGNATURE
 function initSig(id){const c=document.getElementById(id);const ctx=c.getContext('2d');let dr=false;function p(e){const r=c.getBoundingClientRect();const sx=c.width/r.width;const sy=c.height/r.height;if(e.touches)return{x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};}c.addEventListener('mousedown',e=>{dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);});c.addEventListener('mousemove',e=>{if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();});c.addEventListener('mouseup',()=>dr=false);c.addEventListener('mouseleave',()=>dr=false);c.addEventListener('touchstart',e=>{e.preventDefault();dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);},{passive:false});c.addEventListener('touchmove',e=>{e.preventDefault();if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();},{passive:false});c.addEventListener('touchend',()=>dr=false);}
 function clrSig(id){const c=document.getElementById(id);c.getContext('2d').clearRect(0,0,c.width,c.height);}

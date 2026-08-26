@@ -45,7 +45,12 @@ const Storage = {
     if (!resp.ok) throw new Error('Gagal mengambil file (HTTP ' + resp.status + ')');
     const json = await resp.json();
     if (json.error) throw new Error(json.error);
-    return { bytes: base64ToArrayBuffer(json.dataBase64), mimeType: json.mimeType, filename: json.filename };
+    return {
+      bytes: base64ToArrayBuffer(json.dataBase64),
+      base64: json.dataBase64,
+      mimeType: json.mimeType,
+      filename: json.filename,
+    };
   },
 
   // For pdf-lib (buildFinalPdf in Review_Approval_Dashboard.html), which
@@ -62,6 +67,17 @@ const Storage = {
   async toObjectUrl(url) {
     const { bytes, mimeType } = await this.fetchMeta(url);
     return URL.createObjectURL(new Blob([bytes], { type: mimeType || 'application/octet-stream' }));
+  },
+
+  // For restoring an evidence photo back into a check sheet's own PHOTOS-like
+  // state (see load-merge-modal.js's restorePhotosFromUrls hook) — those
+  // structures store a photo as a 'data:...;base64,...' string (PhotoKit's
+  // own `src`/`dataUrl` convention, and what pdf.addImage()/PhotoKit.draw()
+  // expect), not a blob: URL. Reuses fetchMeta's already-decoded base64
+  // string directly — no redundant decode+re-encode round trip.
+  async toDataUrl(url) {
+    const { base64, mimeType } = await this.fetchMeta(url);
+    return `data:${mimeType || 'image/jpeg'};base64,${base64}`;
   },
 
   // Best-effort delete — used only for local/dev cleanup of test uploads.

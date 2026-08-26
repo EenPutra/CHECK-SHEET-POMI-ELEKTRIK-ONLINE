@@ -921,19 +921,70 @@ function rmkList(tbodyId){return [...document.querySelectorAll('#'+tbodyId+' inp
 // Photos live one-per-fixed-slot here (photoStore[slotId]), not a free
 // gallery array like most other sheets — collect them into the
 // {groupKey:[{src,caption}]} shape Approvals.submitWithFiles() expects.
+var PHOTO_SLOTS=[
+  {id:'pd-room1',capId:'cap-room1'},{id:'pd-room2',capId:'cap-room2'},
+  {id:'pd-condA',capId:'cap-condA'},{id:'pd-condB',capId:'cap-condB'},
+  {id:'pd-thermA',capId:'cap-thermA'},{id:'pd-thermB',capId:'cap-thermB'},
+];
 function collectPhotosForUpload(){
-  var slots=[
-    {id:'pd-room1',capId:'cap-room1'},{id:'pd-room2',capId:'cap-room2'},
-    {id:'pd-condA',capId:'cap-condA'},{id:'pd-condB',capId:'cap-condB'},
-    {id:'pd-thermA',capId:'cap-thermA'},{id:'pd-thermB',capId:'cap-thermB'},
-  ];
   var list=[];
-  slots.forEach(function(s){
+  PHOTO_SLOTS.forEach(function(s){
     var p=photoStore[s.id];
     if(p&&p.src)list.push({src:p.src,caption:gv(s.capId)});
   });
   return {main:list};
 }
+
+// Restore hook for load-merge-modal.js (Load & Merge modal / revision-banner
+// "load for revision"). photoUrls is {groupKey:[{url,caption,w,h,widthCm,
+// heightCm}, ...]} — this sheet only ever produces one group, 'main' (see
+// collectPhotosForUpload() above), one array entry per currently-filled
+// slot IN SLOT ORDER but with any empty slots skipped. That collector does
+// not record WHICH slot each entry came from, so on restore there is no
+// way to recover the original slot identity for entries beyond a simple
+// positional guess — the most conservative reasonable mapping is: walk
+// PHOTO_SLOTS in order and hand out restored entries, in order, to
+// whichever slots are eligible (see overwrite handling below). This can
+// misplace a photo into the "wrong" slot label (e.g. a condB photo landing
+// in pd-condA) when the original submission had gaps; there is no data
+// available here to do better. Flagged in the rollout report.
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls||typeof photoUrls!=='object')return 0;
+  var list=photoUrls.main;
+  if(!Array.isArray(list)||!list.length)return 0;
+
+  var targets=overwrite?PHOTO_SLOTS.slice():PHOTO_SLOTS.filter(function(s){
+    var p=photoStore[s.id];return !(p&&p.src);
+  });
+
+  var count=0;
+  for(var i=0;i<list.length&&i<targets.length;i++){
+    var item=list[i],slot=targets[i];
+    try{
+      var dataUrl=await Storage.toDataUrl(item.url);
+      if(!dataUrl)continue;
+      var widthCm=item.widthCm,heightCm=item.heightCm;
+      if((widthCm==null||heightCm==null)&&window.IMG&&IMG.fit){
+        // Older photoUrls entries (saved before approval-helper.js started
+        // carrying w/h/widthCm/heightCm) have no print size — fall back to
+        // this sheet's own default box, fitted to the photo's real aspect
+        // ratio so the "Cetak W x H cm" label is still sane, never stretched.
+        var f=IMG.fit(8.5,6,{w:item.w,h:item.h});
+        widthCm=f.w;heightCm=f.h;
+      }
+      if(widthCm==null||heightCm==null){widthCm=8.5;heightCm=6;}
+      setPhoto(slot.id,{src:dataUrl,w:item.w,h:item.h,widthCm:widthCm,heightCm:heightCm});
+      var capEl=document.getElementById(slot.capId);
+      if(capEl&&item.caption)capEl.value=item.caption;
+      count++;
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal memulihkan foto',item&&item.url,e);
+    }
+  }
+  if(typeof updateStats==='function')updateStats();
+  return count;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
 
 async function submitToDb(){
   const data=DB.collectCheckSheetData('byc125','7EB-BYC-125 A/B','Battery Charger Unit 125 A/B','2 YEARLY');

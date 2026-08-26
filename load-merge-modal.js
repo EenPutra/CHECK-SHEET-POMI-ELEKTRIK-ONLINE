@@ -211,14 +211,23 @@ const LoadMergeModal = (function () {
   // one for the same key.
   function buildMergedBundle(docs, headerMap) {
     const sorted = [...docs].sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-    const header = {}, inputValues = {}, panelStates = {}, toggleStates = {};
+    const header = {}, inputValues = {}, panelStates = {}, toggleStates = {}, photoUrls = {};
     sorted.forEach(d => {
       Object.entries(headerMap).forEach(([f, id]) => { if (d[f]) header[id] = d[f]; });
       if (d.inputValues) Object.assign(inputValues, d.inputValues);
       if (d.panelStates) Object.assign(panelStates, d.panelStates);
       if (d.toggleStates) Object.assign(toggleStates, d.toggleStates);
+      // Photos are additive, not "newest wins" like a scalar field — union
+      // every selected doc's photos per group instead of overwriting, so
+      // picking multiple submissions never silently drops one's photos.
+      if (d.photoUrls) {
+        Object.entries(d.photoUrls).forEach(([group, list]) => {
+          if (!Array.isArray(list) || !list.length) return;
+          photoUrls[group] = (photoUrls[group] || []).concat(list);
+        });
+      }
     });
-    return { header, inputValues, panelStates, toggleStates };
+    return { header, inputValues, panelStates, toggleStates, photoUrls };
   }
 
   // Fill-blank-only unless overwrite=true, for header/inputValues/panelStates
@@ -298,6 +307,32 @@ const LoadMergeModal = (function () {
     return filled;
   }
 
+  // Fetches every photo in `photoUrls` back into a real data: URL and hands
+  // the whole {groupKey:[{url,caption,w,h,widthCm,heightCm}]} bundle to the
+  // HOST PAGE's own `restorePhotosFromUrls(photoUrls, overwrite)` function,
+  // if it defines one. This module can't generically restore photos itself
+  // — the 22 check sheets in this repo use at least 6 different in-memory
+  // photo-state shapes (PHOTOS as {group:[...]} or a flat array, PE/PS/PSD
+  // per-slot triples, photoStore[slotId], FILES, ATTACH — see CLAUDE.md's
+  // "Review & Approval Workflow" section), so each file that wants restored
+  // photos on merge/revision implements this one hook itself, the same way
+  // several already implement a `collectPhotosForUpload()`-style helper for
+  // the upload direction. A sheet with no photo feature, or one that hasn't
+  // added the hook yet, silently gets 0 — merge/revision still succeeds for
+  // every other field, it just leaves the photo gallery empty like before.
+  // Returns however many photos the hook reports restoring (for the toast).
+  async function restorePhotosIfSupported(photoUrls, overwrite) {
+    if (!photoUrls || !Object.keys(photoUrls).length) return 0;
+    if (typeof window.restorePhotosFromUrls !== 'function') return 0;
+    try {
+      const n = await window.restorePhotosFromUrls(photoUrls, overwrite);
+      return typeof n === 'number' ? n : 0;
+    } catch (e) {
+      console.error('restorePhotosFromUrls gagal:', e);
+      return 0;
+    }
+  }
+
   async function _confirm() {
     if (_sel.size === 0) return;
     const overwrite = document.getElementById('lmm-overwrite-toggle').checked;
@@ -306,10 +341,15 @@ const LoadMergeModal = (function () {
 
     const bundle = buildMergedBundle(chosen, _config.headerMap);
     const filled = applyMergedBundleToForm(bundle, overwrite);
-
     close();
+
+    const hasPhotos = Object.keys(bundle.photoUrls).length > 0;
+    if (hasPhotos && typeof showNote === 'function') showNote('⏳ Memulihkan foto...', 'info');
+    const photosRestored = await restorePhotosIfSupported(bundle.photoUrls, overwrite);
+
     if (typeof showNote === 'function') {
-      showNote('✅ ' + chosen.length + ' submission digabungkan' + (overwrite ? ' (mode timpa)' : '') + ' — ' + filled + ' field terisi.', 'ok');
+      const photoPart = photosRestored ? ', ' + photosRestored + ' foto dipulihkan' : '';
+      showNote('✅ ' + chosen.length + ' submission digabungkan' + (overwrite ? ' (mode timpa)' : '') + ' — ' + filled + ' field terisi' + photoPart + '.', 'ok');
     }
     if (typeof autoSaveNow === 'function') autoSaveNow();
   }
@@ -344,7 +384,13 @@ const LoadMergeModal = (function () {
       if (!doc) { if (typeof showNote === 'function') showNote('❌ Submission sebelumnya tidak ditemukan.', 'err'); return; }
       const bundle = buildMergedBundle([doc], _config.headerMap);
       const filled = applyMergedBundleToForm(bundle, true); // overwrite: restore the flagged submission in full, not a partial merge
-      if (typeof showNote === 'function') showNote('✅ Data submission dimuat (' + filled + ' field) — perbaiki sesuai catatan lalu Submit.', 'ok');
+
+      const hasPhotos = Object.keys(bundle.photoUrls).length > 0;
+      if (hasPhotos && typeof showNote === 'function') showNote('⏳ Memulihkan foto...', 'info');
+      const photosRestored = await restorePhotosIfSupported(bundle.photoUrls, true);
+
+      const photoPart = photosRestored ? ', ' + photosRestored + ' foto dipulihkan' : '';
+      if (typeof showNote === 'function') showNote('✅ Data submission dimuat (' + filled + ' field' + photoPart + ') — perbaiki sesuai catatan lalu Submit.', 'ok');
       if (typeof autoSaveNow === 'function') autoSaveNow();
     } catch (e) {
       if (typeof showNote === 'function') showNote('❌ Gagal memuat: ' + e.message, 'err');

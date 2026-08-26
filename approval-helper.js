@@ -131,7 +131,21 @@ const Approvals = {
           const url = await Storage.uploadDataUrl(
             `checksheets/${checksheetId}/photos/${key}-${i}.jpg`, p.src, 'image/jpeg'
           );
-          urls.push({ url, caption: p.caption || '' });
+          // w/h/widthCm/heightCm ride along so a later restore (revision
+          // banner / Load & Merge — see load-merge-modal.js's
+          // restorePhotosFromUrls hook) can recreate the exact same PhotoKit
+          // entry shape, not just the picture. Per CLAUDE.md's "Photos"
+          // section: without these, a restored photo falls back to
+          // PhotoKit's default box instead of the crop the technician
+          // actually chose. Harmless if the source entry doesn't have them
+          // (older photos, or a sheet not using PhotoKit) — just omitted.
+          urls.push({
+            url, caption: p.caption || '',
+            ...(p.w != null ? { w: p.w } : {}),
+            ...(p.h != null ? { h: p.h } : {}),
+            ...(p.widthCm != null ? { widthCm: p.widthCm } : {}),
+            ...(p.heightCm != null ? { heightCm: p.heightCm } : {}),
+          });
         }
         if (urls.length) photoUrls[key] = urls;
       }

@@ -1026,6 +1026,60 @@ function removeEvd(i){
   renderEvdGrid();
 }
 
+// Called by load-merge-modal.js after a Load & Merge / revision-banner
+// restore, if it finds this function defined on window. photoUrls is
+// {groupKey:[{url,caption,w,h,widthCm,heightCm}, ...]} — this file only
+// ever uploads one group ('evidence', see submitToDb()'s photosForUpload),
+// but we iterate every key defensively rather than assuming that. ATTACH
+// is this file's one flat gallery array (images AND pdfs); only the
+// image entries correspond to an uploaded "photo group", so overwrite/
+// fill-blank-only is decided by whether ATTACH already holds any image
+// entries, and only image entries are ever removed/replaced here — pdf
+// attachments are left untouched.
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls||typeof photoUrls!=='object')return 0;
+  let restored=0;
+  for(const groupKey of Object.keys(photoUrls)){
+    const list=photoUrls[groupKey];
+    if(!Array.isArray(list)||!list.length)continue;
+    const hasExistingImages=ATTACH.some(a=>a.type==='image');
+    if(!overwrite&&hasExistingImages){
+      // Fill-blank-only merge mode: technician already has photos here —
+      // never silently overwrite or append on top of their own work.
+      continue;
+    }
+    if(overwrite){
+      ATTACH=ATTACH.filter(a=>a.type!=='image');
+    }
+    for(const entry of list){
+      if(!entry||!entry.url)continue;
+      try{
+        const dataUrl=await Storage.toDataUrl(entry.url);
+        if(!dataUrl)continue;
+        ATTACH.push({
+          id:'evd_'+Date.now()+'_'+Math.random().toString(36).slice(2,7),
+          type:'image',
+          name:entry.caption||'Foto (dipulihkan)',
+          caption:entry.caption||'',
+          dataUrl:dataUrl,
+          w:entry.w,
+          h:entry.h,
+          widthCm:entry.widthCm,
+          heightCm:entry.heightCm,
+        });
+        restored++;
+      }catch(e){
+        // One failed fetch (network hiccup, deleted Drive file) must never
+        // abort restoring the rest of the group.
+        console.error('restorePhotosFromUrls: gagal memuat foto',entry.url,e);
+      }
+    }
+  }
+  if(restored>0)renderEvdGrid();
+  return restored;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
 // ══════════════════════════════════════════════════
 //  DRAFT / RESET
 // ══════════════════════════════════════════════════

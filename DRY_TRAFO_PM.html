@@ -1399,6 +1399,77 @@ function collectApprovalPhotos(){
   });
   return photos;
 }
+
+// Mirrors this file's own PhotoKit.configure({maxWcm:9.2,...,defaultWcm:9.2,
+// defaultHcm:6.5}) call below. widthCm/heightCm are a DISPLAY-ONLY label here
+// (the "Print W x H cm" text under a slot) -- the PDF draws every photo from
+// its natural `w`/`h` pixels via PhotoKit.fit()/pkEntry(), never from these,
+// so this fallback only needs to be aspect-safe, not exact. Used when an
+// older approval record's photoUrls entry (saved before approval-helper.js
+// started carrying print size) has no widthCm/heightCm of its own.
+function calcRestoreCm(w,h){
+  const maxW=9.2, maxH=20;
+  if(!w||!h) return {widthCm:9.2,heightCm:6.5};
+  let wcm=maxW, hcm=wcm*h/w;
+  if(hcm>maxH){hcm=maxH;wcm=hcm*w/h;}
+  return {widthCm:wcm,heightCm:hcm};
+}
+
+// ── Review & Approval: restore photos pulled from Drive (Load & Merge /
+// revision banner) ──────────────────────────────────────────────────
+// Called by load-merge-modal.js's restorePhotosIfSupported() after a merge
+// or a revision-banner "load for revision", with the same
+// {groupKey: [{url, caption, w, h, widthCm, heightCm}, ...]} shape
+// Approvals.submitWithFiles() saved (see collectApprovalPhotos() above --
+// it keys `photos` by PHOTO_IDS slot id directly, one slot = one group, so
+// groupKey === a PHOTO_IDS slot id here; no group-to-slot fan-out needed,
+// unlike a sheet where one logical group can hold several photos).
+// overwrite=true replaces a slot's current photo outright; overwrite=false
+// (merge mode) only fills a slot that is CURRENTLY EMPTY in this session --
+// a technician's own in-progress photo is never silently replaced.
+// Resilient per-photo: a failed Storage.toDataUrl() for one slot is logged
+// and skipped, never aborts the rest.
+window.restorePhotosFromUrls = async function(photoUrls, overwrite){
+  let restored = 0;
+  if(!photoUrls) return restored;
+  for(const groupKey of Object.keys(photoUrls)){
+    if(!PHOTO_IDS.includes(groupKey)) continue; // unknown/foreign slot id -- skip defensively
+    const list = photoUrls[groupKey];
+    if(!list || !list.length) continue;
+    if(!overwrite && photoStore[groupKey]) continue; // fill-blank-only: slot already has a photo
+    // This file's slots hold at most one photo each -- take the first
+    // (most recently uploaded, per collectApprovalPhotos()'s own order).
+    const item = list[0];
+    let dataUrl;
+    try{
+      dataUrl = await Storage.toDataUrl(item.url);
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal ambil foto untuk '+groupKey, e);
+      continue;
+    }
+    if(!dataUrl) continue;
+    const dims = calcRestoreCm(item.w, item.h);
+    const entry = {
+      src: dataUrl,
+      dataUrl: dataUrl,
+      w: item.w,
+      h: item.h,
+      widthCm: item.widthCm != null ? item.widthCm : dims.widthCm,
+      heightCm: item.heightCm != null ? item.heightCm : dims.heightCm,
+    };
+    try{
+      setPhoto(groupKey, entry);
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal set foto untuk '+groupKey, e);
+      continue;
+    }
+    const capId = 'cap-' + groupKey.slice(3);
+    const capEl = document.getElementById(capId);
+    if(capEl && item.caption) capEl.value = item.caption;
+    restored++;
+  }
+  return restored;
+};
 </script>
 </body>
 </html>

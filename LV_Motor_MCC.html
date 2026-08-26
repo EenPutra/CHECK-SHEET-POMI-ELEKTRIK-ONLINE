@@ -1415,6 +1415,49 @@ function removePhoto(idx){
   renderPhotos();
 }
 
+// Load & Merge / revision-banner restore hook (see load-merge-modal.js's
+// restorePhotosIfSupported()). This file's own upload path saves photos as
+// `photos: { main: PHOTOS }` (submitToDb() above) — one flat array, no
+// per-slot/named-group system. There is only ever one gallery on this page,
+// so every entry across every group key in `photoUrls` restores into that
+// same PHOTOS array (in practice the key is always 'main', since that's the
+// only key submitToDb() ever writes — flattening rather than hardcoding
+// `.main` just avoids a silent no-op if that key name ever changes).
+// overwrite=true  -> replace PHOTOS entirely with the restored set.
+// overwrite=false -> fill-blank-only: only restore into PHOTOS if it's
+//                     currently empty (never append to/replace a
+//                     technician's own in-progress photos).
+async function restorePhotosFromUrls(photoUrls, overwrite){
+  const list = photoUrls ? Object.values(photoUrls).flat() : [];
+  if(!list.length) return 0;
+  if(!overwrite && PHOTOS.length > 0) return 0; // group already has content in merge mode
+
+  const restored = [];
+  for(const entry of list){
+    try{
+      const dataUrl = await Storage.toDataUrl(entry.url);
+      if(!dataUrl) continue;
+      restored.push({
+        src: dataUrl,
+        dataUrl: dataUrl,
+        caption: entry.caption || '',
+        w: entry.w,
+        h: entry.h,
+        widthCm: entry.widthCm,
+        heightCm: entry.heightCm,
+      });
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal memuat satu foto, lanjut ke foto berikutnya:', e);
+    }
+  }
+  if(!restored.length) return 0;
+
+  PHOTOS = overwrite ? restored : PHOTOS.concat(restored);
+  renderPhotos();
+  return restored.length;
+}
+window.restorePhotosFromUrls = restorePhotosFromUrls;
+
 // ═══════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════
 //  PRINT / SAVE AS PDF

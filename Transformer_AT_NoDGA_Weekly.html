@@ -475,6 +475,49 @@ function pickPhoto(el,id){PhotoKit.upload(el,{},entry=>{if(entry)setPhoto(id,ent
 function recropPhoto(id,e){e.stopPropagation();if(!PE[id])return;PhotoKit.recrop(PE[id],entry=>{if(entry)setPhoto(id,entry);});}
 function dpx(id,e){e.stopPropagation();const s=document.getElementById(id);const img=s.querySelector('img');if(img)img.remove();s.classList.remove('hp');s.querySelector('.phi').style.display='';s.querySelector('.pht').style.display='';const sz=document.getElementById(id+'-sz');if(sz)sz.textContent='';delete PS[id];delete PSD[id];delete PE[id];}
 
+// Called by load-merge-modal.js after a Load & Merge or a revision-banner
+// restore, with photoUrls shaped {slotId: [{url,caption,w,h,widthCm,heightCm}]}
+// — the group key here IS a PSLOTS slot id (see buildApprovalPhotos() below,
+// which is the upload-side mirror of this function and builds that same
+// {slotId:[{src,caption}]} shape). This file's photo state is one photo per
+// slot (PS/PSD/PE, see setPhoto() above), so each slot only ever needs its
+// LAST (newest) entry restored, not the whole array — a slot's array only
+// has more than one entry when the merge picker unions several past
+// submissions' single photo for that slot together.
+// Fill-blank-only unless overwrite: never clobber a photo the technician has
+// already added to a slot in this session. Resilient per photo: one failed
+// Storage.toDataUrl() (network hiccup, deleted Drive file) is skipped, not
+// allowed to abort the rest.
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  let restored=0;
+  for(const slotId of Object.keys(photoUrls||{})){
+    const list=photoUrls[slotId];
+    if(!Array.isArray(list)||!list.length)continue;
+    if(!overwrite&&PS[slotId])continue; // slot already has a photo — merge mode leaves it alone
+    const src=list[list.length-1];
+    if(!src||!src.url)continue;
+    try{
+      const dataUrl=await Storage.toDataUrl(src.url);
+      if(!dataUrl)continue;
+      setPhoto(slotId,{
+        src:dataUrl,
+        dataUrl:dataUrl,
+        w:src.w,
+        h:src.h,
+        widthCm:src.widthCm||8.8,
+        heightCm:src.heightCm||5.6,
+      });
+      const capEl=document.getElementById(slotId+'-cap');
+      if(capEl&&src.caption)capEl.value=src.caption;
+      restored++;
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal memulihkan foto slot '+slotId,e);
+    }
+  }
+  return restored;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
 // SIGNATURE
 function initSig(id){const c=document.getElementById(id);const ctx=c.getContext('2d');let dr=false;function p(e){const r=c.getBoundingClientRect();const sx=c.width/r.width;const sy=c.height/r.height;if(e.touches)return{x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};}c.addEventListener('mousedown',e=>{dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);});c.addEventListener('mousemove',e=>{if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();});c.addEventListener('mouseup',()=>dr=false);c.addEventListener('mouseleave',()=>dr=false);c.addEventListener('touchstart',e=>{e.preventDefault();dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);},{passive:false});c.addEventListener('touchmove',e=>{e.preventDefault();if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();},{passive:false});c.addEventListener('touchend',()=>dr=false);}
 function clrSig(id){const c=document.getElementById(id);c.getContext('2d').clearRect(0,0,c.width,c.height);}

@@ -450,6 +450,63 @@ function pickPhoto(el,id){PhotoKit.upload(el,{},entry=>{if(entry)setPhoto(id,ent
 function recropPhoto(id,e){e.stopPropagation();if(!PE[id])return;PhotoKit.recrop(PE[id],entry=>{if(entry)setPhoto(id,entry);});}
 function dpx(id,e){e.stopPropagation();const s=document.getElementById(id);const img=s.querySelector('img');if(img)img.remove();s.classList.remove('hp');s.querySelector('.phi').style.display='';s.querySelector('.pht').style.display='';const sz=document.getElementById(id+'-sz');if(sz)sz.textContent='';delete PS[id];delete PSD[id];delete PE[id];}
 
+// REVIEW & APPROVAL WORKFLOW — restore evidence photos from Drive URLs after a
+// Load & Merge pick or a revision-banner "load for revision". Called by
+// load-merge-modal.js's restorePhotosIfSupported() if this function exists —
+// see that function's header comment for the calling contract.
+//
+// This file's photo state is NOT a free-count gallery — it's a fixed set of
+// named slots (PSLOTS: ph1..ph6), one photo per slot, mirrored across three
+// parallel objects (PS[id]=src, PSD[id]={w,h}, PE[id]=full PhotoKit entry)
+// plus a caption typed into a separate `${id}-cap` input (see setPhoto() and
+// submitToDb()'s own `photos[p.id] = [{...entry, caption: vv(p.id+'-cap')}]`,
+// which is exactly why photoUrls here is keyed by slot id). setPhoto() is
+// this file's own single choke point for populating+rendering a slot, so
+// reuse it rather than poking PS/PSD/PE by hand.
+window.restorePhotosFromUrls = async function(photoUrls, overwrite){
+  let restored = 0;
+  if(!photoUrls || typeof photoUrls!=='object') return restored;
+  for(const slotId of Object.keys(photoUrls)){
+    const list = photoUrls[slotId];
+    if(!Array.isArray(list) || !list.length) continue;
+    // Only known slots have DOM (mkPhotos() only builds ph1..ph6); setPhoto()
+    // assumes document.getElementById(slotId) exists.
+    if(!PSLOTS.some(p=>p.id===slotId)) continue;
+    // Merge mode: never touch a slot the technician already populated this
+    // session — same fill-blank-only rule the rest of the merge system uses
+    // for text fields. Overwrite mode always replaces.
+    if(!overwrite && PE[slotId]) continue;
+
+    const src = list[0]; // one photo per slot in this sheet's shape
+    if(!src || !src.url) continue;
+    let dataUrl;
+    try{
+      dataUrl = await Storage.toDataUrl(src.url);
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal mengambil foto slot '+slotId,e);
+      continue; // one bad fetch must not abort the rest
+    }
+    if(!dataUrl) continue;
+
+    let widthCm = src.widthCm, heightCm = src.heightCm;
+    if(!(widthCm>0) || !(heightCm>0)){
+      // Older saved entries may carry no print size — fit into this sheet's
+      // own configured default box (8.8 x 5.6cm, see PhotoKit.configure below)
+      // keeping the photo's real aspect ratio (same maths PhotoKit itself
+      // uses), rather than guessing an unrelated fixed size.
+      const f = IMG.fit(8.8,5.6,(src.w&&src.h)?{w:src.w,h:src.h}:null);
+      widthCm = f.w; heightCm = f.h;
+    }
+
+    setPhoto(slotId,{src:dataUrl,dataUrl:dataUrl,w:src.w,h:src.h,widthCm:widthCm,heightCm:heightCm});
+    const capEl = document.getElementById(slotId+'-cap');
+    if(capEl) capEl.value = src.caption||'';
+
+    restored++;
+  }
+  return restored;
+};
+
 // SIGNATURE
 function initSig(id){const c=document.getElementById(id);const ctx=c.getContext('2d');let dr=false;function p(e){const r=c.getBoundingClientRect();const sx=c.width/r.width;const sy=c.height/r.height;if(e.touches)return{x:(e.touches[0].clientX-r.left)*sx,y:(e.touches[0].clientY-r.top)*sy};return{x:(e.clientX-r.left)*sx,y:(e.clientY-r.top)*sy};}c.addEventListener('mousedown',e=>{dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);});c.addEventListener('mousemove',e=>{if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();});c.addEventListener('mouseup',()=>dr=false);c.addEventListener('mouseleave',()=>dr=false);c.addEventListener('touchstart',e=>{e.preventDefault();dr=true;const q=p(e);ctx.beginPath();ctx.moveTo(q.x,q.y);},{passive:false});c.addEventListener('touchmove',e=>{e.preventDefault();if(!dr)return;const q=p(e);ctx.strokeStyle='#2c3e30';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(q.x,q.y);ctx.stroke();},{passive:false});c.addEventListener('touchend',()=>dr=false);}
 function clrSig(id){const c=document.getElementById(id);c.getContext('2d').clearRect(0,0,c.width,c.height);}

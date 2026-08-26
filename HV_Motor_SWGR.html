@@ -1760,6 +1760,56 @@ function openLoadMergeModal(){
   LoadMergeModal.open();
 }
 
+// Restores evidence photos previously uploaded to Drive (via
+// Approvals.submitWithFiles()) back into this file's own PHOTOS / TREND_PHOTOS
+// galleries. Called by load-merge-modal.js's restorePhotosIfSupported() after a
+// Load & Merge or a revision-banner "load for revision" -- see that file's
+// header comment for the calling contract. Group keys 'main' -> PHOTOS
+// (evidence gallery) and 'trend' -> TREND_PHOTOS (megger trend pictures) match
+// exactly what submitToDb() already passes as
+// `photos: { main: PHOTOS, trend: TREND_PHOTOS }`.
+//
+// overwrite=true: the group is replaced entirely with the restored photos.
+// overwrite=false (merge mode): a group already containing photos the
+// technician added THIS session is left untouched -- never appended to or
+// replaced -- same fill-blank-only spirit as every other merged field.
+//
+// Resilient by design: one photo's failed Storage.toDataUrl() (network hiccup,
+// deleted Drive file) is skipped, not fatal to the rest.
+async function restorePhotosFromUrls(photoUrls, overwrite){
+  const GROUPS = { main: () => PHOTOS, trend: () => TREND_PHOTOS };
+  let restored = 0;
+  for(const key of Object.keys(photoUrls || {})){
+    if(!GROUPS[key]) continue;                 // unknown group -- nothing to restore into
+    const list = photoUrls[key] || [];
+    if(!list.length) continue;
+    if(!overwrite && GROUPS[key]().length > 0) continue; // fill-blank-only: already has content
+    const rebuilt = [];
+    for(const entry of list){
+      if(!entry || !entry.url) continue;
+      try{
+        const dataUrl = await Storage.toDataUrl(entry.url);
+        const photo = { src: dataUrl, dataUrl: dataUrl, caption: entry.caption || '' };
+        if(entry.w != null) photo.w = entry.w;
+        if(entry.h != null) photo.h = entry.h;
+        if(entry.widthCm != null) photo.widthCm = entry.widthCm;
+        if(entry.heightCm != null) photo.heightCm = entry.heightCm;
+        rebuilt.push(photo);
+      }catch(e){
+        console.error('restorePhotosFromUrls: gagal ambil foto', entry.url, e);
+        // skip this one photo, keep going -- one bad fetch must not abort the rest
+      }
+    }
+    if(!rebuilt.length) continue;               // total failure: leave the group as-is
+    if(key === 'main') PHOTOS = rebuilt; else TREND_PHOTOS = rebuilt;
+    restored += rebuilt.length;
+  }
+  renderPhotos();
+  renderTrendPhotos();
+  return restored;
+}
+window.restorePhotosFromUrls = restorePhotosFromUrls;
+
 // ═══════════════════════════════════════════════════
 //  INIT
 // ═══════════════════════════════════════════════════

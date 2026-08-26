@@ -1384,6 +1384,55 @@ function loadDraft(){
 }
 
 /* ══════════════════════════════════════════════════
+   PHOTO RESTORE (Load & Merge / revision banner hook)
+   Called by load-merge-modal.js after a Load & Merge confirm or a
+   revision-banner "load for revision", with the photoUrls this
+   submission (or the merged set) uploaded to Drive on a past submit —
+   see Approvals.submitWithFiles's photos:{all:PHOTOS} call in
+   submitToDb() below: this file only ever uses ONE group ('all'),
+   since PHOTOS is a flat array (its own gallery), not grouped by
+   equipment/zone the way some other check sheets are. So every entry
+   across every photoUrls group is flattened into one list and applied
+   to the single PHOTOS gallery as a whole — there is no per-slot
+   mapping to reverse here, unlike a named-slot photo system.
+══════════════════════════════════════════════════ */
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls)return 0;
+  const entries=[];
+  Object.keys(photoUrls).forEach(k=>{(photoUrls[k]||[]).forEach(e=>entries.push(e));});
+  if(!entries.length)return 0;
+
+  // Merge mode (overwrite===false): never touch a gallery the technician has
+  // already started filling in this session — same fill-blank-only spirit
+  // the rest of the merge system uses for text fields.
+  if(!overwrite&&PHOTOS.length>0)return 0;
+
+  const restored=[];
+  for(const entry of entries){
+    try{
+      const dataUrl=await Storage.toDataUrl(entry.url);
+      if(!dataUrl)continue;
+      restored.push({
+        src:dataUrl,
+        caption:entry.caption||'',
+        widthCm:entry.widthCm,
+        heightCm:entry.heightCm
+      });
+    }catch(e){
+      // One failed fetch (network hiccup, deleted Drive file) must not abort
+      // the rest — skip this photo and keep going.
+      console.error('restorePhotosFromUrls: gagal memuat satu foto, dilewati:',entry.url,e);
+    }
+  }
+  if(!restored.length)return 0;
+
+  PHOTOS=overwrite?restored:PHOTOS.concat(restored);
+  renderPhotos();
+  return restored.length;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
+/* ══════════════════════════════════════════════════
    SUBMIT TO FIRESTORE
 ══════════════════════════════════════════════════ */
 async function submitToDb(){

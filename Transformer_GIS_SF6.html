@@ -753,6 +753,64 @@ function collectPhotosForApproval(){
   return photos;
 }
 
+// Reverse of collectPhotosForApproval() — called by load-merge-modal.js after a
+// Load & Merge or a revision-banner "load for revision" restore, once the Drive
+// photoUrls for the source submission(s) are known. photoUrls is keyed by the
+// SAME slot ids collectPhotosForApproval() used to save them (PSLOTS[].id), each
+// holding an array — but this file's photo state is a fixed single-photo-per-slot
+// system, not a free-count gallery, so only the first entry of any slot's array
+// is ever relevant here (there is nowhere in the UI for a 2nd photo in one slot
+// to go). w/h/widthCm/heightCm may be absent on older saved entries; widthCm/
+// heightCm fall back to this file's own PhotoKit.configure() defaults (8.8/5.6,
+// set at init below) so setPhoto()'s size label never renders "undefined", and
+// missing w/h are backfilled via PhotoKit.prepare() (measures the real image)
+// before setPhoto() is called, so the PDF's aspect-ratio math still has real
+// pixel dimensions to work with.
+window.restorePhotosFromUrls = async function restorePhotosFromUrls(photoUrls, overwrite){
+  if (!photoUrls || typeof photoUrls !== 'object') return 0;
+  let restored = 0;
+  for (const slotId of Object.keys(photoUrls)) {
+    try {
+      const list = photoUrls[slotId];
+      if (!Array.isArray(list) || !list.length) continue;
+      if (!document.getElementById(slotId)) continue; // not one of this file's known photo slots
+      if (!overwrite && PS[slotId]) continue; // merge mode: never clobber a slot the technician already filled
+      const src = list[0];
+      if (!src || !src.url) continue;
+      let dataUrl;
+      try {
+        dataUrl = await Storage.toDataUrl(src.url);
+      } catch (e) {
+        console.error('restorePhotosFromUrls: Storage.toDataUrl failed for slot', slotId, e);
+        continue;
+      }
+      if (!dataUrl) continue;
+      const entry = {
+        src: dataUrl,
+        dataUrl: dataUrl,
+        w: src.w,
+        h: src.h,
+        widthCm: src.widthCm != null ? src.widthCm : 8.8,
+        heightCm: src.heightCm != null ? src.heightCm : 5.6,
+        caption: src.caption || ''
+      };
+      if ((!entry.w || !entry.h) && window.PhotoKit && typeof PhotoKit.prepare === 'function') {
+        try {
+          const filled = await PhotoKit.prepare([entry]);
+          if (filled && filled[0]) Object.assign(entry, filled[0]);
+        } catch (e) { /* fall back to entry without measured w/h */ }
+      }
+      setPhoto(slotId, entry);
+      const capEl = document.getElementById(slotId + '-cap');
+      if (capEl) capEl.value = entry.caption;
+      restored++;
+    } catch (e) {
+      console.error('restorePhotosFromUrls: failed to restore slot', slotId, e);
+    }
+  }
+  return restored;
+};
+
 async function loadLastSubmission() {
   try {
     const snap = await db.collection('checksheets')

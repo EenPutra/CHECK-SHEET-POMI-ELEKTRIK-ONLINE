@@ -6719,6 +6719,55 @@ function removePhoto(key, idx){
   autoSaveNow();
 }
 
+// Called by load-merge-modal.js after a Load & Merge / revision-banner
+// restore, once the Drive photoUrls for the source submission(s) are known
+// — see CLAUDE.md's "Review & Approval Workflow" section. photoUrls is
+// keyed by the same inverter key PHOTOS already uses (see
+// uploadAllPhotosToStorage() above), so no key translation is needed here,
+// unlike sheets with a fixed-slot or flat-array photo shape.
+async function restorePhotosFromUrls(photoUrls, overwrite){
+  if(!photoUrls || typeof photoUrls !== 'object') return 0;
+  let restored = 0;
+  for(const key of Object.keys(photoUrls)){
+    const list = photoUrls[key];
+    if(!Array.isArray(list) || !list.length) continue;
+    // Fill-blank-only in merge mode: a technician's own in-progress photos
+    // for this inverter must never be silently clobbered by a merge.
+    if(!overwrite && PHOTOS[key] && PHOTOS[key].length) continue;
+    const entries = [];
+    for(const src of list){
+      if(!src || !src.url) continue;
+      try{
+        const dataUrl = await Storage.toDataUrl(src.url);
+        const entry = {
+          src: dataUrl, dataUrl,
+          w: src.w, h: src.h,
+          widthCm: src.widthCm, heightCm: src.heightCm,
+          caption: src.caption || '',
+        };
+        // Older saved photos (before Approvals.submitWithFiles started
+        // carrying w/h/widthCm/heightCm) won't have real dimensions —
+        // measure them now so PhotoKit.fit()/draw() still has real pixel
+        // sizes to work with instead of silently falling back to a
+        // stretched/default box.
+        if((!entry.w || !entry.h) && window.PhotoKit && typeof PhotoKit.prepare === 'function'){
+          try{ const filled = await PhotoKit.prepare([entry]); if(filled && filled[0]) Object.assign(entry, filled[0]); }
+          catch(e){ /* fall back to entry without measured w/h */ }
+        }
+        entries.push(entry);
+      }catch(e){
+        console.error('restorePhotosFromUrls: gagal memuat foto', src.url, e);
+      }
+    }
+    if(!entries.length) continue;
+    PHOTOS[key] = entries;
+    renderPhotos(key);
+    restored += entries.length;
+  }
+  return restored;
+}
+window.restorePhotosFromUrls = restorePhotosFromUrls;
+
 // ═══════════════════════════════════════════════════
 //  DRAFT (localStorage — generic sweep of every id'd field, + photos in
 //  their own key so a quota error on photos can't take the draft down too)

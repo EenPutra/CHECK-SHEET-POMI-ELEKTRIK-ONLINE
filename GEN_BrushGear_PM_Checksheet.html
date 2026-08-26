@@ -914,6 +914,71 @@ function removeFile(idx){
   updateFileCountLabel();
 }
 
+// Review & Approval workflow hook — called by load-merge-modal.js after a
+// Load & Merge or a revision-banner "load for revision" restore, if
+// Storage.toDataUrl() successfully resolved a Drive-proxy photoUrls map for
+// the loaded submission(s). See load-merge-modal.js's header comment for the
+// exact {groupKey:[{url,caption,w,h,widthCm,heightCm}, ...]} shape.
+//
+// This file has ONE flat, ungrouped photo gallery (FILES[], filtered by
+// type.startsWith('image/')) rather than named slots per group — unlike a
+// per-slot check sheet, there's no separate destination per groupKey to map
+// into, so every group key present in photoUrls is pooled into that same
+// single gallery. "Currently empty" (for the fill-blank-only merge case) is
+// judged by whether FILES already holds any image entry, not by group key.
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls||typeof photoUrls!=='object')return 0;
+  const hasExistingPhotos=FILES.some(f=>f&&f.type&&f.type.startsWith('image/'));
+  if(hasExistingPhotos&&overwrite!==true){
+    // Fill-blank-only: a technician's own in-progress photos in this session
+    // must never be silently overwritten by a merge.
+    return 0;
+  }
+  const allEntries=[];
+  Object.keys(photoUrls).forEach(key=>{
+    const arr=photoUrls[key];
+    if(Array.isArray(arr))arr.forEach(e=>allEntries.push(e));
+  });
+  if(allEntries.length===0)return 0;
+
+  if(overwrite===true&&hasExistingPhotos){
+    FILES.forEach((f,idx)=>{
+      if(f&&f.type&&f.type.startsWith('image/')){
+        FILES[idx]=null;
+        const t=document.getElementById('thumb-'+idx);
+        if(t)t.remove();
+      }
+    });
+  }
+
+  let restored=0;
+  for(const item of allEntries){
+    if(!item||!item.url)continue;
+    let dataUrl;
+    try{
+      dataUrl=await Storage.toDataUrl(item.url);
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal mengambil foto dari Drive',item.url,e);
+      continue;
+    }
+    if(!dataUrl)continue;
+    const entry={
+      name:item.caption||'photo.jpg',
+      type:'image/jpeg',
+      size:Math.round(dataUrl.length*0.75),
+      dataUrl,
+      w:item.w,h:item.h,
+      widthCm:item.widthCm,heightCm:item.heightCm,
+    };
+    FILES.push(entry);
+    renderPhoto(entry,FILES.length-1);
+    restored++;
+  }
+  if(restored>0)updateFileCountLabel();
+  return restored;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
 // ══════════════════════════════════════════════════
 //  DRAFT (localStorage)
 // ══════════════════════════════════════════════════

@@ -1494,6 +1494,58 @@ function gv(id){const e=document.getElementById(id);return e?e.value.trim():'';}
 // (msg,type) signature, so just bridge the name.
 function showNote(msg,type){ showNotice(msg,type); }
 
+// Called by load-merge-modal.js after a Load & Merge / revision-banner
+// restore, once the Drive photoUrls for the source submission(s) are known
+// — see CLAUDE.md's "Review & Approval Workflow" section. submitToDb()
+// saves photos keyed by 'block'+i (the BLOCKS array index at submit time —
+// see its `photos['block'+i]=b.photos` line below), but BLOCKS is a
+// free-form, reorderable list the technician can add to/remove from/
+// reorder between the original submission and a later revision session, so
+// an index that matched an image block at submit time may no longer point
+// at one (or may not exist at all) by the time this restore runs. Rather
+// than silently drop those photos when the index doesn't line up, this
+// appends a fresh image block to hold them — preserves every photo, just
+// not necessarily in its original position, which is the safer trade-off
+// (the technician can freely reorder blocks after restoring; they cannot
+// recover a silently-dropped photo).
+async function restorePhotosFromUrls(photoUrls, overwrite){
+  if(!photoUrls || typeof photoUrls !== 'object') return 0;
+  let restored = 0;
+  for(const groupKey of Object.keys(photoUrls)){
+    const list = photoUrls[groupKey];
+    if(!Array.isArray(list) || !list.length) continue;
+    const m = /^block(\d+)$/.exec(groupKey);
+    const idx = m ? parseInt(m[1],10) : -1;
+    let block = (idx>=0 && BLOCKS[idx] && BLOCKS[idx].type==='image') ? BLOCKS[idx] : null;
+    if(!block){
+      block = {id:uid(), type:'image', photos:[]};
+      BLOCKS.push(block);
+    }
+    // Fill-blank-only in merge mode: a technician's own in-progress photos
+    // in this block must never be silently clobbered by a merge.
+    if(!overwrite && block.photos && block.photos.length) continue;
+    const entries = [];
+    for(const src of list){
+      if(!src || !src.url) continue;
+      try{
+        const dataUrl = await Storage.toDataUrl(src.url);
+        entries.push({
+          src:dataUrl, w:src.w, h:src.h, widthCm:src.widthCm, heightCm:src.heightCm,
+          filename:'photo.jpg', caption:src.caption||'', size:'m', full:false,
+        });
+      }catch(e){
+        console.error('restorePhotosFromUrls: gagal memuat foto', src.url, e);
+      }
+    }
+    if(!entries.length) continue;
+    block.photos = entries;
+    restored += entries.length;
+  }
+  if(restored>0) renderBlocks();
+  return restored;
+}
+window.restorePhotosFromUrls = restorePhotosFromUrls;
+
 async function submitToDb(){
   const woDate=gv('wo-date'), pic=gv('pic');
   if(!woDate){ showNotice('❌ Isi tanggal terlebih dahulu.','err'); return; }

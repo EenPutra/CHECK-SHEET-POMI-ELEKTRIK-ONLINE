@@ -1013,6 +1013,46 @@ function loadPhotoDraft(){
   }catch(e){}
 }
 
+// Load & Merge / revision-banner photo restore hook (see load-merge-modal.js's
+// restorePhotosIfSupported()). This file uploads its whole gallery under one
+// group key ('main' — see photos:{main:PHOTOS} in submitToDb() below), so
+// every group's entries are just flattened back into the one flat PHOTOS[]
+// array this file already uses everywhere else. `overwrite:false` (merge
+// mode) never touches an already-populated gallery — same fill-blank-only
+// rule the rest of the merge system uses for text fields, so a technician's
+// own in-progress photos are never silently replaced.
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls)return 0;
+  const entries=Object.values(photoUrls).reduce((a,arr)=>a.concat(arr||[]),[]);
+  if(!entries.length)return 0;
+  if(!overwrite && PHOTOS.length)return 0; // gallery already has technician-added photos: leave it alone
+
+  const restored=[];
+  for(const entry of entries){
+    if(!entry||!entry.url)continue;
+    try{
+      const dataUrl=await Storage.toDataUrl(entry.url);
+      if(!dataUrl)continue;
+      restored.push({
+        src:dataUrl,dataUrl:dataUrl,
+        caption:entry.caption||'',
+        w:entry.w,h:entry.h,
+        widthCm:entry.widthCm,heightCm:entry.heightCm,
+      });
+    }catch(e){
+      console.error('restorePhotosFromUrls: gagal memulihkan satu foto',e);
+      // keep going — one bad/expired Drive link must not abort the rest
+    }
+  }
+  if(!restored.length)return 0;
+
+  PHOTOS=overwrite?restored:PHOTOS.concat(restored); // PHOTOS confirmed empty above when !overwrite
+  renderPhotos();
+  try{ savePhotoDraft(); }catch(e){} // this file has no autoSaveNow(); persist ourselves so a refresh doesn't lose the restore
+  return restored.length;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
 // ── INIT ───────────────────────────────────────────
 PhotoKit.configure({maxWcm:8.9,maxHcm:9,defaultWcm:8.9,defaultHcm:6.3});  // 3-up grid on landscape A4
 renderPhotos();

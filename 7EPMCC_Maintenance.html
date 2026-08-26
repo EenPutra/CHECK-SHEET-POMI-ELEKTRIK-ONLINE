@@ -580,6 +580,74 @@ function buildPhotosForUpload(){
   return out;
 }
 
+// Reverse of buildPhotosForUpload(): takes the {groupKey:[{url,caption,w,h,
+// widthCm,heightCm}]} bundle load-merge-modal.js builds from Drive-uploaded
+// photos (see its restorePhotosIfSupported()) and rebuilds real photoStore
+// slots from it. groupKey here is "activity"/"cleaning", same prefix
+// buildPhotosForUpload() grouped by and the same string addPhoto(type)/the
+// '<type>-grid' DOM ids use, so this is a straight round-trip of that shape.
+// overwrite:true replaces a group's existing slots outright; overwrite:false
+// (merge mode) only fills a group that currently has ZERO photos, so a
+// technician's own in-progress photos in a group are never touched.
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls||typeof photoUrls!=='object')return 0;
+  var total=0;
+  var groups=Object.keys(photoUrls);
+  for(var gi=0;gi<groups.length;gi++){
+    var type=groups[gi];
+    var entries=photoUrls[type];
+    if(!Array.isArray(entries)||!entries.length)continue;
+    // Only "activity"/"cleaning" have a grid/badge/counter in this file's
+    // DOM (addPhoto() assumes they exist) — skip anything else defensively.
+    if(!document.getElementById(type+'-grid'))continue;
+
+    var hasExisting=Object.keys(photoStore).some(function(k){return k.indexOf(type+'_')===0;});
+    if(hasExisting&&!overwrite)continue; // fill-blank-only: group already has photos
+
+    if(hasExisting&&overwrite){
+      Object.keys(photoStore).filter(function(k){return k.indexOf(type+'_')===0;}).forEach(function(k){
+        delete photoStore[k];delete PE[k];
+      });
+      var grid=document.getElementById(type+'-grid');
+      if(grid)grid.innerHTML='';
+      photoCounts[type]=0;
+    }
+
+    for(var i=0;i<entries.length;i++){
+      var entry=entries[i];
+      if(!entry||!entry.url)continue;
+      var dataUrl;
+      try{
+        dataUrl=await Storage.toDataUrl(entry.url);
+      }catch(err){
+        console.error('restorePhotosFromUrls: gagal memuat foto ('+type+'):',err);
+        continue;
+      }
+      if(!dataUrl)continue;
+
+      var widthCm=entry.widthCm,heightCm=entry.heightCm;
+      if(!(widthCm>0)||!(heightCm>0)){
+        // Older/incomplete entries have no print size saved — fit into this
+        // file's configured default box (PhotoKit.configure above) at the
+        // photo's own aspect ratio rather than guessing a fixed size.
+        var box=(window.IMG&&IMG.fit)?IMG.fit(8.5,6,{w:entry.w,h:entry.h}):{w:8.5,h:6};
+        widthCm=box.w;heightCm=box.h;
+      }
+
+      addPhoto(type); // creates a fresh empty slot, increments photoCounts[type]
+      var n=photoCounts[type];
+      var id=type+'_'+n;
+      setPhoto(id,type,{src:dataUrl,dataUrl:dataUrl,w:entry.w,h:entry.h,widthCm:widthCm,heightCm:heightCm});
+      var capEl=document.getElementById('cap_'+id);
+      if(capEl)capEl.value=entry.caption||'';
+      total++;
+    }
+    refreshBadge(type);
+  }
+  return total;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
 // ── HELPERS ────────────────────────────────────────
 function gv(id){var e=document.getElementById(id);return e?e.value.trim():'';}
 function gT(id){return ST[id]||'—';}
