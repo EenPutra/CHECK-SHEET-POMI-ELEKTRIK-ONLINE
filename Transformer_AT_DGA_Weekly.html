@@ -12,6 +12,7 @@
 <script src="db-helper.js"></script>
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
+<script src="submit-guard.js"></script>
 <script src="load-merge-modal.js"></script>
 <script src="technician-auth.js"></script>
 <script src="img-helper.js"></script>
@@ -711,6 +712,7 @@ mkPhotos();initSig('sig-tech');initSig('sig-super');loadDraft();upStats();loadLa
 // Review & Approval workflow — load/merge picker + revision banner
 // (?reviseOf=<approvalId>). See load-merge-modal.js's header comment.
 LoadMergeModal.init({ assetTag: '7EX-XFMR-AT-DGA' });
+SubmitGuard.init({ assetTag: '7EX-XFMR-AT-DGA' });
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "checked-by" });
 
@@ -798,10 +800,15 @@ async function submitToDb(){
   if (!data.executionDate) { DB.showSubmitResult(false, 'Isi tanggal eksekusi terlebih dahulu.'); return; }
   if (!data.checkedBy) { DB.showSubmitResult(false, 'Isi nama teknisi terlebih dahulu.'); return; }
 
+  const target = await SubmitGuard.resolveSubmitTarget(data.woNumber);
+  if (target.mode === 'cancel') return;
+
   let id;
   try {
-    id = await DB.save(data);
+    SubmitGuard.setProgress(5, 'Menyimpan data checklist...');
+    id = target.mode === 'overwrite' ? await DB.update(target.targetId, data) : await DB.save(data);
   } catch(e) {
+    SubmitGuard.hideProgress();
     DB.showSubmitResult(false, 'Gagal menyimpan: ' + e.message);
     return;
   }
@@ -829,11 +836,17 @@ async function submitToDb(){
       checksheetFile: 'Transformer_AT_DGA_Weekly.html',
       submittedBy: data.checkedBy,
       revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId: target.mode === 'overwrite' ? target.approvalId : null,
+      onProgress: (pct, label) => SubmitGuard.setProgress(10 + Math.round(pct*0.85), label),
     });
   } catch(e) {
     filesOk = false;
     console.error('Upload foto/PDF/approval record gagal:', e);
   }
+
+  SubmitGuard.markSubmitted(id, {woNumber: data.woNumber, executionDate: data.executionDate, checkedBy: data.checkedBy});
+  SubmitGuard.setProgress(100, 'Selesai!');
+  setTimeout(() => SubmitGuard.hideProgress(), 500);
 
   if (filesOk) {
     DB.showSubmitResult(true, 'Data, foto & PDF berhasil disimpan ke database! ID: ' + id);
