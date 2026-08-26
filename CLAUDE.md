@@ -937,6 +937,78 @@ that the button's count matches `allDataRaw.length - allData.length` exactly
 without ever calling `executeDelete()` in that verification, since that
 would actually delete production data.
 
+## `dashboard.html` — role-based views (technician / techop2 / supervisor / admin)
+
+Before this, `dashboard.html`'s login only checked username/password — it never read
+`userData.role`, so every logged-in account (including a self-registered `technician` account,
+see "Review & Approval Workflow" below) saw the exact same full dashboard: every submission from
+every technician, plus the destructive delete/dedupe buttons. This was an explicit user request
+to fix, discussed and confirmed before any code was written: reuse the **same 4 roles** already
+established by `dashboard_users`/`Review_Approval_Dashboard.html`/`technician-auth.js`
+(`technician`/`techop2`/`supervisor`/`admin`), not a new role system, and split the difference
+along two independent axes — see the matrix below.
+
+|  | technician | techop2 | supervisor | admin |
+|---|---|---|---|---|
+| Data scope | own submissions only | all | all | all |
+| Layout | simplified (stat cards + table only) | full | full | full |
+| 3 analytical charts + Transformer PM Trend panel | hidden | visible | visible | visible |
+| Row-select checkboxes, Delete, Hapus Duplikat | hidden | hidden | visible | visible |
+| Excel export | visible (own data only) | visible (all) | visible | visible |
+
+- **Session is now unified with the rest of the app.** `doLogin()` and the session-restore path
+  now also read/write `dashboard_role` and `dashboard_name` in `sessionStorage` — the exact same
+  keys `Review_Approval_Dashboard.html` and `technician-auth.js` already use — so a login on any
+  one of those pages is recognized on `dashboard.html` too, in the same tab, with no second
+  login. **`checkSession()` is now `async`** and backfills role+name from a one-time Firestore
+  lookup when it finds `dashboard_user` set but no `dashboard_role` cached — this covers a
+  cross-page session created before this feature existed, or any other path that only ever set
+  `dashboard_user`. Without this, such a session would silently fall through to the unscoped
+  full view instead of the correct role-gated one; verified via headless Chrome by seeding
+  exactly that partial sessionStorage state by hand and confirming the backfill runs and
+  `role-technician` still gets applied. `doLogout()` clears all three keys — since they're
+  shared, logging out here also logs the tab out of the other pages, which is the same tab-wide
+  behavior their own logout functions already have (e.g. `TechnicianAuth.logout()`).
+- **Two independent body-class toggles drive every role-gated element**, applied once in
+  `applyRoleUI()` (called from `showDashboard()`, after login/session-restore resolves):
+  `body.role-technician` (the simplified-layout axis — technician only) and `body.can-delete`
+  (the destructive-actions axis — admin/supervisor only, matches `loggedInRole==='admin' ||
+  loggedInRole==='supervisor'`, same boolean shape as `canReview`/`canApprove` already use in
+  `Review_Approval_Dashboard.html`). Elements carry a `full-only` or `del-only` class instead of
+  each getting its own inline check — `.chart-grid`, `.chart-row-2`, `#trend-card` are
+  `full-only`; the table's checkbox `<th>`/`<td>`, `#del-bar`, and `#btn-del-duplicates` are
+  `del-only`.
+- **The CSS hide rules use `!important`, and that's load-bearing, not decoration.**
+  `#btn-del-duplicates` and `#del-bar` also get their `style.display` set directly by other,
+  unrelated JS (`applyDedupeToggle()`, `updateDelBar()`) — an inline style always wins over a
+  plain class-based stylesheet rule regardless of specificity, so without `!important` a
+  technician account could still make the "Hapus Duplikat" button reappear simply by the dataset
+  happening to contain real duplicates (which sets `style.display='inline-flex'` on it, unrelated
+  to role). Confirmed both ways via headless Chrome with a real duplicate pair injected into a
+  mocked `checksheets` query: technician's `computedDisplay` stayed `none` despite the button's
+  own inline `style.display` being `inline-flex`; supervisor's showed through as intended.
+- **Data scoping happens ONCE, right where `allDataRaw` is first fetched in `loadData()`**, not
+  separately in the table/stats/charts/export code: for `technician`, `allDataRaw` is filtered
+  down to docs whose `checkedBy` (trimmed, lower-cased) matches the logged-in account's `name`
+  (falling back to `username`) before `applyDedupeToggle()` (which derives `allData`, the stat
+  cards, and the charts) ever runs — so `filteredData`/Excel export/the table/the asset-filter
+  dropdown are all automatically scoped for free, no second filter needed at any of those call
+  sites. Verified with synthetic docs including a same-name-different-casing pair (`'Budi
+  Santoso'` vs `'budi santoso'`) — both matched, confirming the comparison is genuinely
+  case-insensitive and not just a lucky exact match.
+- **This name-match is a known-imperfect heuristic, not a security boundary** — `checkedBy` is
+  the only submitter-identity field the data contract guarantees (see "The data contract"
+  above), and it's free-typed text on older submissions (pre-`technician-auth.js`), so a typo or
+  a nickname means a technician's own old submission can silently not show up in their own scoped
+  view. Deliberately NOT fuzzy-matched to compensate — a looser match risks pulling in a
+  different person's data instead, which is the worse failure mode. The `#scope-note` banner
+  (shown only under `body.role-technician`) tells the technician to contact an admin if something
+  they submitted seems to be missing, rather than the dashboard silently claiming completeness it
+  can't guarantee. Firestore security rules remain fully open on this collection (see "Review &
+  Approval Workflow" below) — this scoping is a UI-layer convenience for a trusted internal tool,
+  the same trust model every other role check in this codebase (`canReview`/`canApprove`, etc.)
+  already relies on, not a new one introduced here.
+
 ## Review & Approval Workflow (`Review_Approval_Dashboard.html`)
 
 A TechOp2-review → Supervisor-approval sign-off flow layered on top of check sheet
