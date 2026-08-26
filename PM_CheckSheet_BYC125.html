@@ -13,6 +13,7 @@
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
 <script src="load-merge-modal.js"></script>
+<script src="technician-auth.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -873,6 +874,7 @@ loadDraft();updateStats();
 
 LoadMergeModal.init({assetTag:'7EB-BYC-125 A/B'});
 LoadMergeModal.initRevisionBanner();
+TechnicianAuth.init({ checkedByFieldId: "checked-by" });
 
 // Auto-load last submission from database
 setTimeout(async()=>{

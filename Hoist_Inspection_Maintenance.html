@@ -12,6 +12,7 @@
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
 <script src="load-merge-modal.js"></script>
+<script src="technician-auth.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -1602,6 +1603,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   renderPhotos();
   LoadMergeModal.init({assetTag:document.getElementById('tag-no').value.trim(),headerMap:HOIST_HEADER_MAP});
   LoadMergeModal.initRevisionBanner();
+TechnicianAuth.init({ checkedByFieldId: "done-by" });
 });
 </script>
 </body>

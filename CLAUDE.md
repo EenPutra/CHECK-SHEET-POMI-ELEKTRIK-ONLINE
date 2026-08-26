@@ -1223,6 +1223,66 @@ though the exact same photos already exist in Drive from the original submission
      `savePhotoDraft()` directly instead — check whether a sheet actually defines `autoSaveNow`
      before assuming the generic path covers it.)
 
+## Technician login on check sheets — auto-filling "Checked By" (`technician-auth.js`)
+
+An optional, **non-blocking** login widget (`window.TechnicianAuth`) that lets a technician log
+in with their `dashboard_users` account (the same collection/login `dashboard.html` and
+`Review_Approval_Dashboard.html` already use, including accounts self-registered there — see
+"Review & Approval Workflow" above) so their Checked-By-equivalent field auto-fills with their
+real name instead of being typed by hand, and the review dashboard can trust it actually matches
+who submitted. **Deliberately not a login gate**: a technician who doesn't log in can still type
+that field manually and submit exactly like before this existed — no risk of a technician being
+locked out in the field over a forgotten password, bad signal, or a shared device with no
+account set up yet. Logging in only *upgrades* the experience (auto-fill + the field becomes
+read-only so it can't drift from the logged-in account by accident); it never restricts it. This
+was an explicit product decision (asked directly, chose "optional" over "mandatory") — don't
+change this to a hard requirement without checking first, it's load-bearing for field usability.
+
+**One script include + one `init()` call per check sheet, nothing else** — same self-injecting
+philosophy as `load-merge-modal.js`:
+```html
+<script src="db-helper.js"></script>
+<script src="technician-auth.js"></script>
+...
+<script> TechnicianAuth.init({ checkedByFieldId: 'checked-by' }); </script>
+```
+`checkedByFieldId` must match whatever this file's own header field is actually called — per
+"The data contract" above, this varies: 14 check sheets use `checked-by`, 7 use `done-by`
+(`7EPLCB4_Maintenance.html`, `7EPMCC_Maintenance.html`, `DRY_TRAFO_PM.html`,
+`HV_Motor_6Monthly_PM.html`, `HV_Motor_SWGR.html`, `Hoist_Inspection_Maintenance.html`,
+`LV_Motor_MCC.html`), and `Work_Activity_Record.html` uses `pic` (its "Person In Charge" field —
+this file has no PM checklist at all, see its own comments). Get this wrong and the widget
+silently does nothing (`init()` bails out early if the given field id doesn't exist on the page —
+by design, so a copy-paste mistake fails safe/invisibly rather than throwing and breaking the
+rest of the page).
+
+**Session is shared with the dashboards via the same sessionStorage keys**
+(`dashboard_user`/`dashboard_role`/`dashboard_name`/`dashboard_login_time`,
+`Review_Approval_Dashboard.html` also writes `dashboard_name` now, both on login — fetched from
+the account's `name` field, fallback to `username` for the techop2/supervisor/admin accounts
+created before that field existed — and on self-registration, where entering a full name is
+required). This means a technician who's already logged into `Review_Approval_Dashboard.html`
+and navigates to a check sheet **in the same browser tab** is recognized immediately with no
+second login — sessionStorage persists across same-tab navigation, just not across separate tabs
+or devices. A technician opening a check sheet cold (fresh tab, e.g. from `index.html`) sees the
+"🔑 Login untuk isi otomatis" button and logs in there directly; the modal is self-contained
+(same hashPass/Firestore-lookup logic as the dashboards' own login, just duplicated locally so
+this file has zero dependency on those pages being open).
+
+**What logging in actually does to the field**: sets its value to the logged-in name, sets
+`readOnly = true`, and fires synthetic `input`/`change` events on it (`field.dispatchEvent(...)`)
+so any of this codebase's existing delegated autosave listeners — see the "autosave" notes
+elsewhere in this file — pick up the change without needing their own dedicated handler. A small
+"✅ Login: `<name>` · Bukan Anda?" badge replaces the login button; the "Bukan Anda?" link calls
+`TechnicianAuth.logout()`, which clears the shared session, clears the field back to empty, and
+restores it to editable — for a shared device where a different technician takes over the same
+tablet/computer for the next visit.
+
+Widget DOM is injected as a sibling right after whichever wrapper (`.mf`, this codebase's common
+`<div class="mf"><label>...</label><input></div>` pattern) contains the Checked-By field, or
+right after the field itself if there's no such wrapper — works regardless of which check
+sheet's markup it runs inside, no HTML changes needed per file beyond the two lines above.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that

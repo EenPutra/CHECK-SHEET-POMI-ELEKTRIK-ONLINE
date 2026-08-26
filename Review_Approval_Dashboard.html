@@ -187,6 +187,7 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
       <div class="login-sub">📝 Daftar akun Technician baru</div>
       <div class="login-hint">Akun baru otomatis mendapat role <b>Technician</b> (untuk submit check sheet) — role lain (TechOp2/Supervisor/Admin) hanya bisa diberikan oleh admin lewat Firestore.</div>
       <form onsubmit="doRegister(event)">
+        <input type="text" class="login-field" id="reg-name" placeholder="Nama Lengkap (untuk isi Checked By otomatis)" autocomplete="name" required>
         <input type="text" class="login-field" id="reg-user" placeholder="Pilih username" autocomplete="username" required>
         <input type="password" class="login-field" id="reg-pass" placeholder="Pilih password" autocomplete="new-password" required minlength="4">
         <input type="password" class="login-field" id="reg-pass2" placeholder="Ulangi password" autocomplete="new-password" required minlength="4">
@@ -284,6 +285,10 @@ async function doLogin(e){
     sessionStorage.setItem('dashboard_user', loggedInUser);
     sessionStorage.setItem('dashboard_login_time', Date.now().toString());
     sessionStorage.setItem('dashboard_role', loggedInRole || '');
+    // dashboard_name: what check sheets' technician-auth.js widget shows/
+    // fills into Checked By — falls back to username for accounts created
+    // before this field existed (the techop2/supervisor/admin accounts).
+    sessionStorage.setItem('dashboard_name', userData.name || loggedInUser);
     showApp();
   }catch(err){
     console.error('Login error:', err);
@@ -305,6 +310,7 @@ function toggleAuthMode(mode){
 // admin-provisioned directly in Firestore (see CLAUDE.md).
 async function doRegister(e){
   e.preventDefault();
+  const name = document.getElementById('reg-name').value.trim();
   const user = document.getElementById('reg-user').value.trim().toLowerCase();
   const pass = document.getElementById('reg-pass').value;
   const pass2 = document.getElementById('reg-pass2').value;
@@ -312,6 +318,7 @@ async function doRegister(e){
   const btn = document.getElementById('register-btn');
   errEl.textContent = '';
 
+  if(!name){ errEl.textContent='Isi nama lengkap.'; return; }
   if(!user || !pass){ errEl.textContent='Isi username dan password.'; return; }
   if(!/^[a-z0-9._-]+$/.test(user)){ errEl.textContent='Username hanya boleh huruf kecil, angka, titik, garis bawah/strip (tanpa spasi).'; return; }
   if(pass.length < 4){ errEl.textContent='Password minimal 4 karakter.'; return; }
@@ -327,6 +334,7 @@ async function doRegister(e){
       username: user,
       password: hashed,
       role: 'technician',
+      name: name,
       createdAt: new Date().toISOString(),
     });
 
@@ -335,6 +343,7 @@ async function doRegister(e){
     sessionStorage.setItem('dashboard_user', loggedInUser);
     sessionStorage.setItem('dashboard_login_time', Date.now().toString());
     sessionStorage.setItem('dashboard_role', loggedInRole);
+    sessionStorage.setItem('dashboard_name', name);
     showApp();
   }catch(err){
     console.error('Register error:', err);
@@ -347,6 +356,7 @@ function doLogout(){
   sessionStorage.removeItem('dashboard_user');
   sessionStorage.removeItem('dashboard_login_time');
   sessionStorage.removeItem('dashboard_role');
+  sessionStorage.removeItem('dashboard_name');
   location.reload();
 }
 function checkSession(){

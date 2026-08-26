@@ -12,6 +12,7 @@
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
 <script src="load-merge-modal.js"></script>
+<script src="technician-auth.js"></script>
 <script src="img-helper.js"></script>
 <script src="photo-kit.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -1537,6 +1538,7 @@ PhotoKit.configure({maxWcm:9.0,maxHcm:20,defaultWcm:9.0,defaultHcm:6.5});
 // so an early click on "Pilih & Gabung" never throws.
 LoadMergeModal.init({ assetTag: document.getElementById('tag-search').value.trim() || '' });
 LoadMergeModal.initRevisionBanner();
+TechnicianAuth.init({ checkedByFieldId: "done-by" });
 loadDraft();
 updateStats();
 </script>
