@@ -1283,6 +1283,108 @@ Widget DOM is injected as a sibling right after whichever wrapper (`.mf`, this c
 right after the field itself if there's no such wrapper — works regardless of which check
 sheet's markup it runs inside, no HTML changes needed per file beyond the two lines above.
 
+## `UNIT 8/Maintenance_Corrective_Action.html` — RCA-driven corrective action report
+
+A 23rd check sheet, and the first one placed in a **subfolder** (`UNIT 8/`, note the trailing
+space in the folder name — confirmed intentional/pre-existing, not a typo to "fix") rather than
+the repo root. Every shared JS include and the `../index.html` back-link use a `../` prefix
+accordingly (`<script src="../db-helper.js">`, etc.) — there was no prior subfolder-placed check
+sheet to copy this convention from (`4000 Hours Mill/LV_Motor_MCC.html` is a legacy duplicate
+that doesn't use `../`-prefixed includes at all, so it's not a working precedent — see the
+"4000 Hours Mill" bullet under "The data contract" above). The portal's `href` for this card is
+therefore `'UNIT%208/Maintenance_Corrective_Action.html'` (URL-encoded space, matching the
+existing convention other multi-word `href`s in `index.html` already use, e.g.
+`Weekly%20Report%20Dashboard%20EIC7.html`) — a literal space in the `href` string would still
+often work in practice but breaks convention with every other portal entry.
+
+Covers sections A–L per the client's own "Maintenance Corrective Action" template (WO/asset ID,
+failure description, impact/severity, response team, chronology, findings, corrective action,
+root cause analysis, recommendations, parts used, attachments, authorization), plus the full
+standard feature stack (technician-auth login on `checked-by`, autosave draft, PhotoKit evidence
+photos, Load & Merge, Review & Approval submission via `Approvals.submitWithFiles()`, PDF export
+with the shared POMI letterhead). Two things about it don't match any other check sheet in this
+repo and are worth understanding before extending it:
+
+- **No fixed asset tag — every submission is about a different piece of equipment.** Unlike
+  every other check sheet (which has one fixed `assetTag`, or a small closed set for
+  multi-asset/tabbed sheets), a corrective action report can be raised against literally any
+  asset in the plant. Rather than leave `assetTag` blank (which would break `LoadMergeModal`'s
+  per-tag query and the dashboard's per-asset grouping), this sheet uses a synthetic constant
+  tag, `MCA_ASSET_TAG = 'MAINTENANCE-CORRECTIVE-ACTION'`, the same pattern
+  `Work_Activity_Record.html` already established for its own free-form reports
+  (`WORK-ACTIVITY-RECORD`). The REAL equipment identity lives in Section A's free-typed `Asset
+  Tag`/`Asset Description` fields, saved into `base.sheets.info` and `base.inputValues` like any
+  other field — just not used as the Firestore query key. `LoadMergeModal.init({assetTag:
+  MCA_ASSET_TAG})` therefore surfaces every past corrective-action report for picking/merging,
+  not just ones for the same physical asset — appropriate here since each report is inherently
+  about a different failure event, unlike a recurring PM visit to the same motor.
+- **The RCA method (Section H) is a single dropdown — 5-Why / Fishbone (Ishikawa) / FMEA / Other
+  — that swaps the visible input panel via `switchRcaMethod()`** (three `<div id="rca-5why|
+  fishbone|fmea">` panels, `display:none` toggled by matching the select's value; `#rca-
+  other-wrap` shows only a "name this method" text field for `other`, since there's no
+  structured input to collect for an arbitrary method beyond the shared Root Cause/Contributing
+  Factors fields below). Only the currently-selected method's data is meaningful — the other two
+  panels' fields are left blank and read back as empty/`—`, this is expected, not a bug.
+  - **5-Why** is five plain `Why 1`..`Why 5` textareas, rendered in the PDF as a simple label/
+    value table in order — deliberately NOT a branching/tree diagram (no such structure was
+    asked for; a flat sequential list matches how 5-Why is actually filled out on paper).
+  - **Fishbone** is six textareas, one per 6M category (Man/Machine/Method/Material/
+    Measurement/Environment), each meant to hold multiple causes (one per line, free text — no
+    per-line sub-fields). Per the user's explicit choice during design (asked directly: drawn
+    fishbone diagram vs. a table per category), the PDF renders each category as its own small
+    label + wrapped-text table, **not** a hand-drawn fishbone/Ishikawa diagram — simpler to
+    implement correctly and reliably legible at print size, at the cost of not looking like a
+    literal fishbone.
+  - **FMEA** is a dynamic table (`#fmea-body`, `addFmeaRow()`/`removeTableRow()` like Sections
+    D/I/J below) with Severity/Occurrence/Detection each scored 1–10 (the user's explicit choice
+    over a 1–5 scale) and RPN auto-computed as `S×O×D` live via `updateRPN()` on every S/O/D
+    `oninput`. The rendered RPN cell is colour-coded (red ≥200, amber ≥100, green >0, per-cell
+    via `didParseCell` on the PDF's `autoTable` call) — thresholds are a reasonable general RPN
+    convention, not something the source document specified, so treat them as a starting point
+    if a future user wants the plant's own formal FMEA risk bands instead.
+  - Two fields are shared across every method and always shown: **Root Cause** and
+    **Contributing Factors** (free text) — the method-specific panels are inputs that feed the
+    analysis, these two are the actual conclusion, which is what both the dashboard's
+    lighter-weight views and a quick read of the PDF should show regardless of which method was
+    used.
+  - Firestore always gets a `sheets.rca` summary sheet (method label + whichever method's fields
+    are non-empty + the two shared fields); FMEA additionally gets its own `sheets.rca_fmea`
+    sheet with proper tabular columns (`Failure Mode`/`Effect`/`S`/`Cause`/`O`/`Control`/`D`/
+    `RPN`/`Recommended Action`) — same "extra keyed sheet for tabular sub-data" pattern
+    documented in the HV_CHECKS `special` rows bullet above, reused here for the same reason
+    (a single `Value`-column sheet can't represent a multi-row table with real columns).
+
+**Sections E (Chronology), F (Findings), G (Corrective Action) each carry their own dedicated
+evidence-photo gallery, placed immediately after that section's own textarea** — both on screen
+and in the generated PDF (`narrativeSection()` draws the text block via `autoTable`, then that
+section's photos immediately below, before moving on to the next lettered section) — rather than
+one photo gallery for the whole report. This was an explicit user requirement (raised after the
+initial design was agreed, specifically so the exported PDF "reads as a narrative report with
+evidence in context," easy for both engineers and management to follow) — a class of requirement
+distinct from every other check sheet in this repo, where photos are evidence *for a checklist
+item*, not *for a paragraph of prose*. Section K (Attachments/Evidence Log) is a fourth,
+general-purpose gallery for anything not specific to E/F/G (drawings, trend exports, etc.) — kept
+per the user's explicit choice when asked whether it was still needed alongside the three
+narrative galleries. `PHOTOS` is keyed by `chronology`/`findings`/`corrective_action`/
+`attachments` (not by asset/inverter/tab like every other keyed-`PHOTOS` sheet in this repo) —
+`restorePhotosFromUrls()` is otherwise the same generic per-key restore pattern as
+`PLTS_AshDisposal_PM.html`'s, just with these four keys instead of per-inverter ones.
+
+**Section L (Report Authorization) is deliberately NOT built as on-page signature fields.** It
+reuses the existing Review & Approval workflow end-to-end instead of duplicating it: Prepared By
+is the submitting technician (auto-filled via `TechnicianAuth` on `checked-by`), Verified By
+(TechOp2) and Approved By (Supervisor) — including their digital signatures — are captured by
+that workflow's existing `Approvals.submitReview()`/`Approvals.approve()`/`buildFinalPdf()` steps
+in `Review_Approval_Dashboard.html` after this report is submitted. The PDF's own Section L is
+just a one-line pointer to that fact, not a form. Don't add manual signature boxes here — it
+would create two competing sources of truth for who approved a report.
+
+Header fields use the standard ids (`wo-no`, `wo-date`, `checked-by` — labelled "Prepared By" on
+screen but same id as every other sheet) so `DB.collectCheckSheetData()`, `LoadMergeModal`'s
+default `headerMap`, and `TechnicianAuth.init({checkedByFieldId:'checked-by'})` all work with
+zero per-file overrides — no `done-by`/`pic`-style mismatch to work around here, unlike several
+older sheets (see "The data contract" above).
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that
