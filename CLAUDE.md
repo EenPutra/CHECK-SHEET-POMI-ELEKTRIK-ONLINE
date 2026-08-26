@@ -156,13 +156,26 @@ This is the part most likely to regress if a check sheet is edited without check
 Built to attack the duplicate-submission problem at its SOURCE, rather than only cleaning up
 after the fact like the `approvals`-collection dedup work above — a technician resubmitting the
 same visit (unsure if the first click saved, or just impatient) used to always create a brand-new
-`checksheets` doc with no way to know a near-identical one already exists. Rolled out to
-**`UPS_7EB-UPS-AB_Monthly.html` as a pilot only** — this was an explicit, deliberate choice
-(discussed and confirmed before writing any code) to build the shared module + verify it
-thoroughly on one file before touching the other ~23, given how invasive and easy to get subtly
-wrong a change to every check sheet's `submitToDb()` is. **Do not assume this has been rolled out
-anywhere else until CLAUDE.md says so** — check a given file's own script includes for
-`submit-guard.js` before assuming it has this behavior.
+`checksheets` doc with no way to know a near-identical one already exists. Piloted on
+`UPS_7EB-UPS-AB_Monthly.html` first — an explicit, deliberate choice (discussed and confirmed
+before writing any code) to build the shared module + verify it thoroughly on one file before
+touching the other ~23, given how invasive and easy to get subtly wrong a change to every check
+sheet's `submitToDb()` is. **Being rolled out incrementally, one file at a time, since** — check a
+given file's own script includes for `submit-guard.js` before assuming it has this behavior; don't
+assume every check sheet has it just because this section exists. Done so far:
+`UPS_7EB-UPS-AB_Monthly.html` (pilot), `Battery_7EB-BY-125-250.html`. Each new file gets the same
+treatment: add `<script src="submit-guard.js"></script>` after `approval-helper.js`, call
+`SubmitGuard.init({assetTag:'...'})` near the file's existing `LoadMergeModal.init()`/
+`TechnicianAuth.init()` calls, then rewrite `submitToDb()` to call `resolveSubmitTarget()` before
+saving, disable its submit button(s) and show the progress bar for the duration, branch
+`DB.update()` vs `DB.save()` on the resolved mode, thread `existingApprovalId`/`onProgress` into
+`Approvals.submitWithFiles()`, and call `markSubmitted()` on success — adapting to that file's own
+field-id/asset-tag/photo-shape quirks per the per-file variance already documented elsewhere in
+this file (e.g. `done-by` vs `checked-by`, different `PHOTOS` shapes). Verify each with the same
+fail-loud-mock headless-Chrome technique described below (insert path, overwrite path via the real
+choice modal, and the progress bar/button-disable timing under an artificially slowed mock) before
+committing — a copy-paste field-id or asset-tag mistake here fails the same way a `checkedBy`
+mismatch does elsewhere in this codebase: silently, not with a thrown error.
 
 Two independent pieces, both self-injecting DOM/CSS like `load-merge-modal.js`/
 `technician-auth.js`:

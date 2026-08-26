@@ -12,6 +12,7 @@
 <script src="db-helper.js"></script>
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
+<script src="submit-guard.js"></script>
 <script src="load-merge-modal.js"></script>
 <script src="technician-auth.js"></script>
 <script src="img-helper.js"></script>
@@ -1089,6 +1090,7 @@ updateStats();
 LoadMergeModal.init({assetTag:'7EB-BY-125/250'});
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "checked-by" });
+SubmitGuard.init({ assetTag:'7EB-BY-125/250' });
 
 // Auto-load last submission from database
 setTimeout(async()=>{
@@ -1141,10 +1143,26 @@ async function submitToDb(){
   if(!data.executionDate){DB.showSubmitResult(false,'Isi tanggal eksekusi terlebih dahulu.');return;}
   if(!data.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
 
+  // Ask whether this looks like the same visit being resubmitted — if so,
+  // let the technician overwrite the existing record instead of piling up
+  // a duplicate (see submit-guard.js / CLAUDE.md's Review & Approval
+  // duplicate-cleanup writeups for why this matters). Resolves straight to
+  // {mode:'insert'} with no prompt at all for the common case (a genuinely
+  // new visit).
+  const target=await SubmitGuard.resolveSubmitTarget(data.woNumber);
+  if(target.mode==='cancel') return;
+
+  const submitBtns=[...document.querySelectorAll('[onclick="submitToDb()"]')];
+  submitBtns.forEach(b=>b.disabled=true);
+  SubmitGuard.showProgress();
+
   let id;
   try{
-    id=await DB.save(data);
+    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
+    id = target.mode==='overwrite' ? await DB.update(target.targetId,data) : await DB.save(data);
   }catch(e){
+    SubmitGuard.hideProgress();
+    submitBtns.forEach(b=>b.disabled=false);
     DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);
     return;
   }
@@ -1164,11 +1182,18 @@ async function submitToDb(){
       checksheetFile:'Battery_7EB-BY-125-250.html',
       submittedBy:data.checkedBy,
       revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId: target.mode==='overwrite' ? target.approvalId : null,
+      onProgress:(pct,label)=>SubmitGuard.setProgress(10+Math.round(pct*0.85),label),
     });
   }catch(e){
     filesOk=false;
     console.error('Upload foto/PDF/approval record gagal:',e);
   }
+
+  SubmitGuard.markSubmitted(id,{woNumber:data.woNumber,executionDate:data.executionDate,checkedBy:data.checkedBy});
+  SubmitGuard.setProgress(100,'Selesai!');
+  setTimeout(()=>SubmitGuard.hideProgress(),500);
+  submitBtns.forEach(b=>b.disabled=false);
 
   if(filesOk){
     DB.showSubmitResult(true,'Data, foto & PDF berhasil disimpan ke database! ID: '+id);
