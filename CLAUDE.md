@@ -1147,6 +1147,50 @@ the current design — **do not "simplify" these away**:
     while the measurement/remark text fields where real typed effort lives are never silently
     clobbered.
 
+### Duplicate submission cleanup — `cleanupDuplicateApprovals()` (approvals collection only)
+
+A technician resubmitting the same visit (unsure whether the first submit actually saved, or
+just double-clicking "Submit to Database") creates a brand-new `checksheets` doc AND a brand-new
+`approvals` doc every time — there was no dedup anywhere in the review/approval inbox, so every
+accidental resubmit showed up as its own separate item a TechOp2/Supervisor had to review
+separately. Fixed by `cleanupDuplicateApprovals()` in `Review_Approval_Dashboard.html`, called
+once at the top of every `loadAll()` (i.e. on page load and every manual Refresh) — **explicit
+user request, scoped deliberately to the `approvals` collection only**: `dashboard.html` reads
+`checksheets` directly for its own history/Load & Merge and must keep seeing every real
+submission, so this never touches or deletes a checksheet doc, only the workflow-tracking
+`approvals` doc that pointed at a since-superseded duplicate.
+
+An older `approvals` doc is deleted only when **both**:
+1. It's a same-visit duplicate of a newer approval — grouped by asset tag + WO number + execution
+   date (fetched from the linked checksheet via `getChecksheet()`, since `approvals` docs don't
+   carry `woNumber`/`executionDate` themselves), with `createdAt` within `DB.CLUSTER_GAP_HOURS`
+   (24h) of the next one in the group. This is the **exact same validated clustering**
+   `dashboard.html`'s own "Hapus Duplikat" button already uses (see `DEDUP_LATEST_SUBMISSION.md`)
+   — reused here rather than inventing a second dedup heuristic, just applied to `approvals`
+   instead of `checksheets`. A doc missing asset tag or WO number is never grouped, same safety
+   rule `DB.dedupeLatest()` uses.
+2. Its `status` is still `'submitted'` — i.e. no reviewer has touched it. **An already
+   reviewed/approved/returned entry is real workflow history and is never auto-deleted, no matter
+   how close in time it sits to a newer submission** — a deliberate `revisionOf` resubmission
+   naturally leaves its source entry at `'returned_to_technician'`, never `'submitted'`, so this
+   rule alone is what keeps genuine revision history distinct from an accidental double-submit
+   without needing to special-case `revisionOf` explicitly. Verified with a mocked 3-entry cluster
+   (`submitted` → `reviewed` → `submitted`, all within the gap window): only the first
+   (untouched, superseded) entry was deleted; the `reviewed` one survived even though a newer
+   same-visit submission existed.
+
+Runs against every approval currently in the inbox/history (not per-tab), fetching each
+referenced checksheet in parallel (`Promise.all`, reusing `getChecksheet()`'s existing
+`_checksheetCache` so a second `loadAll()` in the same session is cheap). Not silent — a
+`#dedupe-note` banner (styled like the existing `#role-note`, just the indigo/informational
+palette instead of amber/warning) reports how many were cleaned up, and points out the full
+history is still in the database via Dashboard, so a reviewer isn't left wondering why an inbox
+item they remember seeing is now gone. Verified via headless Chrome with a mocked `approvals` +
+`checksheets` pair covering all four cases at once (genuine duplicate deleted, reviewed entry
+preserved, two real distinct visits 40h apart both kept, one unrelated unique entry untouched) —
+and that no `checksheets`-collection delete was ever attempted (the mock's `checksheets` collection
+exposes no `delete` method at all, so any accidental attempt would have thrown).
+
 ### Adding this to a new check sheet
 
 1. Add three script includes right after `db-helper.js`, before `img-helper.js`/`photo-kit.js`:

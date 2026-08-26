@@ -87,6 +87,7 @@ textarea,input{font-family:var(--body)}
 .page-sub{font-size:13px;color:var(--txt-2);margin-top:4px}
 
 .role-note{display:none;align-items:center;gap:10px;background:var(--acc-soft);border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+.dedupe-note{display:none;align-items:center;gap:10px;background:var(--ind-soft);border:1px solid rgba(99,102,241,.25);color:var(--ind);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
 
 /* TABS */
 .tabs{display:flex;gap:6px;border-bottom:1px solid var(--bdr);margin-bottom:16px}
@@ -223,6 +224,7 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   </div>
 
   <div class="role-note" id="role-note"></div>
+  <div class="dedupe-note" id="dedupe-note"></div>
 
   <div class="tabs" id="tabs-bar">
     <button class="tab-btn active" data-tab="inbox" onclick="switchTab('inbox')">Menunggu Saya <span class="tab-count" id="count-inbox">0</span></button>
@@ -394,21 +396,104 @@ let _allApprovals = [];
 const _checksheetCache = {};
 async function loadAll(){
   document.getElementById('list-area').innerHTML = '<div class="list-loading"><div class="msg">Memuat...</div></div>';
+  document.getElementById('dedupe-note').style.display = 'none';
   try{
     _allApprovals = await Approvals.getAll();
   }catch(e){
     document.getElementById('list-area').innerHTML = '<div class="list-empty"><div class="msg">Gagal memuat data</div><div>'+e.message+'</div></div>';
     return;
   }
+  try{
+    const removed = await cleanupDuplicateApprovals(_allApprovals);
+    if(removed.length){
+      const removedIds = new Set(removed.map(a=>a.id));
+      _allApprovals = _allApprovals.filter(a => !removedIds.has(a.id));
+      showDedupeNote(removed.length);
+    }
+  }catch(e){ console.error('Cleanup duplikat approval gagal:', e); }
   updateTabCounts();
   renderList();
   maybeOpenFromUrl();
+}
+function showDedupeNote(n){
+  const note = document.getElementById('dedupe-note');
+  note.style.display = 'flex';
+  note.innerHTML = '&#129529; '+n+' submission duplikat (resubmit yang belum sempat direview) otomatis dibersihkan — hanya submission terbaru per kunjungan yang ditampilkan di sini. Riwayat lengkap tetap tersimpan di database dan bisa dilihat di Dashboard.';
 }
 async function getChecksheet(id){
   if(_checksheetCache[id]) return _checksheetCache[id];
   const doc = await DB.getById(id);
   _checksheetCache[id] = doc;
   return doc;
+}
+
+// ── DUPLICATE SUBMISSION CLEANUP ──
+// A technician resubmitting the same visit (unsure whether it saved, or
+// just hitting "Submit to Database" twice) creates a brand-new checksheet
+// doc AND a brand-new approvals doc each time (see CLAUDE.md's "Review &
+// Approval Workflow" section) — without this, every accidental resubmit
+// shows up as its own separate item in the inbox, so a reviewer sees
+// duplicate work items for what's really one visit.
+//
+// Runs once per loadAll() and only ever deletes an OLDER approvals doc
+// when BOTH:
+//   (a) it's a same-visit duplicate of a NEWER approval — same asset tag +
+//       WO number + execution date, createdAt within DB.CLUSTER_GAP_HOURS
+//       of the next one — the exact same validated clustering
+//       dashboard.html's own "Hapus Duplikat" button uses (see
+//       DEDUP_LATEST_SUBMISSION.md), just applied to approvals instead of
+//       checksheets; and
+//   (b) its status is still 'submitted' — i.e. no reviewer has touched it
+//       yet. An already reviewed/approved/returned entry is REAL workflow
+//       history (a deliberate revisionOf resubmission naturally leaves its
+//       source entry at status 'returned_to_technician', never
+//       'submitted') and is never auto-deleted here, regardless of how
+//       close in time it sits to a newer submission.
+//
+// Only the approvals doc is deleted — never the underlying checksheet doc.
+// dashboard.html reads the checksheets collection directly and needs the
+// full, undeleted history for Load & Merge, per explicit instruction: this
+// cleanup is scoped to the approvals collection only.
+async function cleanupDuplicateApprovals(approvals){
+  const withKey = await Promise.all(approvals.map(async a => {
+    let cs = null;
+    try{ cs = await getChecksheet(a.checksheetId); }catch(e){}
+    return {
+      a,
+      tag: (cs?.assetTag || a.assetTag || '').trim(),
+      wo: (cs?.woNumber || '').trim(),
+      date: (cs?.executionDate || '').trim(),
+      createdAt: a.createdAt || '',
+    };
+  }));
+
+  const groups = new Map();
+  withKey.forEach(x => {
+    if(!x.tag || !x.wo) return; // can't group safely — same rule DB.dedupeLatest() uses
+    const key = x.tag+'||'+x.wo+'||'+x.date;
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(x);
+  });
+
+  const gapMs = (DB.CLUSTER_GAP_HOURS || 24) * 3600 * 1000;
+  const toDelete = [];
+  groups.forEach(list => {
+    if(list.length < 2) return;
+    const sorted = [...list].sort((p,q) => (p.createdAt||'').localeCompare(q.createdAt||''));
+    for(let i=0;i<sorted.length-1;i++){
+      const cur = sorted[i], next = sorted[i+1];
+      const gap = new Date(next.createdAt||0) - new Date(cur.createdAt||0);
+      if(gap <= gapMs && cur.a.status === 'submitted') toDelete.push(cur.a);
+    }
+  });
+  if(!toDelete.length) return [];
+
+  const actuallyDeleted = [];
+  for(const a of toDelete){
+    try{ await Approvals.deleteById(a.id); actuallyDeleted.push(a); }
+    catch(e){ console.error('Gagal hapus approval duplikat', a.id, e); }
+  }
+  return actuallyDeleted;
 }
 
 /* ── TABS / LIST ── */
