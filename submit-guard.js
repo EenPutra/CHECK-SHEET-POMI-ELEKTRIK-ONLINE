@@ -16,6 +16,19 @@
 //       process, show a real, honest progress bar instead of a spinner or
 //       nothing at all, so nobody re-clicks Submit out of impatience.
 //
+//  resolveSubmitTarget() itself locks the submit button(s) and shows the
+//  progress overlay SYNCHRONOUSLY, in the same tick as the click, before its
+//  own Firestore "is this a duplicate?" round-trip even starts — and a
+//  second call made while one is already in flight resolves straight to
+//  {mode:'cancel'} with no further work. This closes a real gap that used
+//  to exist: with only the calling file's own post-await button-disable,
+//  there was a window between click and the first visible feedback (the
+//  duplicate-check network call) where nothing on screen indicated a submit
+//  was in progress, so a technician would click Submit again and create a
+//  genuine second submission. Because the lock/overlay live in this module,
+//  every check sheet already wired to submit-guard.js gets this fix for
+//  free with no per-file change needed.
+//
 //  Usage — one script include (after db-helper.js and approval-helper.js,
 //  since it calls into both) + one init() call:
 //    <script src="db-helper.js"></script>
@@ -50,6 +63,7 @@ const SubmitGuard = (function () {
   let _choiceResolve = null;
   let _pendingTargetId = null;
   let _pendingApprovalId = null;
+  let _busy = false; // true from the instant resolveSubmitTarget() is called until hideProgress() (or a cancel) — see the reentrancy note below
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -140,6 +154,14 @@ const SubmitGuard = (function () {
     injectDom();
   }
 
+  const SUBMIT_BTN_SELECTOR = '[onclick="submitToDb()"]';
+  function _lockButtons() {
+    document.querySelectorAll(SUBMIT_BTN_SELECTOR).forEach(b => b.disabled = true);
+  }
+  function _unlockButtons() {
+    document.querySelectorAll(SUBMIT_BTN_SELECTOR).forEach(b => b.disabled = false);
+  }
+
   // Decides insert vs. overwrite vs. cancel. See the file header for the
   // full usage snippet — call this BEFORE DB.save()/DB.update().
   //
@@ -160,39 +182,73 @@ const SubmitGuard = (function () {
   // overwritten. If no candidate is found, or overwrite isn't safe, this
   // resolves straight to {mode:'insert'} with no prompt at all — the
   // common case (a genuinely new visit) is never interrupted.
+  // Reentrancy + instant-feedback guard: everything from here to the button
+  // click's next tick is still SYNCHRONOUS (an async function runs
+  // synchronously up to its first `await`), so _busy/_lockButtons()/
+  // showProgress() all take effect in the very same tick the technician
+  // clicked Submit — before the Firestore round-trip below even starts.
+  // This closes the exact gap that let a technician re-click Submit during
+  // the "checking for a duplicate" network call (no visual feedback yet,
+  // buttons not yet disabled by the caller's own code) and create a real
+  // second submission: a second resolveSubmitTarget() call made anywhere in
+  // that window now sees _busy===true synchronously and resolves straight
+  // to {mode:'cancel'} with no further work, regardless of how slow the
+  // network call turns out to be or whether the button's own `disabled`
+  // attribute has visually taken effect yet.
   async function resolveSubmitTarget(woNumber) {
     if (!_config) throw new Error('SubmitGuard.init({assetTag}) belum dipanggil.');
-    const wo = (woNumber || '').trim().toLowerCase();
+    if (_busy) return { mode: 'cancel' };
+    _busy = true;
+    _lockButtons();
+    showProgress();
+    setProgress(0, 'Memeriksa submission sebelumnya...');
 
-    let candidate = _sessionLast;
-    if (candidate && wo && (candidate.woNumber || '').trim().toLowerCase() !== wo) {
-      candidate = null; // session's last submit was for a different WO — not relevant to this one
-    }
-
-    if (!candidate && wo) {
-      try {
-        const docs = await DB.getAll({ assetTag: _config.assetTag });
-        const match = docs.find(d => (d.woNumber || '').trim().toLowerCase() === wo);
-        if (match) candidate = { id: match.id, woNumber: match.woNumber, executionDate: match.executionDate, checkedBy: match.checkedBy, createdAt: match.createdAt };
-      } catch (e) { console.error('SubmitGuard: gagal cek submission sebelumnya', e); }
-    }
-
-    if (!candidate) return { mode: 'insert' };
-
-    let approvalId = null, canOverwrite = true;
     try {
-      if (typeof Approvals !== 'undefined') {
-        const appr = await Approvals.getByChecksheetId(candidate.id);
-        if (appr) {
-          approvalId = appr.id;
-          if (appr.status !== 'submitted') canOverwrite = false;
-        }
+      const wo = (woNumber || '').trim().toLowerCase();
+
+      let candidate = _sessionLast;
+      if (candidate && wo && (candidate.woNumber || '').trim().toLowerCase() !== wo) {
+        candidate = null; // session's last submit was for a different WO — not relevant to this one
       }
-    } catch (e) { canOverwrite = false; } // uncertain -> never offer overwrite
 
-    if (!canOverwrite) return { mode: 'insert' };
+      if (!candidate && wo) {
+        try {
+          const docs = await DB.getAll({ assetTag: _config.assetTag });
+          const match = docs.find(d => (d.woNumber || '').trim().toLowerCase() === wo);
+          if (match) candidate = { id: match.id, woNumber: match.woNumber, executionDate: match.executionDate, checkedBy: match.checkedBy, createdAt: match.createdAt };
+        } catch (e) { console.error('SubmitGuard: gagal cek submission sebelumnya', e); }
+      }
 
-    return showChoiceModal(candidate, approvalId);
+      if (!candidate) return { mode: 'insert' }; // _busy stays true — caller proceeds straight into the real save/upload, hideProgress() clears it
+
+      let approvalId = null, canOverwrite = true;
+      try {
+        if (typeof Approvals !== 'undefined') {
+          const appr = await Approvals.getByChecksheetId(candidate.id);
+          if (appr) {
+            approvalId = appr.id;
+            if (appr.status !== 'submitted') canOverwrite = false;
+          }
+        }
+      } catch (e) { canOverwrite = false; } // uncertain -> never offer overwrite
+
+      if (!canOverwrite) return { mode: 'insert' };
+
+      // Hide the progress overlay while the choice modal is up (both are
+      // full-screen overlays — showing both at once would just stack them),
+      // then _chooseInsert()/_chooseOverwrite() bring it back; _chooseCancel()
+      // clears _busy and unlocks the buttons instead.
+      hideProgressOverlayOnly();
+      return await showChoiceModal(candidate, approvalId);
+    } catch (e) {
+      // Truly unexpected — every known failure point above already has its
+      // own try/catch and falls back to {mode:'insert'} on its own, so this
+      // is only a last-resort safety net. _busy is intentionally left true;
+      // the caller is expected to proceed to DB.save()/DB.update() and
+      // eventually call hideProgress(), which is what actually clears it.
+      console.error('SubmitGuard: unexpected error in resolveSubmitTarget', e);
+      return { mode: 'insert' };
+    }
   }
 
   function showChoiceModal(candidate, approvalId) {
@@ -209,14 +265,18 @@ const SubmitGuard = (function () {
   }
   function _chooseInsert() {
     document.getElementById('sg-choice-overlay').classList.remove('show');
+    showProgress(); // back to the upload progress view now that a choice was made — _busy stays true, caller proceeds to save
     if (_choiceResolve) { _choiceResolve({ mode: 'insert' }); _choiceResolve = null; }
   }
   function _chooseOverwrite() {
     document.getElementById('sg-choice-overlay').classList.remove('show');
+    showProgress();
     if (_choiceResolve) { _choiceResolve({ mode: 'overwrite', targetId: _pendingTargetId, approvalId: _pendingApprovalId }); _choiceResolve = null; }
   }
   function _chooseCancel() {
     document.getElementById('sg-choice-overlay').classList.remove('show');
+    _busy = false;
+    _unlockButtons();
     if (_choiceResolve) { _choiceResolve({ mode: 'cancel' }); _choiceResolve = null; }
   }
 
@@ -241,9 +301,18 @@ const SubmitGuard = (function () {
     if (pctEl) pctEl.textContent = clamped + '%';
     if (lblEl && label) lblEl.textContent = label;
   }
-  function hideProgress() {
+  // Hides just the progress overlay's visibility, WITHOUT clearing _busy or
+  // unlocking buttons — used only for the brief window the choice modal is
+  // shown instead (see resolveSubmitTarget()). The public hideProgress()
+  // below is the real "submit is fully done" signal.
+  function hideProgressOverlayOnly() {
     const el = document.getElementById('sg-progress-overlay');
     if (el) el.classList.remove('show');
+  }
+  function hideProgress() {
+    hideProgressOverlayOnly();
+    _busy = false;
+    _unlockButtons();
   }
 
   return {

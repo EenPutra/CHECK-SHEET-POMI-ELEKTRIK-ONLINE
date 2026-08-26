@@ -219,6 +219,39 @@ working unmodified):**
   since new data always means "please look at this again") instead of calling `create()`, so
   overwriting a submission never leaves a second, duplicate approval behind.
 
+**Bug found after the UPS/Battery rollout: the progress popup didn't appear until well into the
+submit, leaving a real double-submit window.** User report: clicking Submit still showed no
+loading animation/percentage until the data was already saved, so technicians were still
+double/multi-submitting. Root cause: the ORIGINAL `resolveSubmitTarget()` only did its
+duplicate-check Firestore round-trip (`DB.getAll()`, then `Approvals.getByChecksheetId()`) — the
+calling file's own `submitBtns.forEach(b=>b.disabled=true)` + `SubmitGuard.showProgress()` only
+ran AFTER that promise resolved. On a slow connection that round-trip could take seconds with
+**zero visual feedback and the buttons not yet disabled**, so a technician would click Submit
+again during that exact window — and since there was no reentrancy guard either, the second click
+ran a fully independent `submitToDb()` call that could create a genuine second `checksheets`
+doc. Fixed entirely inside `submit-guard.js` (no per-file changes needed — every already-rolled-
+out file gets this for free): `resolveSubmitTarget()` now sets a module-level `_busy` flag, locks
+every `[onclick="submitToDb()"]` button, and calls `showProgress()`/`setProgress(0, 'Memeriksa
+submission sebelumnya...')` **synchronously, before its first `await`** — since a JS async
+function runs synchronously up to its first `await`, this all takes effect in the exact same tick
+as the click, before the Firestore call even starts. A second `resolveSubmitTarget()` call made
+anywhere before `hideProgress()` clears `_busy` (i.e. anywhere in the whole submit lifecycle, not
+just during the duplicate-check) now sees `_busy===true` synchronously and resolves straight to
+`{mode:'cancel'}` with no further work — this is a true reentrancy guard, not just a UI-disabled
+hint, so it still holds even if the click races ahead of the button's own `disabled` attribute
+taking visual effect. `_chooseCancel()` (the choice modal's "Batal" button) explicitly clears
+`_busy`/unlocks the buttons since the calling file's own `if(target.mode==='cancel') return;`
+never gets to call `hideProgress()` in that path; `_chooseInsert()`/`_chooseOverwrite()` re-show
+the progress overlay (hidden while the choice modal itself was up, so the two full-screen overlays
+never stack) before resolving. Verified via headless Chrome against both `UPS_7EB-UPS-AB_Monthly.
+html` and `Battery_7EB-BY-125-250.html`: (1) calling `submitToDb()` and checking the DOM
+*synchronously, before awaiting it* shows the progress overlay already visible and both buttons
+already `disabled`; (2) firing two overlapping `submitToDb()` calls against a mock with an
+artificial 500ms duplicate-check delay results in exactly ONE `checksheets` doc and ONE
+`approvals` doc, never two; (3) the existing insert/overwrite/cancel flows and the real
+climbing-percentage progress bar still work exactly as before this fix, including a normal fresh
+submit succeeding right after a cancel (confirming `_busy` doesn't get stuck `true`).
+
 **A real near-miss while testing this, worth remembering for next time**: an early test run's
 mock for `db.collection()` had a bug (missing methods in the chained-call shape it returned) that
 caused it to silently fail and fall through to calling the REAL Firestore/Drive APIs — writing
