@@ -1514,6 +1514,40 @@ security hole.
   truth table, the sig-note banner shows/hides on `loggedInSignature`, and
   `prefillSignatureCanvas()` makes `getSignatureDataUrl()` return the saved signature.
 
+### Account settings + light/dark theme
+
+- **Theme** (`ra_theme` in `localStorage`: `'light'` | `'dark'` | absent = follow OS). A tiny
+  script in `<head>` (before the stylesheet) sets `document.documentElement[data-theme]`
+  pre-paint so there's no flash. Dark tokens live in one `:root[data-theme="dark"]{…}` block —
+  the runtime JS always writes an explicit `light`/`dark` attribute (resolving "system" via
+  `matchMedia`), so no `@media (prefers-color-scheme)` CSS block is needed. All colors flow
+  through CSS custom properties; a handful of previously-hardcoded hex values (amber/green/rose
+  "ink", chip bg, danger surfaces, the detail-overlay scrim) were pulled into new tokens
+  (`--amber-ink`, `--green-ink`, `--rose-ink(-2)`, `--chip-bg/-ink`, `--warn-bdr`,
+  `--danger-surf`, `--danger-btn-surf/-bdr`, `--btn-ok-hover`, `--btn-danger-hover`,
+  `--overlay-scrim`). `setTheme('light'|'dark'|'system')` / `cycleTheme()` / `syncThemeUI()`;
+  a topbar `#theme-btn` (☀️/🌙) cycles light↔dark, the settings modal has a 3-way segmented
+  control. Signature `<canvas>` backgrounds stay white on purpose (ink capture → white PDF).
+- **`#settings-overlay`** (topbar ⚙️ `#settings-btn`, shown in `showApp()`): reuses the
+  `.login-overlay` scrim/box + a close button, scrollable. Sections:
+  - **Tampilan** — the theme segmented control.
+  - **Profil** — edit `name` + `username`. `saveProfile()` checks username uniqueness
+    (`where('username','==',…)`), `.update()`s the doc, and updates `loggedInName`/`loggedInUser`
+    + `sessionStorage` (`dashboard_name`/`dashboard_user`) + the topbar `#user-label` live.
+  - **Ganti Password** — verifies the current password hash before `.update()`ing the new one.
+  - **Tanda Tangan** — only shown for `roleUsesSignature(loggedInRole)`; same pad, prefilled
+    with `loggedInSignature`, `saveSignatureFromSettings()` writes it and clears `#sig-note`.
+  - `_myUserDoc()` resolves the caller's `dashboard_users` doc (cached `_myUserDocId` from
+    login, else a username lookup) — every settings write goes through it.
+- **Forgot password** — `#forgot-panel` (a third `toggleAuthMode()` mode, `'forgot'`, reached
+  from a "Lupa password?" link on the login screen). No email system, so `doForgotPassword()`
+  gates the reset behind the **same admin access code** as elevated registration
+  (`getElevatedRegCode()`), then username-looks-up and `.update()`s the password hash. Tell
+  the user: distributing that code = anyone with it can reset any password.
+- Verified via headless Chrome: theme set/cycle/system + `localStorage` + seg/btn UI sync,
+  `toggleAuthMode('forgot')` panel swap, `openSettings()` field prefill + role-gated signature
+  section, and a dark-mode screenshot of the app + settings modal.
+
 ### Adding this to a new check sheet
 
 1. Add three script includes right after `db-helper.js`, before `img-helper.js`/`photo-kit.js`:

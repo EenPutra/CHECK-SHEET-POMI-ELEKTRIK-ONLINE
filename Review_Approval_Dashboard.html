@@ -26,12 +26,36 @@
   --ind:#6366f1; --ind-soft:#e0e7ff;
   --ok:#10b981; --ok-soft:#d1fae5;
   --ng:#f43f5e; --ng-soft:#ffe4e6;
+  --amber-ink:#92400e; --green-ink:#047857; --rose-ink:#9f1239; --rose-ink-2:#be123c;
+  --chip-bg:#e2e8f0; --chip-ink:#334155;
+  --warn-bdr:#fde68a; --danger-surf:#fff5f6; --danger-btn-surf:#fff1f2; --danger-btn-bdr:#fecdd3;
+  --btn-ok-hover:#059669; --btn-danger-hover:#ffe4e6;
+  --overlay-scrim:rgba(11,18,32,.55);
   --display:'Space Grotesk',system-ui,sans-serif;
   --body:'Manrope',system-ui,sans-serif;
   --mono:'JetBrains Mono',ui-monospace,monospace;
   --shadow:0 2px 8px rgba(15,23,42,0.06),0 1px 2px rgba(15,23,42,0.04);
   --shadow-lg:0 14px 40px -10px rgba(37,99,235,0.18),0 4px 12px rgba(15,23,42,0.06);
 }
+:root[data-theme="dark"]{
+  --bg:#0f172a; --bg-2:#131c30; --surf:#1b2536; --surf-2:#141d2e;
+  --bdr:#2c3850; --bdr-2:#3a4a66;
+  --txt:#e7edf6; --txt-2:#a8b5c8; --txt-3:#6b7a91;
+  --pri:#3b82f6; --pri-soft:#1d3355; --pri-deep:#7db0ff;
+  --acc:#fbbf24; --acc-soft:#3b2f13;
+  --ind:#818cf8; --ind-soft:#272b4e;
+  --ok:#34d399; --ok-soft:#123227;
+  --ng:#fb7185; --ng-soft:#3b1720;
+  --amber-ink:#fcd34d; --green-ink:#6ee7b7; --rose-ink:#fda4af; --rose-ink-2:#fda4af;
+  --chip-bg:#2c3850; --chip-ink:#cbd5e1;
+  --warn-bdr:#5a4a1f; --danger-surf:#2a1620; --danger-btn-surf:#3a1720; --danger-btn-bdr:#7f1d33;
+  --btn-ok-hover:#059669; --btn-danger-hover:#4a1c28;
+  --overlay-scrim:rgba(2,6,15,.72);
+  --shadow:0 2px 8px rgba(0,0,0,0.45),0 1px 2px rgba(0,0,0,0.35);
+  --shadow-lg:0 16px 44px -10px rgba(0,0,0,0.62),0 4px 12px rgba(0,0,0,0.45);
+}
+:root{color-scheme:light}
+:root[data-theme="dark"]{color-scheme:dark}
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
 body{font-family:var(--body);background:var(--bg);color:var(--txt);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased}
@@ -59,6 +83,24 @@ textarea,input{font-family:var(--body)}
 .auth-switch a:hover{text-decoration:underline}
 .login-hint{font-size:11px;color:var(--txt-3);margin:-6px 0 12px;text-align:left;line-height:1.4}
 
+/* segmented control (theme picker) */
+.seg{display:flex;gap:4px;background:var(--surf-2);border:1px solid var(--bdr);border-radius:10px;padding:3px}
+.seg button{flex:1;border:none;background:transparent;color:var(--txt-2);font-family:var(--body);font-weight:700;font-size:12.5px;padding:8px 10px;border-radius:7px;transition:all .15s}
+.seg button.on{background:var(--pri);color:#fff}
+
+/* topbar icon buttons (theme toggle + settings) */
+.icon-btn{background:none;border:1px solid var(--bdr);color:var(--txt-2);width:32px;height:32px;border-radius:9px;font-size:15px;display:inline-flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0}
+.icon-btn:hover{border-color:var(--bdr-2);color:var(--txt);background:var(--surf-2)}
+
+/* SETTINGS MODAL (reuses .login-overlay scrim/box; adds a close + scroll) */
+#settings-overlay .login-box{max-width:440px;text-align:left;max-height:88vh;overflow-y:auto}
+.settings-x{position:absolute;top:12px;right:14px;background:var(--surf-2);border:1px solid var(--bdr);color:var(--txt-2);width:28px;height:28px;border-radius:8px;font-size:15px}
+.settings-x:hover{color:var(--txt);border-color:var(--bdr-2)}
+.settings-sec{border-top:1px solid var(--bdr);padding-top:16px;margin-top:16px}
+.settings-sec:first-of-type{border-top:none;padding-top:0;margin-top:4px}
+.settings-sec h4{font-family:var(--display);font-size:13px;font-weight:700;color:var(--txt);margin-bottom:10px;letter-spacing:.2px}
+.settings-ok{font-size:12px;color:var(--ok);margin-top:8px;min-height:16px;font-weight:600}
+
 /* TOPBAR */
 .topbar{position:sticky;top:0;z-index:100;background:var(--surf);border-bottom:1px solid var(--bdr);height:56px;display:flex;align-items:center;padding:0 20px;gap:16px}
 .tb-brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:15px;flex-shrink:0}
@@ -72,9 +114,9 @@ textarea,input{font-family:var(--body)}
 .user-pill{background:var(--surf-2);border:1px solid var(--bdr);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:600;color:var(--txt-2)}
 .role-pill{border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
 .role-pill.techop2{background:var(--ind-soft);color:var(--ind)}
-.role-pill.supervisor{background:var(--acc-soft);color:#92400e}
-.role-pill.admin{background:var(--ok-soft);color:#047857}
-.role-pill.technician{background:#e2e8f0;color:#334155}
+.role-pill.supervisor{background:var(--acc-soft);color:var(--amber-ink)}
+.role-pill.admin{background:var(--ok-soft);color:var(--green-ink)}
+.role-pill.technician{background:var(--chip-bg);color:var(--chip-ink)}
 .role-pill.none{background:var(--ng-soft);color:var(--ng)}
 .logout-btn{background:none;border:1px solid var(--bdr);color:var(--txt-2);padding:6px 14px;border-radius:9px;font-size:12px;font-weight:600}
 .logout-btn:hover{border-color:var(--bdr-2);color:var(--txt)}
@@ -87,11 +129,11 @@ textarea,input{font-family:var(--body)}
 .page-title{font-family:var(--display);font-size:26px;font-weight:700;letter-spacing:-.5px}
 .page-sub{font-size:13px;color:var(--txt-2);margin-top:4px}
 
-.role-note{display:none;align-items:center;gap:10px;background:var(--acc-soft);border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+.role-note{display:none;align-items:center;gap:10px;background:var(--acc-soft);border:1px solid var(--warn-bdr);color:var(--amber-ink);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
 .dedupe-note{display:none;align-items:center;gap:10px;background:var(--ind-soft);border:1px solid rgba(99,102,241,.25);color:var(--ind);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
 .scope-note{display:none;align-items:center;gap:10px;background:var(--pri-soft);border:1px solid rgba(37,99,235,.22);color:var(--pri-deep);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
 .scope-note b{font-weight:800}
-.sig-note{display:none;align-items:center;gap:12px;flex-wrap:wrap;background:var(--acc-soft);border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+.sig-note{display:none;align-items:center;gap:12px;flex-wrap:wrap;background:var(--acc-soft);border:1px solid var(--warn-bdr);color:var(--amber-ink);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
 .sig-note b{font-weight:800}
 .sig-note .btn{flex-shrink:0}
 /* signature pad used in the register form + the "save signature" modal */
@@ -130,16 +172,16 @@ select.login-field:disabled{opacity:.55;cursor:not-allowed}
 .recap-table th:first-child{text-align:left}
 .recap-table td{text-align:center;padding:7px 10px;border-bottom:1px solid var(--bdr-2)}
 .recap-table td:first-child{text-align:left;font-weight:600;font-family:var(--mono);font-size:11.5px}
-.danger-zone{border:1px solid var(--ng-soft);background:#fff5f6;border-radius:12px;padding:14px 16px}
+.danger-zone{border:1px solid var(--ng-soft);background:var(--danger-surf);border-radius:12px;padding:14px 16px}
 .danger-zone .dsec-title{color:var(--ng)}
 .btn{padding:9px 16px;border-radius:9px;border:1px solid var(--bdr);background:var(--surf);color:var(--txt-2);font-size:12.5px;font-weight:700;transition:all .15s}
 .btn:hover{border-color:var(--bdr-2);color:var(--txt)}
 .btn-pri{background:var(--pri);border-color:var(--pri);color:#fff}
 .btn-pri:hover{background:var(--pri-deep)}
 .btn-ok{background:var(--ok);border-color:var(--ok);color:#fff}
-.btn-ok:hover{background:#059669}
-.btn-danger{background:#fff1f2;border-color:#fecdd3;color:#be123c}
-.btn-danger:hover{background:#ffe4e6}
+.btn-ok:hover{background:var(--btn-ok-hover)}
+.btn-danger{background:var(--danger-btn-surf);border-color:var(--danger-btn-bdr);color:var(--rose-ink-2)}
+.btn-danger:hover{background:var(--btn-danger-hover)}
 .btn:disabled{opacity:.5;cursor:not-allowed}
 .btn-sm{padding:6px 12px;font-size:11.5px}
 
@@ -153,12 +195,12 @@ select.login-field:disabled{opacity:.55;cursor:not-allowed}
 .card-meta{font-size:11.5px;color:var(--txt-3);font-family:var(--mono);margin-top:3px}
 .card-badge{font-size:10.5px;font-weight:800;letter-spacing:.4px;padding:4px 11px;border-radius:20px;text-transform:uppercase;white-space:nowrap}
 .card-badge.submitted{background:var(--ind-soft);color:var(--ind)}
-.card-badge.reviewed{background:var(--acc-soft);color:#92400e}
-.card-badge.approved{background:var(--ok-soft);color:#047857}
+.card-badge.reviewed{background:var(--acc-soft);color:var(--amber-ink)}
+.card-badge.approved{background:var(--ok-soft);color:var(--green-ink)}
 .card-badge.returned_to_technician{background:var(--ng-soft);color:var(--ng)}
 
 /* DETAIL OVERLAY */
-#detail-overlay{display:none;position:fixed;inset:0;background:rgba(11,18,32,.55);z-index:600;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(3px)}
+#detail-overlay{display:none;position:fixed;inset:0;background:var(--overlay-scrim);z-index:600;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(3px)}
 #detail-overlay.show{display:flex}
 .detail-box{background:var(--surf);border-radius:18px;width:min(820px,100%);box-shadow:var(--shadow-lg);overflow:hidden;margin-bottom:30px}
 .detail-hdr{background:linear-gradient(120deg,var(--pri),var(--ind));padding:20px 24px;color:#fff;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
@@ -179,7 +221,7 @@ select.login-field:disabled{opacity:.55;cursor:not-allowed}
 .photo-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 .photo-thumbs img{width:78px;height:78px;object-fit:cover;border-radius:8px;border:1px solid var(--bdr)}
 .note-box{background:var(--surf-2);border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6;white-space:pre-wrap}
-.note-box.returned{background:var(--ng-soft);border-color:#fecdd3;color:#9f1239}
+.note-box.returned{background:var(--ng-soft);border-color:var(--danger-btn-bdr);color:var(--rose-ink)}
 .sig-preview{margin-top:8px}
 .sig-preview img{max-width:220px;max-height:100px;border:1px solid var(--bdr);border-radius:8px;background:#fff}
 textarea.dinput{width:100%;border:1px solid var(--bdr);border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;min-height:70px;outline:none}
@@ -207,6 +249,15 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   .tb-nav a{padding:7px 10px;font-size:12px;white-space:nowrap;flex-shrink:0}
 }
 </style>
+<script>
+// Apply saved theme before first paint (no flash). 'ra_theme' is a per-device
+// preference in localStorage; with none, follow the OS setting.
+(function(){try{
+  var t = localStorage.getItem('ra_theme');
+  if(t!=='light' && t!=='dark') t = matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', t);
+}catch(e){ document.documentElement.setAttribute('data-theme','light'); }})();
+</script>
 </head>
 <body>
 
@@ -225,7 +276,22 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
       </form>
       <div class="login-err" id="login-err"></div>
       <div class="login-info">Hubungi admin untuk akses role TechOp2 / Supervisor / Admin.</div>
-      <div class="auth-switch">Teknisi baru? <a onclick="toggleAuthMode('register')">Daftar akun di sini</a></div>
+      <div class="auth-switch">Teknisi baru? <a onclick="toggleAuthMode('register')">Daftar akun di sini</a>
+        &nbsp;·&nbsp; <a onclick="toggleAuthMode('forgot')">Lupa password?</a></div>
+    </div>
+
+    <div id="forgot-panel" style="display:none">
+      <div class="login-sub">🔑 Reset password</div>
+      <div class="login-hint">Butuh <b>kode akses</b> dari admin (kode yang sama untuk daftar TechOp2/Supervisor). Setelah reset, login dengan password baru.</div>
+      <form onsubmit="doForgotPassword(event)">
+        <input type="text" class="login-field" id="fp-user" placeholder="Username akun Anda" autocomplete="username" required>
+        <input type="text" class="login-field" id="fp-code" placeholder="Kode akses dari admin" autocomplete="off" required>
+        <input type="password" class="login-field" id="fp-pass" placeholder="Password baru" autocomplete="new-password" required minlength="4">
+        <input type="password" class="login-field" id="fp-pass2" placeholder="Ulangi password baru" autocomplete="new-password" required minlength="4">
+        <button type="submit" class="login-btn" id="fp-btn">RESET PASSWORD</button>
+      </form>
+      <div class="login-err" id="fp-err"></div>
+      <div class="auth-switch"><a onclick="toggleAuthMode('login')">← Kembali ke login</a></div>
     </div>
 
     <div id="register-panel" style="display:none">
@@ -314,6 +380,59 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   </div>
 </div>
 
+<!-- ACCOUNT SETTINGS -->
+<div class="login-overlay" id="settings-overlay" style="display:none">
+  <div class="login-box">
+    <button class="settings-x" onclick="closeSettings()" title="Tutup">&times;</button>
+    <div class="login-logo" style="font-size:18px">SETTING <span>AKUN</span></div>
+    <div class="login-sub" id="set-whoami" style="margin-bottom:14px">&mdash;</div>
+
+    <div class="settings-sec">
+      <h4>Tampilan</h4>
+      <div class="seg" id="theme-seg">
+        <button type="button" data-theme-val="light" onclick="setTheme('light')">☀️ Terang</button>
+        <button type="button" data-theme-val="dark" onclick="setTheme('dark')">🌙 Gelap</button>
+        <button type="button" data-theme-val="system" onclick="setTheme('system')">🖥️ Sistem</button>
+      </div>
+    </div>
+
+    <div class="settings-sec">
+      <h4>Profil</h4>
+      <div class="login-field-lbl">Nama Lengkap</div>
+      <input type="text" class="login-field" id="set-name" placeholder="Nama lengkap">
+      <div class="login-field-lbl">Username</div>
+      <input type="text" class="login-field" id="set-user" placeholder="username" autocomplete="off">
+      <button class="login-btn" id="set-profile-btn" onclick="saveProfile()">Simpan Profil</button>
+      <div class="login-err" id="set-profile-err"></div>
+      <div class="settings-ok" id="set-profile-ok"></div>
+    </div>
+
+    <div class="settings-sec">
+      <h4>Ganti Password</h4>
+      <input type="password" class="login-field" id="set-pass-cur" placeholder="Password saat ini" autocomplete="current-password">
+      <input type="password" class="login-field" id="set-pass-new" placeholder="Password baru" autocomplete="new-password" minlength="4">
+      <input type="password" class="login-field" id="set-pass-new2" placeholder="Ulangi password baru" autocomplete="new-password" minlength="4">
+      <button class="login-btn" id="set-pass-btn" onclick="changePassword()">Ubah Password</button>
+      <div class="login-err" id="set-pass-err"></div>
+      <div class="settings-ok" id="set-pass-ok"></div>
+    </div>
+
+    <div class="settings-sec" id="set-sig-sec">
+      <h4>Tanda Tangan</h4>
+      <div class="login-hint" style="margin-top:0">Dipakai otomatis di kolom tanda tangan saat review/approve.</div>
+      <canvas class="reg-sig" id="set-sig-canvas" width="300" height="130"></canvas>
+      <div class="reg-sig-actions">
+        <button type="button" class="btn btn-sm" onclick="clearSignature('set-sig-canvas')">Hapus</button>
+        <button type="button" class="btn btn-sm" onclick="document.getElementById('set-sig-file').click()">&#128193; Upload Gambar</button>
+        <input type="file" id="set-sig-file" accept="image/png,image/jpeg" style="display:none" onchange="handleSignatureFile('set-sig-canvas', this)">
+      </div>
+      <button class="login-btn" id="set-sig-btn" onclick="saveSignatureFromSettings()">Simpan Tanda Tangan</button>
+      <div class="login-err" id="set-sig-err"></div>
+      <div class="settings-ok" id="set-sig-ok"></div>
+    </div>
+  </div>
+</div>
+
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="tb-brand"><div class="tb-logo-mark">E7</div><span>ELECTRIC <span class="accent">7</span></span></div>
@@ -325,6 +444,8 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   <div class="tb-right">
     <span class="role-pill" id="role-label" style="display:none"></span>
     <span class="user-pill" id="user-label" style="display:none"></span>
+    <button class="icon-btn" id="theme-btn" onclick="cycleTheme()" title="Ganti tema terang/gelap">🌗</button>
+    <button class="icon-btn" id="settings-btn" onclick="openSettings()" title="Setting akun" style="display:none">⚙️</button>
     <button class="logout-btn" id="logout-btn" onclick="doLogout()" style="display:none">Sign out</button>
   </div>
 </div>
@@ -416,10 +537,36 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
 </div>
 
 <script>
+/* ── THEME (light / dark / system) ── */
+// 'ra_theme' in localStorage: 'light' | 'dark' | absent(=follow OS). The
+// pre-paint <head> script already applied it; these keep it in sync at runtime.
+function currentThemePref(){ try{ const t=localStorage.getItem('ra_theme'); return (t==='light'||t==='dark') ? t : 'system'; }catch(e){ return 'system'; } }
+function resolvedTheme(){ const p=currentThemePref(); return p==='system' ? (matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light') : p; }
+function setTheme(mode){
+  try{
+    if(mode==='system') localStorage.removeItem('ra_theme');
+    else localStorage.setItem('ra_theme', mode);
+  }catch(e){}
+  document.documentElement.setAttribute('data-theme', resolvedTheme());
+  syncThemeUI();
+}
+function cycleTheme(){ setTheme(resolvedTheme()==='dark' ? 'light' : 'dark'); }
+function syncThemeUI(){
+  const pref = currentThemePref();
+  document.querySelectorAll('#theme-seg button').forEach(b => b.classList.toggle('on', b.dataset.themeVal===pref));
+  const tb = document.getElementById('theme-btn');
+  if(tb) tb.textContent = resolvedTheme()==='dark' ? '☀️' : '🌙';
+}
+// keep in sync if the OS theme flips while on "system"
+try{ matchMedia('(prefers-color-scheme:dark)').addEventListener('change', () => { if(currentThemePref()==='system'){ document.documentElement.setAttribute('data-theme', resolvedTheme()); syncThemeUI(); } }); }catch(e){}
+syncThemeUI();
+
 /* ── AUTH (mirrors dashboard.html's login, plus a role lookup) ── */
 let loggedInUser = null, loggedInRole = null;
+let loggedInName = null;
 let loggedInTeam = null, loggedInArea = null;
 let loggedInSignature = null; // this account's saved signature data URL (TechOp2/Supervisor)
+let _myUserDocId = null;      // cached dashboard_users doc id of the logged-in account
 let _teamSetupDocId = null;   // dashboard_users doc id awaiting a team/area save
 
 // Roles that sign during the workflow — their account carries a saved
@@ -496,13 +643,15 @@ async function doLogin(e){
     if(userData.password !== hashed){ errEl.textContent='Password salah.'; btn.disabled=false; btn.textContent='SIGN IN'; return; }
     loggedInUser = userData.username;
     loggedInRole = userData.role || null;
+    loggedInName = userData.name || loggedInUser;
+    _myUserDocId = snap.docs[0].id;
     sessionStorage.setItem('dashboard_user', loggedInUser);
     sessionStorage.setItem('dashboard_login_time', Date.now().toString());
     sessionStorage.setItem('dashboard_role', loggedInRole || '');
     // dashboard_name: what check sheets' technician-auth.js widget shows/
     // fills into Checked By — falls back to username for accounts created
     // before this field existed (the techop2/supervisor/admin accounts).
-    sessionStorage.setItem('dashboard_name', userData.name || loggedInUser);
+    sessionStorage.setItem('dashboard_name', loggedInName);
     setSignatureSession(userData.signature || null);
     // Mandatory Team/Area for technician/techop2 accounts without one yet —
     // block on the setup form until saved. Supervisor/Admin skip it entirely.
@@ -521,8 +670,42 @@ async function doLogin(e){
 function toggleAuthMode(mode){
   document.getElementById('login-panel').style.display = mode==='login' ? '' : 'none';
   document.getElementById('register-panel').style.display = mode==='register' ? '' : 'none';
+  document.getElementById('forgot-panel').style.display = mode==='forgot' ? '' : 'none';
   document.getElementById('login-err').textContent = '';
   document.getElementById('register-err').textContent = '';
+  document.getElementById('fp-err').textContent = '';
+}
+
+// Forgot password — no email system, so reset is gated by the same admin
+// access code that gates TechOp2/Supervisor registration (getElevatedRegCode()).
+async function doForgotPassword(e){
+  e.preventDefault();
+  const user = document.getElementById('fp-user').value.trim().toLowerCase();
+  const code = document.getElementById('fp-code').value.trim();
+  const pass = document.getElementById('fp-pass').value;
+  const pass2 = document.getElementById('fp-pass2').value;
+  const errEl = document.getElementById('fp-err');
+  const btn = document.getElementById('fp-btn');
+  errEl.textContent = '';
+  if(!user || !code){ errEl.textContent='Isi username dan kode akses.'; return; }
+  if(pass.length < 4){ errEl.textContent='Password baru minimal 4 karakter.'; return; }
+  if(pass !== pass2){ errEl.textContent='Konfirmasi password tidak cocok.'; return; }
+  btn.disabled = true; btn.textContent = 'Memproses...';
+  try{
+    if(code !== (await getElevatedRegCode())){ errEl.textContent='Kode akses salah. Minta kode reset ke admin.'; btn.disabled=false; btn.textContent='RESET PASSWORD'; return; }
+    const snap = await db.collection('dashboard_users').where('username','==',user).limit(1).get();
+    if(snap.empty){ errEl.textContent='Username tidak ditemukan.'; btn.disabled=false; btn.textContent='RESET PASSWORD'; return; }
+    await db.collection('dashboard_users').doc(snap.docs[0].id).update({
+      password: await hashPass(pass), passwordUpdatedAt: new Date().toISOString(),
+    });
+    errEl.style.color = 'var(--ok)';
+    errEl.textContent = '✅ Password berhasil direset. Silakan login dengan password baru.';
+    setTimeout(() => { errEl.style.color=''; toggleAuthMode('login'); document.getElementById('login-user').value = user; }, 1800);
+  }catch(err){
+    console.error('Forgot password error:', err);
+    errEl.textContent = 'Gagal reset: ' + err.message;
+  }
+  btn.disabled = false; btn.textContent = 'RESET PASSWORD';
 }
 
 // Self-registration now lets the new account pick its own role
@@ -705,6 +888,101 @@ function prefillSignatureCanvas(canvasId){
   img.src = loggedInSignature;
 }
 
+// ── ACCOUNT SETTINGS ─────────────────────────────────────────
+async function _myUserDoc(){
+  if(_myUserDocId){
+    const d = await db.collection('dashboard_users').doc(_myUserDocId).get();
+    if(d.exists) return d;
+  }
+  const snap = await db.collection('dashboard_users').where('username','==',loggedInUser).limit(1).get();
+  if(snap.empty) throw new Error('Akun tidak ditemukan.');
+  _myUserDocId = snap.docs[0].id;
+  return snap.docs[0];
+}
+function openSettings(){
+  const ov = document.getElementById('settings-overlay');
+  ov.style.display = 'flex'; ov.classList.remove('hide');
+  document.getElementById('set-whoami').textContent = '👤 ' + loggedInUser + ' · ' + (ROLE_LABELS[loggedInRole||'none']||loggedInRole);
+  ['set-profile-err','set-profile-ok','set-pass-err','set-pass-ok','set-sig-err','set-sig-ok'].forEach(id=>document.getElementById(id).textContent='');
+  document.getElementById('set-name').value = loggedInName || '';
+  document.getElementById('set-user').value = loggedInUser || '';
+  ['set-pass-cur','set-pass-new','set-pass-new2'].forEach(id=>document.getElementById(id).value='');
+  syncThemeUI();
+  // signature section only for roles that sign
+  document.getElementById('set-sig-sec').style.display = roleUsesSignature(loggedInRole) ? '' : 'none';
+  if(roleUsesSignature(loggedInRole)){
+    delete _sigState['set-sig-canvas'];
+    clearSignature('set-sig-canvas');
+    attachSignaturePad('set-sig-canvas');
+    if(_sigState['set-sig-canvas']) _sigState['set-sig-canvas'].hasInk = false;
+    if(loggedInSignature){ const img=new Image(); img.onload=()=>drawImageFitted('set-sig-canvas',img); img.src=loggedInSignature; }
+  }
+}
+function closeSettings(){
+  const ov = document.getElementById('settings-overlay');
+  ov.classList.add('hide');
+  setTimeout(()=>{ ov.style.display='none'; ov.classList.remove('hide'); }, 300);
+}
+async function saveProfile(){
+  const errEl = document.getElementById('set-profile-err'), okEl = document.getElementById('set-profile-ok');
+  const btn = document.getElementById('set-profile-btn');
+  errEl.textContent = ''; okEl.textContent = '';
+  const name = document.getElementById('set-name').value.trim();
+  const newUser = document.getElementById('set-user').value.trim().toLowerCase();
+  if(!name){ errEl.textContent = 'Nama tidak boleh kosong.'; return; }
+  if(!newUser || !/^[a-z0-9._-]+$/.test(newUser)){ errEl.textContent = 'Username: huruf kecil/angka/titik/strip, tanpa spasi.'; return; }
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+  try{
+    if(newUser !== loggedInUser){
+      const clash = await db.collection('dashboard_users').where('username','==',newUser).limit(1).get();
+      if(!clash.empty){ errEl.textContent = 'Username sudah dipakai akun lain.'; btn.disabled=false; btn.textContent='Simpan Profil'; return; }
+    }
+    const doc = await _myUserDoc();
+    await db.collection('dashboard_users').doc(doc.id).update({ name, username: newUser, profileUpdatedAt: new Date().toISOString() });
+    loggedInName = name; loggedInUser = newUser;
+    sessionStorage.setItem('dashboard_name', name);
+    sessionStorage.setItem('dashboard_user', newUser);
+    document.getElementById('user-label').textContent = '👤 ' + newUser;
+    okEl.textContent = '✅ Profil tersimpan.';
+  }catch(err){ console.error(err); errEl.textContent = 'Gagal menyimpan: ' + err.message; }
+  btn.disabled = false; btn.textContent = 'Simpan Profil';
+}
+async function changePassword(){
+  const errEl = document.getElementById('set-pass-err'), okEl = document.getElementById('set-pass-ok');
+  const btn = document.getElementById('set-pass-btn');
+  errEl.textContent = ''; okEl.textContent = '';
+  const cur = document.getElementById('set-pass-cur').value;
+  const nw = document.getElementById('set-pass-new').value;
+  const nw2 = document.getElementById('set-pass-new2').value;
+  if(nw.length < 4){ errEl.textContent = 'Password baru minimal 4 karakter.'; return; }
+  if(nw !== nw2){ errEl.textContent = 'Konfirmasi password baru tidak cocok.'; return; }
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+  try{
+    const doc = await _myUserDoc();
+    if(doc.data().password !== await hashPass(cur)){ errEl.textContent = 'Password saat ini salah.'; btn.disabled=false; btn.textContent='Ubah Password'; return; }
+    await db.collection('dashboard_users').doc(doc.id).update({ password: await hashPass(nw), passwordUpdatedAt: new Date().toISOString() });
+    ['set-pass-cur','set-pass-new','set-pass-new2'].forEach(id=>document.getElementById(id).value='');
+    okEl.textContent = '✅ Password diperbarui.';
+  }catch(err){ console.error(err); errEl.textContent = 'Gagal: ' + err.message; }
+  btn.disabled = false; btn.textContent = 'Ubah Password';
+}
+async function saveSignatureFromSettings(){
+  const errEl = document.getElementById('set-sig-err'), okEl = document.getElementById('set-sig-ok');
+  const btn = document.getElementById('set-sig-btn');
+  errEl.textContent = ''; okEl.textContent = '';
+  const sig = getSignatureDataUrl('set-sig-canvas');
+  if(!sig){ errEl.textContent = 'Gambar atau upload tanda tangan dulu.'; return; }
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+  try{
+    const doc = await _myUserDoc();
+    await db.collection('dashboard_users').doc(doc.id).update({ signature: sig, signatureUpdatedAt: new Date().toISOString() });
+    setSignatureSession(sig);
+    document.getElementById('sig-note').style.display = 'none';
+    okEl.textContent = '✅ Tanda tangan diperbarui.';
+  }catch(err){ console.error(err); errEl.textContent = 'Gagal: ' + err.message; }
+  btn.disabled = false; btn.textContent = 'Simpan Tanda Tangan';
+}
+
 function doLogout(){
   sessionStorage.removeItem('dashboard_user');
   sessionStorage.removeItem('dashboard_login_time');
@@ -722,6 +1000,7 @@ async function checkSession(){
   if(saved && elapsed < 8*60*60*1000){
     loggedInUser = saved;
     loggedInRole = sessionStorage.getItem('dashboard_role') || null;
+    loggedInName = sessionStorage.getItem('dashboard_name') || loggedInUser;
     loggedInTeam = sessionStorage.getItem('dashboard_team') || null;
     loggedInArea = sessionStorage.getItem('dashboard_area') || null;
     loggedInSignature = sessionStorage.getItem('dashboard_signature') || null;
@@ -756,6 +1035,7 @@ function showApp(){
   document.getElementById('user-label').textContent = '👤 ' + loggedInUser;
   document.getElementById('user-label').style.display = '';
   document.getElementById('logout-btn').style.display = '';
+  document.getElementById('settings-btn').style.display = '';
   const roleEl = document.getElementById('role-label');
   const roleKey = loggedInRole || 'none';
   roleEl.textContent = ROLE_LABELS[roleKey] || roleKey;
