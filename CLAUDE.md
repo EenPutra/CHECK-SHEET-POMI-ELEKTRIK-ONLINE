@@ -162,14 +162,12 @@ before writing any code) to build the shared module + verify it thoroughly on on
 touching the other ~23, given how invasive and easy to get subtly wrong a change to every check
 sheet's `submitToDb()` is.
 
-**Now rolled out to all 25 active, portal-linked check sheets** (every file in "The three shared
-library files" list under Review & Approval Workflow, plus `Battery_7EB-BY-125-250.html` and
-`UPS_7EB-UPS-AB_Monthly.html`) — check a given file's own script includes for `submit-guard.js`
-if in doubt, but as of this writing every non-legacy check sheet has it. The 3 files that do NOT
-have it are the documented legacy duplicates, deliberately skipped since they're not linked from
-the portal and not the reference implementation for anything: `esp_checksheet.html`,
-`4000 Hours Mill/LV_Motor_MCC.html`, `4000 Hours Mill/Mill 4000 Hours PM.html`. If a brand-new
-check sheet is ever added, give it the same treatment: add
+**Now rolled out to all 25 active, portal-linked check sheets** — every check sheet in this repo
+has it as of this writing, check a given file's own script includes for `submit-guard.js` if in
+doubt. The 3 files that do NOT have it are the documented legacy duplicates, deliberately skipped
+since they're not linked from the portal and not the reference implementation for anything:
+`esp_checksheet.html`, `4000 Hours Mill/LV_Motor_MCC.html`, `4000 Hours Mill/Mill 4000 Hours PM.html`.
+If a brand-new check sheet is ever added, give it the same treatment: add
 `<script src="submit-guard.js"></script>` after `approval-helper.js`, call
 `SubmitGuard.init({assetTag:'...'})` near the file's existing `LoadMergeModal.init()`/
 `TechnicianAuth.init()` calls (pass `submitFnName:'yourFnName'` too if the submit button isn't
@@ -223,10 +221,12 @@ Two independent pieces, both self-injecting DOM/CSS like `load-merge-modal.js`/
   file links and writing the approval record) — the calling check sheet blends that into its own
   overall bar (e.g. `10 + Math.round(pct*0.85)`, reserving the first ~10% for the `DB.save()`/
   `DB.update()` step that runs before `submitWithFiles()` is even called). The overlay has no
-  close button and the submit button(s) are explicitly `.disabled` for the duration
-  (`[...document.querySelectorAll('[onclick="submitToDb()"]')]` — no id needed, works even when a
-  file has more than one Submit button, as `UPS_7EB-UPS-AB_Monthly.html` does) — this is the literal
-  fix for "technicians re-clicking Submit out of impatience," not just a cosmetic nicety.
+  close button and the submit button(s) are explicitly `.disabled` for the duration — internally,
+  `_lockButtons()`/`_unlockButtons()` select `[onclick="<submitFnName>()"]` (`submitFnName`
+  defaults to `'submitToDb'`, overridable via `SubmitGuard.init()` — see the
+  `GEN_BrushGear_PM_Checksheet.html` note above), no id needed, works even when a file has more
+  than one Submit button, as `UPS_7EB-UPS-AB_Monthly.html` does — this is the literal fix for
+  "technicians re-clicking Submit out of impatience," not just a cosmetic nicety.
 
 **New capabilities added to support this, both backward-compatible (every existing caller keeps
 working unmodified):**
