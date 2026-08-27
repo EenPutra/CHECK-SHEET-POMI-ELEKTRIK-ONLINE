@@ -381,6 +381,10 @@ const TEAM_AREAS = {
   E7: ['Common', 'Powerblock'],
   C7: ['Turbine', 'Boiler', 'Common (CHCB)', 'Common (WWTP-Ashdisposal)'],
 };
+// Team/area only drives TechOp2 inbox routing (and a technician's submissions
+// being routable to a PIC). Supervisor & Admin are never scoped, so they are
+// NOT forced through the mandatory team-setup form on login.
+function roleNeedsTeam(role){ return role !== 'supervisor' && role !== 'admin'; }
 function fillAreaOptions(teamSelId, areaSelId, selected){
   const team = document.getElementById(teamSelId).value;
   const areaSel = document.getElementById(areaSelId);
@@ -422,9 +426,9 @@ async function doLogin(e){
     // fills into Checked By — falls back to username for accounts created
     // before this field existed (the techop2/supervisor/admin accounts).
     sessionStorage.setItem('dashboard_name', userData.name || loggedInUser);
-    // Mandatory Team/Area: accounts created before this feature have no team —
-    // block on the setup form until it's filled and saved to their user doc.
-    if(!TEAM_AREAS[userData.team] || !userData.area){
+    // Mandatory Team/Area for technician/techop2 accounts without one yet —
+    // block on the setup form until saved. Supervisor/Admin skip it entirely.
+    if(roleNeedsTeam(loggedInRole) && (!TEAM_AREAS[userData.team] || !userData.area)){
       promptTeamSetup(snap.docs[0].id, userData.team, userData.area);
       return; // showApp() runs after saveTeamSetup()
     }
@@ -570,7 +574,8 @@ async function checkSession(){
     loggedInArea = sessionStorage.getItem('dashboard_area') || null;
     // Backfill team/area from Firestore for sessions created before this
     // feature (or on another page); force the setup form if still missing.
-    if(!TEAM_AREAS[loggedInTeam] || !loggedInArea){
+    // Supervisor/Admin skip this entirely — team/area doesn't apply to them.
+    if(roleNeedsTeam(loggedInRole) && (!TEAM_AREAS[loggedInTeam] || !loggedInArea)){
       try{
         const snap = await db.collection('dashboard_users').where('username','==',loggedInUser).limit(1).get();
         if(!snap.empty){
