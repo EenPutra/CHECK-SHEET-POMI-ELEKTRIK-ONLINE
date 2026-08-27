@@ -1412,6 +1412,47 @@ case still worked exactly as before, and the simulated network-error entry was n
   button is present only for `loggedInRole==='admin'` and that deleting only ever calls
   `.delete()` on the `approvals` mock, never on `checksheets`.
 
+### Team / Area routing — which TechOp2 (PIC) reviews a submission
+
+`dashboard_users` docs now carry two extra fields, `team` (`'E7'` | `'C7'`) and `area` (a
+string from `TEAM_AREAS[team]` — E7: `Common` / `Powerblock`; C7: `Turbine` / `Boiler` /
+`Common (CHCB)` / `Common (WWTP-Ashdisposal)`), collected in `Review_Approval_Dashboard.html`.
+This was an explicit user request; the design decisions were confirmed up front:
+
+- **Registration form** (`doRegister()`) has a Team select + a dependent Area select
+  (`fillAreaOptions(teamSelId, areaSelId, selected)` repopulates Area on Team change). Both
+  required, validated against `TEAM_AREAS`, written into the new `dashboard_users` doc.
+- **Existing accounts are force-migrated on login.** `doLogin()` and `checkSession()`'s
+  restore path both check `TEAM_AREAS[userData.team] && userData.area`; if missing they call
+  `promptTeamSetup(docId, preTeam, preArea)` which shows a **no-close-button blocking overlay**
+  (`#team-overlay`) — `saveTeamSetup()` writes `{team, area, teamUpdatedAt}` back onto the
+  user's doc via `.update()` and only then calls `showApp()`. `setTeamSession()` mirrors both
+  into `sessionStorage` (`dashboard_team` / `dashboard_area`), cleared by `doLogout()`.
+  `checkSession()` is now `async` (same pattern as dashboard.html's role backfill) and does a
+  one-time Firestore lookup to backfill a session created before this feature; a network error
+  there fails **open** (proceeds without a scope) rather than locking the user out.
+- **Routing = exact team + area match, TechOp2 inbox only** (both chosen deliberately over the
+  looser alternatives). `loadAll()` fetches the whole `dashboard_users` collection once into
+  `_userDir` (keyed `n:<name>` and `u:<username>`, both lowercased) and stamps every approval
+  with `a._team` / `a._area` via `scopeOfApproval(a)` — a **name-match heuristic** on
+  `a.submittedBy` (the free-typed "Checked By" name), the same known-imperfect,
+  not-a-security-boundary approach dashboard.html's technician scoping already uses.
+  `inMyReviewScope(a)` is true when `loggedInRole !== 'techop2'` (Supervisor/Admin are **never**
+  scoped), or the reviewer has no scope set (fail open), or `s.team === loggedInTeam &&
+  s.area === loggedInArea`. `inboxItems()` filters the TechOp2 `'submitted'` queue through it;
+  `renderActionSection()` re-checks it so a direct link to an out-of-scope submission renders a
+  "di luar cakupan team/area Anda" notice instead of the review form. A submission whose
+  submitter's team isn't recorded (name mismatch, pre-feature data) matches **no** TechOp2 and
+  is handled via the Admin account — the `#scope-note` banner says so.
+- The `"Semua Riwayat"` / `"Dikembalikan"` tabs are **not** scoped (full history stays visible
+  to everyone); only `"Menunggu Saya"` is. Cards show a `.card-scope-tag` (`E7 · Powerblock`),
+  and the detail view's Info grid has a "Team / Area (PIC)" cell.
+- Verified via headless Chrome (no Firestore): `TEAM_AREAS`/`fillAreaOptions` both directions,
+  `#team-overlay` has exactly one button (Save, no close), `promptTeamSetup` pre-fills,
+  `inboxItems()` for a C7·Boiler TechOp2 returns only same-team+area `submitted` items while
+  Supervisor/Admin stay unscoped, and `renderActionSection()` blocks the out-of-scope review
+  form.
+
 ### Adding this to a new check sheet
 
 1. Add three script includes right after `db-helper.js`, before `img-helper.js`/`photo-kit.js`:

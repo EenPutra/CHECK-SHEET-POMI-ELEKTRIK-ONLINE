@@ -89,6 +89,13 @@ textarea,input{font-family:var(--body)}
 
 .role-note{display:none;align-items:center;gap:10px;background:var(--acc-soft);border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
 .dedupe-note{display:none;align-items:center;gap:10px;background:var(--ind-soft);border:1px solid rgba(99,102,241,.25);color:var(--ind);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+.scope-note{display:none;align-items:center;gap:10px;background:var(--pri-soft);border:1px solid rgba(37,99,235,.22);color:var(--pri-deep);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+.scope-note b{font-weight:800}
+/* team/area selects inside the login + team-setup cards */
+select.login-field{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:38px;cursor:pointer}
+select.login-field:disabled{opacity:.55;cursor:not-allowed}
+.login-field-lbl{font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--txt-3);text-align:left;margin:2px 0 5px}
+.card-scope-tag{display:inline-block;background:var(--surf-2);border:1px solid var(--bdr);border-radius:6px;padding:1px 7px;font-size:10.5px;font-family:var(--mono);color:var(--txt-2);margin-left:6px}
 
 /* TABS */
 .tabs{display:flex;gap:6px;border-bottom:1px solid var(--bdr);margin-bottom:16px}
@@ -213,11 +220,42 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
         <input type="text" class="login-field" id="reg-user" placeholder="Pilih username" autocomplete="username" required>
         <input type="password" class="login-field" id="reg-pass" placeholder="Pilih password" autocomplete="new-password" required minlength="4">
         <input type="password" class="login-field" id="reg-pass2" placeholder="Ulangi password" autocomplete="new-password" required minlength="4">
+        <div class="login-field-lbl">Team</div>
+        <select class="login-field" id="reg-team" onchange="fillAreaOptions('reg-team','reg-area')" required>
+          <option value="">— Pilih Team —</option>
+          <option value="E7">E7</option>
+          <option value="C7">C7</option>
+        </select>
+        <div class="login-field-lbl">Area</div>
+        <select class="login-field" id="reg-area" required disabled>
+          <option value="">— Pilih Team dulu —</option>
+        </select>
         <button type="submit" class="login-btn" id="register-btn">DAFTAR</button>
       </form>
       <div class="login-err" id="register-err"></div>
       <div class="auth-switch">Sudah punya akun? <a onclick="toggleAuthMode('login')">Login di sini</a></div>
     </div>
+  </div>
+</div>
+
+<!-- TEAM / AREA SETUP (mandatory for accounts without team recorded) -->
+<div class="login-overlay" id="team-overlay" style="display:none">
+  <div class="login-box">
+    <div class="login-mark">T</div>
+    <div class="login-logo">LENGKAPI <span>DATA TEAM</span></div>
+    <div class="login-sub">Akun Anda belum punya Team &amp; Area. Data ini menentukan PIC yang mereview submission Anda &mdash; wajib diisi untuk melanjutkan.</div>
+    <div class="login-field-lbl">Team</div>
+    <select class="login-field" id="ts-team" onchange="fillAreaOptions('ts-team','ts-area')">
+      <option value="">— Pilih Team —</option>
+      <option value="E7">E7</option>
+      <option value="C7">C7</option>
+    </select>
+    <div class="login-field-lbl">Area</div>
+    <select class="login-field" id="ts-area" disabled>
+      <option value="">— Pilih Team dulu —</option>
+    </select>
+    <button class="login-btn" id="ts-btn" onclick="saveTeamSetup()">SIMPAN &amp; LANJUT</button>
+    <div class="login-err" id="ts-err"></div>
   </div>
 </div>
 
@@ -245,6 +283,7 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   </div>
 
   <div class="role-note" id="role-note"></div>
+  <div class="scope-note" id="scope-note"></div>
   <div class="dedupe-note" id="dedupe-note"></div>
 
   <div class="tabs" id="tabs-bar">
@@ -323,6 +362,28 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
 <script>
 /* ── AUTH (mirrors dashboard.html's login, plus a role lookup) ── */
 let loggedInUser = null, loggedInRole = null;
+let loggedInTeam = null, loggedInArea = null;
+let _teamSetupDocId = null;   // dashboard_users doc id awaiting a team/area save
+
+// Team -> valid Area options. A submission is routed to the TechOp2 (PIC)
+// whose own account carries the SAME team + area (see inboxItems()).
+const TEAM_AREAS = {
+  E7: ['Common', 'Powerblock'],
+  C7: ['Turbine', 'Boiler', 'Common (CHCB)', 'Common (WWTP-Ashdisposal)'],
+};
+function fillAreaOptions(teamSelId, areaSelId, selected){
+  const team = document.getElementById(teamSelId).value;
+  const areaSel = document.getElementById(areaSelId);
+  const opts = TEAM_AREAS[team] || [];
+  if(!opts.length){
+    areaSel.innerHTML = '<option value="">— Pilih Team dulu —</option>';
+    areaSel.disabled = true;
+    return;
+  }
+  areaSel.innerHTML = '<option value="">— Pilih Area —</option>' +
+    opts.map(a => `<option value="${a}"${a===selected?' selected':''}>${a}</option>`).join('');
+  areaSel.disabled = false;
+}
 
 async function hashPass(str){
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -351,6 +412,13 @@ async function doLogin(e){
     // fills into Checked By — falls back to username for accounts created
     // before this field existed (the techop2/supervisor/admin accounts).
     sessionStorage.setItem('dashboard_name', userData.name || loggedInUser);
+    // Mandatory Team/Area: accounts created before this feature have no team —
+    // block on the setup form until it's filled and saved to their user doc.
+    if(!TEAM_AREAS[userData.team] || !userData.area){
+      promptTeamSetup(snap.docs[0].id, userData.team, userData.area);
+      return; // showApp() runs after saveTeamSetup()
+    }
+    setTeamSession(userData.team, userData.area);
     showApp();
   }catch(err){
     console.error('Login error:', err);
@@ -376,6 +444,8 @@ async function doRegister(e){
   const user = document.getElementById('reg-user').value.trim().toLowerCase();
   const pass = document.getElementById('reg-pass').value;
   const pass2 = document.getElementById('reg-pass2').value;
+  const team = document.getElementById('reg-team').value;
+  const area = document.getElementById('reg-area').value;
   const errEl = document.getElementById('register-err');
   const btn = document.getElementById('register-btn');
   errEl.textContent = '';
@@ -385,6 +455,8 @@ async function doRegister(e){
   if(!/^[a-z0-9._-]+$/.test(user)){ errEl.textContent='Username hanya boleh huruf kecil, angka, titik, garis bawah/strip (tanpa spasi).'; return; }
   if(pass.length < 4){ errEl.textContent='Password minimal 4 karakter.'; return; }
   if(pass !== pass2){ errEl.textContent='Konfirmasi password tidak cocok.'; return; }
+  if(!TEAM_AREAS[team]){ errEl.textContent='Pilih Team (E7 / C7).'; return; }
+  if(!TEAM_AREAS[team].includes(area)){ errEl.textContent='Pilih Area sesuai Team.'; return; }
 
   btn.disabled = true; btn.textContent = 'Mendaftarkan...';
   try{
@@ -397,6 +469,8 @@ async function doRegister(e){
       password: hashed,
       role: 'technician',
       name: name,
+      team: team,
+      area: area,
       createdAt: new Date().toISOString(),
     });
 
@@ -406,6 +480,7 @@ async function doRegister(e){
     sessionStorage.setItem('dashboard_login_time', Date.now().toString());
     sessionStorage.setItem('dashboard_role', loggedInRole);
     sessionStorage.setItem('dashboard_name', name);
+    setTeamSession(team, area);
     showApp();
   }catch(err){
     console.error('Register error:', err);
@@ -414,20 +489,91 @@ async function doRegister(e){
   }
 }
 
+// ── MANDATORY TEAM/AREA SETUP ──────────────────────────────────
+// Shown when a logged-in account has no valid team/area on its
+// dashboard_users doc. The overlay has no close button and blocks the app
+// until saveTeamSetup() writes the fields back to Firestore.
+function setTeamSession(team, area){
+  loggedInTeam = team || null;
+  loggedInArea = area || null;
+  if(team) sessionStorage.setItem('dashboard_team', team); else sessionStorage.removeItem('dashboard_team');
+  if(area) sessionStorage.setItem('dashboard_area', area); else sessionStorage.removeItem('dashboard_area');
+}
+function promptTeamSetup(docId, preTeam, preArea){
+  _teamSetupDocId = docId;
+  document.getElementById('login-overlay').style.display = 'none';
+  const ov = document.getElementById('team-overlay');
+  ov.style.display = 'flex';
+  ov.classList.remove('hide');
+  document.getElementById('ts-err').textContent = '';
+  const teamSel = document.getElementById('ts-team');
+  if(TEAM_AREAS[preTeam]){
+    teamSel.value = preTeam;
+    fillAreaOptions('ts-team','ts-area', preArea || '');
+  }else{
+    teamSel.value = '';
+    fillAreaOptions('ts-team','ts-area');
+  }
+}
+async function saveTeamSetup(){
+  const team = document.getElementById('ts-team').value;
+  const area = document.getElementById('ts-area').value;
+  const errEl = document.getElementById('ts-err');
+  const btn = document.getElementById('ts-btn');
+  errEl.textContent = '';
+  if(!TEAM_AREAS[team]){ errEl.textContent='Pilih Team (E7 / C7).'; return; }
+  if(!TEAM_AREAS[team].includes(area)){ errEl.textContent='Pilih Area sesuai Team.'; return; }
+  if(!_teamSetupDocId){ errEl.textContent='Sesi tidak valid, silakan login ulang.'; return; }
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+  try{
+    await db.collection('dashboard_users').doc(_teamSetupDocId).update({
+      team, area, teamUpdatedAt: new Date().toISOString(),
+    });
+    setTeamSession(team, area);
+    document.getElementById('team-overlay').classList.add('hide');
+    setTimeout(()=>{ document.getElementById('team-overlay').style.display='none'; }, 400);
+    showApp();
+  }catch(err){
+    console.error('Team setup error:', err);
+    errEl.textContent = 'Gagal menyimpan: ' + err.message;
+    btn.disabled = false; btn.textContent = 'SIMPAN & LANJUT';
+  }
+}
+
 function doLogout(){
   sessionStorage.removeItem('dashboard_user');
   sessionStorage.removeItem('dashboard_login_time');
   sessionStorage.removeItem('dashboard_role');
   sessionStorage.removeItem('dashboard_name');
+  sessionStorage.removeItem('dashboard_team');
+  sessionStorage.removeItem('dashboard_area');
   location.reload();
 }
-function checkSession(){
+async function checkSession(){
   const saved = sessionStorage.getItem('dashboard_user');
   const loginTime = parseInt(sessionStorage.getItem('dashboard_login_time')||'0');
   const elapsed = Date.now() - loginTime;
   if(saved && elapsed < 8*60*60*1000){
     loggedInUser = saved;
     loggedInRole = sessionStorage.getItem('dashboard_role') || null;
+    loggedInTeam = sessionStorage.getItem('dashboard_team') || null;
+    loggedInArea = sessionStorage.getItem('dashboard_area') || null;
+    // Backfill team/area from Firestore for sessions created before this
+    // feature (or on another page); force the setup form if still missing.
+    if(!TEAM_AREAS[loggedInTeam] || !loggedInArea){
+      try{
+        const snap = await db.collection('dashboard_users').where('username','==',loggedInUser).limit(1).get();
+        if(!snap.empty){
+          const u = snap.docs[0].data();
+          if(TEAM_AREAS[u.team] && u.area){
+            setTeamSession(u.team, u.area);
+          }else{
+            promptTeamSetup(snap.docs[0].id, u.team, u.area);
+            return;
+          }
+        }
+      }catch(e){ console.error('Team backfill gagal:', e); }
+    }
     showApp();
   }
 }
@@ -447,6 +593,13 @@ function showApp(){
     note.style.display = 'flex';
     note.innerHTML = '&#9888;&#65039; Akun Anda belum memiliki role (TechOp2/Supervisor) — Anda hanya bisa melihat riwayat, tidak bisa review/approve. Hubungi admin untuk menambahkan field <code>role</code> pada dokumen user ini di collection <code>dashboard_users</code>.';
   }
+  const scope = document.getElementById('scope-note');
+  if(loggedInRole==='techop2' && loggedInTeam && loggedInArea){
+    scope.style.display = 'flex';
+    scope.innerHTML = '&#128100; Kotak masuk <b>"Menunggu Saya"</b> disaring ke submission dari teknisi team <b>'+escHtml(loggedInTeam)+' &middot; '+escHtml(loggedInArea)+'</b>. Submission yang team submitternya belum tercatat ditangani lewat akun Admin. Tab "Semua Riwayat" tetap menampilkan seluruh submission.';
+  }else{
+    scope.style.display = 'none';
+  }
   loadAll();
 }
 const ROLE_LABELS = { techop2:'TechOp2', supervisor:'Supervisor', admin:'Admin', technician:'Technician', none:'Tanpa Role' };
@@ -454,6 +607,42 @@ const ROLE_LABELS = { techop2:'TechOp2', supervisor:'Supervisor', admin:'Admin',
 /* ── DATA ── */
 let _allApprovals = [];
 const _checksheetCache = {};
+
+// dashboard_users directory: submitter name/username -> {team, area}. Used to
+// route a submission to the TechOp2 (PIC) whose account carries the same
+// team+area. Name-match is a known-imperfect heuristic (submittedBy is the
+// free-typed "Checked By" name, same trust model dashboard.html's technician
+// scoping already uses) — not a security boundary, just inbox routing.
+let _userDir = null;
+async function loadUserDir(force){
+  if(_userDir && !force) return _userDir;
+  const dir = {};
+  try{
+    const snap = await db.collection('dashboard_users').get();
+    snap.docs.forEach(d => {
+      const u = d.data();
+      const rec = { team: TEAM_AREAS[u.team] ? u.team : null, area: u.area || null };
+      if(u.name) dir['n:' + u.name.trim().toLowerCase()] = rec;
+      if(u.username) dir['u:' + u.username.trim().toLowerCase()] = rec;
+    });
+  }catch(e){ console.error('loadUserDir gagal:', e); }
+  _userDir = dir;
+  return dir;
+}
+function scopeOfApproval(a){
+  if(!_userDir) return { team:null, area:null };
+  const by = (a.submittedBy || '').trim().toLowerCase();
+  return _userDir['n:'+by] || _userDir['u:'+by] || { team:null, area:null };
+}
+// A submission is "mine" as a TechOp2 PIC when its submitter's team AND area
+// both match the logged-in reviewer's. Admin/Supervisor are never scoped.
+function inMyReviewScope(a){
+  if(loggedInRole !== 'techop2') return true;
+  if(!loggedInTeam || !loggedInArea) return true; // reviewer has no scope set — fail open
+  const s = scopeOfApproval(a);
+  return s.team === loggedInTeam && s.area === loggedInArea;
+}
+
 async function loadAll(){
   document.getElementById('list-area').innerHTML = '<div class="list-loading"><div class="msg">Memuat...</div></div>';
   document.getElementById('dedupe-note').style.display = 'none';
@@ -463,6 +652,11 @@ async function loadAll(){
     document.getElementById('list-area').innerHTML = '<div class="list-empty"><div class="msg">Gagal memuat data</div><div>'+e.message+'</div></div>';
     return;
   }
+  await loadUserDir(true);
+  _allApprovals.forEach(a => {
+    const s = scopeOfApproval(a);
+    a._team = s.team; a._area = s.area;
+  });
   try{
     const removed = await cleanupDuplicateApprovals(_allApprovals);
     if(removed.length){
@@ -612,7 +806,8 @@ function updateTabCounts(){
   document.getElementById('count-all').textContent = _allApprovals.length;
 }
 function inboxItems(){
-  if(loggedInRole==='techop2') return _allApprovals.filter(a=>a.status==='submitted');
+  // TechOp2 inbox is scoped to the PIC's own team+area (see inMyReviewScope).
+  if(loggedInRole==='techop2') return _allApprovals.filter(a=>a.status==='submitted' && inMyReviewScope(a));
   if(loggedInRole==='supervisor') return _allApprovals.filter(a=>a.status==='reviewed');
   if(loggedInRole==='admin') return _allApprovals.filter(a=>a.status==='submitted'||a.status==='reviewed');
   return [];
@@ -635,7 +830,7 @@ function renderList(){
   wrap.innerHTML = items.map(a => `
     <div class="card">
       <div class="card-main">
-        <div class="card-title">${escHtml(a.assetName||a.assetTag||'—')}</div>
+        <div class="card-title">${escHtml(a.assetName||a.assetTag||'—')}${a._team?`<span class="card-scope-tag">${escHtml(a._team)} · ${escHtml(a._area||'?')}</span>`:''}</div>
         <div class="card-meta">${escHtml(a.submittedBy||'—')} · disubmit ${fmtDate(a.createdAt)}${a.revisionOf?' · <span title="Ini revisi dari submission sebelumnya">↻ revisi</span>':''}</div>
       </div>
       <span class="card-badge ${a.status}">${Approvals.STATUS_LABELS[a.status]||a.status}</span>
@@ -800,6 +995,11 @@ async function openDetail(id){
   try{
     const approval = await Approvals.getById(id);
     if(!approval){ document.getElementById('d-body').innerHTML = '<div class="list-empty"><div class="msg">Data tidak ditemukan</div></div>'; return; }
+    // Reuse the enriched copy from the list if we have it, so _team/_area (and
+    // any dedupe) are consistent; fall back to enriching this fetch directly.
+    const listed = _allApprovals.find(x => x.id === id);
+    if(listed){ approval._team = listed._team; approval._area = listed._area; }
+    else { await loadUserDir(); const s = scopeOfApproval(approval); approval._team = s.team; approval._area = s.area; }
     const checksheet = await getChecksheet(approval.checksheetId);
     _curApproval = approval; _curChecksheet = checksheet;
     renderDetail(approval, checksheet);
@@ -845,6 +1045,7 @@ function renderDetail(a, cs){
       <div class="info-cell"><div class="k">Shift</div><div class="v">${escHtml(cs?.shift||'—')}</div></div>
       <div class="info-cell"><div class="k">Status Checklist</div><div class="v">${escHtml(cs?.overallStatus||'—')} (${cs?.countOk||0} OK / ${cs?.countNg||0} NG)</div></div>
       <div class="info-cell"><div class="k">Disubmit</div><div class="v">${fmtDate(a.createdAt)}</div></div>
+      <div class="info-cell"><div class="k">Team / Area (PIC)</div><div class="v">${a._team ? escHtml(a._team)+' · '+escHtml(a._area||'?') : '<span style="color:var(--txt-3);font-weight:500">Team submitter tidak tercatat</span>'}</div></div>
     </div></div>`;
 
   html += `<div class="dsec"><div class="dsec-title">Dokumen</div><div class="file-links">
@@ -947,8 +1148,16 @@ function openRemoteFile(url){
 function renderActionSection(a, cs){
   // 'admin' can do both — matches inboxItems() above, which already shows
   // an admin both the submitted and reviewed queues.
-  const canReview = (loggedInRole==='techop2' || loggedInRole==='admin') && a.status==='submitted';
+  // TechOp2 may only review submissions routed to their own team+area (the
+  // same rule inboxItems() filters on) — enforced here too so a direct link
+  // to an out-of-scope submission can't be reviewed.
+  const canReview = ((loggedInRole==='techop2' && inMyReviewScope(a)) || loggedInRole==='admin') && a.status==='submitted';
   const canApprove = (loggedInRole==='supervisor' || loggedInRole==='admin') && a.status==='reviewed';
+  if(loggedInRole==='techop2' && a.status==='submitted' && !inMyReviewScope(a)){
+    return `<div class="dsec"><div class="dsec-title">Tindakan — Review</div>
+      <div class="readonly-hint">Submission ini di luar cakupan team/area Anda (${a._team?escHtml(a._team)+' · '+escHtml(a._area||'?'):'team submitter tidak tercatat'}). PIC dari team tersebut yang akan mereview.</div>
+    </div>`;
+  }
   if(canReview){
     return `<div class="dsec"><div class="dsec-title">Tindakan — Review</div>
       <label class="field-lbl">Komentar</label>
