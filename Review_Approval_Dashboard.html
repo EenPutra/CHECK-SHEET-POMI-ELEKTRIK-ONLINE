@@ -184,6 +184,9 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
 .sig-actions{margin-top:6px;display:flex;gap:8px;flex-wrap:wrap}
 .action-row{display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap}
 .readonly-hint{font-size:12px;color:var(--txt-3);font-style:italic}
+.edit-cs-box{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--pri-soft);border:1px solid rgba(37,99,235,.22);border-radius:10px;padding:11px 14px;margin-bottom:14px;font-size:12.5px;color:var(--pri-deep)}
+.edit-cs-box b{font-weight:800}
+.edit-cs-box a{flex-shrink:0;text-decoration:none}
 
 @media(max-width:640px){
   .detail-hdr{flex-direction:column}
@@ -1166,7 +1169,14 @@ function renderActionSection(a, cs){
     </div>`;
   }
   if(canReview){
+    const editHref = a.checksheetFile ? a.checksheetFile.replace(/ /g,'%20')+'?reviseOf='+a.id : '';
     return `<div class="dsec"><div class="dsec-title">Tindakan — Review</div>
+      ${editHref ? `<div class="edit-cs-box">
+        <div><b>Perlu memperbaiki isian?</b> Buka check sheet untuk diedit langsung, tekan tombol
+        <i>"Muat Data Submission untuk Direvisi"</i> di banner atas, perbaiki, lalu Submit ulang —
+        submission ini akan diperbarui di tempat.</div>
+        <a class="btn btn-sm btn-pri" target="_blank" rel="noopener" href="${editHref}">&#9999;&#65039; Edit Check Sheet</a>
+      </div>` : ''}
       <label class="field-lbl">Komentar</label>
       <textarea class="dinput" id="in-comments" placeholder="Catatan hasil review..."></textarea>
       <label class="field-lbl" style="margin-top:10px">Rekomendasi / Future Work</label>

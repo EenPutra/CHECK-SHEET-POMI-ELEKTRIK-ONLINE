@@ -109,7 +109,7 @@ const LoadMergeModal = (function () {
     banner.innerHTML = `
       <span style="font-size:18px;flex-shrink:0">&#9888;&#65039;</span>
       <div style="flex:1">
-        <b>Form ini dibuka untuk merevisi submission yang dikembalikan.</b>
+        <b id="lmm-revision-title">Form ini dibuka untuk merevisi submission.</b>
         <div id="lmm-revision-note">Memuat catatan revisi...</div>
         <button class="lmm-btn" style="margin-top:8px" onclick="LoadMergeModal.loadRevisionSource()">&#128229; Muat Data Submission untuk Direvisi</button>
       </div>`;
@@ -369,9 +369,18 @@ const LoadMergeModal = (function () {
       if (!approval) { noteEl.textContent = 'Submission rujukan tidak ditemukan (mungkin sudah dihapus).'; return; }
       _reviseOfChecksheetId = approval.checksheetId;
       const n = approval.returnedNote;
-      noteEl.textContent = n
-        ? `Dikembalikan oleh ${n.by || '—'} (tahap ${n.stage === 'approval' ? 'Approval' : 'Review'}): "${n.note || '—'}"`
-        : 'Submission ini dikembalikan untuk direvisi.';
+      const titleEl = document.getElementById('lmm-revision-title');
+      if (n) {
+        if (titleEl) titleEl.textContent = 'Form ini dibuka untuk merevisi submission yang dikembalikan.';
+        noteEl.textContent = `Dikembalikan oleh ${n.by || '—'} (tahap ${n.stage === 'approval' ? 'Approval' : 'Review'}): "${n.note || '—'}"`;
+      } else if (approval.status === 'submitted') {
+        // Opened by a reviewer (TechOp2) mid-review to fix the report before
+        // deciding — not a returned revision.
+        if (titleEl) titleEl.textContent = 'Form ini dibuka oleh reviewer untuk memperbaiki isian submission.';
+        noteEl.textContent = 'Muat datanya, perbaiki seperlunya, lalu Submit ulang — submission ini akan diperbarui di tempat (pilih "Timpa" saat diminta).';
+      } else {
+        noteEl.textContent = 'Muat data submission ini untuk dilihat / diperbaiki.';
+      }
     } catch (e) {
       noteEl.textContent = 'Gagal memuat catatan revisi: ' + e.message;
     }

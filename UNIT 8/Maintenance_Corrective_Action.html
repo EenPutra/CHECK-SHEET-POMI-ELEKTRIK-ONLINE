@@ -248,6 +248,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   <div class="sec-body">
     <div class="wo-grid">
       <div class="mf"><label>WO No.</label><input type="text" id="wo-no" placeholder="WO-xxxxxx"></div>
+      <div class="mf"><label>Priority</label><input type="number" id="wo-priority" min="1" max="10" step="1" inputmode="numeric" placeholder="cth. 3"></div>
       <div class="mf"><label>Unit</label>
         <select id="unit"><option>Unit 7</option><option selected>Unit 8</option><option>Common Plant</option></select>
       </div>
@@ -258,7 +259,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
         <select id="criticality"><option>Critical</option><option>Essential</option><option>Non-Critical</option></select>
       </div>
       <div class="mf"><label>Work Order Type</label>
-        <select id="wo-type"><option>CM</option><option>CPM</option><option>AH</option></select>
+        <select id="wo-type"><option>CM</option><option>CPM</option><option>AH</option><option>EM</option><option>PDM</option></select>
       </div>
       <div class="mf"><label>Permit / PAS No.</label><input type="text" id="permit-no" placeholder="No. Permit/PAS"></div>
       <div class="mf"><label>Date of Failure</label><input type="date" id="failure-date"></div>
@@ -1264,12 +1265,13 @@ async function generatePDF(opts){
   // ── A. WORK ORDER & ASSET IDENTIFICATION ──
   sectionHeader('A. WORK ORDER & ASSET IDENTIFICATION');
   formRow('WO No.', valueText(gv('wo-no')||'From Maximo work order record', {italic:!gv('wo-no'), color:gv('wo-no')?DARK:[120,120,120]}));
+  formRow('Priority', valueText(gv('wo-priority')||'Maximo work order priority (1 = highest)', {italic:!gv('wo-priority'), color:gv('wo-priority')?DARK:[120,120,120]}));
   chkGroupRow('Unit', [['Unit 7','Unit 7'],['Unit 8','Unit 8'],['Common Plant','Common Plant']], gv('unit'));
   formRow('System / Area', valueText(gv('system-area')||''));
   formRow('Asset Tag', valueText(gv('asset-tag')||''));
   formRow('Asset Description', valueText(gv('asset-desc')||''));
   chkGroupRow('Equipment Criticality', [['Critical','Critical'],['Essential','Essential'],['Non-Critical','Non-Critical']], gv('criticality'));
-  chkGroupRow('Work Order Type', [['CPM','CPM (Corrective Preventive)'],['CM','CM (Corrective)'],['AH','AH (Ad-Hoc)']], gv('wo-type'), {fontSize:7.2});
+  chkGroupRow('Work Order Type', [['CPM','CPM (Corrective Preventive)'],['CM','CM (Corrective)'],['AH','AH (Ad-Hoc)'],['EM','EM (Emergency)'],['PDM','PdM (Predictive)']], gv('wo-type'), {fontSize:7.2});
   formRow('Permit / PAS No.', valueText(gv('permit-no')||''));
   formRow('Date / Time of Failure', valueText(((gv('failure-date')?fmtDatePdf(gv('failure-date')):'')+' '+(gv('failure-time')||'')).trim()));
   formRow('Date of Report', valueText(fmtDatePdf(gv('wo-date'))||''));
@@ -1513,6 +1515,7 @@ async function submitToDb(){
   base.sheets = {
     info: {title:'A — WO & Asset Identification', columns:['Value'], rows:[
       {no:'1', desc:'WO No.', values:{Value: gv('wo-no')||'—'}},
+      {no:'1b', desc:'Priority', values:{Value: gv('wo-priority')||'—'}},
       {no:'2', desc:'Unit', values:{Value: gv('unit')||'—'}},
       {no:'3', desc:'System/Area', values:{Value: gv('system-area')||'—'}},
       {no:'4', desc:'Asset Tag', values:{Value: gv('asset-tag')||'—'}},

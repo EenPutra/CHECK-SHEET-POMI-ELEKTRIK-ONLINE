@@ -1268,6 +1268,19 @@ the current design — **do not "simplify" these away**:
   `applyMergedBundleToForm()` are exposed on the module in case a check sheet needs to compose
   them directly (e.g. a multi-asset sheet re-running `init()` with a different `assetTag` per
   selection — see below).
+  - **`?reviseOf=<approvalId>` opens the check sheet in revision/edit mode** for ANY status,
+    not just returned items. `Review_Approval_Dashboard.html`'s review action section (the
+    `canReview` branch of `renderActionSection()`) has an **"✏️ Edit Check Sheet"** button
+    (`.edit-cs-box`) that opens `<checksheetFile>?reviseOf=<approvalId>` (spaces `%20`-encoded)
+    so a TechOp2 can fix the submitter's data mid-review instead of only bouncing it back.
+    `initRevisionBanner()` adapts its wording by the approval's `status`: a `returnedNote`
+    present → "merevisi submission yang dikembalikan"; `status==='submitted'` and no note →
+    "dibuka oleh reviewer untuk memperbaiki isian" + a hint to pick "Timpa" on resubmit. On
+    resubmit, `SubmitGuard.resolveSubmitTarget()` matches the existing checksheet+approval by
+    WO number (approval still `submitted`) and offers Overwrite → `DB.update()` +
+    `existingApprovalId` updates the SAME approval in place, no duplicate. (If WO No. is blank
+    SubmitGuard can't match → a second approval with `revisionOf` set is created instead; still
+    converges via `cleanupDuplicateApprovals` when tag+WO are both present.)
   - **Merge behavior across the two different OK/NG toggle conventions this codebase uses**
     (see "Per-file conventions worth matching" below): header fields and `inputValues` (the
     generic `<input>`/`<select>`/`<textarea>` sweep — where most of a technician's actual typed
@@ -1791,6 +1804,13 @@ different wording/colours, re-derive these constants from it again rather than g
   replacing an earlier invented 6-option list) once the authoritative template surfaced — this
   was a real data-model fix, not just a rendering tweak, since the earlier options didn't
   correspond to any category in the client's own form.
+- **Section A has a `wo-priority` field** (plain numeric `<input type=number>`, right after
+  `wo-no` in the `.wo-grid`) — Maximo WO priority. Persisted for free by the generic
+  `persistDraft()`/`DB.collectCheckSheetData()` id sweeps; explicitly carried into
+  `base.sheets.info` (row `no:'1b'`) and the PDF (`formRow('Priority', …)` right under WO No.).
+  **Work Order Type** dropdown is `CM / CPM / AH / EM / PDM` (EM/PDM added later at user
+  request) — the PDF `chkGroupRow('Work Order Type', …)` list must be kept in sync with the
+  `<select>` (it renders `EM (Emergency)` / `PdM (Predictive)` for those two).
 - **Section A/B/C's one-line fields use a manually-bordered `formRow()`/`chkGroupRow()` pair**
   (shaded label cell + white value cell, drawn with `pdf.rect()`, not `autoTable`) instead of
   `kvTheme`'s grid theme — needed because a checkbox row's content is vector-drawn, which
