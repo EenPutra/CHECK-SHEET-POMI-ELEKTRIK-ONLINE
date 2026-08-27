@@ -1460,11 +1460,51 @@ This was an explicit user request; the design decisions were confirmed up front:
 - The `"Semua Riwayat"` / `"Dikembalikan"` tabs are **not** scoped (full history stays visible
   to everyone); only `"Menunggu Saya"` is. Cards show a `.card-scope-tag` (`E7 · Powerblock`),
   and the detail view's Info grid has a "Team / Area (PIC)" cell.
+- **`roleNeedsTeam(role)`** (`role !== 'supervisor' && role !== 'admin'`) gates all of the
+  above — Supervisor/Admin never pick a team (not in registration, not the blocking overlay,
+  not `checkSession`'s backfill). Only technician/techop2/unknown-role accounts are forced.
 - Verified via headless Chrome (no Firestore): `TEAM_AREAS`/`fillAreaOptions` both directions,
   `#team-overlay` has exactly one button (Save, no close), `promptTeamSetup` pre-fills,
   `inboxItems()` for a C7·Boiler TechOp2 returns only same-team+area `submitted` items while
   Supervisor/Admin stay unscoped, and `renderActionSection()` blocks the out-of-scope review
   form.
+
+### Self-registration now picks its own role + registers a signature draft
+
+Later change, explicit user request — supersedes the old "self-registration is ALWAYS
+`role:'technician'`" rule (that comment is gone from `doRegister()`). Firestore is already
+fully open on this project (see the trust model above), so this is a UI decision, not a new
+security hole.
+
+- **`#reg-role`** select in the registration form: `technician` (Level 1) / `techop2` (Level 2)
+  / `supervisor` (Level 3). `SELF_REG_ROLES` is the allowlist; **Admin is NOT self-registerable**
+  (stays Firestore-provisioned). `onRegRoleChange()` toggles `#reg-team-wrap` (shown when
+  `roleNeedsTeam(role)`) and `#reg-sig-wrap` (shown when `roleUsesSignature(role)`).
+- **`roleUsesSignature(role)`** = `techop2 || supervisor || admin` — these roles sign during the
+  workflow, so their `dashboard_users` doc carries a **`signature`** field (a PNG data URL from
+  the same `attachSignaturePad()` / `getSignatureDataUrl()` / `handleSignatureFile()` pad the
+  review/approval forms use). Registration **requires** it for those roles.
+- **Session**: `loggedInSignature` + `sessionStorage['dashboard_signature']`, set by
+  `setSignatureSession()` on login/register, backfilled in `checkSession()` (combined with the
+  team backfill fetch — `needTeamBackfill || needSigBackfill` triggers one lookup), cleared by
+  `doLogout()`. A `sessionStorage` quota failure is swallowed (re-fetched next login).
+- **Auto-fill on review/approve**: `renderDetail()` calls `prefillSignatureCanvas(canvasId)`
+  right after `attachSignaturePad()` for `sig-canvas-review` / `sig-canvas-approval` — draws
+  `loggedInSignature` onto the pad and sets `hasInk` so `getSignatureDataUrl()` returns it with
+  no re-signing. The reviewer can still "Hapus Tanda Tangan" + redraw to override for one item.
+  `closeDetail()` now `delete`s `_sigState['sig-canvas-review'/'sig-canvas-approval']` so the
+  next open re-binds the fresh canvases (fixed a latent bug: `attachSignaturePad()` skips a
+  canvas whose id is already in `_sigState`, so without this the 2nd detail-open's pad was dead
+  and prefill never re-ran).
+- **Missing-signature nudge**: `showApp()` shows the non-blocking `#sig-note` banner (amber,
+  with a "Simpan Tanda Tangan" button) when `roleUsesSignature(loggedInRole) &&
+  !loggedInSignature`. The button opens `#sig-overlay` (`openSignatureSetup()` — has a "Nanti
+  saja" close, unlike the team overlay); `saveSignatureSetup()` looks the user's doc up by
+  username, `.update()`s `{signature, signatureUpdatedAt}`, updates the session, hides the
+  banner.
+- Verified via headless Chrome: role→wrap visibility for all 3 roles, `roleUsesSignature`
+  truth table, the sig-note banner shows/hides on `loggedInSignature`, and
+  `prefillSignatureCanvas()` makes `getSignatureDataUrl()` return the saved signature.
 
 ### Adding this to a new check sheet
 

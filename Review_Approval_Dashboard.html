@@ -91,6 +91,12 @@ textarea,input{font-family:var(--body)}
 .dedupe-note{display:none;align-items:center;gap:10px;background:var(--ind-soft);border:1px solid rgba(99,102,241,.25);color:var(--ind);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
 .scope-note{display:none;align-items:center;gap:10px;background:var(--pri-soft);border:1px solid rgba(37,99,235,.22);color:var(--pri-deep);border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
 .scope-note b{font-weight:800}
+.sig-note{display:none;align-items:center;gap:12px;flex-wrap:wrap;background:var(--acc-soft);border:1px solid #fde68a;color:#92400e;border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px}
+.sig-note b{font-weight:800}
+.sig-note .btn{flex-shrink:0}
+/* signature pad used in the register form + the "save signature" modal */
+canvas.reg-sig{border:1.5px dashed var(--bdr-2);border-radius:10px;background:#fff;touch-action:none;cursor:crosshair;width:100%;max-width:300px;height:130px;display:block;margin:0 auto 6px}
+.reg-sig-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:4px}
 /* team/area selects inside the login + team-setup cards */
 select.login-field{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:38px;cursor:pointer}
 select.login-field:disabled{opacity:.55;cursor:not-allowed}
@@ -223,23 +229,40 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
     </div>
 
     <div id="register-panel" style="display:none">
-      <div class="login-sub">📝 Daftar akun Technician baru</div>
-      <div class="login-hint">Akun baru otomatis mendapat role <b>Technician</b> (untuk submit check sheet) — role lain (TechOp2/Supervisor/Admin) hanya bisa diberikan oleh admin lewat Firestore.</div>
+      <div class="login-sub">📝 Daftar akun baru</div>
+      <div class="login-hint">Pilih level akun sesuai peran Anda. Untuk <b>TechOp2</b> &amp; <b>Supervisor</b>, isi juga draft tanda tangan — nanti terisi otomatis saat review/approve tanpa perlu tanda tangan ulang.</div>
       <form onsubmit="doRegister(event)">
         <input type="text" class="login-field" id="reg-name" placeholder="Nama Lengkap (untuk isi Checked By otomatis)" autocomplete="name" required>
         <input type="text" class="login-field" id="reg-user" placeholder="Pilih username" autocomplete="username" required>
         <input type="password" class="login-field" id="reg-pass" placeholder="Pilih password" autocomplete="new-password" required minlength="4">
         <input type="password" class="login-field" id="reg-pass2" placeholder="Ulangi password" autocomplete="new-password" required minlength="4">
-        <div class="login-field-lbl">Team</div>
-        <select class="login-field" id="reg-team" onchange="fillAreaOptions('reg-team','reg-area')" required>
-          <option value="">— Pilih Team —</option>
-          <option value="E7">E7</option>
-          <option value="C7">C7</option>
+        <div class="login-field-lbl">Level Akun / Role</div>
+        <select class="login-field" id="reg-role" onchange="onRegRoleChange()" required>
+          <option value="technician">Level 1 — Teknisi (submit check sheet)</option>
+          <option value="techop2">Level 2 — TechOp2 (review)</option>
+          <option value="supervisor">Level 3 — Supervisor (approve)</option>
         </select>
-        <div class="login-field-lbl">Area</div>
-        <select class="login-field" id="reg-area" required disabled>
-          <option value="">— Pilih Team dulu —</option>
-        </select>
+        <div id="reg-team-wrap">
+          <div class="login-field-lbl">Team</div>
+          <select class="login-field" id="reg-team" onchange="fillAreaOptions('reg-team','reg-area')">
+            <option value="">— Pilih Team —</option>
+            <option value="E7">E7</option>
+            <option value="C7">C7</option>
+          </select>
+          <div class="login-field-lbl">Area</div>
+          <select class="login-field" id="reg-area" disabled>
+            <option value="">— Pilih Team dulu —</option>
+          </select>
+        </div>
+        <div id="reg-sig-wrap" style="display:none">
+          <div class="login-field-lbl">Draft Tanda Tangan (gambar di kotak atau upload)</div>
+          <canvas class="reg-sig" id="reg-sig-canvas" width="300" height="130"></canvas>
+          <div class="reg-sig-actions">
+            <button type="button" class="btn btn-sm" onclick="clearSignature('reg-sig-canvas')">Hapus</button>
+            <button type="button" class="btn btn-sm" onclick="document.getElementById('reg-sig-file').click()">&#128193; Upload Gambar</button>
+            <input type="file" id="reg-sig-file" accept="image/png,image/jpeg" style="display:none" onchange="handleSignatureFile('reg-sig-canvas', this)">
+          </div>
+        </div>
         <button type="submit" class="login-btn" id="register-btn">DAFTAR</button>
       </form>
       <div class="login-err" id="register-err"></div>
@@ -269,6 +292,24 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   </div>
 </div>
 
+<!-- SIGNATURE DRAFT SETUP (for TechOp2 / Supervisor without a saved signature) -->
+<div class="login-overlay" id="sig-overlay" style="display:none">
+  <div class="login-box">
+    <div class="login-mark">✍</div>
+    <div class="login-logo">DRAFT <span>TANDA TANGAN</span></div>
+    <div class="login-sub">Simpan tanda tangan Anda sekali di sini &mdash; nanti terisi otomatis di kolom tanda tangan saat review/approve.</div>
+    <canvas class="reg-sig" id="sig-setup-canvas" width="300" height="130"></canvas>
+    <div class="reg-sig-actions">
+      <button type="button" class="btn btn-sm" onclick="clearSignature('sig-setup-canvas')">Hapus</button>
+      <button type="button" class="btn btn-sm" onclick="document.getElementById('sig-setup-file').click()">&#128193; Upload Gambar</button>
+      <input type="file" id="sig-setup-file" accept="image/png,image/jpeg" style="display:none" onchange="handleSignatureFile('sig-setup-canvas', this)">
+    </div>
+    <button class="login-btn" id="sig-setup-btn" onclick="saveSignatureSetup()">SIMPAN TANDA TANGAN</button>
+    <button class="btn btn-sm" style="width:100%;margin-top:8px" onclick="closeSignatureSetup()">Nanti saja</button>
+    <div class="login-err" id="sig-setup-err"></div>
+  </div>
+</div>
+
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="tb-brand"><div class="tb-logo-mark">E7</div><span>ELECTRIC <span class="accent">7</span></span></div>
@@ -294,6 +335,7 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
 
   <div class="role-note" id="role-note"></div>
   <div class="scope-note" id="scope-note"></div>
+  <div class="sig-note" id="sig-note"></div>
   <div class="dedupe-note" id="dedupe-note"></div>
 
   <div class="tabs" id="tabs-bar">
@@ -373,7 +415,14 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
 /* ── AUTH (mirrors dashboard.html's login, plus a role lookup) ── */
 let loggedInUser = null, loggedInRole = null;
 let loggedInTeam = null, loggedInArea = null;
+let loggedInSignature = null; // this account's saved signature data URL (TechOp2/Supervisor)
 let _teamSetupDocId = null;   // dashboard_users doc id awaiting a team/area save
+
+// Roles that sign during the workflow — their account carries a saved
+// signature draft so review/approve can auto-fill it without re-signing.
+function roleUsesSignature(role){ return role==='techop2' || role==='supervisor' || role==='admin'; }
+// Self-registerable roles (Admin stays Firestore-provisioned only).
+const SELF_REG_ROLES = ['technician','techop2','supervisor'];
 
 // Team -> valid Area options. A submission is routed to the TechOp2 (PIC)
 // whose own account carries the SAME team + area (see inboxItems()).
@@ -397,6 +446,17 @@ function fillAreaOptions(teamSelId, areaSelId, selected){
   areaSel.innerHTML = '<option value="">— Pilih Area —</option>' +
     opts.map(a => `<option value="${a}"${a===selected?' selected':''}>${a}</option>`).join('');
   areaSel.disabled = false;
+}
+
+// Register form: show Team/Area only for roles that need routing, and the
+// signature pad only for roles that sign (TechOp2/Supervisor).
+function onRegRoleChange(){
+  const role = document.getElementById('reg-role').value;
+  document.getElementById('reg-team-wrap').style.display = roleNeedsTeam(role) ? '' : 'none';
+  const sigWrap = document.getElementById('reg-sig-wrap');
+  const showSig = roleUsesSignature(role);
+  sigWrap.style.display = showSig ? '' : 'none';
+  if(showSig) attachSignaturePad('reg-sig-canvas');
 }
 
 async function hashPass(str){
@@ -426,6 +486,7 @@ async function doLogin(e){
     // fills into Checked By — falls back to username for accounts created
     // before this field existed (the techop2/supervisor/admin accounts).
     sessionStorage.setItem('dashboard_name', userData.name || loggedInUser);
+    setSignatureSession(userData.signature || null);
     // Mandatory Team/Area for technician/techop2 accounts without one yet —
     // block on the setup form until saved. Supervisor/Admin skip it entirely.
     if(roleNeedsTeam(loggedInRole) && (!TEAM_AREAS[userData.team] || !userData.area)){
@@ -447,19 +508,23 @@ function toggleAuthMode(mode){
   document.getElementById('register-err').textContent = '';
 }
 
-// Self-registration: ALWAYS role:'technician', never chosen by the form —
-// letting a self-service signup pick its own role (even via a hidden field
-// someone edits in devtools) would let anyone grant themselves
-// TechOp2/Supervisor/Admin. TechOp2/Supervisor/Admin accounts stay
-// admin-provisioned directly in Firestore (see CLAUDE.md).
+// Self-registration now lets the new account pick its own role
+// (Level 1 Technician / Level 2 TechOp2 / Level 3 Supervisor) — an explicit
+// user decision for this internal tool (Firestore is already fully open here,
+// see CLAUDE.md's trust model). Admin stays Firestore-provisioned only.
+// TechOp2/Supervisor must also register a signature draft so review/approve
+// can auto-fill it later.
 async function doRegister(e){
   e.preventDefault();
   const name = document.getElementById('reg-name').value.trim();
   const user = document.getElementById('reg-user').value.trim().toLowerCase();
   const pass = document.getElementById('reg-pass').value;
   const pass2 = document.getElementById('reg-pass2').value;
+  let role = document.getElementById('reg-role').value;
+  if(!SELF_REG_ROLES.includes(role)) role = 'technician';
   const team = document.getElementById('reg-team').value;
   const area = document.getElementById('reg-area').value;
+  const signature = roleUsesSignature(role) ? getSignatureDataUrl('reg-sig-canvas') : null;
   const errEl = document.getElementById('register-err');
   const btn = document.getElementById('register-btn');
   errEl.textContent = '';
@@ -469,8 +534,11 @@ async function doRegister(e){
   if(!/^[a-z0-9._-]+$/.test(user)){ errEl.textContent='Username hanya boleh huruf kecil, angka, titik, garis bawah/strip (tanpa spasi).'; return; }
   if(pass.length < 4){ errEl.textContent='Password minimal 4 karakter.'; return; }
   if(pass !== pass2){ errEl.textContent='Konfirmasi password tidak cocok.'; return; }
-  if(!TEAM_AREAS[team]){ errEl.textContent='Pilih Team (E7 / C7).'; return; }
-  if(!TEAM_AREAS[team].includes(area)){ errEl.textContent='Pilih Area sesuai Team.'; return; }
+  if(roleNeedsTeam(role)){
+    if(!TEAM_AREAS[team]){ errEl.textContent='Pilih Team (E7 / C7).'; return; }
+    if(!TEAM_AREAS[team].includes(area)){ errEl.textContent='Pilih Area sesuai Team.'; return; }
+  }
+  if(roleUsesSignature(role) && !signature){ errEl.textContent='Gambar / upload draft tanda tangan dulu untuk role ini.'; return; }
 
   btn.disabled = true; btn.textContent = 'Mendaftarkan...';
   try{
@@ -481,20 +549,21 @@ async function doRegister(e){
     await db.collection('dashboard_users').add({
       username: user,
       password: hashed,
-      role: 'technician',
+      role: role,
       name: name,
-      team: team,
-      area: area,
+      ...(roleNeedsTeam(role) ? { team, area } : {}),
+      ...(signature ? { signature } : {}),
       createdAt: new Date().toISOString(),
     });
 
     loggedInUser = user;
-    loggedInRole = 'technician';
+    loggedInRole = role;
     sessionStorage.setItem('dashboard_user', loggedInUser);
     sessionStorage.setItem('dashboard_login_time', Date.now().toString());
     sessionStorage.setItem('dashboard_role', loggedInRole);
     sessionStorage.setItem('dashboard_name', name);
-    setTeamSession(team, area);
+    setTeamSession(roleNeedsTeam(role) ? team : null, roleNeedsTeam(role) ? area : null);
+    setSignatureSession(signature);
     showApp();
   }catch(err){
     console.error('Register error:', err);
@@ -512,6 +581,13 @@ function setTeamSession(team, area){
   loggedInArea = area || null;
   if(team) sessionStorage.setItem('dashboard_team', team); else sessionStorage.removeItem('dashboard_team');
   if(area) sessionStorage.setItem('dashboard_area', area); else sessionStorage.removeItem('dashboard_area');
+}
+function setSignatureSession(sig){
+  loggedInSignature = sig || null;
+  try{
+    if(sig) sessionStorage.setItem('dashboard_signature', sig);
+    else sessionStorage.removeItem('dashboard_signature');
+  }catch(e){ /* quota — signature just won't persist across a reload, re-fetched on next login */ }
 }
 function promptTeamSetup(docId, preTeam, preArea){
   _teamSetupDocId = docId;
@@ -554,6 +630,59 @@ async function saveTeamSetup(){
   }
 }
 
+// ── SIGNATURE DRAFT SETUP (post-login, non-blocking) ──────────
+function openSignatureSetup(){
+  const ov = document.getElementById('sig-overlay');
+  ov.style.display = 'flex';
+  ov.classList.remove('hide');
+  document.getElementById('sig-setup-err').textContent = '';
+  clearSignature('sig-setup-canvas');
+  if(_sigState['sig-setup-canvas']) _sigState['sig-setup-canvas'].hasInk = false;
+  attachSignaturePad('sig-setup-canvas');
+  // seed with the current signature if there is one (lets them tweak/replace it)
+  if(loggedInSignature){
+    const img = new Image();
+    img.onload = () => drawImageFitted('sig-setup-canvas', img);
+    img.src = loggedInSignature;
+  }
+}
+function closeSignatureSetup(){
+  const ov = document.getElementById('sig-overlay');
+  ov.classList.add('hide');
+  setTimeout(()=>{ ov.style.display='none'; ov.classList.remove('hide'); }, 300);
+}
+async function saveSignatureSetup(){
+  const errEl = document.getElementById('sig-setup-err');
+  const btn = document.getElementById('sig-setup-btn');
+  errEl.textContent = '';
+  const sig = getSignatureDataUrl('sig-setup-canvas');
+  if(!sig){ errEl.textContent = 'Gambar atau upload tanda tangan dulu.'; return; }
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+  try{
+    const snap = await db.collection('dashboard_users').where('username','==',loggedInUser).limit(1).get();
+    if(snap.empty) throw new Error('Akun tidak ditemukan.');
+    await db.collection('dashboard_users').doc(snap.docs[0].id).update({
+      signature: sig, signatureUpdatedAt: new Date().toISOString(),
+    });
+    setSignatureSession(sig);
+    document.getElementById('sig-note').style.display = 'none';
+    closeSignatureSetup();
+  }catch(err){
+    console.error('Simpan tanda tangan gagal:', err);
+    errEl.textContent = 'Gagal menyimpan: ' + err.message;
+  }
+  btn.disabled = false; btn.textContent = 'SIMPAN TANDA TANGAN';
+}
+// Load this account's saved signature into a review/approval canvas so the
+// reviewer doesn't re-sign. hasInk is set so getSignatureDataUrl() returns it;
+// they can still "Hapus Tanda Tangan" and redraw to override for one item.
+function prefillSignatureCanvas(canvasId){
+  if(!loggedInSignature) return;
+  const img = new Image();
+  img.onload = () => drawImageFitted(canvasId, img);
+  img.src = loggedInSignature;
+}
+
 function doLogout(){
   sessionStorage.removeItem('dashboard_user');
   sessionStorage.removeItem('dashboard_login_time');
@@ -561,6 +690,7 @@ function doLogout(){
   sessionStorage.removeItem('dashboard_name');
   sessionStorage.removeItem('dashboard_team');
   sessionStorage.removeItem('dashboard_area');
+  sessionStorage.removeItem('dashboard_signature');
   location.reload();
 }
 async function checkSession(){
@@ -572,22 +702,28 @@ async function checkSession(){
     loggedInRole = sessionStorage.getItem('dashboard_role') || null;
     loggedInTeam = sessionStorage.getItem('dashboard_team') || null;
     loggedInArea = sessionStorage.getItem('dashboard_area') || null;
+    loggedInSignature = sessionStorage.getItem('dashboard_signature') || null;
     // Backfill team/area from Firestore for sessions created before this
     // feature (or on another page); force the setup form if still missing.
     // Supervisor/Admin skip this entirely — team/area doesn't apply to them.
-    if(roleNeedsTeam(loggedInRole) && (!TEAM_AREAS[loggedInTeam] || !loggedInArea)){
+    const needTeamBackfill = roleNeedsTeam(loggedInRole) && (!TEAM_AREAS[loggedInTeam] || !loggedInArea);
+    const needSigBackfill = roleUsesSignature(loggedInRole) && !loggedInSignature;
+    if(needTeamBackfill || needSigBackfill){
       try{
         const snap = await db.collection('dashboard_users').where('username','==',loggedInUser).limit(1).get();
         if(!snap.empty){
           const u = snap.docs[0].data();
-          if(TEAM_AREAS[u.team] && u.area){
-            setTeamSession(u.team, u.area);
-          }else{
-            promptTeamSetup(snap.docs[0].id, u.team, u.area);
-            return;
+          if(needSigBackfill && u.signature) setSignatureSession(u.signature);
+          if(needTeamBackfill){
+            if(TEAM_AREAS[u.team] && u.area){
+              setTeamSession(u.team, u.area);
+            }else{
+              promptTeamSetup(snap.docs[0].id, u.team, u.area);
+              return;
+            }
           }
         }
-      }catch(e){ console.error('Team backfill gagal:', e); }
+      }catch(e){ console.error('Backfill gagal:', e); }
     }
     showApp();
   }
@@ -614,6 +750,14 @@ function showApp(){
     scope.innerHTML = '&#128100; Kotak masuk <b>"Menunggu Saya"</b> disaring ke submission dari teknisi team <b>'+escHtml(loggedInTeam)+' &middot; '+escHtml(loggedInArea)+'</b>. Submission yang team submitternya belum tercatat ditangani lewat akun Admin. Tab "Semua Riwayat" tetap menampilkan seluruh submission.';
   }else{
     scope.style.display = 'none';
+  }
+  const sigNote = document.getElementById('sig-note');
+  if(roleUsesSignature(loggedInRole) && !loggedInSignature){
+    sigNote.style.display = 'flex';
+    sigNote.innerHTML = '&#9888;&#65039; <span style="flex:1"><b>Anda belum punya draft tanda tangan.</b> Simpan sekali agar kolom tanda tangan terisi otomatis saat review/approve.</span>'
+      + '<button class="btn btn-sm btn-pri" onclick="openSignatureSetup()">&#9997;&#65039; Simpan Tanda Tangan</button>';
+  }else{
+    sigNote.style.display = 'none';
   }
   loadAll();
 }
@@ -1025,6 +1169,11 @@ async function openDetail(id){
 function closeDetail(){
   document.getElementById('detail-overlay').classList.remove('show');
   _curApproval = null; _curChecksheet = null;
+  // Detail body is rebuilt from scratch on the next open (new canvas elements),
+  // so drop the per-canvas pad state or attachSignaturePad() would skip
+  // re-binding the fresh canvases (and prefill wouldn't re-run).
+  delete _sigState['sig-canvas-review'];
+  delete _sigState['sig-canvas-approval'];
   // Drop ?id= so a refresh doesn't keep re-opening the same item.
   if(new URLSearchParams(location.search).has('id')){
     history.replaceState(null, '', location.pathname);
@@ -1131,8 +1280,8 @@ function renderDetail(a, cs){
   }
 
   document.getElementById('d-body').innerHTML = html;
-  if(document.getElementById('sig-canvas-review')) attachSignaturePad('sig-canvas-review');
-  if(document.getElementById('sig-canvas-approval')) attachSignaturePad('sig-canvas-approval');
+  if(document.getElementById('sig-canvas-review')){ attachSignaturePad('sig-canvas-review'); prefillSignatureCanvas('sig-canvas-review'); }
+  if(document.getElementById('sig-canvas-approval')){ attachSignaturePad('sig-canvas-approval'); prefillSignatureCanvas('sig-canvas-approval'); }
 
   document.querySelectorAll('.pk-thumb[data-remote-url]').forEach(img => {
     Storage.toObjectUrl(img.dataset.remoteUrl)
