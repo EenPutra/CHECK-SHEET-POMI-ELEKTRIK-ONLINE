@@ -736,7 +736,17 @@ table.dtbl tr:last-child td{border-bottom:none}
   .page-title{font-size:32px}
 }
 @media(max-width:600px){
-  .tb-nav{display:none}
+  /* Keep the nav (incl. Review & Approval) reachable on mobile: let the topbar
+     grow to a second row and the nav become a compact horizontal scroll strip
+     instead of hiding it entirely. */
+  .topbar{height:auto;flex-wrap:wrap;padding:9px 14px;gap:10px}
+  .tb-brand{font-size:17px}
+  .tb-right{order:2;margin-left:auto}
+  .tb-nav{
+    order:3;width:100%;margin-left:0;padding-left:0;border-left:none;
+    gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px;
+  }
+  .tb-nav a{padding:7px 10px;font-size:12px;white-space:nowrap;flex-shrink:0}
   .stat-grid{grid-template-columns:1fr 1fr}
 }
 </style>

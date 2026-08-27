@@ -189,6 +189,13 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   .detail-hdr{flex-direction:column}
   .action-row{justify-content:stretch}
   .action-row button{flex:1}
+  /* Topbar: wrap to a second row so the nav (incl. this page's own link back
+     to Portal/Dashboard) stays fully visible & tappable instead of clipping. */
+  .topbar{height:auto;flex-wrap:wrap;padding:9px 14px;gap:10px}
+  .tb-brand{font-size:14px}
+  .tb-right{order:2;margin-left:auto;flex-wrap:wrap;justify-content:flex-end;gap:6px}
+  .tb-nav{order:3;flex:1 0 100%;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
+  .tb-nav a{padding:7px 10px;font-size:12px;white-space:nowrap;flex-shrink:0}
 }
 </style>
 </head>
