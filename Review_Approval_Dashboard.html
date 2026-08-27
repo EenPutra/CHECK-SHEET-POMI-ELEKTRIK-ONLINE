@@ -230,7 +230,7 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
 
     <div id="register-panel" style="display:none">
       <div class="login-sub">📝 Daftar akun baru</div>
-      <div class="login-hint">Pilih level akun sesuai peran Anda. Untuk <b>TechOp2</b> &amp; <b>Supervisor</b>, isi juga draft tanda tangan — nanti terisi otomatis saat review/approve tanpa perlu tanda tangan ulang.</div>
+      <div class="login-hint">Pilih level akun sesuai peran Anda. <b>TechOp2</b> &amp; <b>Supervisor</b> butuh <b>kode akses</b> dari admin, plus draft tanda tangan (nanti terisi otomatis saat review/approve).</div>
       <form onsubmit="doRegister(event)">
         <input type="text" class="login-field" id="reg-name" placeholder="Nama Lengkap (untuk isi Checked By otomatis)" autocomplete="name" required>
         <input type="text" class="login-field" id="reg-user" placeholder="Pilih username" autocomplete="username" required>
@@ -253,6 +253,10 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
           <select class="login-field" id="reg-area" disabled>
             <option value="">— Pilih Team dulu —</option>
           </select>
+        </div>
+        <div id="reg-code-wrap" style="display:none">
+          <div class="login-field-lbl">Kode Akses (dari admin)</div>
+          <input type="text" class="login-field" id="reg-access-code" placeholder="Kode akses TechOp2 / Supervisor" autocomplete="off">
         </div>
         <div id="reg-sig-wrap" style="display:none">
           <div class="login-field-lbl">Draft Tanda Tangan (gambar di kotak atau upload)</div>
@@ -423,6 +427,18 @@ let _teamSetupDocId = null;   // dashboard_users doc id awaiting a team/area sav
 function roleUsesSignature(role){ return role==='techop2' || role==='supervisor' || role==='admin'; }
 // Self-registerable roles (Admin stays Firestore-provisioned only).
 const SELF_REG_ROLES = ['technician','techop2','supervisor'];
+// Elevated self-registration (TechOp2 / Supervisor) needs an access code.
+function roleNeedsAccessCode(role){ return role==='techop2' || role==='supervisor'; }
+// Fallback code — CHANGE THIS, or (better) override it without a deploy by
+// creating Firestore doc `dashboard_config/registration` with field `code`.
+const ELEVATED_REG_CODE = 'POMI-EIC7-2026';
+async function getElevatedRegCode(){
+  try{
+    const doc = await db.collection('dashboard_config').doc('registration').get();
+    if(doc.exists && doc.data().code) return String(doc.data().code);
+  }catch(e){ /* collection not allowed / offline — use the fallback */ }
+  return ELEVATED_REG_CODE;
+}
 
 // Team -> valid Area options. A submission is routed to the TechOp2 (PIC)
 // whose own account carries the SAME team + area (see inboxItems()).
@@ -453,6 +469,7 @@ function fillAreaOptions(teamSelId, areaSelId, selected){
 function onRegRoleChange(){
   const role = document.getElementById('reg-role').value;
   document.getElementById('reg-team-wrap').style.display = roleNeedsTeam(role) ? '' : 'none';
+  document.getElementById('reg-code-wrap').style.display = roleNeedsAccessCode(role) ? '' : 'none';
   const sigWrap = document.getElementById('reg-sig-wrap');
   const showSig = roleUsesSignature(role);
   sigWrap.style.display = showSig ? '' : 'none';
@@ -542,6 +559,11 @@ async function doRegister(e){
 
   btn.disabled = true; btn.textContent = 'Mendaftarkan...';
   try{
+    if(roleNeedsAccessCode(role)){
+      const entered = document.getElementById('reg-access-code').value.trim();
+      if(!entered){ errEl.textContent='Isi kode akses (hubungi admin).'; btn.disabled=false; btn.textContent='DAFTAR'; return; }
+      if(entered !== (await getElevatedRegCode())){ errEl.textContent='Kode akses salah. Role TechOp2 / Supervisor hanya bisa didaftarkan dengan kode dari admin.'; btn.disabled=false; btn.textContent='DAFTAR'; return; }
+    }
     const existing = await db.collection('dashboard_users').where('username','==',user).limit(1).get();
     if(!existing.empty){ errEl.textContent='Username sudah dipakai, pilih yang lain.'; btn.disabled=false; btn.textContent='DAFTAR'; return; }
 

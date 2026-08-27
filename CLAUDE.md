@@ -1479,7 +1479,15 @@ security hole.
 - **`#reg-role`** select in the registration form: `technician` (Level 1) / `techop2` (Level 2)
   / `supervisor` (Level 3). `SELF_REG_ROLES` is the allowlist; **Admin is NOT self-registerable**
   (stays Firestore-provisioned). `onRegRoleChange()` toggles `#reg-team-wrap` (shown when
-  `roleNeedsTeam(role)`) and `#reg-sig-wrap` (shown when `roleUsesSignature(role)`).
+  `roleNeedsTeam(role)`), `#reg-code-wrap` (shown when `roleNeedsAccessCode(role)` = techop2 |
+  supervisor) and `#reg-sig-wrap` (shown when `roleUsesSignature(role)`).
+- **Access code gate for elevated roles** (`roleNeedsAccessCode(role)`): registering as
+  `techop2` / `supervisor` requires a code, checked in `doRegister()` **before** any Firestore
+  write. `getElevatedRegCode()` reads Firestore `dashboard_config/registration.code` and falls
+  back to the `ELEVATED_REG_CODE` constant (`'POMI-EIC7-2026'` — change it, or override without
+  a deploy by creating that Firestore doc; the collection isn't in the security-rules allowlist
+  so the read throws and silently uses the fallback until an admin adds it). `technician`
+  registration needs no code.
 - **`roleUsesSignature(role)`** = `techop2 || supervisor || admin` — these roles sign during the
   workflow, so their `dashboard_users` doc carries a **`signature`** field (a PNG data URL from
   the same `attachSignaturePad()` / `getSignatureDataUrl()` / `handleSignatureFile()` pad the
