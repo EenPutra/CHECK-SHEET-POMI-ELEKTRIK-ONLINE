@@ -1223,9 +1223,18 @@ the current design — **do not "simplify" these away**:
   dataUrl, contentType)` / `uploadBlob(path, blob, contentType)` upload and return a
   Drive-proxy URL (`path` is a virtual slash-separated path — everything before the last `/`
   becomes nested Drive folders, e.g. `checksheets/<id>/photos/inv01-0.jpg`).
-  `fetchAsBytes(url)` / `toObjectUrl(url)` read one back (raw `ArrayBuffer`, or a `blob:` URL
-  ready for `<img src>`/`<a href>`/`window.open()`) — always via the JSON+base64 path, per the
-  gotcha above. `deleteByUrl(url)` is best-effort, dev/test cleanup only. **`DRIVE_PROXY_URL`**
+  `fetchAsBytes(url)` / `toObjectUrl(url)` / `toDataUrl(url)` / `fetchMeta(url)` read one back
+  (raw `ArrayBuffer`, a `blob:` URL ready for `<img src>`/`<a href>`/`window.open()`, a
+  `data:` URL, or the full `{bytes,base64,mimeType,filename}`) — always via the JSON+base64
+  path, per the gotcha above. Each of these takes an **optional `onProgress` callback** — when
+  passed, the download runs via `XMLHttpRequest` so `{loaded, total}` progress events fire
+  (`total` is `0` when the Drive proxy sends no `Content-Length`, which is the common case —
+  show a bytes-only / indeterminate indicator then), plus one `{phase:'decode'}` call before
+  the base64→bytes step; omit it and you get the old plain `fetch()`.
+  `Review_Approval_Dashboard.html`'s `#file-progress` overlay
+  (`showFileProgress`/`updateFileProgress`/`setFileProgressPhase`/`hideFileProgress`) uses this
+  for "Buka PDF Asli" / "Unduh PDF Final" and the approve flow's original-PDF fetch.
+  `deleteByUrl(url)` is best-effort, dev/test cleanup only. **`DRIVE_PROXY_URL`**
   at the top of this file is the one deployment-specific value — must match whatever Web App
   URL `drive-proxy.gs` is actually deployed at (ends in `/exec`); if it still contains the
   literal string `PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE`, every upload throws a clear error
