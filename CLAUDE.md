@@ -1450,15 +1450,20 @@ This was an explicit user request; the design decisions were confirmed up front:
   `checkSession()` is now `async` (same pattern as dashboard.html's role backfill) and does a
   one-time Firestore lookup to backfill a session created before this feature; a network error
   there fails **open** (proceeds without a scope) rather than locking the user out.
-- **Routing = exact team + area match, TechOp2 inbox only** (both chosen deliberately over the
-  looser alternatives). `loadAll()` fetches the whole `dashboard_users` collection once into
-  `_userDir` (keyed `n:<name>` and `u:<username>`, both lowercased) and stamps every approval
-  with `a._team` / `a._area` via `scopeOfApproval(a)` — a **name-match heuristic** on
-  `a.submittedBy` (the free-typed "Checked By" name), the same known-imperfect,
-  not-a-security-boundary approach dashboard.html's technician scoping already uses.
-  `inMyReviewScope(a)` is true when `loggedInRole !== 'techop2'` (Supervisor/Admin are **never**
-  scoped), or the reviewer has no scope set (fail open), or `s.team === loggedInTeam &&
-  s.area === loggedInArea`. `inboxItems()` filters the TechOp2 `'submitted'` queue through it;
+- **Routing = team match + the submitter's area ∈ the TechOp2's area(s), TechOp2 inbox only**.
+  `loadAll()` fetches the whole `dashboard_users` collection once into `_userDir` (keyed
+  `n:<name>` and `u:<username>`, both lowercased) and stamps every approval with `a._team` /
+  `a._area` via `scopeOfApproval(a)` — a **name-match heuristic** on `a.submittedBy` (the
+  free-typed "Checked By" name), the same known-imperfect, not-a-security-boundary approach
+  dashboard.html's technician scoping already uses. A submission's routing area is the
+  **submitter's single area**; a **TechOp2 may cover multiple areas** (`loggedInAreas`, an
+  array — technician picks exactly 1, techop2 1+, enforced by `areaListError(role, areas)` /
+  `roleAllowsMultiArea(role)`). `dashboard_users.area` is a **string OR array** — always read
+  via `toAreaList(a)` (parses a JSON-array string too), stored in `localStorage['dashboard_area']`
+  as a JSON array (both dashboards). `inMyReviewScope(a)` is true when `loggedInRole !==
+  'techop2'` (Supervisor/Admin **never** scoped), or the reviewer has no scope set (fail open),
+  or `s.team === loggedInTeam && loggedInAreas.includes(s.area)`. `inboxItems()` filters the
+  TechOp2 `'submitted'` queue through it;
   `renderActionSection()` re-checks it so a direct link to an out-of-scope submission renders a
   "di luar cakupan team/area Anda" notice instead of the review form. A submission whose
   submitter's team isn't recorded (name mismatch, pre-feature data) matches **no** TechOp2 and
@@ -1469,11 +1474,14 @@ This was an explicit user request; the design decisions were confirmed up front:
 - **`roleNeedsTeam(role)`** (`role !== 'supervisor' && role !== 'admin'`) gates all of the
   above — Supervisor/Admin never pick a team (not in registration, not the blocking overlay,
   not `checkSession`'s backfill). Only technician/techop2/unknown-role accounts are forced.
-- Verified via headless Chrome (no Firestore): `TEAM_AREAS`/`fillAreaOptions` both directions,
-  `#team-overlay` has exactly one button (Save, no close), `promptTeamSetup` pre-fills,
-  `inboxItems()` for a C7·Boiler TechOp2 returns only same-team+area `submitted` items while
-  Supervisor/Admin stay unscoped, and `renderActionSection()` blocks the out-of-scope review
-  form.
+- **Area picker is checkboxes** (`renderAreaChecks(containerId, team, selected)` /
+  `getCheckedAreas(containerId)`), used in registration, the mandatory `#team-overlay`, AND a
+  **"Team & Area" section in the Settings modal** (`saveTeamAreaFromSettings()` — writes the
+  doc, `setTeamSession()`, `refreshScopeNote()`, then `loadAll()` so the inbox re-scopes
+  immediately). Shown only for `roleNeedsTeam(loggedInRole)`.
+- Verified via headless Chrome: `toAreaList`/`areaListError`, techop2 register multi-checkbox,
+  a C7·`[Boiler,Turbine]` TechOp2 inbox includes both-area submitters and excludes others, and
+  the Settings Team & Area section prefills + is role-gated.
 
 ### Self-registration now picks its own role + registers a signature draft
 
@@ -1755,7 +1763,11 @@ dashboards) that owns the login session for the whole app:
   on logout; `AuthSession.touch()` / `isExpired()`. `technician-auth.js` falls back to the old
   per-tab `sessionStorage` read if `auth-session.js` isn't on the page (shouldn't happen).
 - One-time **migration** on first load: an existing tab still on the old `sessionStorage` scheme
-  gets its keys copied to `localStorage` instead of being kicked to the login screen.
+  gets its keys copied to `localStorage` instead of being kicked to the login screen — **and the
+  `sessionStorage` copy is then deleted**. `clear()` also wipes the legacy `sessionStorage`
+  keys. Both are load-bearing: without them, `clear()` (Sign Out) nuked only `localStorage`,
+  the reload re-ran `migrate()`, and the leftover `sessionStorage` keys re-imported the session
+  — the "can't sign out" bug.
 
 A technician opening a check sheet cold (never logged in) still sees the "🔑 Login untuk isi
 otomatis" button; the modal is self-contained (same hashPass/Firestore-lookup as the dashboards,
