@@ -102,6 +102,19 @@ textarea,input{font-family:var(--body)}
 .settings-sec h4{font-family:var(--display);font-size:13px;font-weight:700;color:var(--txt);margin-bottom:10px;letter-spacing:.2px}
 .settings-ok{font-size:12px;color:var(--ok);margin-top:8px;min-height:16px;font-weight:600}
 
+/* FILE DOWNLOAD PROGRESS (opening a PDF / building the final PDF) */
+#file-progress{display:none;position:fixed;inset:0;z-index:700;align-items:center;justify-content:center;background:var(--overlay-scrim);backdrop-filter:blur(3px)}
+#file-progress.show{display:flex}
+.fp-card{background:var(--surf);border:1px solid var(--bdr);border-radius:16px;padding:26px 30px;width:min(330px,90vw);text-align:center;box-shadow:var(--shadow-lg)}
+.fp-spinner{width:38px;height:38px;margin:0 auto 14px;border:3px solid var(--bdr-2);border-top-color:var(--pri);border-radius:50%;animation:fp-spin .8s linear infinite}
+@keyframes fp-spin{to{transform:rotate(360deg)}}
+.fp-label{font-family:var(--display);font-weight:700;font-size:14px;color:var(--txt);margin-bottom:12px}
+.fp-bar{height:9px;background:var(--surf-2);border:1px solid var(--bdr);border-radius:20px;overflow:hidden}
+.fp-fill{height:100%;width:0;background:linear-gradient(90deg,var(--pri),var(--ind));border-radius:20px;transition:width .18s ease}
+.fp-fill.indet{width:100%;background:linear-gradient(90deg,transparent 0%,var(--pri) 50%,transparent 100%);background-size:38% 100%;background-repeat:no-repeat;animation:fp-slide 1.1s linear infinite;transition:none}
+@keyframes fp-slide{0%{background-position:-38% 0}100%{background-position:138% 0}}
+.fp-meta{font-family:var(--mono);font-size:11.5px;color:var(--txt-3);margin-top:9px}
+
 /* TOPBAR */
 .topbar{position:sticky;top:0;z-index:100;background:var(--surf);border-bottom:1px solid var(--bdr);height:56px;display:flex;align-items:center;padding:0 20px;gap:16px}
 .tb-brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:700;font-size:15px;flex-shrink:0}
@@ -534,6 +547,16 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
       <button class="detail-x" onclick="closeDetail()">&#10005;</button>
     </div>
     <div class="detail-body" id="d-body"></div>
+  </div>
+</div>
+
+<!-- FILE DOWNLOAD PROGRESS -->
+<div id="file-progress" aria-hidden="true">
+  <div class="fp-card">
+    <div class="fp-spinner"></div>
+    <div class="fp-label" id="fp-label">Memuat file…</div>
+    <div class="fp-bar"><div class="fp-fill indet" id="fp-fill"></div></div>
+    <div class="fp-meta" id="fp-meta">Menyambungkan…</div>
   </div>
 </div>
 
@@ -1584,19 +1607,64 @@ function renderDetail(a, cs){
 
 const BLANK_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 
+// ── FILE DOWNLOAD PROGRESS OVERLAY ──
+function _fpBytes(n){
+  if(!n && n!==0) return '';
+  const u=['B','KB','MB','GB']; let i=0;
+  while(n>=1024 && i<u.length-1){ n/=1024; i++; }
+  return (i>0 && n<10 ? n.toFixed(1) : Math.round(n)) + ' ' + u[i];
+}
+function showFileProgress(label){
+  document.getElementById('fp-label').textContent = label || 'Memuat file…';
+  const fill = document.getElementById('fp-fill');
+  fill.classList.add('indet'); fill.style.width = '';
+  document.getElementById('fp-meta').textContent = 'Menyambungkan…';
+  document.getElementById('file-progress').classList.add('show');
+}
+// p: {loaded,total} while streaming, or {phase:'decode'} once fetched.
+function updateFileProgress(p){
+  const fill = document.getElementById('fp-fill'), meta = document.getElementById('fp-meta');
+  if(p && p.phase === 'decode'){
+    fill.classList.add('indet'); fill.style.width = '';
+    meta.textContent = 'Menyiapkan file…';
+    return;
+  }
+  const loaded = (p && p.loaded) || 0, total = (p && p.total) || 0;
+  if(total > 0){
+    const pct = Math.min(100, Math.round(loaded / total * 100));
+    fill.classList.remove('indet');
+    fill.style.width = pct + '%';
+    meta.textContent = pct + '%  ·  ' + _fpBytes(loaded) + ' / ' + _fpBytes(total);
+  }else{
+    fill.classList.add('indet'); fill.style.width = '';
+    meta.textContent = 'Mengunduh…  ' + _fpBytes(loaded);
+  }
+}
+function setFileProgressPhase(label){
+  document.getElementById('fp-label').textContent = label;
+  const fill = document.getElementById('fp-fill');
+  fill.classList.add('indet'); fill.style.width = '';
+  document.getElementById('fp-meta').textContent = 'Mohon tunggu…';
+}
+function hideFileProgress(){ document.getElementById('file-progress').classList.remove('show'); }
+
 // Opens window immediately (still inside the click's user-gesture context,
 // so popup blockers allow it) with a loading placeholder, then swaps in
 // the real blob: URL once Storage.toObjectUrl() resolves — see
 // storage-helper.js: a drive-proxy URL is a JSON API, not something a
-// browser can navigate to directly.
+// browser can navigate to directly. A progress overlay on the dashboard
+// shows the download running (bytes / % if the server reports a size).
 function openRemoteFile(url){
   const win = window.open('', '_blank');
-  if(win) win.document.write('Memuat file...');
-  Storage.toObjectUrl(url).then(objUrl => {
+  if(win) win.document.write('<p style="font:14px system-ui;padding:24px;color:#334155">Memuat file…</p>');
+  showFileProgress('Memuat file…');
+  Storage.toObjectUrl(url, updateFileProgress).then(objUrl => {
+    hideFileProgress();
     if(win) win.location.href = objUrl;
     else window.open(objUrl, '_blank');
   }).catch(e => {
-    if(win) win.document.write('Gagal memuat file: '+escHtml(e.message));
+    hideFileProgress();
+    if(win) win.document.body.innerHTML = 'Gagal memuat file: '+escHtml(e.message);
     else alert('Gagal memuat file: '+e.message);
   });
 }
@@ -1769,19 +1837,23 @@ async function doApprove(){
   if(!signature){ alert('Tanda tangan diperlukan sebelum approve.'); return; }
   const btn = document.getElementById('btn-approve');
   btn.disabled = true; btn.textContent = '⏳ Membuat PDF final...';
+  showFileProgress('Mengambil PDF asli…');
   try{
     const approvedBy = loggedInUser;
     const approvalForPdf = {
       ..._curApproval,
       approval: {notes, signature, approvedBy, approvedAt: new Date().toISOString()},
     };
-    const blob = await buildFinalPdf(approvalForPdf, _curChecksheet);
+    const blob = await buildFinalPdf(approvalForPdf, _curChecksheet, updateFileProgress);
+    setFileProgressPhase('Mengunggah PDF final…');
     const finalPdfUrl = await Storage.uploadBlob(`approvals/${_curApproval.id}/final.pdf`, blob, 'application/pdf');
     await Approvals.approve(_curApproval.id, {notes, signature, approvedBy, finalPdfUrl});
+    hideFileProgress();
     alert('Submission disetujui. PDF final siap diunduh.');
     closeDetail();
     await loadAll();
   }catch(e){
+    hideFileProgress();
     alert('Gagal approve: '+e.message);
   }finally{
     btn.disabled = false; btn.textContent = '✅ Approve & Buat PDF Final';
@@ -1791,13 +1863,14 @@ async function doApprove(){
 /* ── FINAL PDF: original (from Storage) + a jsPDF addendum page, merged
    with pdf-lib. See CLAUDE.md-style rationale in the project chat — jsPDF
    alone can't merge an already-built PDF, only draw a fresh one. ── */
-async function buildFinalPdf(approval, cs){
+async function buildFinalPdf(approval, cs, onProgress){
   if(!cs.pdfUrl) throw new Error('PDF asli tidak ditemukan pada submission ini.');
   // Storage.fetchAsBytes(), not a plain fetch() — the original PDF is
   // hosted via the Drive proxy (drive-proxy.gs), and a JS-initiated
   // cross-origin read of its raw binary response isn't reliably
   // CORS-permitted; the proxy's ?mode=json path is. See storage-helper.js.
-  const origBytes = await Storage.fetchAsBytes(cs.pdfUrl);
+  const origBytes = await Storage.fetchAsBytes(cs.pdfUrl, onProgress);
+  if(typeof setFileProgressPhase === 'function') setFileProgressPhase('Menggabungkan halaman approval…');
 
   const {jsPDF} = window.jspdf;
   const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});

@@ -40,11 +40,22 @@ const Storage = {
   // actually serve real file bytes (Apps Script sends back a generic HTML
   // page instead), so this JSON decode is the only path that works, for
   // both pdf-lib's byte needs AND for anything meant to be displayed.
-  async fetchMeta(url) {
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error('Gagal mengambil file (HTTP ' + resp.status + ')');
-    const json = await resp.json();
+  // onProgress (optional): called with {loaded, total} as bytes stream in
+  // (total is 0 when the server doesn't send Content-Length — the caller
+  // should then show an indeterminate/bytes-only indicator), then once with
+  // {phase:'decode'} just before the base64 -> bytes step. When given, the
+  // download uses XHR (progress events); without it, a plain fetch().
+  async fetchMeta(url, onProgress) {
+    let json;
+    if (typeof onProgress === 'function') {
+      json = await xhrGetJson(url, onProgress);
+    } else {
+      const resp = await fetch(url);
+      if (!resp.ok) throw new Error('Gagal mengambil file (HTTP ' + resp.status + ')');
+      json = await resp.json();
+    }
     if (json.error) throw new Error(json.error);
+    if (typeof onProgress === 'function') { try { onProgress({ phase: 'decode' }); } catch (e) {} }
     return {
       bytes: base64ToArrayBuffer(json.dataBase64),
       base64: json.dataBase64,
@@ -55,8 +66,8 @@ const Storage = {
 
   // For pdf-lib (buildFinalPdf in Review_Approval_Dashboard.html), which
   // needs raw bytes, not something a browser can merely display.
-  async fetchAsBytes(url) {
-    return (await this.fetchMeta(url)).bytes;
+  async fetchAsBytes(url, onProgress) {
+    return (await this.fetchMeta(url, onProgress)).bytes;
   },
 
   // For <img src>, "buka di tab baru", and download links — a drive-proxy
@@ -64,8 +75,8 @@ const Storage = {
   // fetchMeta's comment), so anything that shows a photo/PDF to a human
   // must convert it to a blob: URL first via this. Caller is responsible
   // for URL.revokeObjectURL() once done with it, if it's short-lived.
-  async toObjectUrl(url) {
-    const { bytes, mimeType } = await this.fetchMeta(url);
+  async toObjectUrl(url, onProgress) {
+    const { bytes, mimeType } = await this.fetchMeta(url, onProgress);
     return URL.createObjectURL(new Blob([bytes], { type: mimeType || 'application/octet-stream' }));
   },
 
@@ -75,8 +86,8 @@ const Storage = {
   // own `src`/`dataUrl` convention, and what pdf.addImage()/PhotoKit.draw()
   // expect), not a blob: URL. Reuses fetchMeta's already-decoded base64
   // string directly — no redundant decode+re-encode round trip.
-  async toDataUrl(url) {
-    const { base64, mimeType } = await this.fetchMeta(url);
+  async toDataUrl(url, onProgress) {
+    const { base64, mimeType } = await this.fetchMeta(url, onProgress);
     return `data:${mimeType || 'image/jpeg'};base64,${base64}`;
   },
 
@@ -94,6 +105,29 @@ const Storage = {
     } catch (e) { /* already gone, ignore */ }
   },
 };
+
+// XHR GET returning parsed JSON, with download-progress callbacks. Used by
+// fetchMeta() when a caller passes onProgress (fetch() has no widely-usable
+// progress event). `total` is 0 unless the server sends Content-Length —
+// Apps Script often doesn't, so the caller must handle an unknown total.
+function xhrGetJson(url, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url);
+    xhr.responseType = 'text';
+    xhr.onprogress = e => {
+      try { onProgress({ loaded: e.loaded, total: e.lengthComputable ? e.total : 0 }); } catch (err) {}
+    };
+    xhr.onload = () => {
+      if (xhr.status < 200 || xhr.status >= 300) return reject(new Error('Gagal mengambil file (HTTP ' + xhr.status + ')'));
+      try { resolve(JSON.parse(xhr.responseText || '{}')); }
+      catch (err) { reject(new Error('Respon file tidak valid.')); }
+    };
+    xhr.onerror = () => reject(new Error('Gagal mengunduh file (jaringan).'));
+    xhr.ontimeout = () => reject(new Error('Unduhan file timeout.'));
+    xhr.send();
+  });
+}
 
 function splitPath(path) {
   const idx = path.lastIndexOf('/');
