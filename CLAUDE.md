@@ -1473,7 +1473,7 @@ This was an explicit user request; the design decisions were confirmed up front:
   `scopeOfApproval()` reads them (after `EXTERNAL_SUBMITTER_SCOPE`, before `_userDir`) so a
   submission can be routed without matching `submittedBy` to an account. Used by **Manual
   Upload** (below); normal check sheets don't pass them so nothing changes.
-- **Manual PDF Upload** (`#btn-manual-upload` in the toolbar, techop2/supervisor/admin only →
+- **Manual PDF Upload** (`#btn-manual-upload` in the toolbar, **all logged-in roles** →
   `#manual-overlay`): pushes a report done OUTSIDE the check-sheet system into the flow.
   `submitManualUpload()` → `DB.save()` a `checksheets` doc (`manualUpload:true`, a
   `sheets.info` summary) → `Approvals.submitWithFiles()` with `pdfBuilder: () => ({ output:
@@ -1495,6 +1495,13 @@ This was an explicit user request; the design decisions were confirmed up front:
 - The `"Semua Riwayat"` / `"Dikembalikan"` tabs are **not** scoped (full history stays visible
   to everyone); only `"Menunggu Saya"` is. Cards show a `.card-scope-tag` (`E7 · Powerblock`),
   and the detail view's Info grid has a "Team / Area (PIC)" cell.
+- **`"Semua Riwayat"` has a filter/sort bar** (`#history-filters`, shown only on that tab):
+  free-text search (name / tag / PIC / WO / area / src), status, team, area (repopulated per
+  team by `populateHistoryAreaOptions()`), and sort (`sortApprovals()`: newest / oldest /
+  name A→Z / Z→A / status order). `renderList()`'s "all" branch applies them and writes
+  `#history-count` ("Menampilkan X dari Y"). `loadAll()` folds `woNumber`/`executionDate` from
+  `_checksheetCache` (populated by `cleanupDuplicateApprovals`) onto `a._wo`/`a._date` for the
+  search + the card meta line. `resetHistoryFilters()` clears everything.
 - **`roleNeedsTeam(role)`** (`role !== 'supervisor' && role !== 'admin'`) gates all of the
   above — Supervisor/Admin never pick a team (not in registration, not the blocking overlay,
   not `checkSession`'s backfill). Only technician/techop2/unknown-role accounts are forced.

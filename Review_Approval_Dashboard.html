@@ -543,17 +543,33 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   </div>
 
   <div class="toolbar" id="list-toolbar">
-    <select class="filter-sel" id="status-filter" style="display:none" onchange="renderList()">
-      <option value="">Semua status</option>
-      <option value="submitted">Menunggu Review</option>
-      <option value="reviewed">Menunggu Approval</option>
-      <option value="approved">Disetujui</option>
-      <option value="returned_to_technician">Dikembalikan</option>
-    </select>
     <button class="btn btn-sm" onclick="loadAll()">&#8635; Refresh</button>
     <button class="btn btn-sm btn-pri" id="btn-manual-upload" onclick="openManualUpload()" style="display:none">&#128206; Upload Manual</button>
+    <div id="history-filters" style="display:none;flex:1;flex-wrap:wrap;gap:8px;align-items:center">
+      <input type="text" class="filter-sel" id="hf-search" placeholder="Cari nama / tag / PIC / WO…" oninput="renderList()" style="min-width:190px;flex:1">
+      <select class="filter-sel" id="status-filter" onchange="renderList()">
+        <option value="">Semua status</option>
+        <option value="submitted">Menunggu Review</option>
+        <option value="reviewed">Menunggu Approval</option>
+        <option value="approved">Disetujui</option>
+        <option value="returned_to_technician">Dikembalikan</option>
+      </select>
+      <select class="filter-sel" id="hf-team" onchange="populateHistoryAreaOptions();renderList()">
+        <option value="">Semua team</option><option value="E7">E7</option><option value="C7">C7</option>
+      </select>
+      <select class="filter-sel" id="hf-area" onchange="renderList()"><option value="">Semua area</option></select>
+      <select class="filter-sel" id="hf-sort" onchange="renderList()">
+        <option value="newest">Terbaru dulu</option>
+        <option value="oldest">Terlama dulu</option>
+        <option value="name_az">Nama A→Z</option>
+        <option value="name_za">Nama Z→A</option>
+        <option value="status">Urut status</option>
+      </select>
+      <button class="btn btn-sm" onclick="resetHistoryFilters()">Reset</button>
+    </div>
   </div>
 
+  <div id="history-count" style="display:none;font-size:12px;color:var(--txt-3);margin:-6px 0 10px"></div>
   <div id="list-area"><div class="list-loading"><div class="msg">Memuat...</div></div></div>
 
   <!-- REKAP BULANAN — Submitted/Reviewed/Approved per bulan, opsional
@@ -1292,7 +1308,7 @@ function showApp(){
   document.getElementById('user-label').style.display = '';
   document.getElementById('logout-btn').style.display = '';
   document.getElementById('settings-btn').style.display = '';
-  document.getElementById('btn-manual-upload').style.display = roleUsesSignature(loggedInRole) ? '' : 'none';
+  document.getElementById('btn-manual-upload').style.display = '';  // semua level bisa upload manual
   const roleEl = document.getElementById('role-label');
   const roleKey = loggedInRole || 'none';
   roleEl.textContent = ROLE_LABELS[roleKey] || roleKey;
@@ -1409,7 +1425,15 @@ async function loadAll(){
       showDedupeNote(removed.length);
     }
   }catch(e){ console.error('Cleanup duplikat approval gagal:', e); }
+  // cleanupDuplicateApprovals() populated _checksheetCache for every approval —
+  // fold WO number + execution date onto the approval for history search/sort.
+  _allApprovals.forEach(a => {
+    const cs = _checksheetCache[a.checksheetId];
+    a._wo = (cs && cs.woNumber) || '';
+    a._date = (cs && cs.executionDate) || '';
+  });
   updateTabCounts();
+  populateHistoryAreaOptions();
   if(_activeTab === 'recap'){ populateRecapPersonOptions(); renderRecapChart(); }
   else renderList();
   maybeOpenFromUrl();
@@ -1532,7 +1556,9 @@ let _activeTab = 'inbox';
 function switchTab(tab){
   _activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
-  document.getElementById('status-filter').style.display = tab==='all' ? '' : 'none';
+  document.getElementById('history-filters').style.display = tab==='all' ? 'flex' : 'none';
+  document.getElementById('history-count').style.display = tab==='all' ? '' : 'none';
+  if(tab==='all') populateHistoryAreaOptions();
   const isRecap = tab === 'recap';
   document.getElementById('list-toolbar').style.display = isRecap ? 'none' : '';
   document.getElementById('list-area').style.display = isRecap ? 'none' : '';
@@ -1556,18 +1582,66 @@ function inboxItems(){
   if(loggedInRole==='admin') return _allApprovals.filter(a=>a.status==='submitted'||a.status==='reviewed');
   return [];
 }
+const STATUS_ORDER = ['submitted','reviewed','returned_to_technician','approved'];
+function sortApprovals(items, mode){
+  const newest = (a,b) => (b.createdAt||'').localeCompare(a.createdAt||'');
+  const nm = a => (a.assetName||a.assetTag||'');
+  const cmp = {
+    newest,
+    oldest:  (a,b) => (a.createdAt||'').localeCompare(b.createdAt||''),
+    name_az: (a,b) => nm(a).localeCompare(nm(b),'id',{sensitivity:'base'}),
+    name_za: (a,b) => nm(b).localeCompare(nm(a),'id',{sensitivity:'base'}),
+    status:  (a,b) => (STATUS_ORDER.indexOf(a.status)-STATUS_ORDER.indexOf(b.status)) || newest(a,b),
+  }[mode] || newest;
+  return items.slice().sort(cmp);
+}
+function populateHistoryAreaOptions(){
+  const sel = document.getElementById('hf-area');
+  if(!sel) return;
+  const team = document.getElementById('hf-team').value;
+  const areas = team ? (TEAM_AREAS[team]||[]) : [...new Set(Object.values(TEAM_AREAS).flat())];
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Semua area</option>' +
+    areas.map(a => `<option value="${escHtml(a)}"${a===cur?' selected':''}>${escHtml(a)}</option>`).join('');
+}
+function resetHistoryFilters(){
+  ['hf-search'].forEach(id => document.getElementById(id).value = '');
+  ['status-filter','hf-team','hf-area'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('hf-sort').value = 'newest';
+  populateHistoryAreaOptions();
+  renderList();
+}
 function renderList(){
   let items;
+  const cnt = document.getElementById('history-count');
+  if(cnt) cnt.style.display = 'none';
   if(_activeTab==='inbox') items = inboxItems();
   else if(_activeTab==='returned') items = _allApprovals.filter(a=>a.status==='returned_to_technician');
   else {
+    // "Semua Riwayat" — filter + sort
+    items = _allApprovals.slice();
     const f = document.getElementById('status-filter').value;
-    items = f ? _allApprovals.filter(a=>a.status===f) : _allApprovals;
+    if(f) items = items.filter(a=>a.status===f);
+    const team = document.getElementById('hf-team').value;
+    if(team) items = items.filter(a => (a._team||'') === team);
+    const area = document.getElementById('hf-area').value;
+    if(area) items = items.filter(a => (a._area||'') === area);
+    const q = document.getElementById('hf-search').value.trim().toLowerCase();
+    if(q) items = items.filter(a =>
+      [a.assetName, a.assetTag, a.submittedBy, a._wo, a._area, a._src].some(v => (v||'').toLowerCase().includes(q))
+    );
+    items = sortApprovals(items, document.getElementById('hf-sort').value);
+    if(cnt){
+      cnt.style.display = '';
+      cnt.textContent = 'Menampilkan ' + items.length + ' dari ' + _allApprovals.length + ' submission';
+    }
   }
   const wrap = document.getElementById('list-area');
   if(!items.length){
     wrap.innerHTML = '<div class="list-empty"><div class="msg">Tidak ada submission</div><div>'+
-      (_activeTab==='inbox' ? (loggedInRole ? 'Tidak ada yang menunggu tindakan Anda saat ini.' : 'Login dengan role TechOp2/Supervisor untuk melihat kotak masuk.') : 'Belum ada data pada kategori ini.')+
+      (_activeTab==='inbox' ? (loggedInRole ? 'Tidak ada yang menunggu tindakan Anda saat ini.' : 'Login dengan role TechOp2/Supervisor untuk melihat kotak masuk.')
+        : _activeTab==='all' ? 'Tidak ada yang cocok dengan filter — coba Reset.'
+        : 'Belum ada data pada kategori ini.')+
       '</div></div>';
     return;
   }
@@ -1575,7 +1649,7 @@ function renderList(){
     <div class="card">
       <div class="card-main">
         <div class="card-title">${escHtml(a.assetName||a.assetTag||'—')}${a._team?`<span class="card-scope-tag">${escHtml(a._team)} · ${escHtml(a._area||'?')}</span>`:''}${a._src?`<span class="card-scope-tag" style="background:var(--ind-soft);color:var(--ind);border-color:rgba(99,102,241,.25)">${escHtml(a._src)}</span>`:''}</div>
-        <div class="card-meta">${escHtml(a.submittedBy||'—')} · disubmit ${fmtDate(a.createdAt)}${a.revisionOf?' · <span title="Ini revisi dari submission sebelumnya">↻ revisi</span>':''}</div>
+        <div class="card-meta">${escHtml(a.submittedBy||'—')}${a._wo?' · WO '+escHtml(a._wo):''} · disubmit ${fmtDate(a.createdAt)}${a.revisionOf?' · <span title="Ini revisi dari submission sebelumnya">↻ revisi</span>':''}</div>
       </div>
       <span class="card-badge ${a.status}">${Approvals.STATUS_LABELS[a.status]||a.status}</span>
       <button class="btn btn-sm btn-pri" onclick="openDetail('${a.id}')">Buka</button>
