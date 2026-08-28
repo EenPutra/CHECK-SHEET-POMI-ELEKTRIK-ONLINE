@@ -1468,6 +1468,16 @@ This was an explicit user request; the design decisions were confirmed up front:
   "di luar cakupan team/area Anda" notice instead of the review form. A submission whose
   submitter's team isn't recorded (name mismatch, pre-feature data) matches **no** TechOp2 and
   is handled via the Admin account — the `#scope-note` banner says so.
+- **External feeds** (`EXTERNAL_SUBMITTER_SCOPE`): other POMI mini-apps post into the same
+  `checksheets`/`approvals` collections via `Approvals.submitWithFiles()` but can't hold
+  `dashboard_users` accounts, so they send a **fixed synthetic `submittedBy` per plant area**
+  and `scopeOfApproval()` maps it (checked **before** `_userDir`) to `{team, area, src}`.
+  Currently: `mahfudjtf`'s **PM-UNIT-7** (`shared.js` → `raSendFinalPdfToFirebaseDashboard()`)
+  sends `PM Unit 7 - Boiler` / `- Turbine` / `- Common CHCB` / `- Common WWTP` → all `C7` +
+  the matching area (the real PIC name stays on the checksheet doc's `checkedBy`). Cards/detail
+  show a `src` tag (`PM Unit 7`); the "Edit Check Sheet" / "Buka Check Sheet untuk Revisi"
+  actions are hidden for these (the form lives in the other app — fixes are made there and
+  re-submitted). Add a new mapping here if another app is wired in.
 - The `"Semua Riwayat"` / `"Dikembalikan"` tabs are **not** scoped (full history stays visible
   to everyone); only `"Menunggu Saya"` is. Cards show a `.card-scope-tag` (`E7 · Powerblock`),
   and the detail view's Info grid has a "Team / Area (PIC)" cell.

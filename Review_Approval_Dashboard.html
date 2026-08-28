@@ -1180,9 +1180,24 @@ async function loadUserDir(force){
   _userDir = dir;
   return dir;
 }
+// Submissions pushed in from OTHER POMI mini-apps that can't hold
+// `dashboard_users` accounts (e.g. mahfudjtf's PM-UNIT-7, which posts to the
+// same `checksheets`/`approvals` collections via Approvals.submitWithFiles).
+// They can't be routed by a real technician name, so they send a FIXED
+// synthetic `submittedBy` per plant area. Keyed lowercased. `src` shows on
+// the card so a reviewer knows it's an external feed (and the "edit check
+// sheet" actions are hidden — that form lives in the other app).
+const EXTERNAL_SUBMITTER_SCOPE = {
+  'pm unit 7 - boiler':       { team: 'C7', area: 'Boiler',                     src: 'PM Unit 7' },
+  'pm unit 7 - turbine':      { team: 'C7', area: 'Turbine',                    src: 'PM Unit 7' },
+  'pm unit 7 - common chcb':  { team: 'C7', area: 'Common (CHCB)',              src: 'PM Unit 7' },
+  'pm unit 7 - common wwtp':  { team: 'C7', area: 'Common (WWTP-Ashdisposal)',  src: 'PM Unit 7' },
+};
 function scopeOfApproval(a){
-  if(!_userDir) return { team:null, area:null };
   const by = (a.submittedBy || '').trim().toLowerCase();
+  const ext = EXTERNAL_SUBMITTER_SCOPE[by];
+  if(ext) return { team: ext.team, area: ext.area, src: ext.src };
+  if(!_userDir) return { team:null, area:null };
   return _userDir['n:'+by] || _userDir['u:'+by] || { team:null, area:null };
 }
 // A submission is "mine" as a TechOp2 PIC when its submitter's team matches
@@ -1207,7 +1222,7 @@ async function loadAll(){
   await loadUserDir(true);
   _allApprovals.forEach(a => {
     const s = scopeOfApproval(a);
-    a._team = s.team; a._area = s.area;
+    a._team = s.team; a._area = s.area; a._src = s.src || null;
   });
   try{
     const removed = await cleanupDuplicateApprovals(_allApprovals);
@@ -1382,7 +1397,7 @@ function renderList(){
   wrap.innerHTML = items.map(a => `
     <div class="card">
       <div class="card-main">
-        <div class="card-title">${escHtml(a.assetName||a.assetTag||'—')}${a._team?`<span class="card-scope-tag">${escHtml(a._team)} · ${escHtml(a._area||'?')}</span>`:''}</div>
+        <div class="card-title">${escHtml(a.assetName||a.assetTag||'—')}${a._team?`<span class="card-scope-tag">${escHtml(a._team)} · ${escHtml(a._area||'?')}</span>`:''}${a._src?`<span class="card-scope-tag" style="background:var(--ind-soft);color:var(--ind);border-color:rgba(99,102,241,.25)">${escHtml(a._src)}</span>`:''}</div>
         <div class="card-meta">${escHtml(a.submittedBy||'—')} · disubmit ${fmtDate(a.createdAt)}${a.revisionOf?' · <span title="Ini revisi dari submission sebelumnya">↻ revisi</span>':''}</div>
       </div>
       <span class="card-badge ${a.status}">${Approvals.STATUS_LABELS[a.status]||a.status}</span>
@@ -1550,8 +1565,8 @@ async function openDetail(id){
     // Reuse the enriched copy from the list if we have it, so _team/_area (and
     // any dedupe) are consistent; fall back to enriching this fetch directly.
     const listed = _allApprovals.find(x => x.id === id);
-    if(listed){ approval._team = listed._team; approval._area = listed._area; }
-    else { await loadUserDir(); const s = scopeOfApproval(approval); approval._team = s.team; approval._area = s.area; }
+    if(listed){ approval._team = listed._team; approval._area = listed._area; approval._src = listed._src || null; }
+    else { await loadUserDir(); const s = scopeOfApproval(approval); approval._team = s.team; approval._area = s.area; approval._src = s.src || null; }
     const checksheet = await getChecksheet(approval.checksheetId);
     _curApproval = approval; _curChecksheet = checksheet;
     renderDetail(approval, checksheet);
@@ -1602,7 +1617,7 @@ function renderDetail(a, cs){
       <div class="info-cell"><div class="k">Shift</div><div class="v">${escHtml(cs?.shift||'—')}</div></div>
       <div class="info-cell"><div class="k">Status Checklist</div><div class="v">${escHtml(cs?.overallStatus||'—')} (${cs?.countOk||0} OK / ${cs?.countNg||0} NG)</div></div>
       <div class="info-cell"><div class="k">Disubmit</div><div class="v">${fmtDate(a.createdAt)}</div></div>
-      <div class="info-cell"><div class="k">Team / Area (PIC)</div><div class="v">${a._team ? escHtml(a._team)+' · '+escHtml(a._area||'?') : '<span style="color:var(--txt-3);font-weight:500">Team submitter tidak tercatat</span>'}</div></div>
+      <div class="info-cell"><div class="k">Team / Area (PIC)</div><div class="v">${a._team ? escHtml(a._team)+' · '+escHtml(a._area||'?') : '<span style="color:var(--txt-3);font-weight:500">Team submitter tidak tercatat</span>'}${a._src?` <span style="color:var(--ind);font-weight:600">· via ${escHtml(a._src)}</span>`:''}</div></div>
     </div></div>`;
 
   html += `<div class="dsec"><div class="dsec-title">Dokumen</div><div class="file-links">
@@ -1631,7 +1646,7 @@ function renderDetail(a, cs){
   if(a.returnedNote){
     html += `<div class="dsec"><div class="dsec-title">&#9888;&#65039; Dikembalikan</div>
       <div class="note-box returned">Oleh <b>${escHtml(a.returnedNote.by||'—')}</b> pada tahap <b>${a.returnedNote.stage==='approval'?'Approval':'Review'}</b> (${fmtDate(a.returnedNote.returnedAt)}):<br>"${escHtml(a.returnedNote.note||'—')}"</div>
-      ${a.checksheetFile ? `<div style="margin-top:8px"><a class="btn btn-sm" target="_blank" rel="noopener" href="${a.checksheetFile}?reviseOf=${a.id}">&#9999;&#65039; Buka Check Sheet untuk Revisi</a></div>` : ''}
+      ${a.checksheetFile && !a._src ? `<div style="margin-top:8px"><a class="btn btn-sm" target="_blank" rel="noopener" href="${a.checksheetFile}?reviseOf=${a.id}">&#9999;&#65039; Buka Check Sheet untuk Revisi</a></div>` : ''}
     </div>`;
   }
 
@@ -1780,8 +1795,11 @@ function renderActionSection(a, cs){
     </div>`;
   }
   if(canReview){
-    const editHref = a.checksheetFile ? a.checksheetFile.replace(/ /g,'%20')+'?reviseOf='+a.id : '';
+    // External feeds (PM Unit 7 etc.) can't be edited from here — the form
+    // lives in the other app.
+    const editHref = (a.checksheetFile && !a._src) ? a.checksheetFile.replace(/ /g,'%20')+'?reviseOf='+a.id : '';
     return `<div class="dsec"><div class="dsec-title">Tindakan — Review</div>
+      ${a._src ? `<div class="edit-cs-box"><div>Submission ini dikirim otomatis dari <b>${escHtml(a._src)}</b>. Perbaikan isian dilakukan di aplikasi asalnya, lalu di-submit ulang.</div></div>` : ''}
       ${editHref ? `<div class="edit-cs-box">
         <div><b>Perlu memperbaiki isian?</b> Buka check sheet untuk diedit langsung, tekan tombol
         <i>"Muat Data Submission untuk Direvisi"</i> di banner atas, perbaiki, lalu Submit ulang —
