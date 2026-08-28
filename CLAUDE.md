@@ -1077,6 +1077,19 @@ that the button's count matches `allDataRaw.length - allData.length` exactly
 without ever calling `executeDelete()` in that verification, since that
 would actually delete production data.
 
+## `team-routing.js` — shared team/area vocabulary + routing resolution
+
+`window.TeamRouting`, loaded (after `db-helper.js`) by **both** dashboards so they share ONE
+copy of `TEAM_AREAS`, `EXTERNAL_SUBMITTER_SCOPE`, and `toAreaList()` — a drift between them
+would misroute submissions. `Review_Approval_Dashboard.html` now delegates its `TEAM_AREAS` /
+`EXTERNAL_SUBMITTER_SCOPE` / `toAreaList` consts to `TeamRouting.*` (its `scopeOfApproval()` /
+`loadUserDir()` / `inMyReviewScope()` stay local). Also exposes:
+- `loadUserDir(force)` — fetches `dashboard_users` once into `name/username -> {team, area}`.
+- `resolveScope({names:[...], team, area, src})` — explicit `team`/`area` win; else the first
+  `names` entry that resolves via `EXTERNAL_SUBMITTER_SCOPE` then the user directory.
+- `inScope(scope, myTeam, myAreas)` — team match + area ∈ areas; **fail-open** when the reviewer
+  has no scope, closed (false) when the submission's scope is unresolved (`team:null`).
+
 ## `dashboard.html` — role-based views (technician / techop2 / supervisor / admin)
 
 Before this, `dashboard.html`'s login only checked username/password — it never read
@@ -1090,11 +1103,20 @@ along two independent axes — see the matrix below.
 
 |  | technician | techop2 | supervisor | admin |
 |---|---|---|---|---|
-| Data scope | own submissions only | all | all | all |
+| Data scope | own submissions only | **own team + area(s)** | all | all |
 | Layout | simplified (stat cards + table only) | full | full | full |
 | 3 analytical charts + Transformer PM Trend panel | hidden | visible | visible | visible |
 | Row-select checkboxes, Delete, Hapus Duplikat | hidden | hidden | visible | visible |
-| Excel export | visible (own data only) | visible (all) | visible | visible |
+| Excel export | visible (own data only) | visible (own team + area) | visible | visible |
+
+- **TechOp2 data scope** (later change, requested): `loadData()` loads `approvals` FIRST (moved
+  up from a trailing pass — needed for routing), then for `role==='techop2'` with a team+area set
+  it filters `allDataRaw` to submissions where `TeamRouting.resolveScope({names:[checkedBy,
+  uploadedBy, approval.submittedBy], team: approval.team||d.team, area: approval.area||d.area,
+  src})` is `TeamRouting.inScope(..., loggedInTeam, loggedInAreas)`. `loggedInTeam`/`loggedInAreas`
+  come from the session (`AuthSession.get()`), backfilled from Firestore in `checkSession()` when
+  missing. `applyRoleUI()` adds `body.role-techop2` (layout stays FULL — only the data is scoped)
+  and fills the `#scope-note` banner. Supervisor/Admin unchanged (see everything).
 
 - **Session is unified with the rest of the app via `auth-session.js` (`window.AuthSession`).**
   `doLogin()` calls `AuthSession.set({user,role,name})`, `checkSession()` (still `async`) reads

@@ -17,6 +17,7 @@
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
 <script src="auth-session.js"></script>
+<script src="team-routing.js"></script>
 <style>
 :root{
   --bg:#f4f7fb; --bg-2:#eaf0f7; --surf:#ffffff; --surf-2:#f8fafc;
@@ -687,12 +688,11 @@ async function getElevatedRegCode(){
   return ELEVATED_REG_CODE;
 }
 
-// Team -> valid Area options. A submission is routed to the TechOp2 (PIC)
-// whose own account carries the SAME team + area (see inboxItems()).
-const TEAM_AREAS = {
-  E7: ['Common', 'Powerblock'],
-  C7: ['Turbine', 'Boiler', 'Common (CHCB)', 'Common (WWTP-Ashdisposal)'],
-};
+// Team -> valid Area options, + the external-feed submitter map. Both live in
+// team-routing.js now so dashboard.html and this file share ONE vocabulary
+// (a drift there would misroute submissions). A submission is routed to the
+// TechOp2 whose account carries the SAME team + one of its areas.
+const TEAM_AREAS = TeamRouting.TEAM_AREAS;
 // Team/area only drives TechOp2 inbox routing (and a technician's submissions
 // being routable to a PIC). Supervisor & Admin are never scoped, so they are
 // NOT forced through the mandatory team-setup form on login.
@@ -701,15 +701,8 @@ function roleNeedsTeam(role){ return role !== 'supervisor' && role !== 'admin'; 
 function roleAllowsMultiArea(role){ return role === 'techop2'; }
 
 // Firestore stores `area` as a string (legacy / technician) or an array
-// (multi-area TechOp2) — always read it through this.
-function toAreaList(a){
-  if(Array.isArray(a)) return a.filter(Boolean);
-  if(typeof a === 'string' && a){
-    try{ const p = JSON.parse(a); if(Array.isArray(p)) return p.filter(Boolean); }catch(e){}
-    return [a];
-  }
-  return [];
-}
+// (multi-area TechOp2) — always read it through this. (Shared: team-routing.js)
+const toAreaList = TeamRouting.toAreaList;
 
 // Render the area picker as checkboxes into `containerId` for `team`, with
 // `selected` (array/string) pre-checked. getCheckedAreas() reads them back.
@@ -1375,19 +1368,10 @@ async function loadUserDir(force){
   _userDir = dir;
   return dir;
 }
-// Submissions pushed in from OTHER POMI mini-apps that can't hold
-// `dashboard_users` accounts (e.g. mahfudjtf's PM-UNIT-7, which posts to the
-// same `checksheets`/`approvals` collections via Approvals.submitWithFiles).
-// They can't be routed by a real technician name, so they send a FIXED
-// synthetic `submittedBy` per plant area. Keyed lowercased. `src` shows on
-// the card so a reviewer knows it's an external feed (and the "edit check
-// sheet" actions are hidden — that form lives in the other app).
-const EXTERNAL_SUBMITTER_SCOPE = {
-  'pm unit 7 - boiler':       { team: 'C7', area: 'Boiler',                     src: 'PM Unit 7' },
-  'pm unit 7 - turbine':      { team: 'C7', area: 'Turbine',                    src: 'PM Unit 7' },
-  'pm unit 7 - common chcb':  { team: 'C7', area: 'Common (CHCB)',              src: 'PM Unit 7' },
-  'pm unit 7 - common wwtp':  { team: 'C7', area: 'Common (WWTP-Ashdisposal)',  src: 'PM Unit 7' },
-};
+// External-feed submitter -> {team, area, src}. Lives in team-routing.js
+// (shared with dashboard.html). `src` shows on the card so a reviewer knows
+// it's an external feed (edit-check-sheet actions hidden — form's elsewhere).
+const EXTERNAL_SUBMITTER_SCOPE = TeamRouting.EXTERNAL_SUBMITTER_SCOPE;
 function scopeOfApproval(a){
   const by = (a.submittedBy || '').trim().toLowerCase();
   const ext = EXTERNAL_SUBMITTER_SCOPE[by];

@@ -15,6 +15,7 @@
 <script src="db-helper.js"></script>
 <script src="approval-helper.js"></script>
 <script src="auth-session.js"></script>
+<script src="team-routing.js"></script>
 <style>
 :root{
   --bg:#f4f7fb;
@@ -143,7 +144,7 @@ body:not(.can-delete) .del-only{display:none!important}
 .scope-note{display:none;align-items:center;gap:10px;padding:12px 16px;border-radius:10px;
   background:var(--ind-soft);border:1px solid rgba(99,102,241,0.25);color:var(--ind);
   font-size:12.5px;line-height:1.5;margin-bottom:18px}
-body.role-technician .scope-note{display:flex}
+body.role-technician .scope-note,body.role-techop2 .scope-note{display:flex}
 
 /* MAIN */
 .main{position:relative;z-index:1;max-width:1380px;margin:0 auto;padding:36px 48px 80px}
@@ -1094,6 +1095,8 @@ let filteredData = [];
 let loggedInUser = null;
 let loggedInRole = null;   // 'technician' | 'techop2' | 'supervisor' | 'admin' | 'none' — from dashboard_users.role
 let loggedInName = null;   // display name, falls back to username — used to scope a technician's own submissions
+let loggedInTeam = null;   // TechOp2 sees only their own team + area(s) — same as Review_Approval_Dashboard.html
+let loggedInAreas = [];
 const ROLE_LABELS = { techop2:'TechOp2', supervisor:'Supervisor', admin:'Admin', technician:'Technician', none:'Tanpa Role' };
 let cachedStats = null;
 let showAllHistory = false;   // "Submission terbaru saja" checkbox is checked by default -> this starts false
@@ -1209,6 +1212,8 @@ async function doLogin(e) {
     loggedInUser = userData.username;
     loggedInRole = userData.role || 'none';
     loggedInName = userData.name || userData.username;
+    loggedInTeam = TeamRouting.TEAM_AREAS[userData.team] ? userData.team : null;
+    loggedInAreas = TeamRouting.toAreaList(userData.area);
     // Shared login session (auth-session.js) — localStorage, so a login here
     // is recognized on every page/tab of this app on the same computer, and
     // idle-expires after AuthSession.IDLE_MS (1h). See auth-session.js.
@@ -1259,7 +1264,18 @@ function showDashboard() {
 //     to win regardless of what that other code does to inline style).
 function applyRoleUI() {
   document.body.classList.toggle('role-technician', loggedInRole === 'technician');
+  // TechOp2 keeps the full layout but their data is scoped to team+area
+  // (see loadData) — only admin/supervisor see everything.
+  const scopedTechop2 = loggedInRole === 'techop2' && loggedInTeam && loggedInAreas.length;
+  document.body.classList.toggle('role-techop2', scopedTechop2);
   document.body.classList.toggle('can-delete', loggedInRole === 'admin' || loggedInRole === 'supervisor');
+  if (scopedTechop2) {
+    const note = document.getElementById('scope-note');
+    note.querySelector('span:last-child').innerHTML =
+      'Anda login sebagai <b>TechOp2</b> — dashboard ini hanya menampilkan submission dari team <b>' +
+      esc(loggedInTeam) + ' · ' + loggedInAreas.map(esc).join(', ') +
+      '</b>. Supervisor &amp; Admin melihat seluruh data.';
+  }
 }
 
 function doLogout() {
@@ -1275,22 +1291,26 @@ async function checkSession() {
     loggedInUser = sess.user;
     loggedInRole = sess.role || null;
     loggedInName = sess.name || null;
-    // A session started on another page before role-tracking existed here
-    // (or a plain dashboard_user set some other way) won't have a role
-    // cached yet — back-fill it once from Firestore so scoping still
-    // applies, rather than silently defaulting to the full/unscoped view.
-    if (!loggedInRole) {
+    loggedInTeam = TeamRouting.TEAM_AREAS[sess.team] ? sess.team : null;
+    loggedInAreas = TeamRouting.toAreaList(sess.area);
+    // A session started on another page before role/team-tracking existed
+    // here won't have those cached — back-fill once from Firestore so a
+    // technician/techop2 view still scopes, rather than showing everything.
+    const needBackfill = !loggedInRole || (loggedInRole === 'techop2' && (!loggedInTeam || !loggedInAreas.length));
+    if (needBackfill) {
       try {
         const snap = await db.collection('dashboard_users').where('username', '==', loggedInUser).limit(1).get();
         if (!snap.empty) {
           const userData = snap.docs[0].data();
-          loggedInRole = userData.role || 'none';
+          if (!loggedInRole) loggedInRole = userData.role || 'none';
           loggedInName = userData.name || userData.username;
+          loggedInTeam = TeamRouting.TEAM_AREAS[userData.team] ? userData.team : null;
+          loggedInAreas = TeamRouting.toAreaList(userData.area);
           AuthSession.set({ user: loggedInUser, role: loggedInRole, name: loggedInName });
-        } else {
+        } else if (!loggedInRole) {
           loggedInRole = 'none';
         }
-      } catch (e) { console.error('Role backfill gagal:', e); loggedInRole = 'none'; }
+      } catch (e) { console.error('Role/team backfill gagal:', e); if (!loggedInRole) loggedInRole = 'none'; }
     }
     showDashboard();
   }
@@ -1321,56 +1341,60 @@ async function loadData() {
   document.getElementById('data-table').style.display = 'none';
   document.getElementById('empty-state').style.display = 'none';
 
+  // Approvals are loaded FIRST now (used to be a trailing best-effort pass)
+  // because the TechOp2 data scope below needs each submission's routing
+  // team/area, which for manual uploads / PM-UNIT-7 lives on the approval
+  // doc. A failure here still must not block the main table.
+  try {
+    const approvals = await Approvals.getAll();
+    approvalsByChecksheetId = {};
+    approvals.forEach(a => { approvalsByChecksheetId[a.checksheetId] = a; });
+  } catch (e) {
+    console.error('Approval status load error:', e);
+    approvalsByChecksheetId = {};
+  }
+
   try {
     allDataRaw = await DB.getAll();
-    // Role-based data scope: a technician only ever sees their own
-    // submissions. Filtered here, once, right after the fetch — everything
-    // downstream (dedupe, stat cards, charts, the table, filters, Excel
-    // export) all derive from allDataRaw/allData, so scoping it at the
-    // source scopes all of them for free, no separate change needed at
-    // each call site. Matches on `checkedBy` (the only submitter-identity
-    // field the data contract guarantees — see "The data contract" in
-    // CLAUDE.md) against the logged-in account's display name, trimmed and
-    // case-insensitive. This can miss older submissions where the name was
-    // typed differently before technician-auth.js existed — see the
-    // scope-note banner shown for this role, rather than trying to
-    // fuzzy-match and risk pulling in someone else's data instead.
+    // ── Role-based DATA SCOPE ──
+    //  technician  -> only their own submissions (by checkedBy / uploadedBy)
+    //  techop2     -> only their team + area(s) — same routing as the Review
+    //                 dashboard's inbox (TeamRouting.resolveScope)
+    //  supervisor / admin -> everything
+    // Filtered once, right after the fetch — everything downstream (dedupe,
+    // stat cards, charts, table, filters, Excel export) derives from
+    // allDataRaw, so scoping it here scopes all of them for free.
     if (loggedInRole === 'technician') {
       const myName = (loggedInName || loggedInUser || '').trim().toLowerCase();
       const myUser = (loggedInUser || '').trim().toLowerCase();
-      // Also match uploadedBy / uploadedByUsername — a manual upload (see
-      // Review_Approval_Dashboard.html) records who put it into the system,
-      // which may differ from the PIC in checkedBy.
       allDataRaw = allDataRaw.filter(d => {
         const cb = (d.checkedBy || '').trim().toLowerCase();
         const ub = (d.uploadedBy || '').trim().toLowerCase();
         const uu = (d.uploadedByUsername || '').trim().toLowerCase();
         return cb === myName || (ub && ub === myName) || (uu && uu === myUser);
       });
+    } else if (loggedInRole === 'techop2' && loggedInTeam && loggedInAreas.length) {
+      await TeamRouting.loadUserDir();
+      allDataRaw = allDataRaw.filter(d => {
+        const ap = approvalsByChecksheetId[d.id] || {};
+        const scope = TeamRouting.resolveScope({
+          names: [d.checkedBy, d.uploadedBy, ap.submittedBy],
+          team: ap.team || d.team,
+          area: ap.area || d.area,
+          src: ap.src || (d.manualUpload ? 'Upload manual' : null),
+        });
+        return TeamRouting.inScope(scope, loggedInTeam, loggedInAreas);
+      });
     }
     applyDedupeToggle();   // sets allData (deduped or not) + stat cards + charts from allDataRaw
     populateAssetFilter();
     initParamTrend();
-    applyFilters();
+    applyFilters();        // renders the table; approvalsByChecksheetId is already loaded above
     const now=new Date();
     document.getElementById('last-update').textContent='Live · synced '+now.toLocaleTimeString('id-ID');
   } catch (e) {
     console.error('Load error:', e);
     document.getElementById('tbl-loading').textContent = 'Gagal memuat data. Pastikan Firebase sudah dikonfigurasi.';
-  }
-
-  // Review/approval status is a separate, best-effort overlay — only the
-  // pilot check sheet (PLTS Ash Disposal) creates 'approvals' docs today,
-  // so most rows simply have none and the column shows '—'. A failure here
-  // (e.g. the collection doesn't exist yet) must never block the main
-  // table above, which is why it's a second, independent try/catch.
-  try {
-    const approvals = await Approvals.getAll();
-    approvalsByChecksheetId = {};
-    approvals.forEach(a => { approvalsByChecksheetId[a.checksheetId] = a; });
-    renderTable(allData); // re-render so the Approval column picks up the fresh map
-  } catch (e) {
-    console.error('Approval status load error:', e);
   }
 }
 let approvalsByChecksheetId = {};
