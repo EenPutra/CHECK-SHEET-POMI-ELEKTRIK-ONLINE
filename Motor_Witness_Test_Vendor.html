@@ -1,0 +1,1564 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Witness Plan — Recondition / Rewinding Motor</title>
+<script>
+(function(){try{var t=localStorage.getItem('mw_theme');if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db-helper.js"></script>
+<script src="storage-helper.js"></script>
+<script src="approval-helper.js"></script>
+<script src="submit-guard.js"></script>
+<script src="load-merge-modal.js"></script>
+<script src="auth-session.js"></script>
+<script src="technician-auth.js"></script>
+<script src="img-helper.js"></script>
+<script src="photo-kit.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<style>
+/* ===== BLUE THEME — light (default) ===== */
+:root{
+  --bg:#eaf0f8;--bg-g1:rgba(80,140,220,.20);--bg-g2:rgba(120,170,235,.16);
+  --panel:rgba(255,255,255,.88);--panel-solid:#ffffff;--pb:rgba(120,155,205,.42);
+  --steel:#1e3a63;--sl:#3567ab;--ink:#132338;--t2:#2c476f;--t3:#6a82a6;
+  --field-bg:#f3f7fd;--field-focus-bg:#ffffff;
+  --topbar-g:linear-gradient(90deg,#122b4c,#1e3a63 55%,#122b4c);
+  --topbar-tl:#8fc0f2;--topbar-sub:#7ba3d4;--topbar-txt:#cfe0f5;--topbar-sep:#3a5988;
+  --sec-hdr-bg:rgba(53,103,171,.07);--sec-hdr-bg-h:rgba(53,103,171,.13);
+  --th-bg:#e7eefa;--td-line:rgba(120,155,205,.26);
+  --chip-bg:#e6eefb;--chip-bd:#b7cdec;
+  --btn-o-h:#dbe6f7;--p-btn-bg:#ffffff;--p-btn-h:#dbe6f7;
+  --photo-wrap-bg:#e6eef9;
+  --ok:#1e874b;--ok-bg:#e6f6ec;--ok-bd:#1e874b30;--ok-soft:#1e874b1f;
+  --ng:#c0392b;--ng-bg:#fbeae8;--ng-bd:#c0392b30;--ng-soft:#c0392b1f;
+  --warn:#c77c17;--na:#6d4bb8;--na-soft:#6d4bb81f;
+  --crit:#1e874b;
+  --info-bg:#e6f1fb;--info-bd:#3479c728;--info-tx:#1b4f86;
+  --pd-bg:#eef0fb;--pd-bd:#6d4bb833;--pd-tx:#33305c;--pd-b:#4b3d9b;
+  --sh:0 4px 22px rgba(20,50,95,.14);
+  --mono:'Share Tech Mono',monospace;--sans:'Barlow',system-ui,sans-serif;--raj:'Rajdhani',sans-serif;
+}
+/* ===== BLUE THEME — dark (system) ===== */
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c1524;--bg-g1:rgba(40,90,170,.22);--bg-g2:rgba(30,70,140,.18);
+  --panel:rgba(22,34,54,.86);--panel-solid:#16223a;--pb:rgba(90,130,190,.34);
+  --steel:#9cc4f5;--sl:#6ea3e0;--ink:#dbe7f7;--t2:#b4c8e4;--t3:#8098bd;
+  --field-bg:#101d33;--field-focus-bg:#152442;
+  --topbar-g:linear-gradient(90deg,#0a1526,#12233d 55%,#0a1526);
+  --topbar-tl:#8fc0f2;--topbar-sub:#6f9bd0;--topbar-txt:#cfe0f5;--topbar-sep:#2c476f;
+  --sec-hdr-bg:rgba(90,140,210,.10);--sec-hdr-bg-h:rgba(90,140,210,.18);
+  --th-bg:#14243f;--td-line:rgba(90,130,190,.22);
+  --chip-bg:#152a48;--chip-bd:#2f4f7d;
+  --btn-o-h:#1c3355;--p-btn-bg:#152442;--p-btn-h:#1c3355;
+  --photo-wrap-bg:#0f1d33;
+  --ok:#4cc98a;--ok-bg:#123726;--ok-bd:#4cc98a40;--ok-soft:#4cc98a26;
+  --ng:#f0776a;--ng-bg:#3a1a17;--ng-bd:#f0776a40;--ng-soft:#f0776a26;
+  --warn:#e0a94a;--na:#a78bec;--na-soft:#a78bec26;
+  --crit:#4cc98a;
+  --info-bg:#132c47;--info-bd:#3f7fc744;--info-tx:#9fc6ef;
+  --pd-bg:#1b1e3a;--pd-bd:#a78bec33;--pd-tx:#c6c2e8;--pd-b:#b6a6f2;
+  --sh:0 4px 22px rgba(0,0,0,.5);
+}}
+/* ===== BLUE THEME — dark (explicit toggle) ===== */
+:root[data-theme="dark"]{
+  --bg:#0c1524;--bg-g1:rgba(40,90,170,.22);--bg-g2:rgba(30,70,140,.18);
+  --panel:rgba(22,34,54,.86);--panel-solid:#16223a;--pb:rgba(90,130,190,.34);
+  --steel:#9cc4f5;--sl:#6ea3e0;--ink:#dbe7f7;--t2:#b4c8e4;--t3:#8098bd;
+  --field-bg:#101d33;--field-focus-bg:#152442;
+  --topbar-g:linear-gradient(90deg,#0a1526,#12233d 55%,#0a1526);
+  --topbar-tl:#8fc0f2;--topbar-sub:#6f9bd0;--topbar-txt:#cfe0f5;--topbar-sep:#2c476f;
+  --sec-hdr-bg:rgba(90,140,210,.10);--sec-hdr-bg-h:rgba(90,140,210,.18);
+  --th-bg:#14243f;--td-line:rgba(90,130,190,.22);
+  --chip-bg:#152a48;--chip-bd:#2f4f7d;
+  --btn-o-h:#1c3355;--p-btn-bg:#152442;--p-btn-h:#1c3355;
+  --photo-wrap-bg:#0f1d33;
+  --ok:#4cc98a;--ok-bg:#123726;--ok-bd:#4cc98a40;--ok-soft:#4cc98a26;
+  --ng:#f0776a;--ng-bg:#3a1a17;--ng-bd:#f0776a40;--ng-soft:#f0776a26;
+  --warn:#e0a94a;--na:#a78bec;--na-soft:#a78bec26;
+  --crit:#4cc98a;
+  --info-bg:#132c47;--info-bd:#3f7fc744;--info-tx:#9fc6ef;
+  --pd-bg:#1b1e3a;--pd-bd:#a78bec33;--pd-tx:#c6c2e8;--pd-b:#b6a6f2;
+  --sh:0 4px 22px rgba(0,0,0,.5);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--ink);min-height:100vh;
+  background-image:radial-gradient(ellipse at 15% 10%,var(--bg-g1),transparent 55%),radial-gradient(ellipse at 85% 85%,var(--bg-g2),transparent 50%)}
+.topbar{position:sticky;top:0;z-index:100;background:var(--topbar-g);color:var(--topbar-txt);
+  display:flex;align-items:center;gap:14px;padding:0 22px;height:54px;border-bottom:2px solid rgba(80,140,220,.28)}
+.topbar .tl{font-family:var(--raj);font-weight:700;font-size:19px;letter-spacing:2px;color:var(--topbar-tl)}
+.topbar .tsub{font-size:11.5px;color:var(--topbar-sub);letter-spacing:1px}
+.tsep{width:1px;height:24px;background:var(--topbar-sep)}
+.tr{margin-left:auto;display:flex;align-items:center;gap:8px}
+.clock{font-family:var(--mono);font-size:12px;color:var(--topbar-sub)}
+.theme-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:var(--topbar-txt);
+  width:32px;height:32px;border-radius:7px;cursor:pointer;font-size:15px;line-height:1;display:inline-flex;align-items:center;justify-content:center}
+.theme-btn:hover{background:rgba(255,255,255,.22)}
+.btn{font-family:var(--raj);font-weight:600;font-size:13px;letter-spacing:.5px;border:none;border-radius:6px;
+  padding:7px 15px;cursor:pointer;display:inline-flex;align-items:center;gap:5px;transition:all .15s}
+.btn.bo{background:transparent;border:1.5px solid var(--pb);color:var(--steel)}
+.btn.bo:hover{background:var(--btn-o-h)}
+.btn.bp{background:var(--steel);color:var(--panel-solid)}.btn.bp:hover{background:var(--sl)}
+.btn.br{background:#c0392b;color:#fff}.btn.br:hover{background:#a93226}
+.btn.bg{background:#2f6fb5;color:#fff}.btn.bg:hover{background:#255c99}
+.btn.bsm{padding:5px 11px;font-size:12px}
+.btn-back{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:5px;font-size:11px;font-weight:700;
+  letter-spacing:1px;text-decoration:none;background:rgba(255,255,255,.1);color:rgba(255,255,255,.85);border:1px solid rgba(255,255,255,.18)}
+.btn-back:hover{background:rgba(255,255,255,.2);color:#fff}
+.wrap{max-width:1220px;margin:0 auto;padding:22px 16px 90px}
+.ph{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+.ph h1{font-family:var(--raj);font-size:30px;font-weight:700;color:var(--steel);line-height:1;letter-spacing:.5px}
+.ph h1 span{color:#2f6fb5}
+.ph .sub{font-size:11px;color:var(--t3);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:3px}
+.badge{padding:3px 10px;border-radius:3px;font-family:var(--mono);font-size:11px;background:var(--chip-bg);color:var(--sl);border:1px solid var(--chip-bd)}
+.stats{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.sc{padding:6px 13px;border-radius:6px;font-family:var(--raj);font-weight:600;font-size:12.5px;display:flex;align-items:center;gap:5px;border:1.5px solid}
+.sc span{font-size:16px;font-weight:700}
+.sc.t{background:var(--chip-bg);border-color:var(--chip-bd);color:var(--steel)}
+.sc.ok{background:var(--ok-bg);border-color:var(--ok-bd);color:var(--ok)}
+.sc.ng{background:var(--ng-bg);border-color:var(--ng-bd);color:var(--ng)}
+.panel{background:var(--panel);border:1px solid var(--pb);border-radius:11px;margin-bottom:14px;box-shadow:var(--sh);
+  backdrop-filter:blur(7px);overflow:hidden}
+.sec-hdr{display:flex;align-items:center;gap:11px;padding:13px 18px;cursor:pointer;user-select:none;background:var(--sec-hdr-bg)}
+.sec-hdr:hover{background:var(--sec-hdr-bg-h)}
+.sec-ico{font-size:17px;width:24px;text-align:center}
+.sec-t{font-family:var(--raj);font-weight:700;font-size:14.5px;letter-spacing:1px;text-transform:uppercase;color:var(--steel);flex:1}
+.sec-arrow{font-size:12px;color:var(--t3);transition:transform .2s}
+.panel.open .sec-arrow{transform:rotate(180deg)}
+.sec-body{display:none;padding:16px 18px 20px;border-top:1px solid var(--pb)}
+.panel.open .sec-body{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:11px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf.full{grid-column:1/-1}
+.mf label{font-size:10px;color:var(--t3);font-weight:600;letter-spacing:.8px;text-transform:uppercase}
+.mf input,.mf select,.mf textarea{border:1.5px solid var(--pb);border-radius:5px;padding:7px 9px;font-family:var(--sans);
+  font-size:12.5px;background:var(--field-bg);color:var(--ink);width:100%}
+.mf input[type=date],.mf input[type=time]{font-family:var(--mono)}
+.mf input:focus,.mf select:focus,.mf textarea:focus{outline:none;border-color:var(--sl);background:var(--field-focus-bg)}
+.mf textarea{resize:vertical;min-height:56px}
+.mf .num{font-family:var(--mono)}
+.mf select option{background:var(--panel-solid);color:var(--ink)}
+.subttl{font-family:var(--raj);font-weight:700;font-size:12.5px;letter-spacing:1px;text-transform:uppercase;color:var(--sl);
+  margin:16px 0 8px;padding-bottom:4px;border-bottom:1px dashed var(--pb)}
+.subttl:first-child{margin-top:0}
+table.ct{width:100%;border-collapse:separate;border-spacing:0;font-size:12px}
+table.ct th{font-family:var(--raj);font-size:10px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--t3);
+  padding:7px 8px;text-align:left;border-bottom:2px solid var(--pb);background:var(--th-bg);white-space:nowrap}
+table.ct th.ctr,table.ct td.ctr{text-align:center}
+table.ct td{padding:5px 7px;border-bottom:1px solid var(--td-line);vertical-align:middle}
+table.ct tr:last-child td{border-bottom:none}
+.tno{font-family:var(--mono);font-size:10.5px;color:var(--t3);white-space:nowrap}
+.tdesc{line-height:1.4}
+.crit{display:block;font-family:var(--mono);font-size:9.5px;color:var(--crit);margin-top:1px;white-space:pre-line}
+.ref{display:block;font-size:9.5px;color:var(--t3);margin-top:1px}
+.ti{border:1.5px solid var(--pb);border-radius:4px;padding:4px 6px;font-family:var(--mono);font-size:11px;background:var(--field-bg);color:var(--ink);width:100%;min-width:56px}
+.ti:focus{outline:none;border-color:var(--sl);background:var(--field-focus-bg)}
+.rc{display:flex;gap:3px;justify-content:center}
+.rb{border:1.5px solid;border-radius:4px;background:transparent;font-family:var(--mono);font-size:9.5px;font-weight:700;
+  padding:3px 7px;cursor:pointer;letter-spacing:.4px;white-space:nowrap;transition:all .12s}
+.rb.ok{color:var(--ok);border-color:var(--ok-bd)}
+.rb.ng{color:var(--ng);border-color:var(--ng-bd)}
+.rb.na{color:var(--na);border-color:var(--na-soft)}
+.rb.ok.a{background:var(--ok-soft);border-color:var(--ok)}
+.rb.ng.a{background:var(--ng-soft);border-color:var(--ng)}
+.rb.na.a{background:var(--na-soft);border-color:var(--na)}
+.tbl-wrap{overflow-x:auto;margin:6px 0}
+.mtx td .ti{text-align:center}
+.mtx th{position:sticky;left:0}
+.hint{font-size:10.5px;color:var(--t3);font-style:italic;margin-top:4px;line-height:1.4}
+.pi-out{font-family:var(--mono);font-weight:700;color:var(--steel)}
+.pi-out.bad{color:var(--ng)}
+/* photos */
+.photo-drop{border:2px dashed var(--pb);border-radius:9px;padding:18px 14px;text-align:center;cursor:pointer;background:var(--sec-hdr-bg);margin-bottom:12px}
+.photo-drop:hover{border-color:var(--sl);background:var(--sec-hdr-bg-h)}
+.photo-drop-ico{font-size:24px}.photo-drop-txt{color:var(--t3);font-size:12.5px}.photo-drop-txt strong{color:var(--steel)}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:11px}
+.photo-item{border:1px solid var(--pb);border-radius:9px;background:var(--field-bg);overflow:hidden}
+.photo-img-wrap{background:var(--photo-wrap-bg);display:flex;align-items:center;justify-content:center;height:140px}
+.photo-img-wrap img{max-width:100%;max-height:140px;object-fit:contain}
+.photo-ctrl{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px 7px;border-top:1px solid var(--pb)}
+.p-btn{border:1.5px solid var(--pb);background:var(--p-btn-bg);color:var(--steel);border-radius:5px;padding:3px 7px;font-size:11px;font-weight:600;cursor:pointer}
+.p-btn:hover{background:var(--p-btn-h)}.p-btn.del{border-color:var(--ng-bd);background:var(--ng-bg);color:var(--ng)}
+.p-sz{font-size:10px;color:var(--t3);font-family:var(--mono);margin-left:auto}
+.photo-cap{width:100%;border:none;border-top:1px solid var(--pb);padding:6px 8px;font-size:12px;background:transparent;color:var(--ink)}
+.photo-cap:focus{outline:none;background:var(--field-focus-bg)}
+.photo-empty{color:var(--t3);font-size:12px;text-align:center;padding:8px}
+.sw2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;width:100%;height:100px;display:block;cursor:crosshair;touch-action:none}
+.sttl{font-family:var(--raj);font-weight:600;font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--steel);margin-bottom:6px}
+.notice{padding:9px 13px;border-radius:6px;font-size:12.5px;display:none;margin-top:10px}
+.notice.ok{background:var(--ok-bg);border:1px solid var(--ok-bd);color:var(--ok);display:block}
+.notice.err{background:var(--ng-bg);border:1px solid var(--ng-bd);color:var(--ng);display:block}
+.notice.info{background:var(--info-bg);border:1px solid var(--info-bd);color:var(--info-tx);display:block}
+.autosave-ind{position:fixed;right:14px;bottom:14px;background:var(--steel);color:var(--panel-solid);font-size:11px;font-family:var(--mono);
+  padding:6px 12px;border-radius:20px;opacity:0;transform:translateY(8px);transition:all .3s;z-index:90;pointer-events:none}
+.autosave-ind.show{opacity:1;transform:translateY(0)}
+.autosave-ind.warn{background:var(--warn)}
+.pd-help{background:var(--pd-bg);border:1px solid var(--pd-bd);border-radius:8px;padding:12px 14px;font-size:11.5px;line-height:1.6;color:var(--pd-tx);margin-top:10px}
+.pd-help b{color:var(--pd-b)}
+@media(max-width:720px){.sw2{grid-template-columns:1fr}.ph h1{font-size:24px}.stats{margin-left:0;width:100%}}
+@media print{.topbar,.tr,.action-row,#pdf-modal-overlay,.autosave-ind{display:none!important}body{background:#fff;color:#000}.sec-body{display:block!important}}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <span class="tl">PLTU</span><div class="tsep"></div>
+  <span class="tsub">WITNESS PLAN — RECONDITION / REWINDING MOTOR</span>
+  <div class="tr">
+    <a class="btn-back" href="index.html">&#8592; Portal</a>
+    <span class="clock" id="clock">--:--:--</span><div class="tsep"></div>
+    <button class="theme-btn" id="theme-btn" title="Ganti tema (light / dark)" onclick="cycleTheme()">🌙</button>
+    <button class="btn bo bsm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn br bsm" onclick="openPdfModal()">📥 PDF</button>
+    <button class="btn bg bsm" onclick="submitToDb()">🗄️ Submit DB</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="ph">
+    <div><div class="sub">Vendor Workshop Inspection</div><div><h1>WITNESS <span>TEST</span> MOTOR</h1></div></div>
+    <span class="badge">RECONDITION / REWINDING</span>
+    <div class="stats">
+      <div class="sc t">Item <span id="cnt-t">0</span></div>
+      <div class="sc ok">OK <span id="cnt-ok">0</span></div>
+      <div class="sc ng">NG <span id="cnt-ng">0</span></div>
+    </div>
+  </div>
+
+  <div style="padding:0 2px 12px">
+    <button class="btn bo bsm" onclick="openLoadMerge()">📥 Pilih &amp; Gabung Data dari Database</button>
+    <span style="font-size:11px;color:var(--t3);margin-left:6px">Ambil / gabung witness test sebelumnya untuk motor yang sama.</span>
+  </div>
+
+  <!-- A. WO & MOTOR DATA + INSPEKSI AWAL -->
+  <div class="panel open" id="p-a">
+    <div class="sec-hdr" onclick="toggleSec('p-a')"><span class="sec-ico">📋</span><span class="sec-t">A. Data WO, Motor &amp; Inspeksi Awal</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-body">
+      <div class="subttl">Work Order &amp; Inspektor</div>
+      <div class="grid">
+        <div class="mf"><label>Work Order No.</label><input type="text" id="wo-no" placeholder="WO-2025-XXXX"></div>
+        <div class="mf"><label>Tanggal Inspeksi</label><input type="date" id="wo-date"></div>
+        <div class="mf"><label>Unit</label><select id="unit-sel"><option>7</option><option>8</option><option>Common</option></select></div>
+        <div class="mf"><label>Vendor / Workshop</label><input type="text" id="vendor" placeholder="Nama vendor / bengkel"></div>
+        <div class="mf"><label>Lokasi Test</label><input type="text" id="test-loc" placeholder="Kota / lokasi workshop"></div>
+        <div class="mf"><label>Inspection By</label><input type="text" id="checked-by" placeholder="Nama inspektor POMI"></div>
+        <div class="mf"><label>NIK</label><input type="text" id="nik" placeholder="NIK-XXXXX"></div>
+        <div class="mf"><label>Reviewed By</label><input type="text" id="reviewed-by" placeholder="Supervisor"></div>
+        <div class="mf"><label>Shift</label><select id="shift"><option>Normal Hours</option><option>Shift 1</option><option>Shift 2</option><option>Shift 3</option></select></div>
+        <div class="mf"><label>Test Plan / Tanggal Test</label><input type="text" id="test-plan" placeholder="cth. Test Plan 12-13 Juni 2025"></div>
+      </div>
+
+      <div class="subttl">Basic Motor Data</div>
+      <div class="grid">
+        <div class="mf"><label>Asset Name / Tag</label><input type="text" id="asset-tag" placeholder="cth. 7BG-FAN-500A"></div>
+        <div class="mf"><label>Manufacture</label><input type="text" id="manuf" placeholder="cth. TOSHIBA 8 POLE"></div>
+        <div class="mf"><label>Rated Voltage (V)</label><input type="text" id="rv" class="num" placeholder="13200"></div>
+        <div class="mf"><label>Rated Power</label><input type="text" id="rp" class="num" placeholder="1000 HP / 746 kW"></div>
+        <div class="mf"><label>Full Load Ampere (A)</label><input type="text" id="fla" class="num" placeholder="392"></div>
+        <div class="mf"><label>Speed (RPM)</label><input type="text" id="rpm" class="num" placeholder="740"></div>
+        <div class="mf"><label>Service Factor</label><input type="text" id="sf" class="num" placeholder="1.15"></div>
+        <div class="mf"><label>Insulation Class</label><input type="text" id="ins-cls" placeholder="F"></div>
+        <div class="mf"><label>Frame Size</label><input type="text" id="frame" placeholder="3509"></div>
+        <div class="mf"><label>Serial Number</label><input type="text" id="serial" placeholder="9510165"></div>
+        <div class="mf"><label>Weight (lbs / kg)</label><input type="text" id="wt" placeholder="—"></div>
+        <div class="mf"><label>Mounting</label><select id="mount"><option value="">—</option><option>Horizontal</option><option>Vertical</option></select></div>
+        <div class="mf"><label>Bearing Type DE</label><input type="text" id="brg-de" placeholder="—"></div>
+        <div class="mf"><label>Bearing Type NDE</label><input type="text" id="brg-nde" placeholder="—"></div>
+      </div>
+
+      <div class="subttl">Inspeksi</div>
+      <div class="tbl-wrap"><table class="ct"><thead><tr>
+        <th style="width:26px">No</th><th>Check Item / Reference</th><th>Acceptance Criteria</th>
+        <th class="ctr" style="width:118px">Result</th><th style="min-width:170px">Remark</th>
+      </tr></thead><tbody id="tb-insp"></tbody></table></div>
+
+      <div class="subttl">Heater Motor Measurement</div>
+      <div class="grid">
+        <div class="mf"><label>Type Heater</label><input type="text" id="ht-type" placeholder="Flat belt / …"></div>
+        <div class="mf"><label>Resistance Total (Ω)</label><input type="text" id="ht-r" class="num"></div>
+        <div class="mf"><label>Current (A)</label><input type="text" id="ht-i" class="num"></div>
+        <div class="mf"><label>IR Heater (GΩ)</label><input type="text" id="ht-ir" class="num"></div>
+        <div class="mf"><label>Raise Temp DE-Side (°C)</label><input type="text" id="ht-de" class="num"></div>
+        <div class="mf"><label>Raise Temp NDE-Side (°C)</label><input type="text" id="ht-nde" class="num"></div>
+      </div>
+      <div class="hint">RTD winding / phase temperature — nilai °C tiap titik (nilai Ω PT100 mentah di lampiran).</div>
+      <div class="tbl-wrap"><table class="ct" id="rtd-heat"></table></div>
+    </div>
+  </div>
+
+  <!-- B. STATOR WINDING RESISTANCE & INSULATION -->
+  <div class="panel" id="p-b">
+    <div class="sec-hdr" onclick="toggleSec('p-b')"><span class="sec-ico">⚡</span><span class="sec-t">B. Stator Winding Resistance &amp; Insulation Test</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-body">
+      <div class="subttl">Winding Resistance <span style="font-weight:400;text-transform:none;color:var(--t3)">— IEEE 62.2 · unbalance ≤ 1% mean</span></div>
+      <div class="grid">
+        <div class="mf"><label>T1 – T4 (mΩ)</label><input type="text" id="wr-14" class="num" oninput="calcUnbalance()"></div>
+        <div class="mf"><label>T2 – T5 (mΩ)</label><input type="text" id="wr-25" class="num" oninput="calcUnbalance()"></div>
+        <div class="mf"><label>T3 – T6 (mΩ)</label><input type="text" id="wr-36" class="num" oninput="calcUnbalance()"></div>
+        <div class="mf"><label>Max Unbalance (%)</label><input type="text" id="wr-unb" class="num" readonly style="background:#eef2ef"></div>
+        <div class="mf full"><label>Hasil Winding Resistance</label><div id="tog-wr" class="rc" style="justify-content:flex-start"></div></div>
+      </div>
+
+      <div class="subttl">Insulation Resistance / Polarization Index <span style="font-weight:400;text-transform:none;color:var(--t3)">— IEEE 43-2000 · IR &gt; 100 MΩ · PI ≥ 2.0</span></div>
+      <div class="grid"><div class="mf"><label>Test Voltage (V-dc)</label><input type="text" id="ir-v" class="num" placeholder="cth. 5000"></div>
+        <div class="mf"><label>Ambient / Winding Temp (°C)</label><input type="text" id="ir-temp" class="num"></div></div>
+      <div class="tbl-wrap"><table class="ct mtx" id="mtx-stator"></table></div>
+      <button class="btn bo bsm" style="margin-top:6px" onclick="calcPI('stator')">🧮 Hitung PI / DAR</button>
+      <div class="grid" style="margin-top:10px">
+        <div class="mf full"><label>Hasil IR / PI</label><div id="tog-ir" class="rc" style="justify-content:flex-start"></div></div>
+        <div class="mf full"><label>Remark</label><textarea id="rmk-ir" placeholder="Catatan IR/PI…"></textarea></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- C. SURGE & CORONA -->
+  <div class="panel" id="p-c">
+    <div class="sec-hdr" onclick="toggleSec('p-c')"><span class="sec-ico">🌊</span><span class="sec-t">C. Surge Comparison &amp; Corona Test</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-body">
+      <div class="grid">
+        <div class="mf full"><label>Surge Comparison — pola gelombang <span style="text-transform:none;font-weight:400;color:var(--t3)">(EASA 100 · single = no fault, multiple = anomaly)</span></label><div id="tog-surge" class="rc" style="justify-content:flex-start"></div></div>
+        <div class="mf"><label>Applied Voltage (kV-Ac)</label><input type="text" id="sc-v" class="num"></div>
+        <div class="mf full"><label>Remark Surge</label><textarea id="rmk-surge" placeholder="Catatan surge test…"></textarea></div>
+      </div>
+      <div class="subttl">Corona Count During Test <span style="font-weight:400;text-transform:none;color:var(--t3)">— ASTM D1868 · L1 safe 0–1000 · L2 caution 1001–5000 · L3 warning 5001–10000 · L4 critical &gt; 10000</span></div>
+      <div class="tbl-wrap"><table class="ct"><thead><tr>
+        <th>Voltage (kV-Ac)</th><th class="ctr">T1–T2 DE</th><th class="ctr">T1–T2 NDE</th><th class="ctr">T2–T3 DE</th><th class="ctr">T2–T3 NDE</th><th class="ctr">T1–T3 DE</th><th class="ctr">T1–T3 NDE</th>
+      </tr></thead><tbody id="tb-corona-surge"></tbody></table></div>
+      <div class="grid" style="margin-top:8px"><div class="mf full"><label>Hasil Corona (surge)</label><div id="tog-csurge" class="rc" style="justify-content:flex-start"></div></div></div>
+    </div>
+  </div>
+
+  <!-- D. TAN DELTA & PARTIAL DISCHARGE -->
+  <div class="panel" id="p-d">
+    <div class="sec-hdr" onclick="toggleSec('p-d')"><span class="sec-ico">📉</span><span class="sec-t">D. Tan Delta &amp; Partial Discharge</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-body">
+      <div class="subttl">Partial Discharge <span style="font-weight:400;text-transform:none;color:var(--t3)">— IEC 60034-27 / IEEE 1434 · Good &lt; 1 nC · Medium &lt; 10 nC · Bad &gt; 20 nC</span></div>
+      <div class="grid">
+        <div class="mf"><label>Qmax / PDmax (nC)</label><input type="text" id="pd-max" class="num" oninput="autoPd()"></div>
+        <div class="mf"><label>+QM</label><input type="text" id="pd-qp" class="num"></div>
+        <div class="mf"><label>−QM</label><input type="text" id="pd-qn" class="num"></div>
+        <div class="mf full"><label>Hasil PD</label><div id="tog-pd" class="rc" style="justify-content:flex-start"></div></div>
+      </div>
+      <div class="subttl">Tan Delta <span style="font-weight:400;text-transform:none;color:var(--t3)">— IEEE 286-2000 · @0.2Un ≤ 40×10⁻³ · Δtanδ ≤ 5×10⁻³ · avg increment ≤ 2.5×10⁻³</span></div>
+      <div class="grid">
+        <div class="mf"><label>Tan Delta @ 0.2Un (×10⁻³)</label><input type="text" id="td-02" class="num"></div>
+        <div class="mf"><label>Δ Tan Delta (×10⁻³)</label><input type="text" id="td-delta" class="num"></div>
+        <div class="mf"><label>Avg Increment (×10⁻³)</label><input type="text" id="td-avg" class="num"></div>
+        <div class="mf full"><label>Hasil Tan Delta</label><div id="tog-td" class="rc" style="justify-content:flex-start"></div></div>
+      </div>
+      <div class="subttl">Corona Count During TD/PD Test</div>
+      <div class="tbl-wrap"><table class="ct"><thead><tr>
+        <th>Voltage (kV)</th><th class="ctr">Ph-U DE</th><th class="ctr">Ph-U NDE</th><th class="ctr">Ph-V DE</th><th class="ctr">Ph-V NDE</th><th class="ctr">Ph-W DE</th><th class="ctr">Ph-W NDE</th><th class="ctr">Ph-UVW DE</th><th class="ctr">Ph-UVW NDE</th>
+      </tr></thead><tbody id="tb-corona-td"></tbody></table></div>
+      <div class="grid" style="margin-top:8px"><div class="mf full"><label>Remark TD / PD</label><textarea id="rmk-tdpd" placeholder="Catatan / trending vs data sebelumnya…"></textarea></div></div>
+      <details class="pd-help"><summary style="cursor:pointer;font-weight:700;color:#5b3d78">📖 Panduan Interpretasi Partial Discharge</summary>
+        <p style="margin-top:8px"><b>QM</b> = nilai peak magnitude; makin besar QM makin besar void di isolasi (udara terjebak / contaminant).</p>
+        <p><b>Symptom umum:</b></p>
+        <p>1. <b>No polarity predominance</b> (+QM ≈ −QM) → internal void, thermal deterioration, poor impregnation.</p>
+        <p>2. <b>Positive polarity predominance</b> (+QM &gt; −QM) → discharge di permukaan coil, loose winding, deterioration voltage stress coating.</p>
+        <p>3. <b>Negative polarity predominance</b> (+QM &lt; −QM) → discharge dekat konduktor tembaga, load cycling, overheating void dekat tembaga (monitoring saja).</p>
+        <p>4. <b>Phase shifted</b> (PD bergerak ±30/60°) → indikasi phase-to-phase PD.</p>
+        <p>PD paling sering muncul di sudut ~45° &amp; ~225° → phase-to-ground discharge antara winding dan core.</p>
+      </details>
+    </div>
+  </div>
+
+  <!-- E. STATOR HIGH POTENTIAL TEST -->
+  <div class="panel" id="p-e">
+    <div class="sec-hdr" onclick="toggleSec('p-e')"><span class="sec-ico">⚠️</span><span class="sec-t">E. Stator High Potential Test</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-body">
+      <div class="hint">IEEE 112 / NEMA MG1 · disarankan level test dibatasi 85% untuk repeated hipot · semua winding harus withstand tanpa kerusakan.</div>
+      <div class="grid">
+        <div class="mf"><label>Ambient Temp (°C)</label><input type="text" id="hp-amb" class="num"></div>
+        <div class="mf"><label>Humidity (%)</label><input type="text" id="hp-hum" class="num"></div>
+        <div class="mf"><label>Winding Temp (°C)</label><input type="text" id="hp-wtemp" class="num"></div>
+        <div class="mf"><label>Rated Voltage HI-POT (kV-dc)</label><input type="text" id="hp-rated" class="num"></div>
+        <div class="mf"><label>Test Level (%)</label><input type="text" id="hp-level" class="num" placeholder="55 / 85"></div>
+        <div class="mf"><label>Applied Voltage (kV-dc)</label><input type="text" id="hp-applied" class="num"></div>
+      </div>
+      <div class="subttl">Resistance Winding Motor (after Hi-Pot)</div>
+      <div class="grid">
+        <div class="mf"><label>T1 – T4 (mΩ)</label><input type="text" id="hp-wr14" class="num"></div>
+        <div class="mf"><label>T2 – T5 (mΩ)</label><input type="text" id="hp-wr25" class="num"></div>
+        <div class="mf"><label>T3 – T6 (mΩ)</label><input type="text" id="hp-wr36" class="num"></div>
+      </div>
+      <div class="subttl">IR / PI Matrix (Hi-Pot)</div>
+      <div class="tbl-wrap"><table class="ct mtx" id="mtx-hipot"></table></div>
+      <button class="btn bo bsm" style="margin-top:6px" onclick="calcPI('hipot')">🧮 Hitung PI / DAR</button>
+      <div class="subttl">Corona Count Hi-Pot dc</div>
+      <div class="tbl-wrap"><table class="ct"><thead><tr>
+        <th>Terminal</th><th class="ctr">Leak Current (µA)</th><th class="ctr">Corona Count</th><th class="ctr">Result</th>
+      </tr></thead><tbody id="tb-corona-hp"></tbody></table></div>
+      <div class="subttl">Insulation Resistance After Hi-Pot <span style="font-weight:400;text-transform:none;color:var(--t3)">(GΩ · 5000 V-dc 1 menit)</span></div>
+      <div class="grid">
+        <div class="mf"><label>T1 – T2T3G</label><input type="text" id="hp-ir1" class="num"></div>
+        <div class="mf"><label>T2 – T3T1G</label><input type="text" id="hp-ir2" class="num"></div>
+        <div class="mf"><label>T3 – T1T2G</label><input type="text" id="hp-ir3" class="num"></div>
+        <div class="mf"><label>T1T2T3 – G</label><input type="text" id="hp-ir4" class="num"></div>
+      </div>
+      <div class="hint">Winding / phase temperature setelah Hi-Pot — °C tiap titik.</div>
+      <div class="tbl-wrap"><table class="ct" id="rtd-hipot"></table></div>
+      <div class="grid" style="margin-top:10px">
+        <div class="mf full"><label>Hasil Hi-Pot Test</label><div id="tog-hp" class="rc" style="justify-content:flex-start"></div></div>
+        <div class="mf full"><label>Remark Hi-Pot</label><textarea id="rmk-hp" placeholder="Catatan hipot…"></textarea></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- F. MECHANICAL INSPECTION -->
+  <div class="panel" id="p-f">
+    <div class="sec-hdr" onclick="toggleSec('p-f')"><span class="sec-ico">🔧</span><span class="sec-t">F. Mechanical Inspection</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-body">
+      <div class="tbl-wrap"><table class="ct"><thead><tr>
+        <th style="width:26px">No</th><th>Check Item</th><th>Criteria</th><th class="ctr" style="width:118px">Result</th><th style="min-width:150px">Value / Remark</th>
+      </tr></thead><tbody id="tb-mech"></tbody></table></div>
+      <div class="subttl">Bearing Clearance &amp; Air Gap</div>
+      <div class="grid">
+        <div class="mf"><label>Bearing Clearance DE (mm)</label><input type="text" id="bc-de" class="num"></div>
+        <div class="mf"><label>Bearing Clearance NDE (mm)</label><input type="text" id="bc-nde" class="num"></div>
+        <div class="mf"><label>Air Gap — 4 titik (mm)</label><input type="text" id="airgap" placeholder="2 / 1.9 / 1.95 / 1.95"></div>
+        <div class="mf"><label>Slave Bearing Contact Gap (mm)</label><input type="text" id="slave-gap" class="num"></div>
+      </div>
+      <div class="hint">Kriteria clearance: min 0.001 × Ø shaft · max 0.002 × Ø shaft.</div>
+    </div>
+  </div>
+
+  <!-- G. UNLOAD TEST -->
+  <div class="panel" id="p-g">
+    <div class="sec-hdr" onclick="toggleSec('p-g')"><span class="sec-ico">🌀</span><span class="sec-t">G. Unload Test</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-body">
+      <div class="subttl">Recording</div>
+      <div class="grid">
+        <div class="mf"><label>Voltage (Vac)</label><input type="text" id="ul-v" class="num"></div>
+        <div class="mf"><label>Current 3φ (A)</label><input type="text" id="ul-i" placeholder="10.2 / 10.2 / 10.1"></div>
+        <div class="mf"><label>RPM</label><input type="text" id="ul-rpm" class="num"></div>
+        <div class="mf"><label>Durasi Test (jam)</label><input type="text" id="ul-dur" class="num"></div>
+        <div class="mf"><label>Air Gap DE (mm)</label><input type="text" id="ul-ag-de" class="num"></div>
+        <div class="mf"><label>Air Gap NDE (mm)</label><input type="text" id="ul-ag-nde" class="num"></div>
+        <div class="mf"><label>Rotasi</label><select id="ul-rot"><option value="">—</option><option>CW</option><option>CCW</option></select></div>
+        <div class="mf"><label>Air Flow Suction</label><input type="text" id="ul-af-s" placeholder="0.5 – 1.3"></div>
+        <div class="mf"><label>Air Flow Discharge</label><input type="text" id="ul-af-d" placeholder="1.6 – 2.3"></div>
+        <div class="mf full"><label>Hasil Air Flow</label><div id="tog-airflow" class="rc" style="justify-content:flex-start"></div></div>
+      </div>
+      <div class="subttl">Vibration (mm/s)</div>
+      <div class="grid">
+        <div class="mf"><label>IB – Horizontal</label><input type="text" id="vib-ibh" class="num"></div>
+        <div class="mf"><label>IB – Vertical</label><input type="text" id="vib-ibv" class="num"></div>
+        <div class="mf"><label>IB – Axial</label><input type="text" id="vib-iba" class="num"></div>
+        <div class="mf"><label>OB – Horizontal</label><input type="text" id="vib-obh" class="num"></div>
+        <div class="mf"><label>OB – Vertical</label><input type="text" id="vib-obv" class="num"></div>
+        <div class="mf"><label>OB – Axial</label><input type="text" id="vib-oba" class="num"></div>
+      </div>
+      <div class="subttl">Winding Temperature (°C) — per interval</div>
+      <div class="tbl-wrap"><table class="ct" id="ul-wtemp"></table></div>
+      <div class="subttl">Bearing Temperature (°C) — per interval</div>
+      <div class="tbl-wrap"><table class="ct" id="ul-btemp"></table></div>
+      <div class="grid" style="margin-top:10px"><div class="mf full"><label>Remark Unload Test</label><textarea id="rmk-ul" placeholder="Catatan unload test…"></textarea></div></div>
+    </div>
+  </div>
+
+  <!-- H. SOLO RUN -->
+  <div class="panel" id="p-h">
+    <div class="sec-hdr" onclick="toggleSec('p-h')"><span class="sec-ico">▶️</span><span class="sec-t">H. Solo Run</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-body">
+      <div class="subttl">Final Visual &amp; Physical Check</div>
+      <div class="tbl-wrap"><table class="ct"><thead><tr>
+        <th style="width:26px">No</th><th>Check Item</th><th>Criteria</th><th class="ctr" style="width:118px">Result</th><th style="min-width:150px">Remark</th>
+      </tr></thead><tbody id="tb-solo-visual"></tbody></table></div>
+
+      <div class="subttl">Electrical Test Recap</div>
+      <div class="grid">
+        <div class="mf"><label>Stator R T1-T2 (Ω)</label><input type="text" id="sr-t12" class="num"></div>
+        <div class="mf"><label>Stator R T2-T3 (Ω)</label><input type="text" id="sr-t23" class="num"></div>
+        <div class="mf"><label>Stator R T3-T1 (Ω)</label><input type="text" id="sr-t31" class="num"></div>
+        <div class="mf"><label>IR T1T2T3-G @ 1" (MΩ)</label><input type="text" id="sr-ir1" class="num"></div>
+        <div class="mf"><label>IR T1T2T3-G @ 10" (MΩ)</label><input type="text" id="sr-ir10" class="num"></div>
+        <div class="mf"><label>PI</label><input type="text" id="sr-pi" class="num"></div>
+        <div class="mf"><label>RTD type</label><input type="text" id="sr-rtdtype" placeholder="PT100"></div>
+        <div class="mf"><label>Heater Resistance (Ω)</label><input type="text" id="sr-htr" class="num"></div>
+      </div>
+      <div class="hint">RTD 1-5 (Ω): RTD 1,2,3 winding · RTD 4 NDE bearing · RTD 5 DE bearing.</div>
+      <div class="grid">
+        <div class="mf"><label>RTD 1 (Ω)</label><input type="text" id="sr-rtd1" class="num"></div>
+        <div class="mf"><label>RTD 2 (Ω)</label><input type="text" id="sr-rtd2" class="num"></div>
+        <div class="mf"><label>RTD 3 (Ω)</label><input type="text" id="sr-rtd3" class="num"></div>
+        <div class="mf"><label>RTD 4 (Ω)</label><input type="text" id="sr-rtd4" class="num"></div>
+        <div class="mf"><label>RTD 5 (Ω)</label><input type="text" id="sr-rtd5" class="num"></div>
+      </div>
+
+      <div class="subttl">Local Monitoring — Temperature &amp; Air Flow (per interval)</div>
+      <div class="tbl-wrap"><table class="ct" id="solo-local"></table></div>
+
+      <div class="subttl">DCS / MPR Monitoring (per interval)</div>
+      <div class="grid">
+        <div class="mf"><label>Voltage VAB (V)</label><input type="text" id="dcs-vab" class="num"></div>
+        <div class="mf"><label>Voltage VBC (V)</label><input type="text" id="dcs-vbc" class="num"></div>
+        <div class="mf"><label>Voltage VAC (V)</label><input type="text" id="dcs-vac" class="num"></div>
+        <div class="mf"><label>Voltage Unbalance (%)</label><input type="text" id="dcs-vunb" class="num"></div>
+        <div class="mf"><label>Power (kW)</label><input type="text" id="dcs-kw" class="num"></div>
+        <div class="mf"><label>Power Factor</label><input type="text" id="dcs-pf" class="num"></div>
+        <div class="mf"><label>Vibration Solo Run</label><input type="text" id="dcs-vib" placeholder="max mm/s"></div>
+      </div>
+      <div class="tbl-wrap"><table class="ct" id="solo-dcs"></table></div>
+      <div class="grid" style="margin-top:10px">
+        <div class="mf full"><label>Hasil Solo Run</label><div id="tog-solo" class="rc" style="justify-content:flex-start"></div></div>
+        <div class="mf full"><label>Remark Solo Run</label><textarea id="rmk-solo" placeholder="Catatan solo run…"></textarea></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- I. PHOTOS + KESIMPULAN -->
+  <div class="panel open" id="p-i">
+    <div class="sec-hdr" onclick="toggleSec('p-i')"><span class="sec-ico">📷</span><span class="sec-t">I. Foto Evidence, Kesimpulan &amp; Tanda Tangan</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-body">
+      <div class="subttl">Foto Evidence <span id="photo-cnt" style="font-family:var(--mono);font-weight:400;text-transform:none;color:var(--t3)">0 foto</span></div>
+      <div class="photo-drop" onclick="pickPhotos(this)">
+        <div class="photo-drop-ico">📷</div>
+        <div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong><br><small style="font-size:11px">Kamera / galeri · bisa banyak · crop &amp; ukuran cetak diatur setelah dipilih</small></div>
+      </div>
+      <div class="photo-grid" id="photo-grid"></div>
+
+      <div class="subttl">Kesimpulan</div>
+      <div class="grid">
+        <div class="mf"><label>Overall Condition</label>
+          <select id="overall"><option>✅ ACCEPTED — Motor layak operasi</option><option>⚠️ ACCEPTED WITH NOTES — perlu monitoring</option><option>🔧 CONDITIONAL — perlu perbaikan sebelum operasi</option><option>🛑 REJECTED — tidak diterima</option></select></div>
+        <div class="mf"><label>Next Test / Follow-up</label><input type="date" id="next-test"></div>
+        <div class="mf full"><label>Findings / Temuan</label><textarea id="findings" rows="4" placeholder="Ringkasan temuan witness test…"></textarea></div>
+        <div class="mf full"><label>Recommendations / Corrective Actions</label><textarea id="recommendations" rows="4" placeholder="Rekomendasi & tindak lanjut…"></textarea></div>
+      </div>
+
+      <div class="subttl">Authorization &amp; Signatures</div>
+      <div class="sw2">
+        <div><div class="sttl">Inspected By — POMI</div>
+          <div class="mf" style="margin-bottom:6px"><label>Nama</label><input type="text" id="sig-insp-name" placeholder="Nama"></div>
+          <canvas class="sigc" id="sig-insp" width="600" height="100"></canvas>
+          <button class="btn bo bsm" style="margin-top:5px" onclick="clrSig('sig-insp')">✕ Clear</button></div>
+        <div><div class="sttl">Witnessed By — Vendor</div>
+          <div class="mf" style="margin-bottom:6px"><label>Nama</label><input type="text" id="sig-vendor-name" placeholder="Nama"></div>
+          <canvas class="sigc" id="sig-vendor" width="600" height="100"></canvas>
+          <button class="btn bo bsm" style="margin-top:5px" onclick="clrSig('sig-vendor')">✕ Clear</button></div>
+        <div><div class="sttl">Reviewed By — Supervisor</div>
+          <div class="mf" style="margin-bottom:6px"><label>Nama</label><input type="text" id="sig-super-name" placeholder="Nama"></div>
+          <canvas class="sigc" id="sig-super" width="600" height="100"></canvas>
+          <button class="btn bo bsm" style="margin-top:5px" onclick="clrSig('sig-super')">✕ Clear</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="action-row" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-top:12px">
+    <button class="btn bo" onclick="saveDraft()">💾 Save Draft</button>
+    <button class="btn bg" style="font-size:15px;padding:10px 22px" onclick="submitToDb()">&#128202; Submit to Database</button>
+    <button class="btn bp" onclick="resetForm()">🔄 Reset</button>
+    <button class="btn br" onclick="openPdfModal()">📥 Download PDF</button>
+  </div>
+  <div id="notice" class="notice"></div>
+</div>
+<div class="autosave-ind" id="autosave-indicator"></div>
+
+<!-- PDF sheet selector -->
+<div id="pdf-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(20,35,25,.6);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
+  <div style="background:#f0f5f1;border:1.5px solid #b4c8bc;border-radius:13px;width:440px;max-width:94vw;overflow:hidden">
+    <div style="background:linear-gradient(90deg,#28382f,#38564a);padding:14px 20px;color:#a8d4b8;font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:2px">PILIH SECTION PDF</div>
+    <div style="padding:14px 18px 6px"><div id="pdf-sheet-list" style="display:flex;flex-direction:column;gap:5px;max-height:340px;overflow-y:auto"></div></div>
+    <div style="padding:12px 18px 16px;display:flex;gap:9px;justify-content:flex-end;border-top:1px solid #dde3de">
+      <button onclick="closePdfModal()" class="btn bo bsm">Batal</button>
+      <button onclick="generatePDFSelected()" class="btn br bsm" style="min-width:130px">📥 Download</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const WITNESS_BG_URI = "data:image/jpeg;base64,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AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAGDixza3PyZkRwtYazWF6FIjTPHGoFVFV2gAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAj+7KSP7sgkAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACPHj2ViOFQIPmAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAApxPbKoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHKnIKzPAt2tyAuAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABycgjM8I2t91bStWtAFrCza4DOAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA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";
+const MW_TAG = 'MOTOR-WITNESS-TEST';
+const MW_NAME = 'Witness Plan Recondition/Rewinding Motor';
+const DRAFT_KEY = 'motor_witness_draft_v1';
+const DRAFT_PHOTOS_KEY = 'motor_witness_draft_v1_photos';
+
+setInterval(()=>document.getElementById('clock').textContent=new Date().toLocaleTimeString('id-ID'),1000);
+document.getElementById('clock').textContent=new Date().toLocaleTimeString('id-ID');
+
+/* ── theme (blue · light / dark) ── */
+function currentTheme(){
+  const set = document.documentElement.getAttribute('data-theme');
+  if(set==='light'||set==='dark') return set;
+  return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+function applyTheme(mode){
+  if(mode==='light'||mode==='dark') document.documentElement.setAttribute('data-theme',mode);
+  else document.documentElement.removeAttribute('data-theme');
+  try{ if(mode) localStorage.setItem('mw_theme',mode); else localStorage.removeItem('mw_theme'); }catch(e){}
+  const btn=document.getElementById('theme-btn');
+  if(btn) btn.textContent = currentTheme()==='dark' ? '☀️' : '🌙';
+}
+function cycleTheme(){ applyTheme(currentTheme()==='dark' ? 'light' : 'dark'); }
+applyTheme(localStorage.getItem('mw_theme') || null);
+if(window.matchMedia) window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{ if(!localStorage.getItem('mw_theme')) applyTheme(null); });
+
+function toggleSec(id){ document.getElementById(id).classList.toggle('open'); }
+
+/* ── value getters / toggle state ── */
+const ST = {};
+const gv = id => { const e=document.getElementById(id); return e ? String(e.value).trim() : ''; };
+const iv = id => gv(id) || '—';
+const tv = id => ST[id] || '—';
+function upStats(){
+  const vs=Object.values(ST).filter(Boolean);
+  const ok=vs.filter(v=>v==='OK').length, ng=vs.filter(v=>v==='NG').length;
+  document.getElementById('cnt-t').textContent=vs.length;
+  document.getElementById('cnt-ok').textContent=ok;
+  document.getElementById('cnt-ng').textContent=ng;
+  document.getElementById('cnt-ng').parentElement.style.opacity = ng ? 1 : .55;
+}
+function togHtml(id, withNa){
+  return `<button class="rb ok" data-id="${id}" data-v="OK" onclick="setTog('${id}','OK',this)">OK</button>`
+    + `<button class="rb ng" data-id="${id}" data-v="NG" onclick="setTog('${id}','NG',this)">NG</button>`
+    + (withNa!==false ? `<button class="rb na" data-id="${id}" data-v="N/A" onclick="setTog('${id}','N/A',this)">N/A</button>` : '');
+}
+function setTog(id,v,btn){
+  const was = btn.classList.contains('a');
+  btn.closest('.rc').querySelectorAll('.rb').forEach(b=>b.classList.remove('a'));
+  if(was){ delete ST[id]; } else { btn.classList.add('a'); ST[id]=v; }
+  upStats(); scheduleAutoSave();
+}
+function mountTog(hostId, id, withNa){
+  const h = document.getElementById(hostId); if(!h) return;
+  h.setAttribute('data-tog', id);
+  h.innerHTML = togHtml(id, withNa);
+}
+
+/* ── build inspection rows ── */
+const INSP = [
+  {no:'1', it:'Pre-inspection', ref:'Manufacture spec/manual, historian trending, last electrical & inspection test data', crit:'Reference data spec, trending, name plate, report tersedia'},
+  {sec:'2. Physical Check'},
+  {no:'2.1', it:'Body Motor', ref:'Approved Spec / NEMA MG1', crit:'Tidak ada defect, wear, dent, indikasi korosi'},
+  {no:'2.2', it:'Stator winding & Core', ref:'Approved Spec / NEMA MG1', crit:'Bersih, tidak ada discoloration / overheating / burnt mark'},
+  {no:'2.3', it:'Rotor', ref:'Approved Spec / NEMA MG1', crit:'Tidak ada dent / crack; cooling path bersih'},
+  {no:'2.4', it:'Bearing DE / NDE', ref:'Approved Spec', crit:'Tidak ada mechanical looseness; fit'},
+  {no:'2.5', it:'Air Box', ref:'Approved Spec', crit:'Tidak korosi, bersih; air filter dibersihkan'},
+  {no:'2.6', it:'Power Box', ref:'Approved Spec', crit:'Bersih, koneksi kencang, tidak ada discoloration'},
+  {no:'2.7', it:'Instrument Box (RTD & Heater)', ref:'Approved Spec', crit:'Terpasang, kondisi baik, fit'},
+  {sec:'3. Protection Device & Accessories'},
+  {no:'3.1', it:'Temperature Sensor', ref:'DIN / IEC 751', crit:'Sesuai approved spec\nNilai > 5 MΩ\nWithstand tanpa kerusakan'},
+  {no:'3.2', it:'Heater', ref:'EASA 100', crit:'Nilai > 5 MΩ\nWithstand tanpa kerusakan'},
+];
+const MECH = [
+  {no:'1', it:'Slave Bearing', crit:'Contact gap sesuai spec'},
+  {no:'2', it:'Bearing Housing DE / NDE', crit:'Tidak ada mechanical looseness; fit'},
+  {no:'3', it:'Labyrinth Seal & Oil Ring', crit:'Tidak ada looseness; fit'},
+  {no:'4', it:'Lubrication System', crit:'Oil rekomendasi, level normal (tengah sight glass), piping terpasang benar'},
+  {no:'5', it:'Coupling / Alignment', crit:'Sesuai toleransi manufacture'},
+];
+const SOLO_VIS = [
+  {no:'1', it:'Stator & Winding', crit:'Bersih, tidak ada dent/discoloration/overheating/burnt mark'},
+  {no:'2', it:'Stator Core & Laminations', crit:'Bersih, cooling path clear'},
+  {no:'3', it:'Wedges', crit:'Tidak loose, rapi, tidak ada dent'},
+  {no:'4', it:'Rotor', crit:'Tidak ada dent/crack, cooling path clear'},
+  {no:'5', it:'Bearing DE & NDE', crit:'Tidak ada mechanical looseness, fit'},
+  {no:'6', it:'Housing Bearing DE & NDE', crit:'Tidak ada looseness, fit'},
+  {no:'7', it:'Labyrinth Seal & Oil Ring', crit:'Tidak ada looseness, fit'},
+  {no:'8', it:'Lubrication System', crit:'Oil rekomendasi, level normal, pressure OK'},
+  {no:'9', it:'Air Box Motor', crit:'Tidak korosi, bersih, filter dibersihkan'},
+  {no:'10', it:'Motor Accessories (RTD, Vib Probe, Power Box, Diff CT, PD Sensor)', crit:'Terpasang, kondisi baik, fit'},
+];
+function inspRowHtml(r){
+  if(r.sec) return `<tr><td colspan="5" style="background:rgba(56,86,74,.08);font-family:var(--raj);font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--steel);padding:6px 8px">${r.sec}</td></tr>`;
+  const id='i_'+r.no.replace(/\./g,'_');
+  return `<tr>
+    <td class="tno">${r.no}</td>
+    <td class="tdesc">${r.it}${r.ref?`<span class="ref">Ref: ${r.ref}</span>`:''}</td>
+    <td class="tdesc"><span class="crit">${r.crit||'—'}</span></td>
+    <td><div class="rc" data-tog="${id}">${togHtml(id)}</div></td>
+    <td><input class="ti" id="rmk-${id}" placeholder="remark"></td>
+  </tr>`;
+}
+function mechRowHtml(r){
+  const id='m_'+r.no;
+  return `<tr><td class="tno">${r.no}</td><td class="tdesc">${r.it}</td><td class="tdesc"><span class="crit">${r.crit}</span></td>
+    <td><div class="rc" data-tog="${id}">${togHtml(id)}</div></td><td><input class="ti" id="rmk-${id}" placeholder="value / remark"></td></tr>`;
+}
+function soloRowHtml(r){
+  const id='sv_'+r.no;
+  return `<tr><td class="tno">${r.no}</td><td class="tdesc">${r.it}</td><td class="tdesc"><span class="crit">${r.crit}</span></td>
+    <td><div class="rc" data-tog="${id}">${togHtml(id)}</div></td><td><input class="ti" id="rmk-${id}" placeholder="remark"></td></tr>`;
+}
+document.getElementById('tb-insp').innerHTML = INSP.map(inspRowHtml).join('');
+document.getElementById('tb-mech').innerHTML = MECH.map(mechRowHtml).join('');
+document.getElementById('tb-solo-visual').innerHTML = SOLO_VIS.map(soloRowHtml).join('');
+
+/* ── RTD tables (T1..T18 deg C) ── */
+function buildRtd(tableId, prefix){
+  const t=document.getElementById(tableId); if(!t) return;
+  let h='<thead><tr>';
+  for(let g=0;g<3;g++) h+='<th class="ctr">Point</th><th class="ctr">°C</th>';
+  h+='</tr></thead><tbody>';
+  for(let row=0;row<6;row++){
+    h+='<tr>';
+    for(let g=0;g<3;g++){
+      const n=g*6+row+1;
+      h+=`<td class="tno ctr">T${n}</td><td><input class="ti" id="${prefix}${n}" style="text-align:center"></td>`;
+    }
+    h+='</tr>';
+  }
+  h+='</tbody>';
+  t.innerHTML=h;
+}
+buildRtd('rtd-heat','rtdh');
+buildRtd('rtd-hipot','rtdp');
+
+/* ── IR/PI matrix ── */
+const MTX_TIMES = [['15','s'],['30','s'],['45','s'],['1','min'],['2','min'],['3','min'],['4','min'],['5','min'],['6','min'],['7','min'],['8','min'],['9','min'],['10','min']];
+const MTX_COLS = [['a','T1–T2T3G'],['b','T2–T1T3G'],['c','T3–T1T2G'],['d','T1T2T3–G']];
+function buildMtx(tableId, prefix){
+  const t=document.getElementById(tableId); if(!t) return;
+  let h='<thead><tr><th>Parameter / Time</th>';
+  MTX_COLS.forEach(c=>h+=`<th class="ctr">${c[1]}<br><span style="font-weight:400;color:var(--t3)">GΩ</span></th>`);
+  h+='</tr></thead><tbody>';
+  MTX_TIMES.forEach(tm=>{
+    const key=tm[0]+tm[1];
+    h+=`<tr><td class="tno">${tm[0]} ${tm[1]}</td>`;
+    MTX_COLS.forEach(c=>h+=`<td><input class="ti" id="${prefix}_${c[0]}_${key}" style="text-align:center"></td>`);
+    h+='</tr>';
+  });
+  h+='<tr style="background:#eef2ef"><td class="tno" style="font-weight:700">DAR (60s/30s)</td>';
+  MTX_COLS.forEach(c=>h+=`<td class="ctr"><span class="pi-out" id="${prefix}_dar_${c[0]}">—</span></td>`);
+  h+='</tr><tr style="background:#eef2ef"><td class="tno" style="font-weight:700">PI (10m/1m)</td>';
+  MTX_COLS.forEach(c=>h+=`<td class="ctr"><span class="pi-out" id="${prefix}_pi_${c[0]}">—</span></td>`);
+  h+='</tr></tbody>';
+  t.innerHTML=h;
+}
+buildMtx('mtx-stator','stator');
+buildMtx('mtx-hipot','hipot');
+function mtxVal(prefix,col,tkey){ const e=document.getElementById(`${prefix}_${col}_${tkey}`); const n=parseFloat(e&&e.value); return isNaN(n)?null:n; }
+function calcPI(prefix){
+  MTX_COLS.forEach(c=>{
+    const r30=mtxVal(prefix,c[0],'30s'), r60=mtxVal(prefix,c[0],'1min'), r600=mtxVal(prefix,c[0],'10min');
+    const dEl=document.getElementById(`${prefix}_dar_${c[0]}`), pEl=document.getElementById(`${prefix}_pi_${c[0]}`);
+    if(r30 && r30>0 && r60){ dEl.textContent=(r60/r30).toFixed(2); dEl.classList.toggle('bad',(r60/r30)<1.25); } else dEl.textContent='—';
+    if(r60 && r60>0 && r600){ const pi=r600/r60; pEl.textContent=pi.toFixed(2); pEl.classList.toggle('bad',pi<2.0); } else pEl.textContent='—';
+  });
+  scheduleAutoSave();
+}
+function calcUnbalance(){
+  const a=parseFloat(gv('wr-14')), b=parseFloat(gv('wr-25')), c=parseFloat(gv('wr-36'));
+  const vs=[a,b,c].filter(x=>!isNaN(x));
+  const el=document.getElementById('wr-unb');
+  if(vs.length<2){ el.value=''; return; }
+  const mean=vs.reduce((s,x)=>s+x,0)/vs.length;
+  const maxDev=Math.max(...vs.map(x=>Math.abs(x-mean)));
+  el.value=(maxDev/mean*100).toFixed(2);
+}
+function autoPd(){
+  const n=parseFloat(gv('pd-max'));
+  if(isNaN(n)) return;
+  const host=document.getElementById('tog-pd');
+  const v = n<1 ? 'OK' : (n<=20 ? 'N/A' : 'NG');
+  const id = host.getAttribute('data-tog');
+  host.querySelectorAll('.rb').forEach(b=>b.classList.toggle('a', b.dataset.v===v));
+  ST[id]=v; upStats();
+}
+
+/* ── corona / interval tables ── */
+function fillCoronaSurge(){
+  const t=document.getElementById('tb-corona-surge'); let h='';
+  for(let r=0;r<3;r++){
+    h+=`<tr><td><input class="ti" id="csv_v${r}"></td>`;
+    ['t12de','t12nde','t23de','t23nde','t13de','t13nde'].forEach(k=>h+=`<td><input class="ti" style="text-align:center" id="csv_${k}${r}"></td>`);
+    h+='</tr>';
+  }
+  t.innerHTML=h;
+}
+function fillCoronaTd(){
+  const t=document.getElementById('tb-corona-td'); let h='';
+  for(let r=0;r<5;r++){
+    h+=`<tr><td><input class="ti" id="ctd_v${r}"></td>`;
+    ['ude','unde','vde','vnde','wde','wnde','uvwde','uvwnde'].forEach(k=>h+=`<td><input class="ti" style="text-align:center" id="ctd_${k}${r}"></td>`);
+    h+='</tr>';
+  }
+  t.innerHTML=h;
+}
+function fillCoronaHp(){
+  const t=document.getElementById('tb-corona-hp'); let h='';
+  [['T1 – T2T3G','1'],['T2 – T3T1G','2'],['T3 – T1T2G','3'],['T1T2T3 – G','4']].forEach(row=>{
+    h+=`<tr><td class="tdesc">${row[0]}</td><td><input class="ti" style="text-align:center" id="chp_lc${row[1]}"></td>`
+      +`<td><input class="ti" style="text-align:center" id="chp_cc${row[1]}"></td>`
+      +`<td><div class="rc" data-tog="chp_${row[1]}">${togHtml('chp_'+row[1])}</div></td></tr>`;
+  });
+  t.innerHTML=h;
+}
+fillCoronaSurge(); fillCoronaTd(); fillCoronaHp();
+
+const UL_INT = ["0'","15'","30'","45'","60'","75'"];
+function fillUlWinding(){
+  const t=document.getElementById('ul-wtemp'); let h='<thead><tr><th>Interval</th>';
+  for(let i=1;i<=10;i++) h+=`<th class="ctr">T${i}</th>`;
+  h+='</tr></thead><tbody>';
+  UL_INT.forEach((iv,r)=>{ h+=`<tr><td class="tno">${iv}</td>`; for(let i=1;i<=10;i++) h+=`<td><input class="ti" style="text-align:center" id="ulw_${r}_${i}"></td>`; h+='</tr>'; });
+  t.innerHTML=h+'</tbody>';
+}
+function fillUlBearing(){
+  const t=document.getElementById('ul-btemp'); let h='<thead><tr><th>Interval</th><th class="ctr">DE-1</th><th class="ctr">DE-2</th><th class="ctr">NDE-1</th><th class="ctr">NDE-2</th></tr></thead><tbody>';
+  UL_INT.forEach((iv,r)=>{ h+=`<tr><td class="tno">${iv}</td>`; ['de1','de2','nde1','nde2'].forEach(k=>h+=`<td><input class="ti" style="text-align:center" id="ulb_${r}_${k}"></td>`); h+='</tr>'; });
+  t.innerHTML=h+'</tbody>';
+}
+fillUlWinding(); fillUlBearing();
+
+const SOLO_INT = ['Initial',"10'","30'","45'","60'"];
+function fillSoloLocal(){
+  const t=document.getElementById('solo-local');
+  const rows=['Motor Body','NDE Bearing','DE Bearing','Motor Body (Thermal Image)','Outlet Duct','Air Flow'];
+  let h='<thead><tr><th>Parameter</th>';
+  SOLO_INT.forEach(i=>h+=`<th class="ctr">${i}</th>`);
+  h+='</tr></thead><tbody>';
+  rows.forEach((r,ri)=>{ h+=`<tr><td class="tdesc">${r}</td>`; SOLO_INT.forEach((_,ci)=>h+=`<td><input class="ti" style="text-align:center" id="slcl_${ri}_${ci}"></td>`); h+='</tr>'; });
+  t.innerHTML=h+'</tbody>';
+}
+function fillSoloDcs(){
+  const t=document.getElementById('solo-dcs');
+  const rows=[['Current Phase A (A)','ia'],['Current Phase B (A)','ib'],['Current Phase C (A)','ic'],['Unbalance Current (%)','unb'],['RTD 1 (°C)','r1'],['RTD 2 (°C)','r2'],['RTD 3 (°C)','r3'],['RTD 4 (°C)','r4'],['RTD 5 (°C)','r5']];
+  let h='<thead><tr><th>Parameter</th>';
+  SOLO_INT.forEach(i=>h+=`<th class="ctr">${i}</th>`);
+  h+='</tr></thead><tbody>';
+  rows.forEach(r=>{ h+=`<tr><td class="tdesc">${r[0]}</td>`; SOLO_INT.forEach((_,ci)=>h+=`<td><input class="ti" style="text-align:center" id="sldcs_${r[1]}_${ci}"></td>`); h+='</tr>'; });
+  t.innerHTML=h+'</tbody>';
+}
+fillSoloLocal(); fillSoloDcs();
+
+/* mount standalone toggles */
+[['tog-wr','wr_result'],['tog-ir','ir_result'],['tog-surge','surge_wave'],['tog-csurge','corona_surge'],
+ ['tog-pd','pd_result'],['tog-td','td_result'],['tog-hp','hp_result'],['tog-airflow','airflow_result'],
+ ['tog-solo','solo_result']].forEach(p=>mountTog(p[0],p[1]));
+
+/* ── signature pads ── */
+function initSig(id){
+  const c=document.getElementById(id); if(!c) return; const ctx=c.getContext('2d'); let dr=false;
+  const pos=e=>{const r=c.getBoundingClientRect();const sx=c.width/r.width,sy=c.height/r.height;const t=e.touches?e.touches[0]:e;return{x:(t.clientX-r.left)*sx,y:(t.clientY-r.top)*sy};};
+  const start=e=>{dr=true;const p=pos(e);ctx.beginPath();ctx.moveTo(p.x,p.y);};
+  const move=e=>{if(!dr)return;e.preventDefault?e.preventDefault():0;const p=pos(e);ctx.strokeStyle='#16241d';ctx.lineWidth=2;ctx.lineCap='round';ctx.lineTo(p.x,p.y);ctx.stroke();};
+  const end=()=>{dr=false;};
+  c.addEventListener('mousedown',start);c.addEventListener('mousemove',move);c.addEventListener('mouseup',end);c.addEventListener('mouseleave',end);
+  c.addEventListener('touchstart',start,{passive:false});c.addEventListener('touchmove',move,{passive:false});c.addEventListener('touchend',end);
+}
+function clrSig(id){const c=document.getElementById(id);c.getContext('2d').clearRect(0,0,c.width,c.height);}
+function sigDataUrl(id){const c=document.getElementById(id);const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;return d.some(v=>v)?c.toDataURL('image/png'):'';}
+['sig-insp','sig-vendor','sig-super'].forEach(initSig);
+
+/* ── evidence photos (PhotoKit free-count) ── */
+PhotoKit.configure({maxWcm:8.8,maxHcm:13,defaultWcm:8.8,defaultHcm:5.6});
+let PHOTOS = [];
+function pickPhotos(el){ PhotoKit.upload(el,{multiple:true},entry=>{ if(!entry)return; entry.caption=''; PHOTOS.push(entry); renderPhotos(); savePhotoDraft(); }); }
+function recropPhotoAt(i){ const cur=PHOTOS[i]; if(!cur)return; PhotoKit.recrop(cur,e=>{ if(!e)return; e.caption=cur.caption||''; PHOTOS[i]=e; renderPhotos(); savePhotoDraft(); }); }
+function rotatePhotoAt(i,deg){
+  const img=new Image();
+  img.onload=()=>{
+    const Wp=img.naturalWidth,Hp=img.naturalHeight, swap=((deg%360)+360)%360===90||((deg%360)+360)%360===270;
+    const cv=document.createElement('canvas'); cv.width=swap?Hp:Wp; cv.height=swap?Wp:Hp;
+    const ctx=cv.getContext('2d'); ctx.translate(cv.width/2,cv.height/2); ctx.rotate(deg*Math.PI/180); ctx.drawImage(img,-Wp/2,-Hp/2);
+    const p=PHOTOS[i]; p.src=cv.toDataURL('image/jpeg',0.92); p.dataUrl=p.src; p.w=cv.width; p.h=cv.height;
+    if(swap&&p.widthCm&&p.heightCm){ const t=p.widthCm; p.widthCm=p.heightCm; p.heightCm=t; }
+    renderPhotos(); savePhotoDraft();
+  };
+  img.src=PHOTOS[i].src;
+}
+function removePhotoAt(i){ if(!confirm('Hapus foto ini?'))return; PHOTOS.splice(i,1); renderPhotos(); savePhotoDraft(); }
+function renderPhotos(){
+  const grid=document.getElementById('photo-grid'); if(!grid)return;
+  document.getElementById('photo-cnt').textContent=PHOTOS.length+' foto';
+  if(!PHOTOS.length){ grid.innerHTML='<div class="photo-empty">Belum ada foto.</div>'; return; }
+  grid.innerHTML=PHOTOS.map((p,i)=>`
+    <div class="photo-item">
+      <div class="photo-img-wrap"><img src="${p.src}" alt="Foto ${i+1}"></div>
+      <div class="photo-ctrl">
+        <button class="p-btn" onclick="recropPhotoAt(${i})">&#9986; Crop</button>
+        <button class="p-btn" onclick="rotatePhotoAt(${i},-90)">&#8634;</button>
+        <button class="p-btn" onclick="rotatePhotoAt(${i},90)">&#8635;</button>
+        <button class="p-btn del" onclick="removePhotoAt(${i})">&#10005;</button>
+        <span class="p-sz">${p.widthCm?p.widthCm.toFixed(1)+'x'+p.heightCm.toFixed(1)+'cm':''}</span>
+      </div>
+      <input class="photo-cap" type="text" placeholder="Caption foto ${i+1}"
+        value="${(p.caption||'').replace(/"/g,'&quot;')}" oninput="PHOTOS[${i}].caption=this.value;savePhotoDraft()">
+    </div>`).join('');
+}
+function savePhotoDraft(){
+  try{ localStorage.setItem(DRAFT_PHOTOS_KEY, JSON.stringify(PHOTOS.map(p=>({src:p.src,dataUrl:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})))); }
+  catch(e){ note('⚠️ Draft tersimpan, tapi foto terlalu besar untuk localStorage.','err'); }
+}
+function loadPhotoDraft(){ try{ const raw=localStorage.getItem(DRAFT_PHOTOS_KEY); if(!raw)return; PHOTOS=JSON.parse(raw)||[]; renderPhotos(); }catch(e){} }
+
+// Review & Approval / Load-merge photo restore
+async function restorePhotosFromUrls(photoUrls, overwrite){
+  if(!photoUrls) return 0;
+  const all=[]; Object.keys(photoUrls).forEach(k=>{ if(Array.isArray(photoUrls[k])) all.push(...photoUrls[k]); });
+  if(!all.length) return 0;
+  if(!overwrite && PHOTOS.length) return 0;
+  const restored=[];
+  for(const entry of all){
+    if(!entry||!entry.url) continue;
+    try{ const d=await Storage.toDataUrl(entry.url); if(!d)continue;
+      restored.push({src:d,dataUrl:d,caption:entry.caption||'',w:entry.w,h:entry.h,widthCm:entry.widthCm,heightCm:entry.heightCm}); }
+    catch(e){ console.error('restore 1 foto gagal:',e); }
+  }
+  if(!restored.length) return 0;
+  PHOTOS = overwrite ? restored : PHOTOS.concat(restored);
+  renderPhotos(); savePhotoDraft();
+  return restored.length;
+}
+window.restorePhotosFromUrls = restorePhotosFromUrls;
+function buildApprovalPhotos(){
+  if(!PHOTOS.length) return null;
+  return { main: PHOTOS.map(p=>({src:p.src,caption:p.caption||'',w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})) };
+}
+
+/* ── notice ── */
+function note(msg,t){ const n=document.getElementById('notice'); n.textContent=msg; n.className='notice '+(t||'info'); setTimeout(()=>{ if(n.textContent===msg) n.className='notice'; },4000); }
+function showNote(msg,t){ note(msg,t); }
+
+/* ── draft (autosave: localStorage + Firestore) ── */
+const DRAFT_SEL = 'input:not(.photo-cap):not([type=file]),select,textarea';
+const CLOUD_DRAFT_COLL = 'checksheet_drafts';
+const CLOUD_DRAFT_ID_KEY = 'motor_witness_cloud_draft_id';
+let _autoTimer=null, _flashTimer=null;
+let _cloudTimer=null, _cloudBusy=false, _cloudEnabled=true, _cloudLastOk=0, _cloudWarned=false;
+
+function newDraftId(){
+  try{ if(window.crypto && crypto.randomUUID) return 'mw_'+crypto.randomUUID(); }catch(e){}
+  return 'mw_'+new Date().toISOString().replace(/[^0-9]/g,'')+'_'+String(performance.now()|0);
+}
+function cloudDraftId(){
+  let id=null; try{ id=localStorage.getItem(CLOUD_DRAFT_ID_KEY); }catch(e){}
+  if(!id){ id=newDraftId(); try{ localStorage.setItem(CLOUD_DRAFT_ID_KEY,id); }catch(e){} }
+  return id;
+}
+function collectDraftPayload(){
+  const d={};
+  document.querySelectorAll(DRAFT_SEL).forEach(el=>{ if(el.id) d['f_'+el.id]=el.value; });
+  d._st = Object.assign({}, ST);
+  return d;
+}
+function flashAutosave(state){
+  // state: 'local' | 'cloud' | 'localonly' | 'err'
+  const el=document.getElementById('autosave-indicator');
+  const t=new Date().toLocaleTimeString('id-ID');
+  if(state==='err'){ el.textContent='⚠️ Auto-save gagal'; el.className='autosave-ind show warn'; }
+  else if(state==='cloud'){ el.textContent='☁️ Tersimpan (lokal + database) '+t; el.className='autosave-ind show'; }
+  else if(state==='localonly'){ el.textContent='💾 Tersimpan lokal '+t+' · database nonaktif'; el.className='autosave-ind show warn'; }
+  else { el.textContent='💾 Tersimpan lokal '+t; el.className='autosave-ind show'; }
+  clearTimeout(_flashTimer); _flashTimer=setTimeout(()=>el.classList.remove('show'),2600);
+}
+function persistDraft(silent){
+  const d=collectDraftPayload(); d.__ts=Date.now();
+  try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }
+  catch(e){ if(!silent) note('❌ Gagal simpan draft lokal: '+e.message,'err'); return; }
+  savePhotoDraft();
+  if(silent) flashAutosave(_cloudEnabled ? 'local' : 'localonly'); else note('💾 Draft tersimpan.','ok');
+  if(_cloudEnabled) scheduleCloudSave();
+}
+function saveDraft(){ persistDraft(false); cloudDraftSave(true); }
+function autoSaveNow(){ persistDraft(true); }
+function scheduleAutoSave(){ clearTimeout(_autoTimer); _autoTimer=setTimeout(autoSaveNow,800); }
+function scheduleCloudSave(){ clearTimeout(_cloudTimer); _cloudTimer=setTimeout(()=>cloudDraftSave(true),4000); }
+
+const _TEXTISH = {text:1,number:1,date:1,time:1,tel:1,email:1,search:1,url:1,'':1};
+function draftHasContent(d){
+  if(Object.keys(d._st||{}).length) return true;
+  // Only real typed input counts. <select> always carries a default value, and
+  // load-merge-modal.js injects a checkbox (#lmm-overwrite-toggle) whose .value
+  // is "on" even unchecked — both would make a blank form look "dirty".
+  return Object.keys(d).some(k=>{
+    if(k.indexOf('f_')!==0) return false;
+    if(String(d[k]||'').trim()==='') return false;
+    const el=document.getElementById(k.slice(2));
+    if(!el) return false;
+    if(el.tagName==='TEXTAREA') return true;
+    return el.tagName==='INPUT' && _TEXTISH[el.type||''];
+  });
+}
+async function cloudDraftSave(silent){
+  if(!_cloudEnabled || _cloudBusy) return;
+  if(typeof db==='undefined' || !db) return;
+  const dataNow=collectDraftPayload();
+  if(!draftHasContent(dataNow)) return;   // don't create an empty cloud draft doc
+  _cloudBusy=true;
+  const payload={
+    kind:'motor-witness-test',
+    draftId: cloudDraftId(),
+    assetTag: (gv('asset-tag')||'').trim(),
+    woNumber: (gv('wo-no')||'').trim(),
+    checkedBy: (gv('checked-by')||'').trim(),
+    executionDate: (gv('wo-date')||'').trim(),
+    data: dataNow,
+    photoCount: PHOTOS.length,
+    updatedAt: new Date().toISOString(),
+    ua: navigator.userAgent.slice(0,120),
+  };
+  try{
+    await db.collection(CLOUD_DRAFT_COLL).doc(cloudDraftId()).set(payload);
+    _cloudLastOk=Date.now();
+    if(silent) flashAutosave('cloud');
+  }catch(e){
+    console.warn('cloud draft autosave gagal:', e && e.code, e && e.message);
+    // permission-denied / unavailable collection -> disable cloud drafts, keep localStorage
+    if(e && (e.code==='permission-denied' || e.code==='unauthenticated')){
+      _cloudEnabled=false;
+      if(!_cloudWarned){ _cloudWarned=true; note('ℹ️ Auto-save ke database nonaktif (koleksi checksheet_drafts belum diizinkan). Draft tetap tersimpan di perangkat ini.','info'); }
+      flashAutosave('localonly');
+    } else {
+      if(silent) flashAutosave('err');
+    }
+  }finally{ _cloudBusy=false; }
+}
+async function cloudDraftDelete(){
+  if(typeof db==='undefined' || !db) return;
+  try{ await db.collection(CLOUD_DRAFT_COLL).doc(cloudDraftId()).delete(); }catch(e){}
+  try{ localStorage.removeItem(CLOUD_DRAFT_ID_KEY); }catch(e){}
+}
+async function fetchCloudDraft(){
+  if(typeof db==='undefined' || !db) return null;
+  let id=null; try{ id=localStorage.getItem(CLOUD_DRAFT_ID_KEY); }catch(e){}
+  if(!id) return null;
+  try{ const doc=await db.collection(CLOUD_DRAFT_COLL).doc(id).get(); return doc.exists ? doc.data() : null; }
+  catch(e){ if(e && e.code==='permission-denied') _cloudEnabled=false; return null; }
+}
+
+function applyDraftData(d){
+  if(!d) return;
+  document.querySelectorAll(DRAFT_SEL).forEach(el=>{ if(el.id && d['f_'+el.id]!==undefined) el.value=d['f_'+el.id]; });
+  if(d._st){
+    Object.assign(ST, d._st);
+    Object.entries(ST).forEach(([id,v])=>{
+      document.querySelectorAll(`.rb[data-id="${id}"]`).forEach(b=>b.classList.toggle('a', b.dataset.v===v));
+    });
+  }
+  upStats(); calcUnbalance(); calcPI('stator'); calcPI('hipot');
+}
+function loadDraft(){
+  try{
+    const raw=localStorage.getItem(DRAFT_KEY); if(!raw) return;
+    applyDraftData(JSON.parse(raw));
+    note('📂 Draft lokal dimuat.','info');
+  }catch(e){}
+}
+// If the cloud draft is newer than what we just restored from localStorage
+// (e.g. last edited on another device, or localStorage was cleared), offer it.
+async function loadCloudDraftIfNewer(){
+  const cd=await fetchCloudDraft();
+  if(!cd || !cd.data) return;
+  let localTs=0;
+  try{ const lr=localStorage.getItem(DRAFT_KEY); if(lr){ const ld=JSON.parse(lr); localTs = ld.__ts||0; } }catch(e){}
+  const cloudTs = cd.updatedAt ? Date.parse(cd.updatedAt) : 0;
+  const hasLocal = !!(()=>{ try{ return localStorage.getItem(DRAFT_KEY); }catch(e){ return null; } })();
+  if(!hasLocal || cloudTs > localTs + 60000){
+    const when = cd.updatedAt ? new Date(cd.updatedAt).toLocaleString('id-ID') : '(waktu tidak diketahui)';
+    if(confirm('Ditemukan draft tersimpan di database (terakhir '+when+').\n\nMuat draft dari database? (Data teks/hasil dipulihkan; foto tetap dari perangkat ini.)')){
+      applyDraftData(cd.data);
+      persistDraft(true);
+      note('☁️ Draft dari database dimuat.','ok');
+    }
+  }
+}
+
+document.addEventListener('input', e=>{ if(e.target.matches('input,select,textarea')) scheduleAutoSave(); });
+document.addEventListener('change', e=>{ if(e.target.matches('input,select,textarea')) scheduleAutoSave(); });
+// best-effort flush when leaving / backgrounding the tab
+window.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ autoSaveNow(); cloudDraftSave(true); } });
+window.addEventListener('beforeunload', ()=>{ try{ const d=collectDraftPayload(); d.__ts=Date.now(); localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); savePhotoDraft(); }catch(e){} });
+// periodic cloud safety net even if the debounce keeps getting reset while typing
+setInterval(()=>{ if(_cloudEnabled && Date.now()-_cloudLastOk>25000) cloudDraftSave(true); }, 25000);
+
+function resetForm(){
+  if(!confirm('Reset semua data? Draft lokal & database untuk sesi ini juga dihapus.')) return;
+  document.querySelectorAll('input,select,textarea').forEach(el=>{ if(el.type!=='file') el.value=''; });
+  Object.keys(ST).forEach(k=>delete ST[k]);
+  document.querySelectorAll('.rb').forEach(b=>b.classList.remove('a'));
+  ['sig-insp','sig-vendor','sig-super'].forEach(clrSig);
+  PHOTOS=[]; renderPhotos();
+  cloudDraftDelete();
+  try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); }catch(e){}
+  document.querySelectorAll('.pi-out').forEach(el=>{ el.textContent='—'; el.classList.remove('bad'); });
+  upStats(); note('🔄 Form direset.','info');
+}
+
+/* ── build base.sheets ── */
+function mkSheet(title, columns, rows){ return { title, columns, rows: rows.filter(Boolean) }; }
+function kv(no,desc,val){ return { no:String(no), desc, values:{ Value: val } }; }
+function tblRow(no,desc,crit,vals){ return { no:String(no), desc, crit:crit||'', values:vals }; }
+function inspSheet(){
+  const rows=[]; let sec='';
+  INSP.forEach(r=>{
+    if(r.sec){ sec=r.sec; return; }
+    const id='i_'+r.no.replace(/\./g,'_');
+    rows.push({ no:r.no, desc:r.it, crit:r.crit||'', section:sec, values:{ Result: tv(id), Remark: gv('rmk-'+id)||'—' } });
+  });
+  return { title:'A — Inspeksi', columns:['Result','Remark'], rows };
+}
+function rtdRows(prefix){
+  const r=[]; for(let n=1;n<=18;n++){ const v=gv(prefix+n); if(v) r.push(kv('T'+n,'RTD T'+n+' (°C)', v)); } return r;
+}
+function mtxRows(prefix){
+  const rows=[];
+  MTX_TIMES.forEach(tm=>{
+    const key=tm[0]+tm[1]; const vals={};
+    MTX_COLS.forEach(c=>{ vals[c[1]] = (document.getElementById(`${prefix}_${c[0]}_${key}`)||{}).value || '—'; });
+    rows.push({ no:'', desc:tm[0]+' '+tm[1], values:vals });
+  });
+  const dar={}, pi={};
+  MTX_COLS.forEach(c=>{ dar[c[1]]=(document.getElementById(`${prefix}_dar_${c[0]}`)||{}).textContent||'—'; pi[c[1]]=(document.getElementById(`${prefix}_pi_${c[0]}`)||{}).textContent||'—'; });
+  rows.push({ no:'', desc:'DAR (60s/30s)', values:dar });
+  rows.push({ no:'', desc:'PI (10m/1m)', values:pi });
+  return rows;
+}
+function gridVals(ids){ const o={}; ids.forEach(([k,id])=>o[k]=gv(id)||'—'); return o; }
+function tableCollect(tbodyId, colKeys, cellId){
+  const rows=[]; const tb=document.getElementById(tbodyId); if(!tb) return rows;
+  const trs=tb.querySelectorAll('tr');
+  trs.forEach((tr,ri)=>{
+    const inp=tr.querySelectorAll('input,.rb.a,.ti');
+  });
+  return rows;
+}
+
+async function submitToDb(){
+  const woDate=gv('wo-date'), checkedBy=gv('checked-by');
+  if(!woDate){ note('❌ Isi tanggal inspeksi terlebih dahulu.','err'); return; }
+  if(!checkedBy){ note('❌ Isi nama Inspection By terlebih dahulu.','err'); return; }
+
+  const base = DB.collectCheckSheetData('mw', MW_TAG, MW_NAME, 'WITNESS');
+  base.assetTag = gv('asset-tag') || MW_TAG;
+  base.assetName = gv('asset-tag') ? (MW_NAME + ' — ' + gv('asset-tag')) : MW_NAME;
+  base.checkedBy = base.checkedBy || checkedBy;
+  base.recommendations = base.recommendations || gv('recommendations');
+  base.findings = base.findings || gv('findings');
+  base.overallCondition = gv('overall');
+  base.nextInspection = gv('next-insp') || gv('next-test');
+  base.vendor = gv('vendor');
+
+  const ngCount = Object.values(ST).filter(v=>v==='NG').length;
+  const okCount = Object.values(ST).filter(v=>v==='OK').length;
+  base.countOk = okCount; base.countNg = ngCount; base.countNa = Object.values(ST).filter(v=>v==='N/A').length;
+  base.overallStatus = ngCount>0 ? 'NG' : 'OK';
+
+  base.sheets = {};
+  base.sheets.motordata = mkSheet('A — Data Motor', ['Value'], [
+    kv(1,'Asset Tag', iv('asset-tag')), kv(2,'Manufacture', iv('manuf')), kv(3,'Rated Voltage (V)', iv('rv')),
+    kv(4,'Rated Power', iv('rp')), kv(5,'Full Load Ampere (A)', iv('fla')), kv(6,'Speed (RPM)', iv('rpm')),
+    kv(7,'Service Factor', iv('sf')), kv(8,'Insulation Class', iv('ins-cls')), kv(9,'Frame Size', iv('frame')),
+    kv(10,'Serial Number', iv('serial')), kv(11,'Weight', iv('wt')), kv(12,'Mounting', iv('mount')),
+    kv(13,'Bearing DE', iv('brg-de')), kv(14,'Bearing NDE', iv('brg-nde')),
+    kv(15,'Vendor / Workshop', iv('vendor')), kv(16,'Lokasi Test', iv('test-loc')), kv(17,'Test Plan', iv('test-plan')),
+  ]);
+  base.sheets.inspeksi = inspSheet();
+  base.sheets.heater = mkSheet('A — Heater Motor Measurement', ['Value'], [
+    kv(1,'Type Heater', iv('ht-type')), kv(2,'Resistance Total (Ω)', iv('ht-r')), kv(3,'Current (A)', iv('ht-i')),
+    kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE (°C)', iv('ht-de')), kv(6,'Raise Temp NDE (°C)', iv('ht-nde')),
+  ].concat(rtdRows('rtdh')));
+
+  base.sheets.stator = mkSheet('B — Stator Winding Resistance & Insulation', ['Value'], [
+    kv('B.1','Winding R T1-T4 (mΩ)', iv('wr-14')), kv('B.2','Winding R T2-T5 (mΩ)', iv('wr-25')),
+    kv('B.3','Winding R T3-T6 (mΩ)', iv('wr-36')), kv('B.4','Max Unbalance (%)', iv('wr-unb')),
+    kv('B.5','Hasil Winding Resistance', tv('wr_result')),
+    kv('B.6','IR Test Voltage (V-dc)', iv('ir-v')), kv('B.7','Ambient/Winding Temp (°C)', iv('ir-temp')),
+    kv('B.8','Hasil IR / PI', tv('ir_result')), kv('B.9','Remark IR/PI', gv('rmk-ir')||'—'),
+  ]);
+  base.sheets.stator_mtx = { title:'B — IR/PI Matrix (Stator)', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('stator') };
+
+  base.sheets.surge = mkSheet('C — Surge Comparison & Corona', ['Value'], [
+    kv('C.1','Surge Waveform', tv('surge_wave')), kv('C.2','Applied Voltage (kV-Ac)', iv('sc-v')),
+    kv('C.3','Remark Surge', gv('rmk-surge')||'—'), kv('C.4','Hasil Corona (surge)', tv('corona_surge')),
+  ]);
+  base.sheets.corona_surge = { title:'C — Corona Count During Surge Test', columns:['Voltage','T1-T2 DE','T1-T2 NDE','T2-T3 DE','T2-T3 NDE','T1-T3 DE','T1-T3 NDE'], rows:
+    [0,1,2].map(r=>({ no:'', desc:'', values:{
+      Voltage: gv('csv_v'+r)||'—', 'T1-T2 DE': gv('csv_t12de'+r)||'—', 'T1-T2 NDE': gv('csv_t12nde'+r)||'—',
+      'T2-T3 DE': gv('csv_t23de'+r)||'—', 'T2-T3 NDE': gv('csv_t23nde'+r)||'—',
+      'T1-T3 DE': gv('csv_t13de'+r)||'—', 'T1-T3 NDE': gv('csv_t13nde'+r)||'—' } }))
+      .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
+
+  base.sheets.tdpd = mkSheet('D — Tan Delta & Partial Discharge', ['Value'], [
+    kv('D.1','PD Qmax (nC)', iv('pd-max')), kv('D.2','+QM', iv('pd-qp')), kv('D.3','−QM', iv('pd-qn')),
+    kv('D.4','Hasil PD', tv('pd_result')),
+    kv('D.5','Tan Delta @0.2Un (×10⁻³)', iv('td-02')), kv('D.6','Δ Tan Delta (×10⁻³)', iv('td-delta')),
+    kv('D.7','Avg Increment (×10⁻³)', iv('td-avg')), kv('D.8','Hasil Tan Delta', tv('td_result')),
+    kv('D.9','Remark TD/PD', gv('rmk-tdpd')||'—'),
+  ]);
+  base.sheets.corona_td = { title:'D — Corona Count During TD/PD Test', columns:['Voltage','Ph-U DE','Ph-U NDE','Ph-V DE','Ph-V NDE','Ph-W DE','Ph-W NDE','Ph-UVW DE','Ph-UVW NDE'], rows:
+    [0,1,2,3,4].map(r=>({ no:'', desc:'', values:{
+      Voltage: gv('ctd_v'+r)||'—', 'Ph-U DE': gv('ctd_ude'+r)||'—', 'Ph-U NDE': gv('ctd_unde'+r)||'—',
+      'Ph-V DE': gv('ctd_vde'+r)||'—', 'Ph-V NDE': gv('ctd_vnde'+r)||'—', 'Ph-W DE': gv('ctd_wde'+r)||'—', 'Ph-W NDE': gv('ctd_wnde'+r)||'—',
+      'Ph-UVW DE': gv('ctd_uvwde'+r)||'—', 'Ph-UVW NDE': gv('ctd_uvwnde'+r)||'—' } }))
+      .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
+
+  base.sheets.hipot = mkSheet('E — Stator High Potential Test', ['Value'], [
+    kv('E.1','Ambient Temp (°C)', iv('hp-amb')), kv('E.2','Humidity (%)', iv('hp-hum')), kv('E.3','Winding Temp (°C)', iv('hp-wtemp')),
+    kv('E.4','Rated Voltage HI-POT (kV-dc)', iv('hp-rated')), kv('E.5','Test Level (%)', iv('hp-level')), kv('E.6','Applied Voltage (kV-dc)', iv('hp-applied')),
+    kv('E.7','Winding R T1-T4 (mΩ)', iv('hp-wr14')), kv('E.8','Winding R T2-T5 (mΩ)', iv('hp-wr25')), kv('E.9','Winding R T3-T6 (mΩ)', iv('hp-wr36')),
+    kv('E.10','IR After Hipot T1-T2T3G (GΩ)', iv('hp-ir1')), kv('E.11','IR After Hipot T2-T3T1G (GΩ)', iv('hp-ir2')),
+    kv('E.12','IR After Hipot T3-T1T2G (GΩ)', iv('hp-ir3')), kv('E.13','IR After Hipot T1T2T3-G (GΩ)', iv('hp-ir4')),
+    kv('E.14','Hasil Hi-Pot', tv('hp_result')), kv('E.15','Remark Hi-Pot', gv('rmk-hp')||'—'),
+  ].concat(rtdRows('rtdp').map((r,i)=>({...r, desc:'RTD After Hipot '+r.desc}))));
+  base.sheets.hipot_mtx = { title:'E — IR/PI Matrix (Hi-Pot)', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('hipot') };
+  base.sheets.corona_hp = { title:'E — Corona Count Hi-Pot dc', columns:['Leak Current (µA)','Corona Count','Result'], rows:
+    [['T1 – T2T3G','1'],['T2 – T3T1G','2'],['T3 – T1T2G','3'],['T1T2T3 – G','4']].map(x=>({ no:'', desc:x[0], values:{
+      'Leak Current (µA)': gv('chp_lc'+x[1])||'—', 'Corona Count': gv('chp_cc'+x[1])||'—', 'Result': tv('chp_'+x[1]) } })) };
+
+  base.sheets.mech = { title:'F — Mechanical Inspection', columns:['Result','Value / Remark'], rows:
+    MECH.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result: tv('m_'+r.no), 'Value / Remark': gv('rmk-m_'+r.no)||'—' } })).concat([
+      kv('','Bearing Clearance DE (mm)', iv('bc-de')), kv('','Bearing Clearance NDE (mm)', iv('bc-nde')),
+      kv('','Air Gap 4 titik (mm)', iv('airgap')), kv('','Slave Bearing Contact Gap (mm)', iv('slave-gap')),
+    ].map(r=>({ no:'', desc:r.desc, values:{ Result:'—', 'Value / Remark': r.values.Value } }))) };
+
+  base.sheets.unload = mkSheet('G — Unload Test', ['Value'], [
+    kv(1,'Voltage (Vac)', iv('ul-v')), kv(2,'Current 3φ (A)', iv('ul-i')), kv(3,'RPM', iv('ul-rpm')),
+    kv(4,'Durasi (jam)', iv('ul-dur')), kv(5,'Air Gap DE (mm)', iv('ul-ag-de')), kv(6,'Air Gap NDE (mm)', iv('ul-ag-nde')),
+    kv(7,'Rotasi', iv('ul-rot')), kv(8,'Air Flow Suction', iv('ul-af-s')), kv(9,'Air Flow Discharge', iv('ul-af-d')),
+    kv(10,'Hasil Air Flow', tv('airflow_result')),
+    kv(11,'Vibration IB-H (mm/s)', iv('vib-ibh')), kv(12,'Vibration IB-V', iv('vib-ibv')), kv(13,'Vibration IB-A', iv('vib-iba')),
+    kv(14,'Vibration OB-H', iv('vib-obh')), kv(15,'Vibration OB-V', iv('vib-obv')), kv(16,'Vibration OB-A', iv('vib-oba')),
+    kv(17,'Remark Unload', gv('rmk-ul')||'—'),
+  ]);
+  base.sheets.unload_wtemp = { title:'G — Unload Winding Temp (°C)', columns:['Interval','T1','T2','T3','T4','T5','T6','T7','T8','T9','T10'], rows:
+    UL_INT.map((iv,r)=>{ const o={Interval:iv}; for(let i=1;i<=10;i++) o['T'+i]=gv(`ulw_${r}_${i}`)||'—'; return { no:'', desc:iv, values:o }; }) };
+  base.sheets.unload_btemp = { title:'G — Unload Bearing Temp (°C)', columns:['Interval','DE-1','DE-2','NDE-1','NDE-2'], rows:
+    UL_INT.map((iv,r)=>({ no:'', desc:iv, values:{ Interval:iv, 'DE-1':gv(`ulb_${r}_de1`)||'—', 'DE-2':gv(`ulb_${r}_de2`)||'—', 'NDE-1':gv(`ulb_${r}_nde1`)||'—', 'NDE-2':gv(`ulb_${r}_nde2`)||'—' } })) };
+
+  base.sheets.solo = { title:'H — Solo Run Visual', columns:['Result','Remark'], rows:
+    SOLO_VIS.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result: tv('sv_'+r.no), Remark: gv('rmk-sv_'+r.no)||'—' } })) };
+  base.sheets.solo_elec = mkSheet('H — Solo Run Electrical Recap', ['Value'], [
+    kv(1,'Stator R T1-T2 (Ω)', iv('sr-t12')), kv(2,'Stator R T2-T3 (Ω)', iv('sr-t23')), kv(3,'Stator R T3-T1 (Ω)', iv('sr-t31')),
+    kv(4,'IR @1" (MΩ)', iv('sr-ir1')), kv(5,'IR @10" (MΩ)', iv('sr-ir10')), kv(6,'PI', iv('sr-pi')),
+    kv(7,'RTD type', iv('sr-rtdtype')), kv(8,'Heater Resistance (Ω)', iv('sr-htr')),
+    kv(9,'RTD 1 (Ω)', iv('sr-rtd1')), kv(10,'RTD 2 (Ω)', iv('sr-rtd2')), kv(11,'RTD 3 (Ω)', iv('sr-rtd3')),
+    kv(12,'RTD 4 (Ω)', iv('sr-rtd4')), kv(13,'RTD 5 (Ω)', iv('sr-rtd5')),
+    kv(14,'DCS VAB (V)', iv('dcs-vab')), kv(15,'DCS VBC (V)', iv('dcs-vbc')), kv(16,'DCS VAC (V)', iv('dcs-vac')),
+    kv(17,'Voltage Unbalance (%)', iv('dcs-vunb')), kv(18,'Power (kW)', iv('dcs-kw')), kv(19,'Power Factor', iv('dcs-pf')),
+    kv(20,'Vibration Solo Run', iv('dcs-vib')), kv(21,'Hasil Solo Run', tv('solo_result')), kv(22,'Remark Solo Run', gv('rmk-solo')||'—'),
+  ]);
+  base.sheets.solo_local = { title:'H — Solo Run Local Monitoring', columns:['Parameter'].concat(SOLO_INT), rows:
+    ['Motor Body','NDE Bearing','DE Bearing','Motor Body (Thermal)','Outlet Duct','Air Flow'].map((r,ri)=>{
+      const o={Parameter:r}; SOLO_INT.forEach((it,ci)=>o[it]=gv(`slcl_${ri}_${ci}`)||'—'); return { no:'', desc:r, values:o }; }) };
+  base.sheets.solo_dcs = { title:'H — Solo Run DCS Monitoring', columns:['Parameter'].concat(SOLO_INT), rows:
+    [['Current A (A)','ia'],['Current B (A)','ib'],['Current C (A)','ic'],['Unbalance I (%)','unb'],['RTD 1 (°C)','r1'],['RTD 2 (°C)','r2'],['RTD 3 (°C)','r3'],['RTD 4 (°C)','r4'],['RTD 5 (°C)','r5']]
+      .map(r=>{ const o={Parameter:r[0]}; SOLO_INT.forEach((it,ci)=>o[it]=gv(`sldcs_${r[1]}_${ci}`)||'—'); return { no:'', desc:r[0], values:o }; }) };
+
+  base.sheets.conclusion = mkSheet('I — Kesimpulan', ['Value'], [
+    kv(1,'Overall Condition', iv('overall')), kv(2,'Findings', gv('findings')||'—'),
+    kv(3,'Recommendations', gv('recommendations')||'—'), kv(4,'Next Test / Follow-up', iv('next-test')),
+    kv(5,'Inspected By', gv('sig-insp-name')||checkedBy), kv(6,'Witnessed By (Vendor)', iv('sig-vendor-name')),
+    kv(7,'Reviewed By', iv('sig-super-name')||iv('reviewed-by')),
+  ]);
+
+  base.toggleStates = Object.assign({}, ST);
+  const _iv={};
+  document.querySelectorAll('input[type=text],input[type=number],input[type=date],input[type=time],select,textarea').forEach(el=>{ if(el.id && el.value) _iv[el.id]=el.value; });
+  base.inputValues = _iv;
+
+  // matrix values by id too (so a revision/merge restore brings them back)
+  document.querySelectorAll('.mtx .ti, .ct .ti').forEach(el=>{ if(el.id && el.value) base.inputValues[el.id]=el.value; });
+
+  SubmitGuard.init({ assetTag: base.assetTag });
+  const target = await SubmitGuard.resolveSubmitTarget(base.woNumber);
+  if(target.mode==='cancel') return;
+
+  let id;
+  try{
+    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
+    id = target.mode==='overwrite' ? await DB.update(target.targetId, base) : await DB.save(base);
+    DB.showSubmitResult(true, 'Data berhasil disimpan! ID: '+id);
+  }catch(e){
+    SubmitGuard.hideProgress();
+    DB.showSubmitResult(false, 'Gagal menyimpan: '+e.message);
+    return;
+  }
+  try{
+    const filesOk = await Approvals.submitWithFiles(id, {
+      photos: buildApprovalPhotos(),
+      pdfBuilder: () => generatePDF(new Set(PDF_SHEETS.map(s=>s.key)), { silent:true }),
+      assetTag: base.assetTag,
+      assetName: base.assetName,
+      checksheetFile: 'Motor_Witness_Test_Vendor.html',
+      submittedBy: checkedBy,
+      revisionOf: LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId: target.mode==='overwrite' ? target.approvalId : null,
+      onProgress: (pct,label) => SubmitGuard.setProgress(10+Math.round(pct*0.85), label),
+    });
+    if(!filesOk) DB.showSubmitResult(false, 'Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah — coba submit ulang.');
+  }catch(e){
+    console.error('submitWithFiles gagal:', e);
+    DB.showSubmitResult(false, 'Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah: '+e.message);
+  }
+  SubmitGuard.markSubmitted(id, { woNumber: base.woNumber, executionDate: base.executionDate, checkedBy });
+  // submission is safely in the DB — clear the autosave drafts (local + cloud) so
+  // a later reload doesn't offer to restore data that's already been submitted.
+  clearTimeout(_cloudTimer); clearTimeout(_autoTimer);
+  await cloudDraftDelete();
+  try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); }catch(e){}
+  SubmitGuard.setProgress(100,'Selesai!');
+  setTimeout(()=>SubmitGuard.hideProgress(), 500);
+}
+
+/* ── PDF ── */
+const PDF_SHEETS = [
+  {key:'cover', ic:'📋', label:'Letterhead & Data Motor'},
+  {key:'inspeksi', ic:'🔍', label:'Inspeksi + Heater/RTD'},
+  {key:'stator', ic:'⚡', label:'Stator R & IR/PI Matrix'},
+  {key:'surge', ic:'🌊', label:'Surge & Corona'},
+  {key:'tdpd', ic:'📉', label:'Tan Delta & PD'},
+  {key:'hipot', ic:'⚠️', label:'Hi-Pot Test'},
+  {key:'mech', ic:'🔧', label:'Mechanical Inspection'},
+  {key:'unload', ic:'🌀', label:'Unload Test'},
+  {key:'solo', ic:'▶️', label:'Solo Run'},
+  {key:'photos', ic:'📷', label:'Foto Evidence'},
+  {key:'concl', ic:'✍️', label:'Kesimpulan & Tanda Tangan'},
+];
+let _pdfSel = new Set(PDF_SHEETS.map(s=>s.key));
+function openPdfModal(){ _pdfSel=new Set(PDF_SHEETS.map(s=>s.key)); renderPdfModal(); document.getElementById('pdf-modal-overlay').style.display='flex'; }
+function closePdfModal(){ document.getElementById('pdf-modal-overlay').style.display='none'; }
+function renderPdfModal(){
+  document.getElementById('pdf-sheet-list').innerHTML = PDF_SHEETS.map(s=>`
+    <label style="display:flex;align-items:center;gap:9px;padding:7px 10px;border:1.5px solid #d0ddd5;border-radius:7px;background:#f8fbf9;cursor:pointer;font-size:13px">
+      <input type="checkbox" ${_pdfSel.has(s.key)?'checked':''} onchange="toggleSheet('${s.key}')" style="width:16px;height:16px">
+      <span>${s.ic}</span><span>${s.label}</span></label>`).join('');
+}
+function toggleSheet(k){ if(_pdfSel.has(k)) _pdfSel.delete(k); else _pdfSel.add(k); }
+function generatePDFSelected(){ if(!_pdfSel.size){ note('⚠️ Pilih minimal 1 section.','err'); return; } closePdfModal(); try{ generatePDF(new Set(_pdfSel)); }catch(e){ console.error(e); note('❌ Gagal PDF: '+e.message,'err'); } }
+
+async function generatePDF(selSet, opts){
+  opts = opts || {};
+  if(!selSet) selSet = new Set(PDF_SHEETS.map(s=>s.key));
+  if(!opts.silent) note('⏳ Membuat PDF…','info');
+  await new Promise(r=>setTimeout(r,150));
+  if(!window.jspdf || !window.jspdf.jsPDF){ if(!opts.silent) note('❌ Library PDF tidak tersedia.','err'); return; }
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const W=210, H=297, M=14, TOP=27, BOT=276;
+  const sanitize = s => s==null ? '' : String(s).replace(/[Ω]/g,'ohm').replace(/[≤]/g,'<=').replace(/[≥]/g,'>=').replace(/[°]/g,'deg').replace(/[×]/g,'x').replace(/[–—]/g,'-').replace(/[·•▸]/g,'-').replace(/[^\x20-\x7E\n]/g,'');
+  let y = TOP;
+  const bgDrawn = {};
+  function ensureBg(){
+    const pg = pdf.internal.getCurrentPageInfo().pageNumber;
+    if(bgDrawn[pg]) return; bgDrawn[pg]=true;
+    if(WITNESS_BG_URI && WITNESS_BG_URI.indexOf('data:image')===0){ try{ pdf.addImage(WITNESS_BG_URI,'JPEG',0,0,W,H); }catch(e){} }
+  }
+  ensureBg();
+  function checkY(need){ if(y+need > BOT){ pdf.addPage(); y=TOP; ensureBg(); } }
+  const theme = {
+    startY:0, theme:'grid', margin:{ left:M, right:M, top:TOP, bottom:H-BOT },
+    styles:{ font:'helvetica', fontSize:7.6, cellPadding:1.9, textColor:[26,38,32], lineColor:[190,210,198], lineWidth:.15, overflow:'linebreak' },
+    headStyles:{ fillColor:[236,242,239], textColor:[70,110,90], fontStyle:'bold', fontSize:7, halign:'center' },
+    willDrawPage:()=>ensureBg(),
+  };
+  function secTitle(t){ checkY(11); pdf.setFillColor(56,86,74); pdf.rect(M,y,W-M*2,7,'F'); pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.text(sanitize(t), M+3, y+4.9); y+=10; }
+  function kvTable(rows){
+    checkY(Math.min(BOT-TOP, rows.length*7+6));
+    pdf.autoTable({ ...theme, startY:y, body: rows.map(r=>[sanitize(r.desc), sanitize(r.values.Value!==undefined?r.values.Value:Object.values(r.values).join(' / '))]),
+      columnStyles:{0:{cellWidth:64, fontStyle:'bold', fillColor:[244,248,246], textColor:[70,110,90]}} });
+    y = pdf.lastAutoTable.finalY + 5;
+  }
+  function fullTable(sheet, includeCrit){
+    if(!sheet || !sheet.rows.length) return;
+    const cols = sheet.columns;
+    const head = includeCrit ? ['No','Item','Criteria',...cols] : ['No','Item',...cols];
+    const body = sheet.rows.map(r=>{
+      const base = includeCrit ? [sanitize(r.no||''), sanitize(r.desc||''), sanitize(r.crit||'')] : [sanitize(r.no||''), sanitize(r.desc||'')];
+      return base.concat(cols.map(c => sanitize(r.values[c]!==undefined ? r.values[c] : '—')));
+    });
+    checkY(20);
+    pdf.autoTable({ ...theme, startY:y, head:[head], body,
+      columnStyles: includeCrit ? {0:{cellWidth:11},1:{cellWidth:40},2:{cellWidth:52}} : {0:{cellWidth:12},1:{cellWidth:46}},
+      didParseCell: d=>{ const v=d.cell.text[0]; if(v==='OK'){d.cell.styles.textColor=[30,135,75];d.cell.styles.fontStyle='bold';} if(v==='NG'){d.cell.styles.textColor=[192,57,43];d.cell.styles.fontStyle='bold';} if(v==='N/A'){d.cell.styles.textColor=[123,83,156];} } });
+    y = pdf.lastAutoTable.finalY + 5;
+  }
+  function collectFor(){
+    // build a fresh base.sheets snapshot without saving
+    const snap = {};
+    return null;
+  }
+
+  // Rebuild sheets snapshot (reuse submit logic lightly)
+  const S = _pdfSnapshot();
+
+  if(selSet.has('cover')){
+    const logo = await imgToDataUrl('LOGO POMI.png');
+    if(logo) try{ pdf.addImage(logo.url,'PNG',M,y,logo.h?16*(logo.w/logo.h):30,16); }catch(e){}
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(14); pdf.setTextColor(44,62,48);
+    pdf.text('WITNESS PLAN - RECONDITION / REWINDING MOTOR', M+34, y+7);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(90,120,100);
+    pdf.text('Vendor Workshop Inspection  -  Unit '+ (gv('unit-sel')||'-'), M+34, y+13);
+    y += 20;
+    pdf.autoTable({ ...theme, startY:y, body:[
+      ['WO No.', sanitize(gv('wo-no')||'-'), 'Tanggal', sanitize(gv('wo-date')||'-')],
+      ['Vendor / Workshop', sanitize(gv('vendor')||'-'), 'Lokasi', sanitize(gv('test-loc')||'-')],
+      ['Inspection By', sanitize(gv('checked-by')||'-'), 'Reviewed By', sanitize(gv('reviewed-by')||'-')],
+      ['Test Plan', sanitize(gv('test-plan')||'-'), 'Shift', sanitize(gv('shift')||'-')],
+    ], styles:{...theme.styles}, columnStyles:{0:{cellWidth:34,fontStyle:'bold',fillColor:[244,248,246]},2:{cellWidth:30,fontStyle:'bold',fillColor:[244,248,246]}} });
+    y = pdf.lastAutoTable.finalY + 5;
+    secTitle('A - Basic Motor Data');
+    kvTable(S.motordata.rows);
+  }
+  if(selSet.has('inspeksi')){ secTitle('A - Inspeksi'); fullTable(S.inspeksi, true); secTitle('A - Heater Motor Measurement'); kvTable(S.heater.rows.filter(r=>r.values.Value!==undefined)); }
+  if(selSet.has('stator')){ secTitle('B - Stator Winding Resistance & Insulation'); kvTable(S.stator.rows); secTitle('B - IR/PI Matrix (Stator)'); fullTable(S.stator_mtx, false); }
+  if(selSet.has('surge')){ secTitle('C - Surge Comparison & Corona'); kvTable(S.surge.rows); if(S.corona_surge.rows.length){ secTitle('C - Corona Count During Surge'); fullTable(S.corona_surge, false); } }
+  if(selSet.has('tdpd')){ secTitle('D - Tan Delta & Partial Discharge'); kvTable(S.tdpd.rows); if(S.corona_td.rows.length){ secTitle('D - Corona Count TD/PD'); fullTable(S.corona_td, false); } }
+  if(selSet.has('hipot')){ secTitle('E - Stator High Potential Test'); kvTable(S.hipot.rows.filter(r=>r.values.Value!==undefined)); secTitle('E - IR/PI Matrix (Hi-Pot)'); fullTable(S.hipot_mtx, false); secTitle('E - Corona Count Hi-Pot dc'); fullTable(S.corona_hp, false); }
+  if(selSet.has('mech')){ secTitle('F - Mechanical Inspection'); fullTable(S.mech, true); }
+  if(selSet.has('unload')){ secTitle('G - Unload Test'); kvTable(S.unload.rows); secTitle('G - Winding Temp per Interval'); fullTable(S.unload_wtemp, false); secTitle('G - Bearing Temp per Interval'); fullTable(S.unload_btemp, false); }
+  if(selSet.has('solo')){ secTitle('H - Solo Run Visual'); fullTable(S.solo, true); secTitle('H - Solo Run Electrical Recap'); kvTable(S.solo_elec.rows); secTitle('H - Local Monitoring'); fullTable(S.solo_local, false); secTitle('H - DCS Monitoring'); fullTable(S.solo_dcs, false); }
+
+  if(selSet.has('photos') && PHOTOS.length){
+    secTitle('Foto Evidence');
+    const cw=(W-M*2-4)/2, MAXH=62;
+    for(let i=0;i<PHOTOS.length;i+=2){
+      const g=PHOTOS.slice(i,i+2);
+      const dims=g.map(p=>PhotoKit.fit(p,cw,MAXH));
+      const ih=Math.max(...dims.map(d=>d.h));
+      checkY(ih+13);
+      g.forEach((p,pi)=>{
+        const xo=M+pi*(cw+4);
+        PhotoKit.draw(pdf,p,xo,y,cw,MAXH,{align:'center'});
+        if(p.caption){ pdf.setFont('helvetica','italic'); pdf.setFontSize(6.6); pdf.setTextColor(120,150,130); pdf.text(sanitize(p.caption).slice(0,60), xo, y+ih+4); }
+      });
+      y += ih + 10;
+    }
+  }
+  if(selSet.has('concl')){
+    secTitle('I - Kesimpulan');
+    kvTable(S.conclusion.rows);
+    checkY(40);
+    const sw=(W-M*2)/3-4;
+    [['sig-insp','Inspected By - POMI', gv('sig-insp-name')||gv('checked-by')],
+     ['sig-vendor','Witnessed By - Vendor', gv('sig-vendor-name')],
+     ['sig-super','Reviewed By - Supervisor', gv('sig-super-name')||gv('reviewed-by')]].forEach((s,i)=>{
+      const xo=M+i*(sw+6);
+      pdf.setFillColor(244,248,246); pdf.setDrawColor(180,205,190); pdf.roundedRect(xo,y,sw,34,2,2,'FD');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(6.6); pdf.setTextColor(70,110,90); pdf.text(sanitize(s[1]), xo+2, y+5);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(44,62,48); pdf.text(sanitize(s[2]||''), xo+2, y+11);
+      const du=sigDataUrl(s[0]); if(du) try{ pdf.addImage(du,'PNG',xo+2,y+13,sw-4,17); }catch(e){}
+      pdf.setDrawColor(180,205,190); pdf.line(xo+2,y+31,xo+sw-2,y+31);
+    });
+    y += 40;
+  }
+
+  const pages = pdf.internal.getNumberOfPages();
+  for(let p=1;p<=pages;p++){ pdf.setPage(p); pdf.setFont('helvetica','normal'); pdf.setFontSize(6.5); pdf.setTextColor(150); pdf.text('Hal '+p+'/'+pages, W-M, H-6, {align:'right'}); pdf.text(sanitize('PLTU - Witness Test Motor'), M, H-6); }
+
+  const fn = `witness_motor_${(gv('asset-tag')||'motor').replace(/[^A-Za-z0-9_-]/g,'_')}_${(gv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
+  if(opts.silent){ /* caller reads returned pdf */ } else { pdf.save(fn); note('✅ PDF: '+fn,'ok'); }
+  return pdf;
+}
+async function imgToDataUrl(src){
+  return new Promise(res=>{
+    const img=new Image(); img.crossOrigin='anonymous';
+    img.onload=()=>{ try{ const cv=document.createElement('canvas'); cv.width=img.naturalWidth; cv.height=img.naturalHeight; cv.getContext('2d').drawImage(img,0,0); res({url:cv.toDataURL('image/png'),w:img.naturalWidth,h:img.naturalHeight}); }catch{ res(null); } };
+    img.onerror=()=>res(null); img.src=src+'?'+Date.now();
+  });
+}
+// lightweight snapshot for the PDF (mirrors submitToDb's base.sheets, no save)
+function _pdfSnapshot(){
+  const S={};
+  S.motordata = mkSheet('A', ['Value'], [
+    kv(1,'Asset Tag', iv('asset-tag')), kv(2,'Manufacture', iv('manuf')), kv(3,'Rated Voltage (V)', iv('rv')),
+    kv(4,'Rated Power', iv('rp')), kv(5,'Full Load Ampere (A)', iv('fla')), kv(6,'Speed (RPM)', iv('rpm')),
+    kv(7,'Service Factor', iv('sf')), kv(8,'Insulation Class', iv('ins-cls')), kv(9,'Frame Size', iv('frame')),
+    kv(10,'Serial Number', iv('serial')), kv(11,'Weight', iv('wt')), kv(12,'Mounting', iv('mount')),
+    kv(13,'Bearing DE', iv('brg-de')), kv(14,'Bearing NDE', iv('brg-nde')),
+  ]);
+  S.inspeksi = inspSheet();
+  S.heater = mkSheet('A', ['Value'], [
+    kv(1,'Type Heater', iv('ht-type')), kv(2,'Resistance Total (Ω)', iv('ht-r')), kv(3,'Current (A)', iv('ht-i')),
+    kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE (°C)', iv('ht-de')), kv(6,'Raise Temp NDE (°C)', iv('ht-nde')),
+  ].concat(rtdRows('rtdh')));
+  S.stator = mkSheet('B', ['Value'], [
+    kv('B.1','Winding R T1-T4 (mΩ)', iv('wr-14')), kv('B.2','Winding R T2-T5 (mΩ)', iv('wr-25')), kv('B.3','Winding R T3-T6 (mΩ)', iv('wr-36')),
+    kv('B.4','Max Unbalance (%)', iv('wr-unb')), kv('B.5','Hasil Winding Resistance', tv('wr_result')),
+    kv('B.6','IR Test Voltage (V-dc)', iv('ir-v')), kv('B.7','Temp (°C)', iv('ir-temp')),
+    kv('B.8','Hasil IR / PI', tv('ir_result')), kv('B.9','Remark', gv('rmk-ir')||'—'),
+  ]);
+  S.stator_mtx = { title:'B', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('stator') };
+  S.surge = mkSheet('C', ['Value'], [
+    kv('C.1','Surge Waveform', tv('surge_wave')), kv('C.2','Applied Voltage (kV-Ac)', iv('sc-v')),
+    kv('C.3','Remark', gv('rmk-surge')||'—'), kv('C.4','Hasil Corona', tv('corona_surge')),
+  ]);
+  S.corona_surge = { title:'C', columns:['Voltage','T1-T2 DE','T1-T2 NDE','T2-T3 DE','T2-T3 NDE','T1-T3 DE','T1-T3 NDE'], rows:
+    [0,1,2].map(r=>({ no:'', desc:'', values:{ Voltage: gv('csv_v'+r)||'—', 'T1-T2 DE':gv('csv_t12de'+r)||'—','T1-T2 NDE':gv('csv_t12nde'+r)||'—','T2-T3 DE':gv('csv_t23de'+r)||'—','T2-T3 NDE':gv('csv_t23nde'+r)||'—','T1-T3 DE':gv('csv_t13de'+r)||'—','T1-T3 NDE':gv('csv_t13nde'+r)||'—' } }))
+      .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
+  S.tdpd = mkSheet('D', ['Value'], [
+    kv('D.1','PD Qmax (nC)', iv('pd-max')), kv('D.2','+QM', iv('pd-qp')), kv('D.3','−QM', iv('pd-qn')), kv('D.4','Hasil PD', tv('pd_result')),
+    kv('D.5','Tan Delta @0.2Un (×10⁻³)', iv('td-02')), kv('D.6','Δ Tan Delta (×10⁻³)', iv('td-delta')),
+    kv('D.7','Avg Increment (×10⁻³)', iv('td-avg')), kv('D.8','Hasil Tan Delta', tv('td_result')), kv('D.9','Remark', gv('rmk-tdpd')||'—'),
+  ]);
+  S.corona_td = { title:'D', columns:['Voltage','Ph-U DE','Ph-U NDE','Ph-V DE','Ph-V NDE','Ph-W DE','Ph-W NDE','Ph-UVW DE','Ph-UVW NDE'], rows:
+    [0,1,2,3,4].map(r=>({ no:'', desc:'', values:{ Voltage:gv('ctd_v'+r)||'—','Ph-U DE':gv('ctd_ude'+r)||'—','Ph-U NDE':gv('ctd_unde'+r)||'—','Ph-V DE':gv('ctd_vde'+r)||'—','Ph-V NDE':gv('ctd_vnde'+r)||'—','Ph-W DE':gv('ctd_wde'+r)||'—','Ph-W NDE':gv('ctd_wnde'+r)||'—','Ph-UVW DE':gv('ctd_uvwde'+r)||'—','Ph-UVW NDE':gv('ctd_uvwnde'+r)||'—' } }))
+      .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
+  S.hipot = mkSheet('E', ['Value'], [
+    kv('E.1','Ambient Temp (°C)', iv('hp-amb')), kv('E.2','Humidity (%)', iv('hp-hum')), kv('E.3','Winding Temp (°C)', iv('hp-wtemp')),
+    kv('E.4','Rated V HI-POT (kV-dc)', iv('hp-rated')), kv('E.5','Test Level (%)', iv('hp-level')), kv('E.6','Applied V (kV-dc)', iv('hp-applied')),
+    kv('E.7','Winding R T1-T4 (mΩ)', iv('hp-wr14')), kv('E.8','Winding R T2-T5 (mΩ)', iv('hp-wr25')), kv('E.9','Winding R T3-T6 (mΩ)', iv('hp-wr36')),
+    kv('E.10','IR After T1-T2T3G (GΩ)', iv('hp-ir1')), kv('E.11','IR After T2-T3T1G (GΩ)', iv('hp-ir2')),
+    kv('E.12','IR After T3-T1T2G (GΩ)', iv('hp-ir3')), kv('E.13','IR After T1T2T3-G (GΩ)', iv('hp-ir4')),
+    kv('E.14','Hasil Hi-Pot', tv('hp_result')), kv('E.15','Remark', gv('rmk-hp')||'—'),
+  ]);
+  S.hipot_mtx = { title:'E', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('hipot') };
+  S.corona_hp = { title:'E', columns:['Leak Current (µA)','Corona Count','Result'], rows:
+    [['T1 – T2T3G','1'],['T2 – T3T1G','2'],['T3 – T1T2G','3'],['T1T2T3 – G','4']].map(x=>({ no:'', desc:x[0], values:{ 'Leak Current (µA)':gv('chp_lc'+x[1])||'—','Corona Count':gv('chp_cc'+x[1])||'—','Result':tv('chp_'+x[1]) } })) };
+  S.mech = { title:'F', columns:['Result','Value / Remark'], rows:
+    MECH.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result:tv('m_'+r.no), 'Value / Remark':gv('rmk-m_'+r.no)||'—' } })).concat(
+    [['Bearing Clearance DE (mm)','bc-de'],['Bearing Clearance NDE (mm)','bc-nde'],['Air Gap 4 titik (mm)','airgap'],['Slave Bearing Contact Gap (mm)','slave-gap']]
+      .map(x=>({ no:'', desc:x[0], crit:'', values:{ Result:'—', 'Value / Remark':iv(x[1]) } }))) };
+  S.unload = mkSheet('G', ['Value'], [
+    kv(1,'Voltage (Vac)', iv('ul-v')), kv(2,'Current 3φ (A)', iv('ul-i')), kv(3,'RPM', iv('ul-rpm')), kv(4,'Durasi (jam)', iv('ul-dur')),
+    kv(5,'Air Gap DE (mm)', iv('ul-ag-de')), kv(6,'Air Gap NDE (mm)', iv('ul-ag-nde')), kv(7,'Rotasi', iv('ul-rot')),
+    kv(8,'Air Flow Suction', iv('ul-af-s')), kv(9,'Air Flow Discharge', iv('ul-af-d')), kv(10,'Hasil Air Flow', tv('airflow_result')),
+    kv(11,'Vib IB-H', iv('vib-ibh')), kv(12,'Vib IB-V', iv('vib-ibv')), kv(13,'Vib IB-A', iv('vib-iba')),
+    kv(14,'Vib OB-H', iv('vib-obh')), kv(15,'Vib OB-V', iv('vib-obv')), kv(16,'Vib OB-A', iv('vib-oba')), kv(17,'Remark', gv('rmk-ul')||'—'),
+  ]);
+  S.unload_wtemp = { title:'G', columns:['Interval','T1','T2','T3','T4','T5','T6','T7','T8','T9','T10'], rows:
+    UL_INT.map((it,r)=>{ const o={Interval:it}; for(let i=1;i<=10;i++) o['T'+i]=gv(`ulw_${r}_${i}`)||'—'; return { no:'', desc:it, values:o }; }) };
+  S.unload_btemp = { title:'G', columns:['Interval','DE-1','DE-2','NDE-1','NDE-2'], rows:
+    UL_INT.map((it,r)=>({ no:'', desc:it, values:{ Interval:it, 'DE-1':gv(`ulb_${r}_de1`)||'—','DE-2':gv(`ulb_${r}_de2`)||'—','NDE-1':gv(`ulb_${r}_nde1`)||'—','NDE-2':gv(`ulb_${r}_nde2`)||'—' } })) };
+  S.solo = { title:'H', columns:['Result','Remark'], rows:
+    SOLO_VIS.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result:tv('sv_'+r.no), Remark:gv('rmk-sv_'+r.no)||'—' } })) };
+  S.solo_elec = mkSheet('H', ['Value'], [
+    kv(1,'Stator R T1-T2 (Ω)', iv('sr-t12')), kv(2,'Stator R T2-T3 (Ω)', iv('sr-t23')), kv(3,'Stator R T3-T1 (Ω)', iv('sr-t31')),
+    kv(4,'IR @1" (MΩ)', iv('sr-ir1')), kv(5,'IR @10" (MΩ)', iv('sr-ir10')), kv(6,'PI', iv('sr-pi')),
+    kv(7,'RTD type', iv('sr-rtdtype')), kv(8,'Heater R (Ω)', iv('sr-htr')),
+    kv(9,'RTD1 (Ω)', iv('sr-rtd1')), kv(10,'RTD2 (Ω)', iv('sr-rtd2')), kv(11,'RTD3 (Ω)', iv('sr-rtd3')), kv(12,'RTD4 (Ω)', iv('sr-rtd4')), kv(13,'RTD5 (Ω)', iv('sr-rtd5')),
+    kv(14,'DCS VAB (V)', iv('dcs-vab')), kv(15,'DCS VBC (V)', iv('dcs-vbc')), kv(16,'DCS VAC (V)', iv('dcs-vac')),
+    kv(17,'Voltage Unbalance (%)', iv('dcs-vunb')), kv(18,'Power (kW)', iv('dcs-kw')), kv(19,'PF', iv('dcs-pf')),
+    kv(20,'Vibration', iv('dcs-vib')), kv(21,'Hasil Solo Run', tv('solo_result')), kv(22,'Remark', gv('rmk-solo')||'—'),
+  ]);
+  S.solo_local = { title:'H', columns:['Parameter'].concat(SOLO_INT), rows:
+    ['Motor Body','NDE Bearing','DE Bearing','Motor Body (Thermal)','Outlet Duct','Air Flow'].map((r,ri)=>{ const o={Parameter:r}; SOLO_INT.forEach((it,ci)=>o[it]=gv(`slcl_${ri}_${ci}`)||'—'); return { no:'', desc:r, values:o }; }) };
+  S.solo_dcs = { title:'H', columns:['Parameter'].concat(SOLO_INT), rows:
+    [['Current A (A)','ia'],['Current B (A)','ib'],['Current C (A)','ic'],['Unbalance I (%)','unb'],['RTD 1 (°C)','r1'],['RTD 2 (°C)','r2'],['RTD 3 (°C)','r3'],['RTD 4 (°C)','r4'],['RTD 5 (°C)','r5']]
+      .map(r=>{ const o={Parameter:r[0]}; SOLO_INT.forEach((it,ci)=>o[it]=gv(`sldcs_${r[1]}_${ci}`)||'—'); return { no:'', desc:r[0], values:o }; }) };
+  S.conclusion = mkSheet('I', ['Value'], [
+    kv(1,'Overall Condition', iv('overall')), kv(2,'Findings', gv('findings')||'—'),
+    kv(3,'Recommendations', gv('recommendations')||'—'), kv(4,'Next Test', iv('next-test')),
+    kv(5,'Inspected By', gv('sig-insp-name')||gv('checked-by')), kv(6,'Witnessed By (Vendor)', iv('sig-vendor-name')),
+    kv(7,'Reviewed By', iv('sig-super-name')||iv('reviewed-by')),
+  ]);
+  return S;
+}
+
+/* ── Load & Merge helper (multi-asset: re-init per typed tag) ── */
+function openLoadMerge(){ LoadMergeModal.init({ assetTag: gv('asset-tag') || MW_TAG }); LoadMergeModal.open(); }
+
+/* ── INIT ── */
+loadDraft();
+loadPhotoDraft();
+upStats();
+loadCloudDraftIfNewer();
+// prime the cloud draft id + a first cloud save shortly after load so an
+// immediately-closed tab still leaves a recoverable record
+setTimeout(()=>{ if(_cloudEnabled) cloudDraftSave(true); }, 6000);
+LoadMergeModal.init({ assetTag: MW_TAG });
+LoadMergeModal.initRevisionBanner();
+SubmitGuard.init({ assetTag: MW_TAG });
+TechnicianAuth.init({ checkedByFieldId: 'checked-by' });
+document.getElementById('asset-tag').addEventListener('change', ()=>{ const t=gv('asset-tag')||MW_TAG; LoadMergeModal.init({ assetTag:t }); SubmitGuard.init({ assetTag:t }); });
+</script>
+</body>
+</html>
