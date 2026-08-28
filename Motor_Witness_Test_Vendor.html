@@ -189,6 +189,23 @@ table.ct tr:last-child td{border-bottom:none}
 .photo-cap{width:100%;border:none;border-top:1px solid var(--pb);padding:6px 8px;font-size:12px;background:transparent;color:var(--ink)}
 .photo-cap:focus{outline:none;background:var(--field-focus-bg)}
 .photo-empty{color:var(--t3);font-size:12px;text-align:center;padding:8px}
+/* per-card photo block */
+.photo-block{margin-top:16px;border-top:1px dashed var(--pb);padding-top:12px}
+.photo-block .pbh{display:flex;align-items:center;gap:8px;font-family:var(--raj);font-weight:700;font-size:11.5px;letter-spacing:1px;text-transform:uppercase;color:var(--sl);margin-bottom:8px}
+.photo-block .pbh .cnt{font-family:var(--mono);font-weight:400;text-transform:none;color:var(--t3)}
+.photo-drop.sm{padding:11px;margin-bottom:10px}
+.photo-drop.sm .photo-drop-ico{font-size:18px}
+.photo-drop.sm .photo-drop-txt{font-size:11.5px}
+/* header logo */
+.hdr-logo{height:44px;width:auto;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
+:root[data-theme="dark"] .hdr-logo,html:not([data-theme="light"]) .hdr-logo{background:#fff;border-radius:6px;padding:4px 6px}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .hdr-logo{background:#fff;border-radius:6px;padding:4px 6px}}
+.topbar .hdr-logo-sm{height:30px;width:auto;background:#fff;border-radius:5px;padding:2px 5px}
+/* IR trend chart */
+.ir-chart-wrap{margin-top:12px;background:var(--field-bg);border:1px solid var(--pb);border-radius:8px;padding:10px 8px 6px}
+.ir-chart-wrap .ircl{display:flex;flex-wrap:wrap;gap:10px 16px;justify-content:center;margin-top:4px;font-size:10px;color:var(--t3)}
+.ir-chart-wrap .ircl i{width:16px;height:3px;display:inline-block;border-radius:2px;margin-right:4px;vertical-align:middle}
+canvas.ir-chart{width:100%;max-width:760px;height:210px;display:block;margin:0 auto}
 .sw2{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
 canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;width:100%;height:100px;display:block;cursor:crosshair;touch-action:none}
 .sttl{font-family:var(--raj);font-weight:600;font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;color:var(--steel);margin-bottom:6px}
@@ -208,6 +225,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
 </head>
 <body>
 <div class="topbar">
+  <img class="hdr-logo-sm" src="LOGO POMI.png" alt="POMI">
   <span class="tl">PLTU</span><div class="tsep"></div>
   <span class="tsub">WITNESS PLAN — RECONDITION / REWINDING MOTOR</span>
   <div class="tr">
@@ -222,6 +240,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
 
 <div class="wrap">
   <div class="ph">
+    <img class="hdr-logo" src="LOGO POMI.png" alt="PT POMI">
     <div><div class="sub">Vendor Workshop Inspection</div><div><h1>WITNESS <span>TEST</span> MOTOR</h1></div></div>
     <span class="badge">RECONDITION / REWINDING</span>
     <div class="stats">
@@ -248,7 +267,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div class="mf"><label>Vendor / Workshop</label><input type="text" id="vendor" placeholder="Nama vendor / bengkel"></div>
         <div class="mf"><label>Lokasi Test</label><input type="text" id="test-loc" placeholder="Kota / lokasi workshop"></div>
         <div class="mf"><label>Inspection By</label><input type="text" id="checked-by" placeholder="Nama inspektor POMI"></div>
-        <div class="mf"><label>NIK</label><input type="text" id="nik" placeholder="NIK-XXXXX"></div>
+        <div class="mf"><label>BN</label><input type="text" id="nik" placeholder="BN-XXXXX"></div>
         <div class="mf"><label>Reviewed By</label><input type="text" id="reviewed-by" placeholder="Supervisor"></div>
         <div class="mf"><label>Shift</label><select id="shift"><option>Normal Hours</option><option>Shift 1</option><option>Shift 2</option><option>Shift 3</option></select></div>
         <div class="mf"><label>Test Plan / Tanggal Test</label><input type="text" id="test-plan" placeholder="cth. Test Plan 12-13 Juni 2025"></div>
@@ -310,6 +329,11 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div class="mf"><label>Ambient / Winding Temp (°C)</label><input type="text" id="ir-temp" class="num"></div></div>
       <div class="tbl-wrap"><table class="ct mtx" id="mtx-stator"></table></div>
       <button class="btn bo bsm" style="margin-top:6px" onclick="calcPI('stator')">🧮 Hitung PI / DAR</button>
+      <div class="subttl">Grafik Insulation Resistance — detik ke-15 s/d menit ke-10</div>
+      <div class="ir-chart-wrap">
+        <canvas class="ir-chart" id="ir-chart-stator" width="1520" height="420"></canvas>
+        <div class="ircl" id="ir-legend-stator"></div>
+      </div>
       <div class="grid" style="margin-top:10px">
         <div class="mf full"><label>Hasil IR / PI</label><div id="tog-ir" class="rc" style="justify-content:flex-start"></div></div>
         <div class="mf full"><label>Remark</label><textarea id="rmk-ir" placeholder="Catatan IR/PI…"></textarea></div>
@@ -391,6 +415,11 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
       <div class="subttl">IR / PI Matrix (Hi-Pot)</div>
       <div class="tbl-wrap"><table class="ct mtx" id="mtx-hipot"></table></div>
       <button class="btn bo bsm" style="margin-top:6px" onclick="calcPI('hipot')">🧮 Hitung PI / DAR</button>
+      <div class="subttl">Grafik Insulation Resistance (Hi-Pot) — detik ke-15 s/d menit ke-10</div>
+      <div class="ir-chart-wrap">
+        <canvas class="ir-chart" id="ir-chart-hipot" width="1520" height="420"></canvas>
+        <div class="ircl" id="ir-legend-hipot"></div>
+      </div>
       <div class="subttl">Corona Count Hi-Pot dc</div>
       <div class="tbl-wrap"><table class="ct"><thead><tr>
         <th>Terminal</th><th class="ctr">Leak Current (µA)</th><th class="ctr">Corona Count</th><th class="ctr">Result</th>
@@ -515,15 +544,8 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
 
   <!-- I. PHOTOS + KESIMPULAN -->
   <div class="panel open" id="p-i">
-    <div class="sec-hdr" onclick="toggleSec('p-i')"><span class="sec-ico">📷</span><span class="sec-t">I. Foto Evidence, Kesimpulan &amp; Tanda Tangan</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-hdr" onclick="toggleSec('p-i')"><span class="sec-ico">✍️</span><span class="sec-t">I. Kesimpulan &amp; Tanda Tangan</span><span class="sec-arrow">▼</span></div>
     <div class="sec-body">
-      <div class="subttl">Foto Evidence <span id="photo-cnt" style="font-family:var(--mono);font-weight:400;text-transform:none;color:var(--t3)">0 foto</span></div>
-      <div class="photo-drop" onclick="pickPhotos(this)">
-        <div class="photo-drop-ico">📷</div>
-        <div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong><br><small style="font-size:11px">Kamera / galeri · bisa banyak · crop &amp; ukuran cetak diatur setelah dipilih</small></div>
-      </div>
-      <div class="photo-grid" id="photo-grid"></div>
-
       <div class="subttl">Kesimpulan</div>
       <div class="grid">
         <div class="mf"><label>Overall Condition</label>
@@ -563,8 +585,8 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
 
 <!-- PDF sheet selector -->
 <div id="pdf-modal-overlay" style="display:none;position:fixed;inset:0;background:rgba(20,35,25,.6);z-index:9999;align-items:center;justify-content:center;backdrop-filter:blur(3px)">
-  <div style="background:#f0f5f1;border:1.5px solid #b4c8bc;border-radius:13px;width:440px;max-width:94vw;overflow:hidden">
-    <div style="background:linear-gradient(90deg,#28382f,#38564a);padding:14px 20px;color:#a8d4b8;font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:2px">PILIH SECTION PDF</div>
+  <div style="background:var(--panel-solid);border:1.5px solid var(--pb);border-radius:13px;width:440px;max-width:94vw;overflow:hidden">
+    <div style="background:var(--topbar-g);padding:14px 20px;color:var(--topbar-tl);font-family:'Rajdhani',sans-serif;font-weight:700;letter-spacing:2px">PILIH SECTION PDF</div>
     <div style="padding:14px 18px 6px"><div id="pdf-sheet-list" style="display:flex;flex-direction:column;gap:5px;max-height:340px;overflow-y:auto"></div></div>
     <div style="padding:12px 18px 16px;display:flex;gap:9px;justify-content:flex-end;border-top:1px solid #dde3de">
       <button onclick="closePdfModal()" class="btn bo bsm">Batal</button>
@@ -742,8 +764,63 @@ function calcPI(prefix){
     if(r30 && r30>0 && r60){ dEl.textContent=(r60/r30).toFixed(2); dEl.classList.toggle('bad',(r60/r30)<1.25); } else dEl.textContent='—';
     if(r60 && r60>0 && r600){ const pi=r600/r60; pEl.textContent=pi.toFixed(2); pEl.classList.toggle('bad',pi<2.0); } else pEl.textContent='—';
   });
+  drawIRChart(prefix);
   scheduleAutoSave();
 }
+
+/* ── IR trend chart (15s .. 10min) ── */
+const IR_SERIES_COLORS = ['#2f6fb5','#e0a94a','#1e874b','#8b3fc7'];
+function irChartData(prefix){
+  return MTX_COLS.map((c,ci)=>({
+    label: c[1], color: IR_SERIES_COLORS[ci%IR_SERIES_COLORS.length],
+    points: MTX_TIMES.map(tm=>{ const v=mtxVal(prefix,c[0],tm[0]+tm[1]); return v; }),
+  }));
+}
+function drawIRChart(prefix){
+  const canvas=document.getElementById('ir-chart-'+prefix); if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const CW=canvas.width, CH=canvas.height;
+  ctx.clearRect(0,0,CW,CH);
+  const cs=getComputedStyle(document.documentElement);
+  const inkC=(cs.getPropertyValue('--ink')||'#132338').trim();
+  const gridC=(cs.getPropertyValue('--td-line')||'rgba(120,155,205,.26)').trim();
+  const axC=(cs.getPropertyValue('--t3')||'#6a82a6').trim();
+  const series=irChartData(prefix);
+  const all=series.flatMap(s=>s.points).filter(v=>v!=null && !isNaN(v));
+  const labels=MTX_TIMES.map(tm=>tm[0]+(tm[1]==='s'?'s':'m'));
+  const padL=64, padR=16, padT=16, padB=40;
+  const pw=CW-padL-padR, ph=CH-padT-padB;
+  const n=MTX_TIMES.length, stepX=pw/(n-1);
+  let yMax = all.length ? Math.max(...all) : 1;
+  yMax = yMax>0 ? yMax*1.15 : 1;
+  ctx.font='20px Arial';
+  // gridlines + y labels
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let i=0;i<=5;i++){
+    const yy=padT+ph-(ph*i/5);
+    ctx.strokeStyle=gridC; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(padL+pw,yy); ctx.stroke();
+    ctx.fillStyle=axC; ctx.fillText((yMax*i/5).toFixed(yMax<10?2:1), padL-8, yy);
+  }
+  // axes
+  ctx.strokeStyle=axC; ctx.lineWidth=1.5; ctx.beginPath();
+  ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+ph); ctx.lineTo(padL+pw,padT+ph); ctx.stroke();
+  // x labels
+  ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillStyle=axC;
+  labels.forEach((t,i)=>{ ctx.fillText(t, padL+stepX*i, padT+ph+8); });
+  ctx.save(); ctx.translate(16,padT+ph/2); ctx.rotate(-Math.PI/2); ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle=axC; ctx.fillText('IR (G'+String.fromCharCode(937)+')',0,0); ctx.restore();
+  // series
+  series.forEach(s=>{
+    ctx.strokeStyle=s.color; ctx.lineWidth=2.5; ctx.beginPath(); let started=false;
+    s.points.forEach((v,i)=>{ if(v==null||isNaN(v)) return; const x=padL+stepX*i, yy=padT+ph-(v/yMax*ph); if(!started){ctx.moveTo(x,yy);started=true;} else ctx.lineTo(x,yy); });
+    ctx.stroke();
+    ctx.fillStyle=s.color;
+    s.points.forEach((v,i)=>{ if(v==null||isNaN(v)) return; const x=padL+stepX*i, yy=padT+ph-(v/yMax*ph); ctx.beginPath(); ctx.arc(x,yy,4,0,Math.PI*2); ctx.fill(); });
+  });
+  // legend row (html)
+  const leg=document.getElementById('ir-legend-'+prefix);
+  if(leg) leg.innerHTML = series.map(s=>`<span><i style="background:${s.color}"></i>${s.label}</span>`).join('');
+}
+function drawAllIRCharts(){ drawIRChart('stator'); drawIRChart('hipot'); }
 function calcUnbalance(){
   const a=parseFloat(gv('wr-14')), b=parseFloat(gv('wr-25')), c=parseFloat(gv('wr-36'));
   const vs=[a,b,c].filter(x=>!isNaN(x));
@@ -848,70 +925,119 @@ function clrSig(id){const c=document.getElementById(id);c.getContext('2d').clear
 function sigDataUrl(id){const c=document.getElementById(id);const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;return d.some(v=>v)?c.toDataURL('image/png'):'';}
 ['sig-insp','sig-vendor','sig-super'].forEach(initSig);
 
-/* ── evidence photos (PhotoKit free-count) ── */
+/* ── evidence photos — one gallery per card (section) ── */
 PhotoKit.configure({maxWcm:8.8,maxHcm:13,defaultWcm:8.8,defaultHcm:5.6});
-let PHOTOS = [];
-function pickPhotos(el){ PhotoKit.upload(el,{multiple:true},entry=>{ if(!entry)return; entry.caption=''; PHOTOS.push(entry); renderPhotos(); savePhotoDraft(); }); }
-function recropPhotoAt(i){ const cur=PHOTOS[i]; if(!cur)return; PhotoKit.recrop(cur,e=>{ if(!e)return; e.caption=cur.caption||''; PHOTOS[i]=e; renderPhotos(); savePhotoDraft(); }); }
-function rotatePhotoAt(i,deg){
+const PHOTO_SECTIONS = [
+  {key:'a', panel:'p-a', label:'A. Data WO, Motor & Inspeksi Awal'},
+  {key:'b', panel:'p-b', label:'B. Stator Winding Resistance & Insulation'},
+  {key:'c', panel:'p-c', label:'C. Surge Comparison & Corona'},
+  {key:'d', panel:'p-d', label:'D. Tan Delta & Partial Discharge'},
+  {key:'e', panel:'p-e', label:'E. Stator High Potential Test'},
+  {key:'f', panel:'p-f', label:'F. Mechanical Inspection'},
+  {key:'g', panel:'p-g', label:'G. Unload Test'},
+  {key:'h', panel:'p-h', label:'H. Solo Run'},
+  {key:'i', panel:'p-i', label:'I. Kesimpulan & Tanda Tangan'},
+];
+const PHOTO_KEYS = PHOTO_SECTIONS.map(s=>s.key);
+let PHOTOS = {}; PHOTO_KEYS.forEach(k=>PHOTOS[k]=[]);
+function photoTotal(){ return PHOTO_KEYS.reduce((n,k)=>n+(PHOTOS[k]||[]).length,0); }
+
+function mountPhotoPanels(){
+  PHOTO_SECTIONS.forEach(sec=>{
+    const body=document.querySelector('#'+sec.panel+' .sec-body'); if(!body) return;
+    if(body.querySelector('.photo-block')) return;
+    const blk=document.createElement('div');
+    blk.className='photo-block';
+    blk.dataset.key=sec.key;
+    blk.innerHTML=
+      '<div class="pbh">📷 Foto Evidence <span class="cnt" id="pcnt-'+sec.key+'">0 foto</span></div>'
+      +'<div class="photo-drop sm" onclick="pickPhotos(\''+sec.key+'\',this)">'
+      +'<div class="photo-drop-ico">📷</div>'
+      +'<div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong> — kamera / galeri, bisa banyak</div></div>'
+      +'<div class="photo-grid" id="pgrid-'+sec.key+'"></div>';
+    body.appendChild(blk);
+  });
+}
+function pickPhotos(key,el){ PhotoKit.upload(el,{multiple:true},entry=>{ if(!entry)return; entry.caption=''; PHOTOS[key].push(entry); renderPhotos(key); afterPhotoChange(); }); }
+function recropPhotoAt(key,i){ const cur=PHOTOS[key][i]; if(!cur)return; PhotoKit.recrop(cur,e=>{ if(!e)return; e.caption=cur.caption||''; PHOTOS[key][i]=e; renderPhotos(key); afterPhotoChange(); }); }
+function rotatePhotoAt(key,i,deg){
+  const p0=PHOTOS[key][i]; if(!p0) return;
   const img=new Image();
   img.onload=()=>{
     const Wp=img.naturalWidth,Hp=img.naturalHeight, swap=((deg%360)+360)%360===90||((deg%360)+360)%360===270;
     const cv=document.createElement('canvas'); cv.width=swap?Hp:Wp; cv.height=swap?Wp:Hp;
     const ctx=cv.getContext('2d'); ctx.translate(cv.width/2,cv.height/2); ctx.rotate(deg*Math.PI/180); ctx.drawImage(img,-Wp/2,-Hp/2);
-    const p=PHOTOS[i]; p.src=cv.toDataURL('image/jpeg',0.92); p.dataUrl=p.src; p.w=cv.width; p.h=cv.height;
+    const p=PHOTOS[key][i]; p.src=cv.toDataURL('image/jpeg',0.92); p.dataUrl=p.src; p.w=cv.width; p.h=cv.height;
     if(swap&&p.widthCm&&p.heightCm){ const t=p.widthCm; p.widthCm=p.heightCm; p.heightCm=t; }
-    renderPhotos(); savePhotoDraft();
+    renderPhotos(key); afterPhotoChange();
   };
-  img.src=PHOTOS[i].src;
+  img.src=p0.src;
 }
-function removePhotoAt(i){ if(!confirm('Hapus foto ini?'))return; PHOTOS.splice(i,1); renderPhotos(); savePhotoDraft(); }
-function renderPhotos(){
-  const grid=document.getElementById('photo-grid'); if(!grid)return;
-  document.getElementById('photo-cnt').textContent=PHOTOS.length+' foto';
-  if(!PHOTOS.length){ grid.innerHTML='<div class="photo-empty">Belum ada foto.</div>'; return; }
-  grid.innerHTML=PHOTOS.map((p,i)=>`
+function removePhotoAt(key,i){ if(!confirm('Hapus foto ini?'))return; PHOTOS[key].splice(i,1); renderPhotos(key); afterPhotoChange(); }
+function renderPhotos(key){
+  const grid=document.getElementById('pgrid-'+key); if(!grid)return;
+  const list=PHOTOS[key]||[];
+  const cnt=document.getElementById('pcnt-'+key); if(cnt) cnt.textContent=list.length+' foto';
+  if(!list.length){ grid.innerHTML='<div class="photo-empty">Belum ada foto.</div>'; return; }
+  grid.innerHTML=list.map((p,i)=>`
     <div class="photo-item">
       <div class="photo-img-wrap"><img src="${p.src}" alt="Foto ${i+1}"></div>
       <div class="photo-ctrl">
-        <button class="p-btn" onclick="recropPhotoAt(${i})">&#9986; Crop</button>
-        <button class="p-btn" onclick="rotatePhotoAt(${i},-90)">&#8634;</button>
-        <button class="p-btn" onclick="rotatePhotoAt(${i},90)">&#8635;</button>
-        <button class="p-btn del" onclick="removePhotoAt(${i})">&#10005;</button>
+        <button class="p-btn" onclick="recropPhotoAt('${key}',${i})">&#9986; Crop</button>
+        <button class="p-btn" onclick="rotatePhotoAt('${key}',${i},-90)">&#8634;</button>
+        <button class="p-btn" onclick="rotatePhotoAt('${key}',${i},90)">&#8635;</button>
+        <button class="p-btn del" onclick="removePhotoAt('${key}',${i})">&#10005;</button>
         <span class="p-sz">${p.widthCm?p.widthCm.toFixed(1)+'x'+p.heightCm.toFixed(1)+'cm':''}</span>
       </div>
       <input class="photo-cap" type="text" placeholder="Caption foto ${i+1}"
-        value="${(p.caption||'').replace(/"/g,'&quot;')}" oninput="PHOTOS[${i}].caption=this.value;savePhotoDraft()">
+        value="${(p.caption||'').replace(/"/g,'&quot;')}" oninput="PHOTOS['${key}'][${i}].caption=this.value;savePhotoDraft()">
     </div>`).join('');
 }
+function renderAllPhotos(){ PHOTO_KEYS.forEach(renderPhotos); }
+function afterPhotoChange(){ savePhotoDraft(); if(typeof autoSaveNow==='function') autoSaveNow(); }
 function savePhotoDraft(){
-  try{ localStorage.setItem(DRAFT_PHOTOS_KEY, JSON.stringify(PHOTOS.map(p=>({src:p.src,dataUrl:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})))); }
-  catch(e){ note('⚠️ Draft tersimpan, tapi foto terlalu besar untuk localStorage.','err'); }
+  try{
+    const out={};
+    PHOTO_KEYS.forEach(k=>{ out[k]=(PHOTOS[k]||[]).map(p=>({src:p.src,dataUrl:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})); });
+    localStorage.setItem(DRAFT_PHOTOS_KEY, JSON.stringify(out));
+  }catch(e){ note('⚠️ Draft tersimpan, tapi foto terlalu besar untuk localStorage.','err'); }
 }
-function loadPhotoDraft(){ try{ const raw=localStorage.getItem(DRAFT_PHOTOS_KEY); if(!raw)return; PHOTOS=JSON.parse(raw)||[]; renderPhotos(); }catch(e){} }
+function loadPhotoDraft(){
+  try{
+    const raw=localStorage.getItem(DRAFT_PHOTOS_KEY); if(!raw)return;
+    const d=JSON.parse(raw)||{};
+    if(Array.isArray(d)){ PHOTOS.a = d; }                 // migrate old flat-array drafts into section A
+    else PHOTO_KEYS.forEach(k=>{ if(Array.isArray(d[k])) PHOTOS[k]=d[k]; });
+    renderAllPhotos();
+  }catch(e){}
+}
 
-// Review & Approval / Load-merge photo restore
+// Review & Approval / Load-merge photo restore — keyed per section
 async function restorePhotosFromUrls(photoUrls, overwrite){
   if(!photoUrls) return 0;
-  const all=[]; Object.keys(photoUrls).forEach(k=>{ if(Array.isArray(photoUrls[k])) all.push(...photoUrls[k]); });
-  if(!all.length) return 0;
-  if(!overwrite && PHOTOS.length) return 0;
-  const restored=[];
-  for(const entry of all){
-    if(!entry||!entry.url) continue;
-    try{ const d=await Storage.toDataUrl(entry.url); if(!d)continue;
-      restored.push({src:d,dataUrl:d,caption:entry.caption||'',w:entry.w,h:entry.h,widthCm:entry.widthCm,heightCm:entry.heightCm}); }
-    catch(e){ console.error('restore 1 foto gagal:',e); }
+  let restored=0;
+  for(const key of Object.keys(photoUrls)){
+    const list=photoUrls[key]; if(!Array.isArray(list)||!list.length) continue;
+    const target = PHOTO_KEYS.indexOf(key)!==-1 ? key : 'a';   // unknown groups fall into section A
+    if(!overwrite && (PHOTOS[target]||[]).length) continue;
+    const acc=[];
+    for(const entry of list){
+      if(!entry||!entry.url) continue;
+      try{ const dd=await Storage.toDataUrl(entry.url); if(!dd)continue;
+        acc.push({src:dd,dataUrl:dd,caption:entry.caption||'',w:entry.w,h:entry.h,widthCm:entry.widthCm,heightCm:entry.heightCm}); }
+      catch(e){ console.error('restore 1 foto gagal:',e); }
+    }
+    if(acc.length){ PHOTOS[target] = overwrite ? acc : (PHOTOS[target]||[]).concat(acc); restored+=acc.length; }
   }
-  if(!restored.length) return 0;
-  PHOTOS = overwrite ? restored : PHOTOS.concat(restored);
-  renderPhotos(); savePhotoDraft();
-  return restored.length;
+  if(restored){ renderAllPhotos(); savePhotoDraft(); }
+  return restored;
 }
 window.restorePhotosFromUrls = restorePhotosFromUrls;
 function buildApprovalPhotos(){
-  if(!PHOTOS.length) return null;
-  return { main: PHOTOS.map(p=>({src:p.src,caption:p.caption||'',w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})) };
+  if(!photoTotal()) return null;
+  const out={};
+  PHOTO_KEYS.forEach(k=>{ if((PHOTOS[k]||[]).length) out[k]=PHOTOS[k].map(p=>({src:p.src,caption:p.caption||'',w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})); });
+  return out;
 }
 
 /* ── notice ── */
@@ -992,7 +1118,7 @@ async function cloudDraftSave(silent){
     checkedBy: (gv('checked-by')||'').trim(),
     executionDate: (gv('wo-date')||'').trim(),
     data: dataNow,
-    photoCount: PHOTOS.length,
+    photoCount: photoTotal(),
     updatedAt: new Date().toISOString(),
     ua: navigator.userAgent.slice(0,120),
   };
@@ -1062,7 +1188,12 @@ async function loadCloudDraftIfNewer(){
   }
 }
 
-document.addEventListener('input', e=>{ if(e.target.matches('input,select,textarea')) scheduleAutoSave(); });
+document.addEventListener('input', e=>{
+  if(!e.target.matches('input,select,textarea')) return;
+  scheduleAutoSave();
+  const mtx=e.target.closest('#mtx-stator,#mtx-hipot');
+  if(mtx) drawIRChart(mtx.id==='mtx-stator'?'stator':'hipot');
+});
 document.addEventListener('change', e=>{ if(e.target.matches('input,select,textarea')) scheduleAutoSave(); });
 // best-effort flush when leaving / backgrounding the tab
 window.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ autoSaveNow(); cloudDraftSave(true); } });
@@ -1076,7 +1207,7 @@ function resetForm(){
   Object.keys(ST).forEach(k=>delete ST[k]);
   document.querySelectorAll('.rb').forEach(b=>b.classList.remove('a'));
   ['sig-insp','sig-vendor','sig-super'].forEach(clrSig);
-  PHOTOS=[]; renderPhotos();
+  PHOTO_KEYS.forEach(k=>PHOTOS[k]=[]); renderAllPhotos();
   cloudDraftDelete();
   try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); }catch(e){}
   document.querySelectorAll('.pi-out').forEach(el=>{ el.textContent='—'; el.classList.remove('bad'); });
@@ -1301,24 +1432,22 @@ async function submitToDb(){
 
 /* ── PDF ── */
 const PDF_SHEETS = [
-  {key:'cover', ic:'📋', label:'Letterhead & Data Motor'},
-  {key:'inspeksi', ic:'🔍', label:'Inspeksi + Heater/RTD'},
-  {key:'stator', ic:'⚡', label:'Stator R & IR/PI Matrix'},
-  {key:'surge', ic:'🌊', label:'Surge & Corona'},
-  {key:'tdpd', ic:'📉', label:'Tan Delta & PD'},
-  {key:'hipot', ic:'⚠️', label:'Hi-Pot Test'},
-  {key:'mech', ic:'🔧', label:'Mechanical Inspection'},
-  {key:'unload', ic:'🌀', label:'Unload Test'},
-  {key:'solo', ic:'▶️', label:'Solo Run'},
-  {key:'photos', ic:'📷', label:'Foto Evidence'},
-  {key:'concl', ic:'✍️', label:'Kesimpulan & Tanda Tangan'},
+  {key:'a', ic:'📋', label:'A. Data WO, Motor & Inspeksi Awal'},
+  {key:'b', ic:'⚡', label:'B. Stator Winding Resistance & Insulation'},
+  {key:'c', ic:'🌊', label:'C. Surge Comparison & Corona'},
+  {key:'d', ic:'📉', label:'D. Tan Delta & Partial Discharge'},
+  {key:'e', ic:'⚠️', label:'E. Stator High Potential Test'},
+  {key:'f', ic:'🔧', label:'F. Mechanical Inspection'},
+  {key:'g', ic:'🌀', label:'G. Unload Test'},
+  {key:'h', ic:'▶️', label:'H. Solo Run'},
+  {key:'i', ic:'✍️', label:'I. Kesimpulan & Tanda Tangan'},
 ];
 let _pdfSel = new Set(PDF_SHEETS.map(s=>s.key));
 function openPdfModal(){ _pdfSel=new Set(PDF_SHEETS.map(s=>s.key)); renderPdfModal(); document.getElementById('pdf-modal-overlay').style.display='flex'; }
 function closePdfModal(){ document.getElementById('pdf-modal-overlay').style.display='none'; }
 function renderPdfModal(){
   document.getElementById('pdf-sheet-list').innerHTML = PDF_SHEETS.map(s=>`
-    <label style="display:flex;align-items:center;gap:9px;padding:7px 10px;border:1.5px solid #d0ddd5;border-radius:7px;background:#f8fbf9;cursor:pointer;font-size:13px">
+    <label style="display:flex;align-items:center;gap:9px;padding:7px 10px;border:1.5px solid var(--pb);border-radius:7px;background:var(--field-bg);cursor:pointer;font-size:13px">
       <input type="checkbox" ${_pdfSel.has(s.key)?'checked':''} onchange="toggleSheet('${s.key}')" style="width:16px;height:16px">
       <span>${s.ic}</span><span>${s.label}</span></label>`).join('');
 }
@@ -1350,93 +1479,217 @@ async function generatePDF(selSet, opts){
     headStyles:{ fillColor:[236,242,239], textColor:[70,110,90], fontStyle:'bold', fontSize:7, halign:'center' },
     willDrawPage:()=>ensureBg(),
   };
-  function secTitle(t){ checkY(11); pdf.setFillColor(56,86,74); pdf.rect(M,y,W-M*2,7,'F'); pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.text(sanitize(t), M+3, y+4.9); y+=10; }
-  function kvTable(rows){
-    checkY(Math.min(BOT-TOP, rows.length*7+6));
-    pdf.autoTable({ ...theme, startY:y, body: rows.map(r=>[sanitize(r.desc), sanitize(r.values.Value!==undefined?r.values.Value:Object.values(r.values).join(' / '))]),
-      columnStyles:{0:{cellWidth:64, fontStyle:'bold', fillColor:[244,248,246], textColor:[70,110,90]}} });
-    y = pdf.lastAutoTable.finalY + 5;
+  // ---- HTML-mirroring layout helpers ----
+  const NAVY=[30,58,99], NAVY2=[53,103,171], LBL_BG=[231,238,250], LBL_TX=[30,58,99];
+  const half=(W-M*2)/2;
+  function secBar(title){
+    checkY(14);
+    pdf.setFillColor(...NAVY); pdf.rect(M,y,W-M*2,8,'F');
+    pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(9.5);
+    pdf.text(sanitize(title), M+3.5, y+5.5);
+    y+=11.5;
   }
-  function fullTable(sheet, includeCrit){
+  function subTitle(t){
+    checkY(9);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(7.6); pdf.setTextColor(...NAVY2);
+    pdf.text(sanitize(t).toUpperCase(), M, y+3.2);
+    pdf.setDrawColor(185,205,232); pdf.setLineWidth(.2); pdf.line(M, y+4.5, W-M, y+4.5);
+    y+=7.2;
+  }
+  function kvGrid(rows){
+    const flat=(rows||[]).filter(r=>r&&r.desc).map(r=>[
+      sanitize(r.desc),
+      sanitize(r.values && r.values.Value!==undefined ? r.values.Value : (r.values?Object.values(r.values).join(' / '):''))
+    ]);
+    if(!flat.length) return;
+    const body=[];
+    for(let i=0;i<flat.length;i+=2){ const a=flat[i], b=flat[i+1]||['','']; body.push([a[0],a[1],b[0],b[1]]); }
+    checkY(Math.min(BOT-TOP, body.length*7+4));
+    pdf.autoTable({ ...theme, startY:y, body,
+      columnStyles:{
+        0:{cellWidth:38, fontStyle:'bold', fillColor:LBL_BG, textColor:LBL_TX},
+        1:{cellWidth:half-38},
+        2:{cellWidth:38, fontStyle:'bold', fillColor:LBL_BG, textColor:LBL_TX},
+        3:{cellWidth:half-38},
+      } });
+    y=pdf.lastAutoTable.finalY+4;
+  }
+  function checkTable(sheet){
     if(!sheet || !sheet.rows.length) return;
-    const cols = sheet.columns;
-    const head = includeCrit ? ['No','Item','Criteria',...cols] : ['No','Item',...cols];
-    const body = sheet.rows.map(r=>{
-      const base = includeCrit ? [sanitize(r.no||''), sanitize(r.desc||''), sanitize(r.crit||'')] : [sanitize(r.no||''), sanitize(r.desc||'')];
-      return base.concat(cols.map(c => sanitize(r.values[c]!==undefined ? r.values[c] : '—')));
+    const cols=sheet.columns;
+    const body=sheet.rows.map(r=>[
+      sanitize(r.no||''), sanitize(r.desc||''), sanitize(String(r.crit||'').replace(/\s*\n\s*/g,' · ')),
+      ...cols.map(c=>sanitize(r.values[c]!==undefined?r.values[c]:'-'))
+    ]);
+    checkY(18);
+    pdf.autoTable({ ...theme, startY:y, head:[['No','Item','Kriteria',...cols]], body,
+      columnStyles:{0:{cellWidth:8},1:{cellWidth:42},2:{cellWidth:44}},
+      didParseCell:d=>{ const v=d.cell.text[0]; if(v==='OK'){d.cell.styles.textColor=[30,135,75];d.cell.styles.fontStyle='bold';} if(v==='NG'){d.cell.styles.textColor=[192,57,43];d.cell.styles.fontStyle='bold';} if(v==='N/A'){d.cell.styles.textColor=[123,83,156];} } });
+    y=pdf.lastAutoTable.finalY+4;
+  }
+  function dataTable(sheet, firstLabel){
+    if(!sheet || !sheet.rows.length) return;
+    const cols=sheet.columns;
+    const useDesc=!!firstLabel;
+    const head=useDesc ? [firstLabel,...cols] : cols.slice();
+    const body=sheet.rows.map(r=>{
+      const cells=cols.map(c=>sanitize(r.values[c]!==undefined?r.values[c]:'-'));
+      return useDesc ? [sanitize(r.desc||''),...cells] : cells;
     });
-    checkY(20);
+    checkY(16);
     pdf.autoTable({ ...theme, startY:y, head:[head], body,
-      columnStyles: includeCrit ? {0:{cellWidth:11},1:{cellWidth:40},2:{cellWidth:52}} : {0:{cellWidth:12},1:{cellWidth:46}},
-      didParseCell: d=>{ const v=d.cell.text[0]; if(v==='OK'){d.cell.styles.textColor=[30,135,75];d.cell.styles.fontStyle='bold';} if(v==='NG'){d.cell.styles.textColor=[192,57,43];d.cell.styles.fontStyle='bold';} if(v==='N/A'){d.cell.styles.textColor=[123,83,156];} } });
-    y = pdf.lastAutoTable.finalY + 5;
+      headStyles:{...theme.headStyles, fillColor:LBL_BG, textColor:LBL_TX},
+      didParseCell:d=>{ const v=d.cell.text[0]; if(v==='OK'){d.cell.styles.textColor=[30,135,75];} if(v==='NG'){d.cell.styles.textColor=[192,57,43];} } });
+    y=pdf.lastAutoTable.finalY+4;
   }
-  function collectFor(){
-    // build a fresh base.sheets snapshot without saving
-    const snap = {};
-    return null;
+  function irChartImage(prefix){
+    const canvas=document.getElementById('ir-chart-'+prefix); if(!canvas) return;
+    try{ drawIRChart(prefix); }catch(e){}
+    const any=irChartData(prefix).some(s=>s.points.some(v=>v!=null && !isNaN(v)));
+    if(!any) return;
+    subTitle('Grafik Insulation Resistance (15 s - 10 min)');
+    const iw=W-M*2, ih=iw*(canvas.height/canvas.width);
+    checkY(ih+3);
+    try{ pdf.addImage(canvas.toDataURL('image/png'),'PNG',M,y,iw,ih); }catch(e){}
+    y+=ih+5;
   }
-
-  // Rebuild sheets snapshot (reuse submit logic lightly)
-  const S = _pdfSnapshot();
-
-  if(selSet.has('cover')){
-    const logo = await imgToDataUrl('LOGO POMI.png');
-    if(logo) try{ pdf.addImage(logo.url,'PNG',M,y,logo.h?16*(logo.w/logo.h):30,16); }catch(e){}
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(14); pdf.setTextColor(44,62,48);
-    pdf.text('WITNESS PLAN - RECONDITION / REWINDING MOTOR', M+34, y+7);
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(90,120,100);
-    pdf.text('Vendor Workshop Inspection  -  Unit '+ (gv('unit-sel')||'-'), M+34, y+13);
-    y += 20;
-    pdf.autoTable({ ...theme, startY:y, body:[
-      ['WO No.', sanitize(gv('wo-no')||'-'), 'Tanggal', sanitize(gv('wo-date')||'-')],
-      ['Vendor / Workshop', sanitize(gv('vendor')||'-'), 'Lokasi', sanitize(gv('test-loc')||'-')],
-      ['Inspection By', sanitize(gv('checked-by')||'-'), 'Reviewed By', sanitize(gv('reviewed-by')||'-')],
-      ['Test Plan', sanitize(gv('test-plan')||'-'), 'Shift', sanitize(gv('shift')||'-')],
-    ], styles:{...theme.styles}, columnStyles:{0:{cellWidth:34,fontStyle:'bold',fillColor:[244,248,246]},2:{cellWidth:30,fontStyle:'bold',fillColor:[244,248,246]}} });
-    y = pdf.lastAutoTable.finalY + 5;
-    secTitle('A - Basic Motor Data');
-    kvTable(S.motordata.rows);
-  }
-  if(selSet.has('inspeksi')){ secTitle('A - Inspeksi'); fullTable(S.inspeksi, true); secTitle('A - Heater Motor Measurement'); kvTable(S.heater.rows.filter(r=>r.values.Value!==undefined)); }
-  if(selSet.has('stator')){ secTitle('B - Stator Winding Resistance & Insulation'); kvTable(S.stator.rows); secTitle('B - IR/PI Matrix (Stator)'); fullTable(S.stator_mtx, false); }
-  if(selSet.has('surge')){ secTitle('C - Surge Comparison & Corona'); kvTable(S.surge.rows); if(S.corona_surge.rows.length){ secTitle('C - Corona Count During Surge'); fullTable(S.corona_surge, false); } }
-  if(selSet.has('tdpd')){ secTitle('D - Tan Delta & Partial Discharge'); kvTable(S.tdpd.rows); if(S.corona_td.rows.length){ secTitle('D - Corona Count TD/PD'); fullTable(S.corona_td, false); } }
-  if(selSet.has('hipot')){ secTitle('E - Stator High Potential Test'); kvTable(S.hipot.rows.filter(r=>r.values.Value!==undefined)); secTitle('E - IR/PI Matrix (Hi-Pot)'); fullTable(S.hipot_mtx, false); secTitle('E - Corona Count Hi-Pot dc'); fullTable(S.corona_hp, false); }
-  if(selSet.has('mech')){ secTitle('F - Mechanical Inspection'); fullTable(S.mech, true); }
-  if(selSet.has('unload')){ secTitle('G - Unload Test'); kvTable(S.unload.rows); secTitle('G - Winding Temp per Interval'); fullTable(S.unload_wtemp, false); secTitle('G - Bearing Temp per Interval'); fullTable(S.unload_btemp, false); }
-  if(selSet.has('solo')){ secTitle('H - Solo Run Visual'); fullTable(S.solo, true); secTitle('H - Solo Run Electrical Recap'); kvTable(S.solo_elec.rows); secTitle('H - Local Monitoring'); fullTable(S.solo_local, false); secTitle('H - DCS Monitoring'); fullTable(S.solo_dcs, false); }
-
-  if(selSet.has('photos') && PHOTOS.length){
-    secTitle('Foto Evidence');
-    const cw=(W-M*2-4)/2, MAXH=62;
-    for(let i=0;i<PHOTOS.length;i+=2){
-      const g=PHOTOS.slice(i,i+2);
-      const dims=g.map(p=>PhotoKit.fit(p,cw,MAXH));
-      const ih=Math.max(...dims.map(d=>d.h));
-      checkY(ih+13);
+  function sectionPhotos(key){
+    const list=(PHOTOS[key]||[]).filter(p=>p&&p.src);
+    if(!list.length) return;
+    subTitle('Foto Evidence');
+    const cw=(W-M*2-4)/2, MAXH=58;
+    for(let i=0;i<list.length;i+=2){
+      const g=list.slice(i,i+2);
+      const dims=g.map(p=>{ try{ return PhotoKit.fit(p,cw,MAXH); }catch(e){ return {w:cw,h:MAXH}; } });
+      const rh=Math.max(...dims.map(d=>d.h));
+      checkY(rh+9);
       g.forEach((p,pi)=>{
         const xo=M+pi*(cw+4);
-        PhotoKit.draw(pdf,p,xo,y,cw,MAXH,{align:'center'});
-        if(p.caption){ pdf.setFont('helvetica','italic'); pdf.setFontSize(6.6); pdf.setTextColor(120,150,130); pdf.text(sanitize(p.caption).slice(0,60), xo, y+ih+4); }
+        try{ PhotoKit.draw(pdf,p,xo,y,cw,MAXH,{align:'center'}); }catch(e){}
+        if(p.caption){ pdf.setFont('helvetica','italic'); pdf.setFontSize(6.4); pdf.setTextColor(110,130,160); pdf.text(sanitize(p.caption).slice(0,70), xo, y+rh+3.4); }
       });
-      y += ih + 10;
+      y+=rh+7;
     }
   }
-  if(selSet.has('concl')){
-    secTitle('I - Kesimpulan');
-    kvTable(S.conclusion.rows);
+
+  const S = _pdfSnapshot();
+
+  // ---------- COVER (logo left, title right — no overlap) ----------
+  {
+    y = TOP + 1;
+    const logo = await imgToDataUrl('LOGO POMI.png');
+    const logoW = 28, logoH = (logo && logo.w) ? logoW*(logo.h/logo.w) : 12;
+    if(logo){ try{ pdf.addImage(logo.url,'PNG',M,y,logoW,logoH); }catch(e){} }
+    const tx = M + logoW + 9;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(...NAVY);
+    pdf.text('WITNESS PLAN', tx, y+4.5);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(10.5); pdf.setTextColor(...NAVY2);
+    pdf.text('Recondition / Rewinding Motor', tx, y+10.5);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.6); pdf.setTextColor(95,115,145);
+    pdf.text('Vendor Workshop Inspection  -  PT POMI  -  Unit '+(gv('unit-sel')||'-'), tx, y+15.5);
+    y += Math.max(logoH, 16) + 5;
+    pdf.setDrawColor(...NAVY2); pdf.setLineWidth(.4); pdf.line(M,y,W-M,y); y+=5;
+  }
+
+  if(selSet.has('a')){
+    secBar('A. Data WO, Motor & Inspeksi Awal');
+    subTitle('Work Order & Inspektor');
+    kvGrid([
+      {desc:'Work Order No.',values:{Value:gv('wo-no')||'-'}},
+      {desc:'Tanggal Inspeksi',values:{Value:gv('wo-date')||'-'}},
+      {desc:'Unit',values:{Value:gv('unit-sel')||'-'}},
+      {desc:'Vendor / Workshop',values:{Value:gv('vendor')||'-'}},
+      {desc:'Lokasi Test',values:{Value:gv('test-loc')||'-'}},
+      {desc:'Inspection By',values:{Value:gv('checked-by')||'-'}},
+      {desc:'BN',values:{Value:gv('nik')||'-'}},
+      {desc:'Reviewed By',values:{Value:gv('reviewed-by')||'-'}},
+      {desc:'Shift',values:{Value:gv('shift')||'-'}},
+      {desc:'Test Plan / Tgl Test',values:{Value:gv('test-plan')||'-'}},
+    ]);
+    subTitle('Basic Motor Data');
+    kvGrid(S.motordata.rows);
+    subTitle('Inspeksi');
+    checkTable(S.inspeksi);
+    subTitle('Heater Motor Measurement & RTD Winding/Phase Temp (deg C)');
+    kvGrid(S.heater.rows.filter(r=>r.values && r.values.Value!==undefined));
+    sectionPhotos('a');
+  }
+  if(selSet.has('b')){
+    secBar('B. Stator Winding Resistance & Insulation Test');
+    subTitle('Winding Resistance & Insulation Resistance / PI');
+    kvGrid(S.stator.rows);
+    subTitle('IR / PI Matrix (Stator)');
+    dataTable(S.stator_mtx, 'Waktu');
+    irChartImage('stator');
+    sectionPhotos('b');
+  }
+  if(selSet.has('c')){
+    secBar('C. Surge Comparison & Corona Test');
+    subTitle('Surge Comparison');
+    kvGrid(S.surge.rows);
+    if(S.corona_surge.rows.length){ subTitle('Corona Count During Surge Test'); dataTable(S.corona_surge, null); }
+    sectionPhotos('c');
+  }
+  if(selSet.has('d')){
+    secBar('D. Tan Delta & Partial Discharge');
+    subTitle('Partial Discharge & Tan Delta');
+    kvGrid(S.tdpd.rows);
+    if(S.corona_td.rows.length){ subTitle('Corona Count During TD / PD Test'); dataTable(S.corona_td, null); }
+    sectionPhotos('d');
+  }
+  if(selSet.has('e')){
+    secBar('E. Stator High Potential Test');
+    subTitle('Hi-Pot Parameters, Winding R & IR After Hi-Pot');
+    kvGrid(S.hipot.rows.filter(r=>r.values && r.values.Value!==undefined));
+    subTitle('IR / PI Matrix (Hi-Pot)');
+    dataTable(S.hipot_mtx, 'Waktu');
+    irChartImage('hipot');
+    if(S.corona_hp.rows.length){ subTitle('Corona Count Hi-Pot dc'); dataTable(S.corona_hp, 'Terminal'); }
+    sectionPhotos('e');
+  }
+  if(selSet.has('f')){
+    secBar('F. Mechanical Inspection');
+    checkTable(S.mech);
+    sectionPhotos('f');
+  }
+  if(selSet.has('g')){
+    secBar('G. Unload Test');
+    subTitle('Recording & Vibration');
+    kvGrid(S.unload.rows);
+    subTitle('Winding Temperature (deg C) per Interval');
+    dataTable(S.unload_wtemp, null);
+    subTitle('Bearing Temperature (deg C) per Interval');
+    dataTable(S.unload_btemp, null);
+    sectionPhotos('g');
+  }
+  if(selSet.has('h')){
+    secBar('H. Solo Run');
+    subTitle('Final Visual & Physical Check');
+    checkTable(S.solo);
+    subTitle('Electrical Test Recap');
+    kvGrid(S.solo_elec.rows);
+    subTitle('Local Monitoring per Interval');
+    dataTable(S.solo_local, null);
+    subTitle('DCS / MPR Monitoring per Interval');
+    dataTable(S.solo_dcs, null);
+    sectionPhotos('h');
+  }
+  if(selSet.has('i')){
+    secBar('I. Kesimpulan & Tanda Tangan');
+    kvGrid(S.conclusion.rows);
+    sectionPhotos('i');
+    subTitle('Authorization & Signatures');
     checkY(40);
     const sw=(W-M*2)/3-4;
     [['sig-insp','Inspected By - POMI', gv('sig-insp-name')||gv('checked-by')],
      ['sig-vendor','Witnessed By - Vendor', gv('sig-vendor-name')],
      ['sig-super','Reviewed By - Supervisor', gv('sig-super-name')||gv('reviewed-by')]].forEach((s,i)=>{
       const xo=M+i*(sw+6);
-      pdf.setFillColor(244,248,246); pdf.setDrawColor(180,205,190); pdf.roundedRect(xo,y,sw,34,2,2,'FD');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(6.6); pdf.setTextColor(70,110,90); pdf.text(sanitize(s[1]), xo+2, y+5);
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(44,62,48); pdf.text(sanitize(s[2]||''), xo+2, y+11);
+      pdf.setFillColor(244,247,252); pdf.setDrawColor(185,205,232); pdf.roundedRect(xo,y,sw,34,2,2,'FD');
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(6.6); pdf.setTextColor(...NAVY2); pdf.text(sanitize(s[1]), xo+2, y+5);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(...NAVY); pdf.text(sanitize(s[2]||''), xo+2, y+11);
       const du=sigDataUrl(s[0]); if(du) try{ pdf.addImage(du,'PNG',xo+2,y+13,sw-4,17); }catch(e){}
-      pdf.setDrawColor(180,205,190); pdf.line(xo+2,y+31,xo+sw-2,y+31);
+      pdf.setDrawColor(185,205,232); pdf.line(xo+2,y+31,xo+sw-2,y+31);
     });
     y += 40;
   }
@@ -1547,9 +1800,12 @@ function _pdfSnapshot(){
 function openLoadMerge(){ LoadMergeModal.init({ assetTag: gv('asset-tag') || MW_TAG }); LoadMergeModal.open(); }
 
 /* ── INIT ── */
+mountPhotoPanels();
 loadDraft();
 loadPhotoDraft();
+renderAllPhotos();
 upStats();
+drawAllIRCharts();
 loadCloudDraftIfNewer();
 // prime the cloud draft id + a first cloud save shortly after load so an
 // immediately-closed tab still leaves a recoverable record
