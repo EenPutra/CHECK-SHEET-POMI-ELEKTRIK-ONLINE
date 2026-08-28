@@ -23,17 +23,16 @@
 //    <script> TechnicianAuth.init({ checkedByFieldId: 'checked-by' }); </script>
 //
 //  Self-injects its own small widget right next to the Checked By field
-//  and its own <style> — no HTML markup needed in the host page. Reuses
-//  the exact same sessionStorage keys Review_Approval_Dashboard.html
-//  already writes on login/register (dashboard_user/_role/_name/
-//  _login_time), so a technician who's already logged in there and
-//  navigates to a check sheet in the SAME browser tab is recognized
-//  immediately with no second login.
+//  and its own <style> — no HTML markup needed in the host page. Reads the
+//  shared login session via auth-session.js (window.AuthSession) — the same
+//  session dashboard.html / Review_Approval_Dashboard.html write on login —
+//  so a technician already logged in on any page in this app (any tab) is
+//  recognized here with no second login, and the session idle-expires after
+//  AuthSession.IDLE_MS (1h) of no activity. Falls back to the old per-tab
+//  sessionStorage read if auth-session.js isn't loaded on the page.
 // ============================================================
 
 const TechnicianAuth = (function () {
-  const SESSION_MS = 8 * 60 * 60 * 1000; // matches Review_Approval_Dashboard.html's own session length
-
   let _config = null;
   let _domReady = false;
 
@@ -43,9 +42,14 @@ const TechnicianAuth = (function () {
   }
 
   function currentSession() {
+    if (window.AuthSession) {
+      const s = window.AuthSession.get();
+      return s ? { user: s.user, role: s.role, name: s.name } : null;
+    }
+    // Fallback: no auth-session.js on this page — old per-tab behaviour.
     const user = sessionStorage.getItem('dashboard_user');
     const loginTime = parseInt(sessionStorage.getItem('dashboard_login_time') || '0', 10);
-    if (!user || (Date.now() - loginTime) >= SESSION_MS) return null;
+    if (!user || (Date.now() - loginTime) >= 8 * 60 * 60 * 1000) return null;
     return {
       user,
       role: sessionStorage.getItem('dashboard_role') || '',
@@ -185,10 +189,16 @@ const TechnicianAuth = (function () {
       const data = snap.docs[0].data();
       if (data.password !== hashed) { errEl.textContent = 'Password salah.'; btn.disabled = false; btn.textContent = 'MASUK'; return; }
 
-      sessionStorage.setItem('dashboard_user', data.username);
-      sessionStorage.setItem('dashboard_login_time', Date.now().toString());
-      sessionStorage.setItem('dashboard_role', data.role || '');
-      sessionStorage.setItem('dashboard_name', data.name || data.username);
+      const sess = { user: data.username, role: data.role || '', name: data.name || data.username };
+      if (window.AuthSession) {
+        window.AuthSession.set(sess);
+        if (data.signature) { try { localStorage.setItem('dashboard_signature', data.signature); } catch (e) {} }
+      } else {
+        sessionStorage.setItem('dashboard_user', sess.user);
+        sessionStorage.setItem('dashboard_login_time', Date.now().toString());
+        sessionStorage.setItem('dashboard_role', sess.role);
+        sessionStorage.setItem('dashboard_name', sess.name);
+      }
 
       closeModal();
       applySession({ user: data.username, role: data.role || '', name: data.name || data.username });
@@ -203,10 +213,13 @@ const TechnicianAuth = (function () {
     // Only clears THIS widget's effect on the form + the shared session —
     // does not touch anything else on the page. A technician sharing a
     // device with a colleague uses this to switch accounts between visits.
-    sessionStorage.removeItem('dashboard_user');
-    sessionStorage.removeItem('dashboard_login_time');
-    sessionStorage.removeItem('dashboard_role');
-    sessionStorage.removeItem('dashboard_name');
+    if (window.AuthSession) window.AuthSession.clear();
+    else {
+      sessionStorage.removeItem('dashboard_user');
+      sessionStorage.removeItem('dashboard_login_time');
+      sessionStorage.removeItem('dashboard_role');
+      sessionStorage.removeItem('dashboard_name');
+    }
     const field = document.getElementById(_config.checkedByFieldId);
     if (field) field.value = '';
     clearSession();
@@ -220,6 +233,15 @@ const TechnicianAuth = (function () {
     const session = currentSession();
     if (session) applySession(session);
     else renderLoggedOut();
+    // Session went idle while the sheet was open: unlock the field so the
+    // technician can still type/submit — but keep whatever they already
+    // typed, don't wipe an in-progress form.
+    if (window.AuthSession) window.AuthSession.onExpire(() => {
+      const field = document.getElementById(_config.checkedByFieldId);
+      if (field) { field.readOnly = false; field.style.background = ''; field.style.cursor = ''; }
+      renderLoggedOut();
+      if (typeof showNote === 'function') showNote('⏳ Sesi login berakhir (1 jam tanpa aktivitas). Login lagi bila perlu.', 'info');
+    });
   }
 
   return { init, openModal, logout, _submit: submit, _closeModal: closeModal };

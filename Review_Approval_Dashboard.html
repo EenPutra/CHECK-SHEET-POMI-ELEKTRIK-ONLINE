@@ -16,6 +16,7 @@
 <script src="db-helper.js"></script>
 <script src="storage-helper.js"></script>
 <script src="approval-helper.js"></script>
+<script src="auth-session.js"></script>
 <style>
 :root{
   --bg:#f4f7fb; --bg-2:#eaf0f7; --surf:#ffffff; --surf-2:#f8fafc;
@@ -645,13 +646,10 @@ async function doLogin(e){
     loggedInRole = userData.role || null;
     loggedInName = userData.name || loggedInUser;
     _myUserDocId = snap.docs[0].id;
-    sessionStorage.setItem('dashboard_user', loggedInUser);
-    sessionStorage.setItem('dashboard_login_time', Date.now().toString());
-    sessionStorage.setItem('dashboard_role', loggedInRole || '');
-    // dashboard_name: what check sheets' technician-auth.js widget shows/
-    // fills into Checked By — falls back to username for accounts created
-    // before this field existed (the techop2/supervisor/admin accounts).
-    sessionStorage.setItem('dashboard_name', loggedInName);
+    // Shared login session (auth-session.js) — localStorage, carries across
+    // every tab/page of this app, idle-expires after 1h. dashboard_name is
+    // also what check sheets' technician-auth.js widget fills into Checked By.
+    AuthSession.set({ user: loggedInUser, role: loggedInRole || '', name: loggedInName });
     setSignatureSession(userData.signature || null);
     // Mandatory Team/Area for technician/techop2 accounts without one yet —
     // block on the setup form until saved. Supervisor/Admin skip it entirely.
@@ -763,10 +761,8 @@ async function doRegister(e){
 
     loggedInUser = user;
     loggedInRole = role;
-    sessionStorage.setItem('dashboard_user', loggedInUser);
-    sessionStorage.setItem('dashboard_login_time', Date.now().toString());
-    sessionStorage.setItem('dashboard_role', loggedInRole);
-    sessionStorage.setItem('dashboard_name', name);
+    loggedInName = name;
+    AuthSession.set({ user: loggedInUser, role: loggedInRole, name: name });
     setTeamSession(roleNeedsTeam(role) ? team : null, roleNeedsTeam(role) ? area : null);
     setSignatureSession(signature);
     showApp();
@@ -784,14 +780,16 @@ async function doRegister(e){
 function setTeamSession(team, area){
   loggedInTeam = team || null;
   loggedInArea = area || null;
-  if(team) sessionStorage.setItem('dashboard_team', team); else sessionStorage.removeItem('dashboard_team');
-  if(area) sessionStorage.setItem('dashboard_area', area); else sessionStorage.removeItem('dashboard_area');
+  try{
+    if(team) localStorage.setItem('dashboard_team', team); else localStorage.removeItem('dashboard_team');
+    if(area) localStorage.setItem('dashboard_area', area); else localStorage.removeItem('dashboard_area');
+  }catch(e){}
 }
 function setSignatureSession(sig){
   loggedInSignature = sig || null;
   try{
-    if(sig) sessionStorage.setItem('dashboard_signature', sig);
-    else sessionStorage.removeItem('dashboard_signature');
+    if(sig) localStorage.setItem('dashboard_signature', sig);
+    else localStorage.removeItem('dashboard_signature');
   }catch(e){ /* quota — signature just won't persist across a reload, re-fetched on next login */ }
 }
 function promptTeamSetup(docId, preTeam, preArea){
@@ -940,8 +938,7 @@ async function saveProfile(){
     const doc = await _myUserDoc();
     await db.collection('dashboard_users').doc(doc.id).update({ name, username: newUser, profileUpdatedAt: new Date().toISOString() });
     loggedInName = name; loggedInUser = newUser;
-    sessionStorage.setItem('dashboard_name', name);
-    sessionStorage.setItem('dashboard_user', newUser);
+    AuthSession.set({ user: newUser, role: loggedInRole || '', name });
     document.getElementById('user-label').textContent = '👤 ' + newUser;
     okEl.textContent = '✅ Profil tersimpan.';
   }catch(err){ console.error(err); errEl.textContent = 'Gagal menyimpan: ' + err.message; }
@@ -984,26 +981,19 @@ async function saveSignatureFromSettings(){
 }
 
 function doLogout(){
-  sessionStorage.removeItem('dashboard_user');
-  sessionStorage.removeItem('dashboard_login_time');
-  sessionStorage.removeItem('dashboard_role');
-  sessionStorage.removeItem('dashboard_name');
-  sessionStorage.removeItem('dashboard_team');
-  sessionStorage.removeItem('dashboard_area');
-  sessionStorage.removeItem('dashboard_signature');
+  AuthSession.clear();
   location.reload();
 }
 async function checkSession(){
-  const saved = sessionStorage.getItem('dashboard_user');
-  const loginTime = parseInt(sessionStorage.getItem('dashboard_login_time')||'0');
-  const elapsed = Date.now() - loginTime;
-  if(saved && elapsed < 8*60*60*1000){
-    loggedInUser = saved;
-    loggedInRole = sessionStorage.getItem('dashboard_role') || null;
-    loggedInName = sessionStorage.getItem('dashboard_name') || loggedInUser;
-    loggedInTeam = sessionStorage.getItem('dashboard_team') || null;
-    loggedInArea = sessionStorage.getItem('dashboard_area') || null;
-    loggedInSignature = sessionStorage.getItem('dashboard_signature') || null;
+  AuthSession.onExpire(() => location.reload()); // idle 1h -> back to login overlay
+  const sess = AuthSession.get();
+  if(sess){
+    loggedInUser = sess.user;
+    loggedInRole = sess.role || null;
+    loggedInName = sess.name || loggedInUser;
+    loggedInTeam = sess.team || null;
+    loggedInArea = sess.area || null;
+    loggedInSignature = sess.signature || null;
     // Backfill team/area from Firestore for sessions created before this
     // feature (or on another page); force the setup form if still missing.
     // Supervisor/Admin skip this entirely — team/area doesn't apply to them.

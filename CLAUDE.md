@@ -12,13 +12,15 @@ Firestore for review, Excel export, and a Transformer PM parameter trend chart (
 sign-off workflow layered on top of every check sheet's submissions (see "Review & Approval
 Workflow" below). There is **no build step, no bundler, no package.json, no test suite** —
 every page is a single self-contained `.html` file with inline `<style>` and `<script>`,
-sharing seven small JS files via plain `<script src>` tags: `firebase-config.js`,
+sharing a handful of small JS files via plain `<script src>` tags: `firebase-config.js`,
 `db-helper.js` (the Firestore data contract), `img-helper.js` + `photo-kit.js` (the shared
-evidence-photo pipeline, see "Photos" below), and `storage-helper.js` + `approval-helper.js` +
+evidence-photo pipeline, see "Photos" below), `storage-helper.js` + `approval-helper.js` +
 `load-merge-modal.js` (the Review & Approval workflow's file-storage/approvals-collection/
-merge-modal layer — not every check sheet needs these last three, but all 22 currently do) —
-plus a couple of PNG assets (`LOGO POMI.png`, `brush_magazine_diagram.png`) via plain
-`<img src>` tags.
+merge-modal layer — not every check sheet needs these last three, but all 22 currently do),
+`auth-session.js` (the shared `localStorage` login session + 1-hour idle timeout, loaded before
+`technician-auth.js` everywhere — see "Technician login on check sheets" below), and
+`technician-auth.js` (the optional Checked-By auto-fill widget) — plus a couple of PNG assets
+(`LOGO POMI.png`, `brush_magazine_diagram.png`) via plain `<img src>` tags.
 
 ## Running / testing changes
 
@@ -1094,19 +1096,14 @@ along two independent axes — see the matrix below.
 | Row-select checkboxes, Delete, Hapus Duplikat | hidden | hidden | visible | visible |
 | Excel export | visible (own data only) | visible (all) | visible | visible |
 
-- **Session is now unified with the rest of the app.** `doLogin()` and the session-restore path
-  now also read/write `dashboard_role` and `dashboard_name` in `sessionStorage` — the exact same
-  keys `Review_Approval_Dashboard.html` and `technician-auth.js` already use — so a login on any
-  one of those pages is recognized on `dashboard.html` too, in the same tab, with no second
-  login. **`checkSession()` is now `async`** and backfills role+name from a one-time Firestore
-  lookup when it finds `dashboard_user` set but no `dashboard_role` cached — this covers a
-  cross-page session created before this feature existed, or any other path that only ever set
-  `dashboard_user`. Without this, such a session would silently fall through to the unscoped
-  full view instead of the correct role-gated one; verified via headless Chrome by seeding
-  exactly that partial sessionStorage state by hand and confirming the backfill runs and
-  `role-technician` still gets applied. `doLogout()` clears all three keys — since they're
-  shared, logging out here also logs the tab out of the other pages, which is the same tab-wide
-  behavior their own logout functions already have (e.g. `TechnicianAuth.logout()`).
+- **Session is unified with the rest of the app via `auth-session.js` (`window.AuthSession`).**
+  `doLogin()` calls `AuthSession.set({user,role,name})`, `checkSession()` (still `async`) reads
+  `AuthSession.get()` and backfills role+name from a one-time Firestore lookup when it finds a
+  session with no role cached, `doLogout()` calls `AuthSession.clear()`. The session lives in
+  **`localStorage`** now (shared across every tab/page of the app, 1-hour idle timeout) — see
+  "Technician login on check sheets" below for the full `AuthSession` contract. `checkSession()`
+  registers `AuthSession.onExpire(() => location.reload())` so an idle timeout drops back to the
+  login overlay.
 - **Two independent body-class toggles drive every role-gated element**, applied once in
   `applyRoleUI()` (called from `showDashboard()`, after login/session-restore resolves):
   `body.role-technician` (the simplified-layout axis — technician only) and `body.can-delete`
@@ -1729,18 +1726,31 @@ silently does nothing (`init()` bails out early if the given field id doesn't ex
 by design, so a copy-paste mistake fails safe/invisibly rather than throwing and breaking the
 rest of the page).
 
-**Session is shared with the dashboards via the same sessionStorage keys**
-(`dashboard_user`/`dashboard_role`/`dashboard_name`/`dashboard_login_time`,
-`Review_Approval_Dashboard.html` also writes `dashboard_name` now, both on login — fetched from
-the account's `name` field, fallback to `username` for the techop2/supervisor/admin accounts
-created before that field existed — and on self-registration, where entering a full name is
-required). This means a technician who's already logged into `Review_Approval_Dashboard.html`
-and navigates to a check sheet **in the same browser tab** is recognized immediately with no
-second login — sessionStorage persists across same-tab navigation, just not across separate tabs
-or devices. A technician opening a check sheet cold (fresh tab, e.g. from `index.html`) sees the
-"🔑 Login untuk isi otomatis" button and logs in there directly; the modal is self-contained
-(same hashPass/Firestore-lookup logic as the dashboards' own login, just duplicated locally so
-this file has zero dependency on those pages being open).
+**Session is shared with the dashboards via `auth-session.js` (`window.AuthSession`)** — a small
+shared file (loaded before `technician-auth.js` in every check sheet, and in `<head>` of both
+dashboards) that owns the login session for the whole app:
+- **`localStorage`, not `sessionStorage`** — keys `dashboard_user`/`dashboard_role`/
+  `dashboard_name`/`dashboard_login_time` (+ `dashboard_team`/`dashboard_area`/
+  `dashboard_signature` from `Review_Approval_Dashboard.html`), plus `dashboard_last_activity`.
+  So one login carries across **every tab/window/page** of this app on the same computer —
+  clicking a link that opens a new tab no longer re-prompts. (Was `sessionStorage` = per-tab.)
+- **1-hour idle timeout**: `AuthSession` wires `click`/`keydown`/`pointerdown`/`scroll`/
+  `touchstart` (throttled) + `visibilitychange` to bump `dashboard_last_activity`, and a
+  `setInterval(_check, 60s)`. `AuthSession.get()` returns `null` (and `clear()`s storage) once
+  `now - last_activity >= IDLE_MS` (3600000). Pages register `AuthSession.onExpire(fn)` —
+  dashboards reload (→ login overlay); `technician-auth.js` unlocks the Checked-By field but
+  keeps whatever the technician already typed (never wipes an in-progress form). A `storage`
+  event listener makes a logout/expiry in one tab propagate to the others.
+- **API**: `AuthSession.set({user,role,name})` on login (login-time + activity stamped);
+  `AuthSession.get()` → `{user,role,name,team,area,signature}` | `null`; `AuthSession.clear()`
+  on logout; `AuthSession.touch()` / `isExpired()`. `technician-auth.js` falls back to the old
+  per-tab `sessionStorage` read if `auth-session.js` isn't on the page (shouldn't happen).
+- One-time **migration** on first load: an existing tab still on the old `sessionStorage` scheme
+  gets its keys copied to `localStorage` instead of being kicked to the login screen.
+
+A technician opening a check sheet cold (never logged in) still sees the "🔑 Login untuk isi
+otomatis" button; the modal is self-contained (same hashPass/Firestore-lookup as the dashboards,
+duplicated locally so the file has zero dependency on those pages being open).
 
 **What logging in actually does to the field**: sets its value to the logged-in name, sets
 `readOnly = true`, and fires synthetic `input`/`change` events on it (`field.dispatchEvent(...)`)

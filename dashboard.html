@@ -14,6 +14,7 @@
 <script src="firebase-config.js"></script>
 <script src="db-helper.js"></script>
 <script src="approval-helper.js"></script>
+<script src="auth-session.js"></script>
 <style>
 :root{
   --bg:#f4f7fb;
@@ -1208,13 +1209,12 @@ async function doLogin(e) {
     loggedInUser = userData.username;
     loggedInRole = userData.role || 'none';
     loggedInName = userData.name || userData.username;
-    // Shared with Review_Approval_Dashboard.html / technician-auth.js — same
-    // sessionStorage keys, so a login here is recognized on those pages too
-    // (and vice versa) without a second login in the same tab.
-    sessionStorage.setItem('dashboard_user', loggedInUser);
-    sessionStorage.setItem('dashboard_role', loggedInRole);
-    sessionStorage.setItem('dashboard_name', loggedInName);
-    sessionStorage.setItem('dashboard_login_time', Date.now().toString());
+    // Shared login session (auth-session.js) — localStorage, so a login here
+    // is recognized on every page/tab of this app on the same computer, and
+    // idle-expires after AuthSession.IDLE_MS (1h). See auth-session.js.
+    AuthSession.set({ user: loggedInUser, role: loggedInRole, name: loggedInName });
+    if (userData.signature) { try { localStorage.setItem('dashboard_signature', userData.signature); } catch (e) {} }
+    if (userData.team) { try { localStorage.setItem('dashboard_team', userData.team); localStorage.setItem('dashboard_area', userData.area || ''); } catch (e) {} }
     showDashboard();
   } catch (err) {
     console.error('Login error:', err);
@@ -1257,35 +1257,30 @@ function applyRoleUI() {
 }
 
 function doLogout() {
-  sessionStorage.removeItem('dashboard_user');
-  sessionStorage.removeItem('dashboard_role');
-  sessionStorage.removeItem('dashboard_name');
-  sessionStorage.removeItem('dashboard_login_time');
+  AuthSession.clear();
   loggedInUser = null; loggedInRole = null; loggedInName = null;
   location.reload();
 }
 
 async function checkSession() {
-  const saved = sessionStorage.getItem('dashboard_user');
-  const loginTime = parseInt(sessionStorage.getItem('dashboard_login_time') || '0');
-  const elapsed = Date.now() - loginTime;
-  if (saved && elapsed < 8 * 60 * 60 * 1000) {
-    loggedInUser = saved;
-    loggedInRole = sessionStorage.getItem('dashboard_role') || null;
-    loggedInName = sessionStorage.getItem('dashboard_name') || null;
+  AuthSession.onExpire(() => location.reload()); // idle 1h -> back to login
+  const sess = AuthSession.get();
+  if (sess) {
+    loggedInUser = sess.user;
+    loggedInRole = sess.role || null;
+    loggedInName = sess.name || null;
     // A session started on another page before role-tracking existed here
     // (or a plain dashboard_user set some other way) won't have a role
     // cached yet — back-fill it once from Firestore so scoping still
     // applies, rather than silently defaulting to the full/unscoped view.
     if (!loggedInRole) {
       try {
-        const snap = await db.collection('dashboard_users').where('username', '==', saved).limit(1).get();
+        const snap = await db.collection('dashboard_users').where('username', '==', loggedInUser).limit(1).get();
         if (!snap.empty) {
           const userData = snap.docs[0].data();
           loggedInRole = userData.role || 'none';
           loggedInName = userData.name || userData.username;
-          sessionStorage.setItem('dashboard_role', loggedInRole);
-          sessionStorage.setItem('dashboard_name', loggedInName);
+          AuthSession.set({ user: loggedInUser, role: loggedInRole, name: loggedInName });
         } else {
           loggedInRole = 'none';
         }
