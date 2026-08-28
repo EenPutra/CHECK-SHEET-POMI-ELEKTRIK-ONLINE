@@ -1508,7 +1508,11 @@ async function cleanupDuplicateApprovals(approvals){
     };
   }));
 
-  const orphanDeletes = withKey.filter(x => x.orphaned && x.a.status === 'submitted').map(x => x.a);
+  // A duplicate is auto-cleanable only if no human has touched it: a plain
+  // 'submitted', OR a 'reviewed' that was auto-advanced because the submitter
+  // is a TechOp2 (review.auto) — no real review to lose.
+  const autoCleanEligible = a => a.status === 'submitted' || (a.status === 'reviewed' && a.review && a.review.auto);
+  const orphanDeletes = withKey.filter(x => x.orphaned && autoCleanEligible(x.a)).map(x => x.a);
 
   const groups = new Map();
   withKey.forEach(x => {
@@ -1527,7 +1531,7 @@ async function cleanupDuplicateApprovals(approvals){
     for(let i=0;i<sorted.length-1;i++){
       const cur = sorted[i], next = sorted[i+1];
       const gap = new Date(next.createdAt||0) - new Date(cur.createdAt||0);
-      if(gap <= gapMs && cur.a.status === 'submitted') toDelete.push(cur.a);
+      if(gap <= gapMs && autoCleanEligible(cur.a)) toDelete.push(cur.a);
     }
   });
   if(!toDelete.length) return [];

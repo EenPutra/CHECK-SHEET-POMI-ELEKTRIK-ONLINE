@@ -1428,6 +1428,11 @@ async function submitToDb(){
   try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); }catch(e){}
   SubmitGuard.setProgress(100,'Selesai!');
   setTimeout(()=>SubmitGuard.hideProgress(), 500);
+  const _sess = (window.AuthSession && window.AuthSession.get) ? window.AuthSession.get() : null;
+  if(_sess && _sess.role==='techop2')
+    note('✅ Terkirim ke Review & Approval — karena Anda TechOp2, laporan langsung masuk antrean approval Supervisor.','ok');
+  else
+    note('✅ Terkirim ke Review & Approval — menunggu review TechOp2.','ok');
 }
 
 /* ── PDF ── */

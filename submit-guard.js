@@ -238,7 +238,11 @@ const SubmitGuard = (function () {
           const appr = await Approvals.getByChecksheetId(candidate.id);
           if (appr) {
             approvalId = appr.id;
-            if (appr.status !== 'submitted') canOverwrite = false;
+            // Safe to overwrite when nothing a human has reviewed yet: a plain
+            // 'submitted', OR a 'reviewed' that was auto-advanced because the
+            // submitter is a TechOp2 (review.auto) — no real review to lose.
+            const autoReviewed = appr.status === 'reviewed' && appr.review && appr.review.auto;
+            if (appr.status !== 'submitted' && !autoReviewed) canOverwrite = false;
           }
         }
       } catch (e) { canOverwrite = false; } // uncertain -> never offer overwrite

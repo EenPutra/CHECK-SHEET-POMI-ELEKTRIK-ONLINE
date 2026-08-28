@@ -34,8 +34,12 @@ const Approvals = {
       ...(meta.team ? { team: meta.team } : {}),
       ...(meta.area ? { area: meta.area } : {}),
       ...(meta.src ? { src: meta.src } : {}),
-      status: 'submitted',
-      review: null,       // {comments, recommendations, signature, reviewedBy, reviewedAt}
+      // When the submitter is themselves a TechOp2 (level 2), the TechOp2
+      // review step is auto-completed and the item goes straight to the
+      // Supervisor's approval queue (status 'reviewed'). meta.autoReview holds
+      // the synthetic review record; absent for a normal technician submit.
+      status: meta.autoReview ? 'reviewed' : 'submitted',
+      review: meta.autoReview || null,   // {comments, recommendations, signature, reviewedBy, reviewedAt, auto}
       approval: null,     // {notes, signature, approvedBy, approvedAt}
       returnedNote: null, // {note, by, stage, returnedAt}
       finalPdfUrl: null,
@@ -133,15 +137,50 @@ const Approvals = {
   //     photos upload (proportional to count), then the PDF, then the
   //     approvals record — lets the caller drive a real progress bar
   //     instead of a guessed animation. Never called if omitted.
+  //   autoReview: pass false to force the normal review path even when the
+  //     submitter is a TechOp2. Otherwise this is decided automatically from
+  //     window.AuthSession.get(): a logged-in TechOp2 (role 'techop2')
+  //     submitting their own work skips the review stage — the approvals doc
+  //     is created at status 'reviewed' with a synthetic review record
+  //     ({reviewedBy, reviewedAt, signature, auto:true}) so it goes straight
+  //     to the Supervisor's approval queue. team/area are also backfilled
+  //     from the session here when the caller didn't pass them.
   //
   // Returns true if photos/PDF/approval record all succeeded, false if
   // any part failed (logged to console) — the checksheet doc itself was
   // ALREADY saved by the caller before this runs, so a false return here
   // must never be treated as "the whole submission failed."
   async submitWithFiles(checksheetId, opts = {}) {
-    const { photos, pdfBuilder, assetTag, assetName, checksheetFile, submittedBy, revisionOf, existingApprovalId, onProgress, team, area, src } = opts;
+    const { photos, pdfBuilder, assetTag, assetName, checksheetFile, submittedBy, revisionOf, existingApprovalId, onProgress, src } = opts;
+    let { team, area } = opts;
     const report = (pct, label) => { if (typeof onProgress === 'function') onProgress(pct, label); };
     let ok = true;
+
+    // Who is submitting? A logged-in TechOp2 (level 2) submitting their own
+    // work skips the TechOp2 review stage — the approval is created already
+    // 'reviewed' so it lands straight in the Supervisor's approval queue.
+    // Also backfills team/area routing from the session when the caller
+    // didn't pass them. Fully optional: no session / plain technician =>
+    // unchanged 'submitted' behaviour.
+    let autoReview = null;
+    try {
+      const sess = (typeof window !== 'undefined' && window.AuthSession && window.AuthSession.get) ? window.AuthSession.get() : null;
+      if (sess) {
+        if (!team && sess.team) team = sess.team;
+        if (!area && sess.area) area = Array.isArray(sess.area) ? sess.area[0] : sess.area;
+        if (opts.autoReview !== false && sess.role === 'techop2') {
+          const who = sess.name || submittedBy || 'TechOp2';
+          autoReview = {
+            comments: 'Disubmit langsung oleh TechOp2 (' + who + ') — tahap review dilewati otomatis.',
+            recommendations: '',
+            signature: sess.signature || null,
+            reviewedBy: who,
+            reviewedAt: new Date().toISOString(),
+            auto: true,
+          };
+        }
+      }
+    } catch (e) { /* session lookup is best-effort */ }
     try {
       const photoUrls = {};
       const groups = Object.keys(photos || {});
@@ -200,11 +239,14 @@ const Approvals = {
       if (existingApprovalId) {
         await db.collection(this.COLLECTION).doc(existingApprovalId).set({
           assetTag: assetTag || '', assetName: assetName || '', checksheetFile: checksheetFile || '',
-          submittedBy: submittedBy || '', status: 'submitted',
+          submittedBy: submittedBy || '',
+          status: autoReview ? 'reviewed' : 'submitted',
+          ...(autoReview ? { review: autoReview } : {}),
+          ...(team ? { team } : {}), ...(area ? { area } : {}),
           updatedAt: new Date().toISOString(),
         }, { merge: true });
       } else {
-        await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf, team, area, src });
+        await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf, team, area, src, autoReview });
       }
       report(100, 'Selesai');
     } catch (e) {

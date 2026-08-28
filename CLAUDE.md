@@ -1278,6 +1278,20 @@ the current design — **do not "simplify" these away**:
   `revisionOf`) — `photos: null` and `pdfBuilder: null` are both valid for a sheet with no
   photo feature / no jsPDF export (e.g. `Hoist_Inspection_Maintenance.html`, which only has
   `window.print()`).
+  **Submitter-role auto-advance (applies to every check sheet automatically — no per-file
+  code):** `submitWithFiles()` reads `window.AuthSession.get()` at submit time. When the
+  logged-in submitter's `role` is `techop2` (level 2), the TechOp2 review step is skipped —
+  the `approvals` doc is created already at `status:'reviewed'` with a synthetic
+  `review:{reviewedBy, reviewedAt, signature:<their session signature>, auto:true}` record, so
+  it lands straight in the Supervisor's approval queue (`inboxItems()` for
+  `loggedInRole==='supervisor'` already filters on `status==='reviewed'`). A plain
+  `technician` (or no session) is unchanged → `status:'submitted'`. `submitWithFiles()` also
+  backfills `team`/`area` from the session when the caller didn't pass them. Pass
+  `opts.autoReview:false` to force the normal review path even for a TechOp2. Because an
+  auto-reviewed doc starts at `reviewed`, `submit-guard.js`'s overwrite-safety check and
+  `Review_Approval_Dashboard.html`'s `cleanupDuplicateApprovals()` both additionally treat
+  `status==='reviewed' && review.auto` as "nothing a human reviewed yet" (same as
+  `'submitted'`) so a TechOp2's accidental resubmit still de-dupes correctly.
 - **`load-merge-modal.js`** (`window.LoadMergeModal`) — the generic "pull from database" +
   multi-submission merge picker + revision banner, reused across every check sheet instead of
   the ~150-line bespoke version originally hand-written for the `PLTS_AshDisposal_PM.html`
