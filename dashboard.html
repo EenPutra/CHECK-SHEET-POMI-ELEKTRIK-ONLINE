@@ -1214,7 +1214,13 @@ async function doLogin(e) {
     // idle-expires after AuthSession.IDLE_MS (1h). See auth-session.js.
     AuthSession.set({ user: loggedInUser, role: loggedInRole, name: loggedInName });
     if (userData.signature) { try { localStorage.setItem('dashboard_signature', userData.signature); } catch (e) {} }
-    if (userData.team) { try { localStorage.setItem('dashboard_team', userData.team); localStorage.setItem('dashboard_area', userData.area || ''); } catch (e) {} }
+    if (userData.team) { try {
+      localStorage.setItem('dashboard_team', userData.team);
+      // area is stored as a JSON array (multi-area TechOp2) — keep the format
+      // consistent with Review_Approval_Dashboard.html's setTeamSession().
+      const _areas = Array.isArray(userData.area) ? userData.area : (userData.area ? [userData.area] : []);
+      if (_areas.length) localStorage.setItem('dashboard_area', JSON.stringify(_areas));
+    } catch (e) {} }
     showDashboard();
   } catch (err) {
     console.error('Login error:', err);

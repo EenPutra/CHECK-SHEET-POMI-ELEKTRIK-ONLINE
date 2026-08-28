@@ -157,6 +157,11 @@ canvas.reg-sig{border:1.5px dashed var(--bdr-2);border-radius:10px;background:#f
 select.login-field{appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 16px center;padding-right:38px;cursor:pointer}
 select.login-field:disabled{opacity:.55;cursor:not-allowed}
 .login-field-lbl{font-size:10.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--txt-3);text-align:left;margin:2px 0 5px}
+.area-checks{display:flex;flex-direction:column;gap:6px;margin-bottom:10px}
+.area-chk{display:flex;align-items:center;gap:9px;font-size:13px;color:var(--txt);background:var(--surf-2);border:1px solid var(--bdr);border-radius:8px;padding:8px 11px;cursor:pointer;user-select:none}
+.area-chk:hover{border-color:var(--bdr-2)}
+.area-chk input{width:16px;height:16px;flex-shrink:0;accent-color:var(--pri)}
+.area-hint{font-size:11.5px;color:var(--txt-3);padding:3px 1px}
 .card-scope-tag{display:inline-block;background:var(--surf-2);border:1px solid var(--bdr);border-radius:6px;padding:1px 7px;font-size:10.5px;font-family:var(--mono);color:var(--txt-2);margin-left:6px}
 
 /* TABS */
@@ -324,15 +329,13 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
         </select>
         <div id="reg-team-wrap">
           <div class="login-field-lbl">Team</div>
-          <select class="login-field" id="reg-team" onchange="fillAreaOptions('reg-team','reg-area')">
+          <select class="login-field" id="reg-team" onchange="renderAreaChecks('reg-area-checks', this.value)">
             <option value="">— Pilih Team —</option>
             <option value="E7">E7</option>
             <option value="C7">C7</option>
           </select>
-          <div class="login-field-lbl">Area</div>
-          <select class="login-field" id="reg-area" disabled>
-            <option value="">— Pilih Team dulu —</option>
-          </select>
+          <div class="login-field-lbl">Area <span id="reg-area-note" style="text-transform:none;font-weight:400;color:var(--txt-3)"></span></div>
+          <div id="reg-area-checks" class="area-checks"><div class="area-hint">Pilih Team dulu.</div></div>
         </div>
         <div id="reg-code-wrap" style="display:none">
           <div class="login-field-lbl">Kode Akses (dari admin)</div>
@@ -362,15 +365,13 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
     <div class="login-logo">LENGKAPI <span>DATA TEAM</span></div>
     <div class="login-sub">Akun Anda belum punya Team &amp; Area. Data ini menentukan PIC yang mereview submission Anda &mdash; wajib diisi untuk melanjutkan.</div>
     <div class="login-field-lbl">Team</div>
-    <select class="login-field" id="ts-team" onchange="fillAreaOptions('ts-team','ts-area')">
+    <select class="login-field" id="ts-team" onchange="renderAreaChecks('ts-area-checks', this.value)">
       <option value="">— Pilih Team —</option>
       <option value="E7">E7</option>
       <option value="C7">C7</option>
     </select>
-    <div class="login-field-lbl">Area</div>
-    <select class="login-field" id="ts-area" disabled>
-      <option value="">— Pilih Team dulu —</option>
-    </select>
+    <div class="login-field-lbl">Area <span id="ts-area-note" style="text-transform:none;font-weight:400;color:var(--txt-3)"></span></div>
+    <div id="ts-area-checks" class="area-checks"><div class="area-hint">Pilih Team dulu.</div></div>
     <button class="login-btn" id="ts-btn" onclick="saveTeamSetup()">SIMPAN &amp; LANJUT</button>
     <div class="login-err" id="ts-err"></div>
   </div>
@@ -419,6 +420,22 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
       <button class="login-btn" id="set-profile-btn" onclick="saveProfile()">Simpan Profil</button>
       <div class="login-err" id="set-profile-err"></div>
       <div class="settings-ok" id="set-profile-ok"></div>
+    </div>
+
+    <div class="settings-sec" id="set-team-sec">
+      <h4>Team &amp; Area</h4>
+      <div class="login-hint" style="margin-top:0">Menentukan submission mana yang masuk kotak masuk "Menunggu Saya".</div>
+      <div class="login-field-lbl">Team</div>
+      <select class="login-field" id="set-team" onchange="renderAreaChecks('set-area-checks', this.value)">
+        <option value="">— Pilih Team —</option>
+        <option value="E7">E7</option>
+        <option value="C7">C7</option>
+      </select>
+      <div class="login-field-lbl">Area <span id="set-area-note" style="text-transform:none;font-weight:400;color:var(--txt-3)"></span></div>
+      <div id="set-area-checks" class="area-checks"><div class="area-hint">Pilih Team dulu.</div></div>
+      <button class="login-btn" id="set-team-btn" onclick="saveTeamAreaFromSettings()">Simpan Team &amp; Area</button>
+      <div class="login-err" id="set-team-err"></div>
+      <div class="settings-ok" id="set-team-ok"></div>
     </div>
 
     <div class="settings-sec">
@@ -588,7 +605,8 @@ syncThemeUI();
 /* ── AUTH (mirrors dashboard.html's login, plus a role lookup) ── */
 let loggedInUser = null, loggedInRole = null;
 let loggedInName = null;
-let loggedInTeam = null, loggedInArea = null;
+let loggedInTeam = null;
+let loggedInAreas = [];   // this account's area(s). Technician = 1; TechOp2 = 1+ (multi).
 let loggedInSignature = null; // this account's saved signature data URL (TechOp2/Supervisor)
 let _myUserDocId = null;      // cached dashboard_users doc id of the logged-in account
 let _teamSetupDocId = null;   // dashboard_users doc id awaiting a team/area save
@@ -621,19 +639,42 @@ const TEAM_AREAS = {
 // being routable to a PIC). Supervisor & Admin are never scoped, so they are
 // NOT forced through the mandatory team-setup form on login.
 function roleNeedsTeam(role){ return role !== 'supervisor' && role !== 'admin'; }
-function fillAreaOptions(teamSelId, areaSelId, selected){
-  const team = document.getElementById(teamSelId).value;
-  const areaSel = document.getElementById(areaSelId);
-  const opts = TEAM_AREAS[team] || [];
-  if(!opts.length){
-    areaSel.innerHTML = '<option value="">— Pilih Team dulu —</option>';
-    areaSel.disabled = true;
-    return;
+// TechOp2 can be PIC for more than one area; a technician belongs to exactly one.
+function roleAllowsMultiArea(role){ return role === 'techop2'; }
+
+// Firestore stores `area` as a string (legacy / technician) or an array
+// (multi-area TechOp2) — always read it through this.
+function toAreaList(a){
+  if(Array.isArray(a)) return a.filter(Boolean);
+  if(typeof a === 'string' && a){
+    try{ const p = JSON.parse(a); if(Array.isArray(p)) return p.filter(Boolean); }catch(e){}
+    return [a];
   }
-  areaSel.innerHTML = '<option value="">— Pilih Area —</option>' +
-    opts.map(a => `<option value="${a}"${a===selected?' selected':''}>${a}</option>`).join('');
-  areaSel.disabled = false;
+  return [];
 }
+
+// Render the area picker as checkboxes into `containerId` for `team`, with
+// `selected` (array/string) pre-checked. getCheckedAreas() reads them back.
+function renderAreaChecks(containerId, team, selected){
+  const c = document.getElementById(containerId);
+  if(!c) return;
+  const opts = TEAM_AREAS[team] || [];
+  if(!opts.length){ c.innerHTML = '<div class="area-hint">Pilih Team dulu.</div>'; return; }
+  const sel = new Set(toAreaList(selected));
+  c.innerHTML = opts.map(a =>
+    `<label class="area-chk"><input type="checkbox" value="${escHtml(a)}"${sel.has(a)?' checked':''}> ${escHtml(a)}</label>`
+  ).join('');
+}
+function getCheckedAreas(containerId){
+  return [...document.querySelectorAll('#'+containerId+' input[type=checkbox]:checked')].map(x => x.value);
+}
+// Validate a picked area list for a role. Returns an error string, or '' if OK.
+function areaListError(role, areas){
+  if(!areas.length) return 'Pilih minimal satu Area.';
+  if(!roleAllowsMultiArea(role) && areas.length > 1) return 'Untuk role ini pilih tepat satu Area.';
+  return '';
+}
+function areaNoteFor(role){ return roleAllowsMultiArea(role) ? '(bisa pilih lebih dari satu)' : '(pilih satu)'; }
 
 // Register form: show Team/Area only for roles that need routing, and the
 // signature pad only for roles that sign (TechOp2/Supervisor).
@@ -641,6 +682,8 @@ function onRegRoleChange(){
   const role = document.getElementById('reg-role').value;
   document.getElementById('reg-team-wrap').style.display = roleNeedsTeam(role) ? '' : 'none';
   document.getElementById('reg-code-wrap').style.display = roleNeedsAccessCode(role) ? '' : 'none';
+  document.getElementById('reg-area-note').textContent = areaNoteFor(role);
+  renderAreaChecks('reg-area-checks', document.getElementById('reg-team').value);
   const sigWrap = document.getElementById('reg-sig-wrap');
   const showSig = roleUsesSignature(role);
   sigWrap.style.display = showSig ? '' : 'none';
@@ -676,11 +719,11 @@ async function doLogin(e){
     setSignatureSession(userData.signature || null);
     // Mandatory Team/Area for technician/techop2 accounts without one yet —
     // block on the setup form until saved. Supervisor/Admin skip it entirely.
-    if(roleNeedsTeam(loggedInRole) && (!TEAM_AREAS[userData.team] || !userData.area)){
-      promptTeamSetup(snap.docs[0].id, userData.team, userData.area);
+    if(roleNeedsTeam(loggedInRole) && (!TEAM_AREAS[userData.team] || !toAreaList(userData.area).length)){
+      promptTeamSetup(snap.docs[0].id, userData.team, toAreaList(userData.area));
       return; // showApp() runs after saveTeamSetup()
     }
-    setTeamSession(userData.team, userData.area);
+    setTeamSession(userData.team, toAreaList(userData.area));
     showApp();
   }catch(err){
     console.error('Login error:', err);
@@ -695,6 +738,7 @@ function toggleAuthMode(mode){
   document.getElementById('login-err').textContent = '';
   document.getElementById('register-err').textContent = '';
   document.getElementById('fp-err').textContent = '';
+  if(mode==='register') onRegRoleChange();
 }
 
 // Forgot password — no email system, so reset is gated by the same admin
@@ -744,7 +788,7 @@ async function doRegister(e){
   let role = document.getElementById('reg-role').value;
   if(!SELF_REG_ROLES.includes(role)) role = 'technician';
   const team = document.getElementById('reg-team').value;
-  const area = document.getElementById('reg-area').value;
+  const areas = getCheckedAreas('reg-area-checks');
   const signature = roleUsesSignature(role) ? getSignatureDataUrl('reg-sig-canvas') : null;
   const errEl = document.getElementById('register-err');
   const btn = document.getElementById('register-btn');
@@ -757,7 +801,8 @@ async function doRegister(e){
   if(pass !== pass2){ errEl.textContent='Konfirmasi password tidak cocok.'; return; }
   if(roleNeedsTeam(role)){
     if(!TEAM_AREAS[team]){ errEl.textContent='Pilih Team (E7 / C7).'; return; }
-    if(!TEAM_AREAS[team].includes(area)){ errEl.textContent='Pilih Area sesuai Team.'; return; }
+    const ae = areaListError(role, areas);
+    if(ae){ errEl.textContent = ae; return; }
   }
   if(roleUsesSignature(role) && !signature){ errEl.textContent='Gambar / upload draft tanda tangan dulu untuk role ini.'; return; }
 
@@ -777,7 +822,7 @@ async function doRegister(e){
       password: hashed,
       role: role,
       name: name,
-      ...(roleNeedsTeam(role) ? { team, area } : {}),
+      ...(roleNeedsTeam(role) ? { team, area: areas } : {}),
       ...(signature ? { signature } : {}),
       createdAt: new Date().toISOString(),
     });
@@ -786,7 +831,7 @@ async function doRegister(e){
     loggedInRole = role;
     loggedInName = name;
     AuthSession.set({ user: loggedInUser, role: loggedInRole, name: name });
-    setTeamSession(roleNeedsTeam(role) ? team : null, roleNeedsTeam(role) ? area : null);
+    setTeamSession(roleNeedsTeam(role) ? team : null, roleNeedsTeam(role) ? areas : []);
     setSignatureSession(signature);
     showApp();
   }catch(err){
@@ -800,12 +845,13 @@ async function doRegister(e){
 // Shown when a logged-in account has no valid team/area on its
 // dashboard_users doc. The overlay has no close button and blocks the app
 // until saveTeamSetup() writes the fields back to Firestore.
-function setTeamSession(team, area){
+function setTeamSession(team, areas){
   loggedInTeam = team || null;
-  loggedInArea = area || null;
+  loggedInAreas = toAreaList(areas);
   try{
     if(team) localStorage.setItem('dashboard_team', team); else localStorage.removeItem('dashboard_team');
-    if(area) localStorage.setItem('dashboard_area', area); else localStorage.removeItem('dashboard_area');
+    if(loggedInAreas.length) localStorage.setItem('dashboard_area', JSON.stringify(loggedInAreas));
+    else localStorage.removeItem('dashboard_area');
   }catch(e){}
 }
 function setSignatureSession(sig){
@@ -815,37 +861,34 @@ function setSignatureSession(sig){
     else localStorage.removeItem('dashboard_signature');
   }catch(e){ /* quota — signature just won't persist across a reload, re-fetched on next login */ }
 }
-function promptTeamSetup(docId, preTeam, preArea){
+function promptTeamSetup(docId, preTeam, preAreas){
   _teamSetupDocId = docId;
   document.getElementById('login-overlay').style.display = 'none';
   const ov = document.getElementById('team-overlay');
   ov.style.display = 'flex';
   ov.classList.remove('hide');
   document.getElementById('ts-err').textContent = '';
+  document.getElementById('ts-area-note').textContent = areaNoteFor(loggedInRole);
   const teamSel = document.getElementById('ts-team');
-  if(TEAM_AREAS[preTeam]){
-    teamSel.value = preTeam;
-    fillAreaOptions('ts-team','ts-area', preArea || '');
-  }else{
-    teamSel.value = '';
-    fillAreaOptions('ts-team','ts-area');
-  }
+  teamSel.value = TEAM_AREAS[preTeam] ? preTeam : '';
+  renderAreaChecks('ts-area-checks', teamSel.value, preAreas || []);
 }
 async function saveTeamSetup(){
   const team = document.getElementById('ts-team').value;
-  const area = document.getElementById('ts-area').value;
+  const areas = getCheckedAreas('ts-area-checks');
   const errEl = document.getElementById('ts-err');
   const btn = document.getElementById('ts-btn');
   errEl.textContent = '';
   if(!TEAM_AREAS[team]){ errEl.textContent='Pilih Team (E7 / C7).'; return; }
-  if(!TEAM_AREAS[team].includes(area)){ errEl.textContent='Pilih Area sesuai Team.'; return; }
+  const ae = areaListError(loggedInRole, areas);
+  if(ae){ errEl.textContent = ae; return; }
   if(!_teamSetupDocId){ errEl.textContent='Sesi tidak valid, silakan login ulang.'; return; }
   btn.disabled = true; btn.textContent = 'Menyimpan...';
   try{
     await db.collection('dashboard_users').doc(_teamSetupDocId).update({
-      team, area, teamUpdatedAt: new Date().toISOString(),
+      team, area: areas, teamUpdatedAt: new Date().toISOString(),
     });
-    setTeamSession(team, area);
+    setTeamSession(team, areas);
     document.getElementById('team-overlay').classList.add('hide');
     setTimeout(()=>{ document.getElementById('team-overlay').style.display='none'; }, 400);
     showApp();
@@ -854,6 +897,27 @@ async function saveTeamSetup(){
     errEl.textContent = 'Gagal menyimpan: ' + err.message;
     btn.disabled = false; btn.textContent = 'SIMPAN & LANJUT';
   }
+}
+// ── TEAM/AREA FROM SETTINGS (non-blocking, after login) ──
+async function saveTeamAreaFromSettings(){
+  const errEl = document.getElementById('set-team-err'), okEl = document.getElementById('set-team-ok');
+  const btn = document.getElementById('set-team-btn');
+  errEl.textContent = ''; okEl.textContent = '';
+  const team = document.getElementById('set-team').value;
+  const areas = getCheckedAreas('set-area-checks');
+  if(!TEAM_AREAS[team]){ errEl.textContent = 'Pilih Team (E7 / C7).'; return; }
+  const ae = areaListError(loggedInRole, areas);
+  if(ae){ errEl.textContent = ae; return; }
+  btn.disabled = true; btn.textContent = 'Menyimpan...';
+  try{
+    const doc = await _myUserDoc();
+    await db.collection('dashboard_users').doc(doc.id).update({ team, area: areas, teamUpdatedAt: new Date().toISOString() });
+    setTeamSession(team, areas);
+    refreshScopeNote();
+    okEl.textContent = '✅ Tersimpan. Kotak masuk diperbarui.';
+    loadAll();
+  }catch(err){ console.error(err); errEl.textContent = 'Gagal menyimpan: ' + err.message; }
+  btn.disabled = false; btn.textContent = 'Simpan Team & Area';
 }
 
 // ── SIGNATURE DRAFT SETUP (post-login, non-blocking) ──────────
@@ -924,11 +988,19 @@ function openSettings(){
   const ov = document.getElementById('settings-overlay');
   ov.style.display = 'flex'; ov.classList.remove('hide');
   document.getElementById('set-whoami').textContent = '👤 ' + loggedInUser + ' · ' + (ROLE_LABELS[loggedInRole||'none']||loggedInRole);
-  ['set-profile-err','set-profile-ok','set-pass-err','set-pass-ok','set-sig-err','set-sig-ok'].forEach(id=>document.getElementById(id).textContent='');
+  ['set-profile-err','set-profile-ok','set-pass-err','set-pass-ok','set-sig-err','set-sig-ok','set-team-err','set-team-ok'].forEach(id=>document.getElementById(id).textContent='');
   document.getElementById('set-name').value = loggedInName || '';
   document.getElementById('set-user').value = loggedInUser || '';
   ['set-pass-cur','set-pass-new','set-pass-new2'].forEach(id=>document.getElementById(id).value='');
   syncThemeUI();
+  // Team & Area section — only for roles that are routed (technician/techop2)
+  const teamSec = document.getElementById('set-team-sec');
+  teamSec.style.display = roleNeedsTeam(loggedInRole) ? '' : 'none';
+  if(roleNeedsTeam(loggedInRole)){
+    document.getElementById('set-team').value = TEAM_AREAS[loggedInTeam] ? loggedInTeam : '';
+    document.getElementById('set-area-note').textContent = areaNoteFor(loggedInRole);
+    renderAreaChecks('set-area-checks', loggedInTeam, loggedInAreas);
+  }
   // signature section only for roles that sign
   document.getElementById('set-sig-sec').style.display = roleUsesSignature(loggedInRole) ? '' : 'none';
   if(roleUsesSignature(loggedInRole)){
@@ -1015,12 +1087,12 @@ async function checkSession(){
     loggedInRole = sess.role || null;
     loggedInName = sess.name || loggedInUser;
     loggedInTeam = sess.team || null;
-    loggedInArea = sess.area || null;
+    loggedInAreas = toAreaList(sess.area);
     loggedInSignature = sess.signature || null;
     // Backfill team/area from Firestore for sessions created before this
     // feature (or on another page); force the setup form if still missing.
     // Supervisor/Admin skip this entirely — team/area doesn't apply to them.
-    const needTeamBackfill = roleNeedsTeam(loggedInRole) && (!TEAM_AREAS[loggedInTeam] || !loggedInArea);
+    const needTeamBackfill = roleNeedsTeam(loggedInRole) && (!TEAM_AREAS[loggedInTeam] || !loggedInAreas.length);
     const needSigBackfill = roleUsesSignature(loggedInRole) && !loggedInSignature;
     if(needTeamBackfill || needSigBackfill){
       try{
@@ -1029,10 +1101,10 @@ async function checkSession(){
           const u = snap.docs[0].data();
           if(needSigBackfill && u.signature) setSignatureSession(u.signature);
           if(needTeamBackfill){
-            if(TEAM_AREAS[u.team] && u.area){
-              setTeamSession(u.team, u.area);
+            if(TEAM_AREAS[u.team] && toAreaList(u.area).length){
+              setTeamSession(u.team, toAreaList(u.area));
             }else{
-              promptTeamSetup(snap.docs[0].id, u.team, u.area);
+              promptTeamSetup(snap.docs[0].id, u.team, toAreaList(u.area));
               return;
             }
           }
@@ -1059,13 +1131,7 @@ function showApp(){
     note.style.display = 'flex';
     note.innerHTML = '&#9888;&#65039; Akun Anda belum memiliki role (TechOp2/Supervisor) — Anda hanya bisa melihat riwayat, tidak bisa review/approve. Hubungi admin untuk menambahkan field <code>role</code> pada dokumen user ini di collection <code>dashboard_users</code>.';
   }
-  const scope = document.getElementById('scope-note');
-  if(loggedInRole==='techop2' && loggedInTeam && loggedInArea){
-    scope.style.display = 'flex';
-    scope.innerHTML = '&#128100; Kotak masuk <b>"Menunggu Saya"</b> disaring ke submission dari teknisi team <b>'+escHtml(loggedInTeam)+' &middot; '+escHtml(loggedInArea)+'</b>. Submission yang team submitternya belum tercatat ditangani lewat akun Admin. Tab "Semua Riwayat" tetap menampilkan seluruh submission.';
-  }else{
-    scope.style.display = 'none';
-  }
+  refreshScopeNote();
   const sigNote = document.getElementById('sig-note');
   if(roleUsesSignature(loggedInRole) && !loggedInSignature){
     sigNote.style.display = 'flex';
@@ -1075,6 +1141,17 @@ function showApp(){
     sigNote.style.display = 'none';
   }
   loadAll();
+}
+function refreshScopeNote(){
+  const scope = document.getElementById('scope-note');
+  if(loggedInRole==='techop2' && loggedInTeam && loggedInAreas.length){
+    scope.style.display = 'flex';
+    scope.innerHTML = '&#128100; Kotak masuk <b>"Menunggu Saya"</b> disaring ke submission dari teknisi team <b>'
+      + escHtml(loggedInTeam) + ' &middot; ' + loggedInAreas.map(escHtml).join(', ') + '</b>. '
+      + 'Submission yang team submitternya belum tercatat ditangani lewat akun Admin. Tab "Semua Riwayat" tetap menampilkan seluruh submission.';
+  }else{
+    scope.style.display = 'none';
+  }
 }
 const ROLE_LABELS = { techop2:'TechOp2', supervisor:'Supervisor', admin:'Admin', technician:'Technician', none:'Tanpa Role' };
 
@@ -1095,7 +1172,9 @@ async function loadUserDir(force){
     const snap = await db.collection('dashboard_users').get();
     snap.docs.forEach(d => {
       const u = d.data();
-      const rec = { team: TEAM_AREAS[u.team] ? u.team : null, area: u.area || null };
+      // A submission's routing area is the SUBMITTER's (technician's) single
+      // area — take the first if their account somehow lists several.
+      const rec = { team: TEAM_AREAS[u.team] ? u.team : null, area: toAreaList(u.area)[0] || null };
       if(u.name) dir['n:' + u.name.trim().toLowerCase()] = rec;
       if(u.username) dir['u:' + u.username.trim().toLowerCase()] = rec;
     });
@@ -1108,13 +1187,14 @@ function scopeOfApproval(a){
   const by = (a.submittedBy || '').trim().toLowerCase();
   return _userDir['n:'+by] || _userDir['u:'+by] || { team:null, area:null };
 }
-// A submission is "mine" as a TechOp2 PIC when its submitter's team AND area
-// both match the logged-in reviewer's. Admin/Supervisor are never scoped.
+// A submission is "mine" as a TechOp2 PIC when its submitter's team matches
+// the reviewer's AND the submitter's area is one of the reviewer's areas
+// (a TechOp2 can cover multiple areas). Admin/Supervisor are never scoped.
 function inMyReviewScope(a){
   if(loggedInRole !== 'techop2') return true;
-  if(!loggedInTeam || !loggedInArea) return true; // reviewer has no scope set — fail open
+  if(!loggedInTeam || !loggedInAreas.length) return true; // reviewer has no scope set — fail open
   const s = scopeOfApproval(a);
-  return s.team === loggedInTeam && s.area === loggedInArea;
+  return s.team === loggedInTeam && loggedInAreas.includes(s.area);
 }
 
 async function loadAll(){

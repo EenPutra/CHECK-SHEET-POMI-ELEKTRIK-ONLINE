@@ -35,12 +35,17 @@
   const lsGet = k => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   const lsDel = k => { try { localStorage.removeItem(k); } catch (e) {} };
+  const ssDel = k => { try { sessionStorage.removeItem(k); } catch (e) {} };
+  function _clearLegacySession() { ALL_KEYS.forEach(ssDel); }
 
   // One-time migration: a tab already logged in under the old per-tab
-  // sessionStorage scheme keeps its session instead of being kicked to login.
+  // sessionStorage scheme keeps its session (copied into localStorage), then
+  // the sessionStorage copy is wiped so it can't resurrect the session after
+  // a later Sign Out (the "can't sign out" bug — clear() nukes localStorage,
+  // reload runs migrate() again, old sessionStorage keys re-import the user).
   (function migrate() {
-    if (lsGet(K.user)) return;
     try {
+      if (lsGet(K.user)) { _clearLegacySession(); return; }
       if (!sessionStorage.getItem('dashboard_user')) return;
       ['dashboard_user', 'dashboard_role', 'dashboard_name', 'dashboard_login_time',
        'dashboard_team', 'dashboard_area', 'dashboard_signature'].forEach(k => {
@@ -48,6 +53,7 @@
         if (v != null) lsSet(k, v);
       });
       lsSet(K.act, String(now()));
+      _clearLegacySession();
     } catch (e) {}
   })();
 
@@ -94,7 +100,7 @@
     if (lsGet(K.user)) lsSet(K.act, String(t));
   }
 
-  function clear() { ALL_KEYS.forEach(lsDel); }
+  function clear() { ALL_KEYS.forEach(lsDel); _clearLegacySession(); }
 
   let _onExpire = null;
   function _fireExpire() {
