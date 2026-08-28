@@ -94,7 +94,9 @@ textarea,input{font-family:var(--body)}
 .icon-btn:hover{border-color:var(--bdr-2);color:var(--txt);background:var(--surf-2)}
 
 /* SETTINGS MODAL (reuses .login-overlay scrim/box; adds a close + scroll) */
-#settings-overlay .login-box{max-width:440px;text-align:left;max-height:88vh;overflow-y:auto}
+#settings-overlay .login-box,#manual-overlay .login-box{max-width:460px;text-align:left;max-height:90vh;overflow-y:auto}
+#manual-overlay input[type=file]{background:var(--surf-2);cursor:pointer}
+#manual-overlay textarea.dinput{margin-bottom:4px}
 .settings-x{position:absolute;top:12px;right:14px;background:var(--surf-2);border:1px solid var(--bdr);color:var(--txt-2);width:28px;height:28px;border-radius:8px;font-size:15px}
 .settings-x:hover{color:var(--txt);border-color:var(--bdr-2)}
 .settings-sec{border-top:1px solid var(--bdr);padding-top:16px;margin-top:16px}
@@ -462,6 +464,47 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   </div>
 </div>
 
+<!-- MANUAL PDF UPLOAD — a report done outside the check-sheet system, pushed into the approval flow -->
+<div class="login-overlay" id="manual-overlay" style="display:none">
+  <div class="login-box">
+    <button class="settings-x" onclick="closeManualUpload()" title="Tutup">&times;</button>
+    <div class="login-logo" style="font-size:18px">UPLOAD <span>MANUAL</span></div>
+    <div class="login-sub" style="margin-bottom:14px">Masukkan laporan yang tidak lewat check sheet ke alur Review &amp; Approval. Isi data, lampirkan PDF, dan gambar (opsional).</div>
+
+    <div class="login-field-lbl">Judul / Nama Laporan *</div>
+    <input type="text" class="login-field" id="mu-name" placeholder="cth. Kalibrasi Flow Meter FGD">
+    <div class="mg2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><div class="login-field-lbl">No. WO</div><input type="text" class="login-field" id="mu-wo" placeholder="opsional"></div>
+      <div><div class="login-field-lbl">Tanggal *</div><input type="date" class="login-field" id="mu-date"></div>
+    </div>
+    <div class="mg2" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div><div class="login-field-lbl">Kode / Asset Tag</div><input type="text" class="login-field" id="mu-tag" placeholder="opsional"></div>
+      <div><div class="login-field-lbl">PIC / Dikerjakan oleh *</div><input type="text" class="login-field" id="mu-pic" placeholder="Nama pelaksana"></div>
+    </div>
+    <div class="login-field-lbl">Team *</div>
+    <select class="login-field" id="mu-team" onchange="renderAreaChecks('mu-area-checks', this.value)">
+      <option value="">— Pilih Team —</option>
+      <option value="E7">E7</option>
+      <option value="C7">C7</option>
+    </select>
+    <div class="login-field-lbl">Area * <span style="text-transform:none;font-weight:400;color:var(--txt-3)">(pilih satu — menentukan PIC yang mereview)</span></div>
+    <div id="mu-area-checks" class="area-checks"><div class="area-hint">Pilih Team dulu.</div></div>
+    <div class="login-field-lbl">Catatan / Deskripsi</div>
+    <textarea class="dinput" id="mu-notes" placeholder="Ringkasan pekerjaan / temuan (opsional)"></textarea>
+
+    <div class="settings-sec" style="margin-top:14px">
+      <h4>File PDF Laporan *</h4>
+      <input type="file" id="mu-pdf" accept="application/pdf,.pdf" class="login-field" style="padding:9px">
+      <h4 style="margin-top:14px">Gambar / Foto (opsional, bisa banyak)</h4>
+      <input type="file" id="mu-images" accept="image/*" multiple class="login-field" style="padding:9px">
+      <div class="login-hint" id="mu-img-count" style="margin-top:4px"></div>
+    </div>
+
+    <button class="login-btn" id="mu-btn" onclick="submitManualUpload()">&#128228; Submit ke Review &amp; Approval</button>
+    <div class="login-err" id="mu-err"></div>
+  </div>
+</div>
+
 <!-- TOPBAR -->
 <div class="topbar">
   <div class="tb-brand"><div class="tb-logo-mark">E7</div><span>ELECTRIC <span class="accent">7</span></span></div>
@@ -508,6 +551,7 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
       <option value="returned_to_technician">Dikembalikan</option>
     </select>
     <button class="btn btn-sm" onclick="loadAll()">&#8635; Refresh</button>
+    <button class="btn btn-sm btn-pri" id="btn-manual-upload" onclick="openManualUpload()" style="display:none">&#128206; Upload Manual</button>
   </div>
 
   <div id="list-area"><div class="list-loading"><div class="msg">Memuat...</div></div></div>
@@ -1073,6 +1117,135 @@ async function saveSignatureFromSettings(){
   btn.disabled = false; btn.textContent = 'Simpan Tanda Tangan';
 }
 
+// ── MANUAL PDF UPLOAD ─────────────────────────────────────────
+// Push a report done OUTSIDE the check-sheet system into the review/approval
+// flow: writes a `checksheets` doc + uploads the PDF + images to Drive +
+// creates an `approvals` doc (status 'submitted') with explicit team/area
+// routing. scopeOfApproval() reads that team/area straight off the approval.
+function openManualUpload(){
+  const ov = document.getElementById('manual-overlay');
+  ov.style.display = 'flex'; ov.classList.remove('hide');
+  ['mu-name','mu-wo','mu-tag','mu-pic','mu-notes'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('mu-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('mu-pic').value = loggedInName || loggedInUser || '';
+  document.getElementById('mu-team').value = TEAM_AREAS[loggedInTeam] ? loggedInTeam : '';
+  renderAreaChecks('mu-area-checks', document.getElementById('mu-team').value, loggedInAreas.slice(0,1));
+  document.getElementById('mu-pdf').value = '';
+  document.getElementById('mu-images').value = '';
+  document.getElementById('mu-img-count').textContent = '';
+  document.getElementById('mu-err').textContent = '';
+}
+function closeManualUpload(){
+  const ov = document.getElementById('manual-overlay');
+  ov.classList.add('hide');
+  setTimeout(()=>{ ov.style.display='none'; ov.classList.remove('hide'); }, 300);
+}
+document.addEventListener('change', e => {
+  if(e.target && e.target.id === 'mu-images'){
+    const n = e.target.files.length;
+    document.getElementById('mu-img-count').textContent = n ? (n + ' gambar dipilih') : '';
+  }
+});
+// Read an image File -> downscaled JPEG data URL (dashboard doesn't load
+// img-helper/photo-kit, so a tiny canvas resize keeps the Drive upload sane).
+function _muImageToDataUrl(file, maxEdge, quality){
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        let w = img.naturalWidth, h = img.naturalHeight;
+        const s = Math.min(1, maxEdge / Math.max(w, h));
+        w = Math.max(1, Math.round(w * s)); h = Math.max(1, Math.round(h * s));
+        const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(cv.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Gambar tidak bisa dibaca.'));
+      img.src = fr.result;
+    };
+    fr.onerror = () => reject(new Error('File gambar gagal dibaca.'));
+    fr.readAsDataURL(file);
+  });
+}
+async function submitManualUpload(){
+  const errEl = document.getElementById('mu-err'), btn = document.getElementById('mu-btn');
+  errEl.textContent = '';
+  const assetName = document.getElementById('mu-name').value.trim();
+  const woNumber  = document.getElementById('mu-wo').value.trim();
+  const assetTag  = document.getElementById('mu-tag').value.trim();
+  const executionDate = document.getElementById('mu-date').value;
+  const pic = document.getElementById('mu-pic').value.trim();
+  const notes = document.getElementById('mu-notes').value.trim();
+  const team = document.getElementById('mu-team').value;
+  const areas = getCheckedAreas('mu-area-checks');
+  const pdfFile = document.getElementById('mu-pdf').files[0];
+  const imgFiles = [...document.getElementById('mu-images').files];
+
+  if(!assetName){ errEl.textContent = 'Isi judul / nama laporan.'; return; }
+  if(!executionDate){ errEl.textContent = 'Isi tanggal.'; return; }
+  if(!pic){ errEl.textContent = 'Isi PIC / pelaksana.'; return; }
+  if(!TEAM_AREAS[team]){ errEl.textContent = 'Pilih Team.'; return; }
+  if(areas.length !== 1){ errEl.textContent = 'Pilih tepat satu Area.'; return; }
+  if(!pdfFile){ errEl.textContent = 'Lampirkan file PDF laporan.'; return; }
+  if(pdfFile.type && pdfFile.type.indexOf('pdf') === -1){ errEl.textContent = 'File utama harus PDF.'; return; }
+
+  btn.disabled = true; btn.textContent = 'Mengunggah...';
+  showFileProgress('Menyiapkan laporan manual…');
+  try{
+    const area = areas[0];
+    const base = {
+      assetTag: assetTag || '', assetName, frequency: 'MANUAL',
+      woNumber, executionDate, timeStart: '', timeEnd: '',
+      checkedBy: pic, nik: '', reviewedBy: '', shift: '',
+      findings: notes, recommendations: '',
+      countOk: 0, countNg: 0, countNa: 0, overallStatus: '—',
+      manualUpload: true,
+      sheets: { info: { title: 'Laporan Manual (Upload)', columns: ['Value'], rows: [
+        { no: '1', desc: 'Judul', values: { Value: assetName } },
+        { no: '2', desc: 'No. WO', values: { Value: woNumber || '—' } },
+        { no: '3', desc: 'Tanggal', values: { Value: executionDate } },
+        { no: '4', desc: 'PIC / Pelaksana', values: { Value: pic } },
+        { no: '5', desc: 'Team / Area', values: { Value: team + ' / ' + area } },
+        { no: '6', desc: 'Diinput oleh', values: { Value: loggedInName || loggedInUser } },
+        { no: '7', desc: 'Catatan', values: { Value: notes || '—' } },
+      ] } },
+    };
+    setFileProgressPct(6, 'Menyimpan data laporan…');
+    const id = await DB.save(base);
+
+    // Compress images up front so submitWithFiles just uploads them.
+    const photoEntries = [];
+    for(let i=0;i<imgFiles.length;i++){
+      setFileProgressPct(6 + Math.round(i/Math.max(1,imgFiles.length)*4), 'Menyiapkan gambar ' + (i+1) + '/' + imgFiles.length + '…');
+      try{ photoEntries.push({ src: await _muImageToDataUrl(imgFiles[i], 1600, 0.85), caption: '' }); }
+      catch(e){ console.warn('skip 1 gambar:', e); }
+    }
+
+    const ok = await Approvals.submitWithFiles(id, {
+      photos: photoEntries.length ? { manual: photoEntries } : null,
+      // No jsPDF here — hand submitWithFiles the uploaded file directly; it
+      // only ever calls pdf.output('blob') on this.
+      pdfBuilder: () => ({ output: () => pdfFile }),
+      assetTag: assetTag || '', assetName,
+      checksheetFile: '', submittedBy: pic,
+      team, area, src: 'Upload manual',
+      onProgress: (pct, label) => setFileProgressPct(10 + Math.round(pct * 0.85), label),
+    });
+    if(!ok) throw new Error('Upload file / pencatatan approval gagal — cek koneksi lalu coba lagi.');
+
+    finishFileProgress();
+    closeManualUpload();
+    alert('✅ Laporan manual masuk ke Review & Approval (team ' + team + ' · ' + area + ').');
+    await loadAll();
+  }catch(err){
+    hideFileProgress();
+    console.error('Manual upload gagal:', err);
+    errEl.textContent = 'Gagal: ' + (err.message || err);
+  }
+  btn.disabled = false; btn.textContent = '📤 Submit ke Review & Approval';
+}
+
 function doLogout(){
   AuthSession.clear();
   location.reload();
@@ -1119,6 +1292,7 @@ function showApp(){
   document.getElementById('user-label').style.display = '';
   document.getElementById('logout-btn').style.display = '';
   document.getElementById('settings-btn').style.display = '';
+  document.getElementById('btn-manual-upload').style.display = roleUsesSignature(loggedInRole) ? '' : 'none';
   const roleEl = document.getElementById('role-label');
   const roleKey = loggedInRole || 'none';
   roleEl.textContent = ROLE_LABELS[roleKey] || roleKey;
@@ -1197,6 +1371,9 @@ function scopeOfApproval(a){
   const by = (a.submittedBy || '').trim().toLowerCase();
   const ext = EXTERNAL_SUBMITTER_SCOPE[by];
   if(ext) return { team: ext.team, area: ext.area, src: ext.src };
+  // Explicit routing stored on the approval doc (manual PDF uploads — see
+  // openManualUpload() — set team/area/src directly).
+  if(a.team && a.area) return { team: a.team, area: a.area, src: a.src || null };
   if(!_userDir) return { team:null, area:null };
   return _userDir['n:'+by] || _userDir['u:'+by] || { team:null, area:null };
 }
@@ -1750,6 +1927,13 @@ function setFileProgressPhase(label){
   document.getElementById('fp-label').textContent = label;
   _fpSet(_fpPct + 1, 'Mohon tunggu…');
 }
+// Explicit percentage from a caller that knows its own 0–100 (e.g. an upload
+// with Approvals.submitWithFiles' onProgress). Stops the time-based creep.
+function setFileProgressPct(pct, label){
+  clearInterval(_fpCreep); _fpCreep = null;
+  if(label) document.getElementById('fp-label').textContent = label;
+  _fpSet(pct, '');
+}
 function finishFileProgress(){
   clearInterval(_fpCreep); _fpCreep = null;
   _fpPct = 100; _fpRender('Selesai');
@@ -1799,7 +1983,7 @@ function renderActionSection(a, cs){
     // lives in the other app.
     const editHref = (a.checksheetFile && !a._src) ? a.checksheetFile.replace(/ /g,'%20')+'?reviseOf='+a.id : '';
     return `<div class="dsec"><div class="dsec-title">Tindakan — Review</div>
-      ${a._src ? `<div class="edit-cs-box"><div>Submission ini dikirim otomatis dari <b>${escHtml(a._src)}</b>. Perbaikan isian dilakukan di aplikasi asalnya, lalu di-submit ulang.</div></div>` : ''}
+      ${a._src ? `<div class="edit-cs-box"><div>Submission ini masuk lewat <b>${escHtml(a._src)}</b> (bukan check sheet) — isian tidak bisa diedit dari sini. Review berdasarkan PDF &amp; foto terlampir.</div></div>` : ''}
       ${editHref ? `<div class="edit-cs-box">
         <div><b>Perlu memperbaiki isian?</b> Buka check sheet untuk diedit langsung, tekan tombol
         <i>"Muat Data Submission untuk Direvisi"</i> di banner atas, perbaiki, lalu Submit ulang —

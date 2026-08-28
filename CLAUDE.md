@@ -1468,6 +1468,20 @@ This was an explicit user request; the design decisions were confirmed up front:
   "di luar cakupan team/area Anda" notice instead of the review form. A submission whose
   submitter's team isn't recorded (name mismatch, pre-feature data) matches **no** TechOp2 and
   is handled via the Admin account — the `#scope-note` banner says so.
+- **Explicit routing on the approval doc**: `Approvals.create()` / `submitWithFiles()` now
+  accept `team` / `area` / `src` in `opts` — stored straight on the `approvals` doc, and
+  `scopeOfApproval()` reads them (after `EXTERNAL_SUBMITTER_SCOPE`, before `_userDir`) so a
+  submission can be routed without matching `submittedBy` to an account. Used by **Manual
+  Upload** (below); normal check sheets don't pass them so nothing changes.
+- **Manual PDF Upload** (`#btn-manual-upload` in the toolbar, techop2/supervisor/admin only →
+  `#manual-overlay`): pushes a report done OUTSIDE the check-sheet system into the flow.
+  `submitManualUpload()` → `DB.save()` a `checksheets` doc (`manualUpload:true`, a
+  `sheets.info` summary) → `Approvals.submitWithFiles()` with `pdfBuilder: () => ({ output:
+  () => pdfFile })` (the picked PDF `File` handed straight through — `submitWithFiles` only
+  ever calls `pdf.output('blob')`), `photos:{manual:[…]}` (images canvas-downscaled by
+  `_muImageToDataUrl()` since the dashboard doesn't load photo-kit), and `team`/`area`/`src:
+  'Upload manual'`. The `#file-progress` overlay is driven by `setFileProgressPct()` +
+  `submitWithFiles`' `onProgress`. Edit/revise actions are hidden for `_src` submissions.
 - **External feeds** (`EXTERNAL_SUBMITTER_SCOPE`): other POMI mini-apps post into the same
   `checksheets`/`approvals` collections via `Approvals.submitWithFiles()` but can't hold
   `dashboard_users` accounts, so they send a **fixed synthetic `submittedBy` per plant area**

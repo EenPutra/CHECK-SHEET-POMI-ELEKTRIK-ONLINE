@@ -26,6 +26,14 @@ const Approvals = {
       checksheetFile: meta.checksheetFile || '',   // e.g. 'PLTS_AshDisposal_PM.html' — lets the review dashboard link back to the right form for revisions
       submittedBy: meta.submittedBy || '',
       revisionOf: meta.revisionOf || null,          // approvals doc id this supersedes, if any
+      // Explicit review routing — set for manual uploads (and anything else
+      // that isn't routed by matching submittedBy to a dashboard_users
+      // account). Review_Approval_Dashboard.html's scopeOfApproval() checks
+      // these before the name lookup. Omitted (undefined) for normal check
+      // sheets, so Firestore just doesn't store the keys.
+      ...(meta.team ? { team: meta.team } : {}),
+      ...(meta.area ? { area: meta.area } : {}),
+      ...(meta.src ? { src: meta.src } : {}),
       status: 'submitted',
       review: null,       // {comments, recommendations, signature, reviewedBy, reviewedAt}
       approval: null,     // {notes, signature, approvedBy, approvedAt}
@@ -131,7 +139,7 @@ const Approvals = {
   // ALREADY saved by the caller before this runs, so a false return here
   // must never be treated as "the whole submission failed."
   async submitWithFiles(checksheetId, opts = {}) {
-    const { photos, pdfBuilder, assetTag, assetName, checksheetFile, submittedBy, revisionOf, existingApprovalId, onProgress } = opts;
+    const { photos, pdfBuilder, assetTag, assetName, checksheetFile, submittedBy, revisionOf, existingApprovalId, onProgress, team, area, src } = opts;
     const report = (pct, label) => { if (typeof onProgress === 'function') onProgress(pct, label); };
     let ok = true;
     try {
@@ -196,7 +204,7 @@ const Approvals = {
           updatedAt: new Date().toISOString(),
         }, { merge: true });
       } else {
-        await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf });
+        await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf, team, area, src });
       }
       report(100, 'Selesai');
     } catch (e) {
