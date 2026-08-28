@@ -1337,7 +1337,16 @@ async function loadData() {
     // fuzzy-match and risk pulling in someone else's data instead.
     if (loggedInRole === 'technician') {
       const myName = (loggedInName || loggedInUser || '').trim().toLowerCase();
-      allDataRaw = allDataRaw.filter(d => (d.checkedBy || '').trim().toLowerCase() === myName);
+      const myUser = (loggedInUser || '').trim().toLowerCase();
+      // Also match uploadedBy / uploadedByUsername — a manual upload (see
+      // Review_Approval_Dashboard.html) records who put it into the system,
+      // which may differ from the PIC in checkedBy.
+      allDataRaw = allDataRaw.filter(d => {
+        const cb = (d.checkedBy || '').trim().toLowerCase();
+        const ub = (d.uploadedBy || '').trim().toLowerCase();
+        const uu = (d.uploadedByUsername || '').trim().toLowerCase();
+        return cb === myName || (ub && ub === myName) || (uu && uu === myUser);
+      });
     }
     applyDedupeToggle();   // sets allData (deduped or not) + stat cards + charts from allDataRaw
     populateAssetFilter();
@@ -2443,6 +2452,7 @@ async function showDetail(id) {
         <div class="info-cell"><span class="info-lbl">Shift</span><span class="info-val">${esc(d.shift || '-')}</span></div>
         <div class="info-cell"><span class="info-lbl">Waktu</span><span class="info-val">${esc(d.timeStart || '-')} — ${esc(d.timeEnd || '-')}</span></div>
         <div class="info-cell"><span class="info-lbl">Checked By</span><span class="info-val">${esc(d.checkedBy || '-')}</span></div>
+        ${d.uploadedBy ? `<div class="info-cell"><span class="info-lbl">Diinput / Upload oleh</span><span class="info-val">${esc(d.uploadedBy)}${d.manualUpload ? ' · Upload manual' : ''}</span></div>` : ''}
         <div class="info-cell"><span class="info-lbl">NIK</span><span class="info-val">${esc(d.nik || '-')}</span></div>
         <div class="info-cell"><span class="info-lbl">Reviewed By</span><span class="info-val">${esc(d.reviewedBy || '-')}</span></div>
         <div class="info-cell"><span class="info-lbl">Status</span><span class="info-val"><span class="rpt-status ${statusClass}">${d.overallStatus || '-'}</span></span></div>

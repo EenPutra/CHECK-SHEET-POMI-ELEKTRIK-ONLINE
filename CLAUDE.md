@@ -1482,6 +1482,11 @@ This was an explicit user request; the design decisions were confirmed up front:
   `_muImageToDataUrl()` since the dashboard doesn't load photo-kit), and `team`/`area`/`src:
   'Upload manual'`. The `#file-progress` overlay is driven by `setFileProgressPct()` +
   `submitWithFiles`' `onProgress`. Edit/revise actions are hidden for `_src` submissions.
+  The checksheet doc gets `manualUpload:true`, `assetTag:'MANUAL-UPLOAD'` (if none typed), and
+  `uploadedBy` / `uploadedByUsername` = the logged-in uploader (may differ from the PIC in
+  `checkedBy`). `dashboard.html`'s technician-scope filter matches `checkedBy` **OR**
+  `uploadedBy` **OR** `uploadedByUsername` so the uploader can track approval status there;
+  both detail views show a "Diinput oleh" row when `uploadedBy` is set.
 - **External feeds** (`EXTERNAL_SUBMITTER_SCOPE`): other POMI mini-apps post into the same
   `checksheets`/`approvals` collections via `Approvals.submitWithFiles()` but can't hold
   `dashboard_users` accounts, so they send a **fixed synthetic `submittedBy` per plant area**

@@ -1211,12 +1211,17 @@ async function submitManualUpload(){
   try{
     const area = areas[0];
     const base = {
-      assetTag: assetTag || '', assetName, frequency: 'MANUAL',
+      assetTag: assetTag || 'MANUAL-UPLOAD', assetName, frequency: 'MANUAL',
       woNumber, executionDate, timeStart: '', timeEnd: '',
       checkedBy: pic, nik: '', reviewedBy: '', shift: '',
       findings: notes, recommendations: '',
       countOk: 0, countNg: 0, countNa: 0, overallStatus: '—',
       manualUpload: true,
+      // who put this into the system (may differ from the PIC) — dashboard.html
+      // scopes a technician's view to their own submissions, and matches this
+      // too so the uploader can track its status there.
+      uploadedBy: loggedInName || loggedInUser || '',
+      uploadedByUsername: loggedInUser || '',
       sheets: { info: { title: 'Laporan Manual (Upload)', columns: ['Value'], rows: [
         { no: '1', desc: 'Judul', values: { Value: assetName } },
         { no: '2', desc: 'No. WO', values: { Value: woNumber || '—' } },
@@ -1243,7 +1248,7 @@ async function submitManualUpload(){
       // No jsPDF here — hand submitWithFiles the uploaded file directly; it
       // only ever calls pdf.output('blob') on this.
       pdfBuilder: () => ({ output: () => pdfFile }),
-      assetTag: assetTag || '', assetName,
+      assetTag: assetTag || 'MANUAL-UPLOAD', assetName,
       checksheetFile: '', submittedBy: pic,
       team, area, src: 'Upload manual',
       onProgress: (pct, label) => setFileProgressPct(10 + Math.round(pct * 0.85), label),
@@ -1863,7 +1868,8 @@ function renderDetail(a, cs){
 
   html += `<div class="dsec"><div class="dsec-title">Info Submission</div>
     <div class="info-grid">
-      <div class="info-cell"><div class="k">Checked By</div><div class="v">${escHtml(cs?.checkedBy||'—')}</div></div>
+      <div class="info-cell"><div class="k">Checked By (PIC)</div><div class="v">${escHtml(cs?.checkedBy||'—')}</div></div>
+      ${cs?.uploadedBy ? `<div class="info-cell"><div class="k">Diinput oleh</div><div class="v">${escHtml(cs.uploadedBy)}</div></div>` : ''}
       <div class="info-cell"><div class="k">Tanggal Eksekusi</div><div class="v">${escHtml(cs?.executionDate||'—')}</div></div>
       <div class="info-cell"><div class="k">Shift</div><div class="v">${escHtml(cs?.shift||'—')}</div></div>
       <div class="info-cell"><div class="k">Status Checklist</div><div class="v">${escHtml(cs?.overallStatus||'—')} (${cs?.countOk||0} OK / ${cs?.countNg||0} NG)</div></div>
