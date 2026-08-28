@@ -793,7 +793,7 @@ function drawIRChart(prefix){
   const n=MTX_TIMES.length, stepX=pw/(n-1);
   let yMax = all.length ? Math.max(...all) : 1;
   yMax = yMax>0 ? yMax*1.15 : 1;
-  ctx.font='20px Arial';
+  ctx.font='20px "Times New Roman", Georgia, serif';
   // gridlines + y labels
   ctx.textAlign='right'; ctx.textBaseline='middle';
   for(let i=0;i<=5;i++){
@@ -1475,8 +1475,8 @@ async function generatePDF(selSet, opts){
   function checkY(need){ if(y+need > BOT){ pdf.addPage(); y=TOP; ensureBg(); } }
   const theme = {
     startY:0, theme:'grid', margin:{ left:M, right:M, top:TOP, bottom:H-BOT },
-    styles:{ font:'helvetica', fontSize:7.6, cellPadding:1.9, textColor:[26,38,32], lineColor:[190,210,198], lineWidth:.15, overflow:'linebreak' },
-    headStyles:{ fillColor:[236,242,239], textColor:[70,110,90], fontStyle:'bold', fontSize:7, halign:'center' },
+    styles:{ font:'times', fontSize:8.4, cellPadding:1.9, textColor:[26,38,32], lineColor:[190,210,198], lineWidth:.15, overflow:'linebreak' },
+    headStyles:{ font:'times', fillColor:[236,242,239], textColor:[70,110,90], fontStyle:'bold', fontSize:8, halign:'center' },
     willDrawPage:()=>ensureBg(),
   };
   // ---- HTML-mirroring layout helpers ----
@@ -1485,13 +1485,13 @@ async function generatePDF(selSet, opts){
   function secBar(title){
     checkY(14);
     pdf.setFillColor(...NAVY); pdf.rect(M,y,W-M*2,8,'F');
-    pdf.setTextColor(255,255,255); pdf.setFont('helvetica','bold'); pdf.setFontSize(9.5);
+    pdf.setTextColor(255,255,255); pdf.setFont('times','bold'); pdf.setFontSize(10.5);
     pdf.text(sanitize(title), M+3.5, y+5.5);
     y+=11.5;
   }
   function subTitle(t){
     checkY(9);
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(7.6); pdf.setTextColor(...NAVY2);
+    pdf.setFont('times','bold'); pdf.setFontSize(8.6); pdf.setTextColor(...NAVY2);
     pdf.text(sanitize(t).toUpperCase(), M, y+3.2);
     pdf.setDrawColor(185,205,232); pdf.setLineWidth(.2); pdf.line(M, y+4.5, W-M, y+4.5);
     y+=7.2;
@@ -1566,7 +1566,7 @@ async function generatePDF(selSet, opts){
       g.forEach((p,pi)=>{
         const xo=M+pi*(cw+4);
         try{ PhotoKit.draw(pdf,p,xo,y,cw,MAXH,{align:'center'}); }catch(e){}
-        if(p.caption){ pdf.setFont('helvetica','italic'); pdf.setFontSize(6.4); pdf.setTextColor(110,130,160); pdf.text(sanitize(p.caption).slice(0,70), xo, y+rh+3.4); }
+        if(p.caption){ pdf.setFont('times','italic'); pdf.setFontSize(7.4); pdf.setTextColor(110,130,160); pdf.text(sanitize(p.caption).slice(0,70), xo, y+rh+3.4); }
       });
       y+=rh+7;
     }
@@ -1581,11 +1581,11 @@ async function generatePDF(selSet, opts){
     const logoW = 28, logoH = (logo && logo.w) ? logoW*(logo.h/logo.w) : 12;
     if(logo){ try{ pdf.addImage(logo.url,'PNG',M,y,logoW,logoH); }catch(e){} }
     const tx = M + logoW + 9;
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(...NAVY);
+    pdf.setFont('times','bold'); pdf.setFontSize(13); pdf.setTextColor(...NAVY);
     pdf.text('WITNESS PLAN', tx, y+4.5);
-    pdf.setFont('helvetica','bold'); pdf.setFontSize(10.5); pdf.setTextColor(...NAVY2);
+    pdf.setFont('times','bold'); pdf.setFontSize(10.5); pdf.setTextColor(...NAVY2);
     pdf.text('Recondition / Rewinding Motor', tx, y+10.5);
-    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.6); pdf.setTextColor(95,115,145);
+    pdf.setFont('times','normal'); pdf.setFontSize(7.6); pdf.setTextColor(95,115,145);
     pdf.text('Vendor Workshop Inspection  -  PT POMI  -  Unit '+(gv('unit-sel')||'-'), tx, y+15.5);
     y += Math.max(logoH, 16) + 5;
     pdf.setDrawColor(...NAVY2); pdf.setLineWidth(.4); pdf.line(M,y,W-M,y); y+=5;
@@ -1686,8 +1686,8 @@ async function generatePDF(selSet, opts){
      ['sig-super','Reviewed By - Supervisor', gv('sig-super-name')||gv('reviewed-by')]].forEach((s,i)=>{
       const xo=M+i*(sw+6);
       pdf.setFillColor(244,247,252); pdf.setDrawColor(185,205,232); pdf.roundedRect(xo,y,sw,34,2,2,'FD');
-      pdf.setFont('helvetica','bold'); pdf.setFontSize(6.6); pdf.setTextColor(...NAVY2); pdf.text(sanitize(s[1]), xo+2, y+5);
-      pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(...NAVY); pdf.text(sanitize(s[2]||''), xo+2, y+11);
+      pdf.setFont('times','bold'); pdf.setFontSize(7.6); pdf.setTextColor(...NAVY2); pdf.text(sanitize(s[1]), xo+2, y+5);
+      pdf.setFont('times','normal'); pdf.setFontSize(8); pdf.setTextColor(...NAVY); pdf.text(sanitize(s[2]||''), xo+2, y+11);
       const du=sigDataUrl(s[0]); if(du) try{ pdf.addImage(du,'PNG',xo+2,y+13,sw-4,17); }catch(e){}
       pdf.setDrawColor(185,205,232); pdf.line(xo+2,y+31,xo+sw-2,y+31);
     });
@@ -1695,7 +1695,7 @@ async function generatePDF(selSet, opts){
   }
 
   const pages = pdf.internal.getNumberOfPages();
-  for(let p=1;p<=pages;p++){ pdf.setPage(p); pdf.setFont('helvetica','normal'); pdf.setFontSize(6.5); pdf.setTextColor(150); pdf.text('Hal '+p+'/'+pages, W-M, H-6, {align:'right'}); pdf.text(sanitize('PLTU - Witness Test Motor'), M, H-6); }
+  for(let p=1;p<=pages;p++){ pdf.setPage(p); pdf.setFont('times','normal'); pdf.setFontSize(7.5); pdf.setTextColor(150); pdf.text('Hal '+p+'/'+pages, W-M, H-6, {align:'right'}); pdf.text(sanitize('PLTU - Witness Test Motor'), M, H-6); }
 
   const fn = `witness_motor_${(gv('asset-tag')||'motor').replace(/[^A-Za-z0-9_-]/g,'_')}_${(gv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
   if(opts.silent){ /* caller reads returned pdf */ } else { pdf.save(fn); note('✅ PDF: '+fn,'ok'); }
