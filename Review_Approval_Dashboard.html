@@ -221,6 +221,35 @@ select.login-field:disabled{opacity:.55;cursor:not-allowed}
 .card-badge.approved{background:var(--ok-soft);color:var(--green-ink)}
 .card-badge.returned_to_technician{background:var(--ng-soft);color:var(--ng)}
 
+/* STATUS LAPORAN TAB */
+.ms-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px}
+.ms-sc{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.ms-sc .n{font-family:var(--display);font-size:24px;font-weight:700;line-height:1}
+.ms-sc .l{font-size:11px;color:var(--txt-2);font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
+.ms-sc.rev .n{color:var(--ind)}.ms-sc.appr .n{color:var(--acc)}.ms-sc.done .n{color:var(--ok)}.ms-sc.back .n{color:var(--ng)}
+.ms-sec{margin-bottom:24px}
+.ms-sec-h{font-family:var(--display);font-size:14px;font-weight:700;margin-bottom:3px;display:flex;align-items:center;gap:8px}
+.ms-sec-h .c{font-family:var(--mono);font-size:11.5px;color:var(--txt-3);font-weight:500}
+.ms-sec-sub{font-size:12px;color:var(--txt-2);margin-bottom:11px}
+.ms-card{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:13px 15px;margin-bottom:10px;box-shadow:var(--shadow)}
+.ms-card-top{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.ms-card-title{font-weight:700;font-size:13.5px;flex:1;min-width:170px}
+.ms-card-meta{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);margin-top:2px}
+.ms-stepper{display:flex;align-items:center;margin:11px 0 3px;flex-wrap:wrap}
+.ms-step{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt-3)}
+.ms-step .d{width:17px;height:17px;border-radius:50%;border:2px solid var(--bdr-2);display:grid;place-items:center;font-size:9px;font-weight:800;background:var(--surf);flex-shrink:0}
+.ms-step.done .d{background:var(--ok);border-color:var(--ok);color:#fff}
+.ms-step.cur .d{background:var(--ind);border-color:var(--ind);color:#fff}
+.ms-step.back .d{background:var(--ng);border-color:var(--ng);color:#fff}
+.ms-step.done,.ms-step.cur{color:var(--txt)}.ms-step.back{color:var(--ng)}
+.ms-ln{flex:1;min-width:14px;height:2px;background:var(--bdr-2);margin:0 5px}
+.ms-ln.done{background:var(--ok)}
+.ms-detail{margin-top:9px;font-size:12px;color:var(--txt-2);border-top:1px dashed var(--bdr);padding-top:8px}
+.ms-detail b{color:var(--txt)}
+.ms-noteq{background:var(--ng-soft);border:1px solid var(--ng);border-radius:8px;padding:8px 11px;color:var(--rose-ink);font-size:11.5px;margin-top:7px}
+.ms-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:9px}
+.ms-empty{color:var(--txt-3);font-size:12px;text-align:center;padding:20px;border:1px dashed var(--bdr-2);border-radius:12px}
+
 /* DETAIL OVERLAY */
 #detail-overlay{display:none;position:fixed;inset:0;background:var(--overlay-scrim);z-index:600;align-items:flex-start;justify-content:center;padding:30px 16px;overflow-y:auto;backdrop-filter:blur(3px)}
 #detail-overlay.show{display:flex}
@@ -515,7 +544,6 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
     <a href="index.html">Portal</a>
     <a href="dashboard.html">Dashboard</a>
     <a href="Review_Approval_Dashboard.html" class="active">Review &amp; Approval</a>
-    <a href="Status_Report.html">Status Report</a>
   </div>
   <div class="tb-right">
     <span class="role-pill" id="role-label" style="display:none"></span>
@@ -540,7 +568,8 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   <div class="dedupe-note" id="dedupe-note"></div>
 
   <div class="tabs" id="tabs-bar">
-    <button class="tab-btn active" data-tab="inbox" onclick="switchTab('inbox')">Menunggu Saya <span class="tab-count" id="count-inbox">0</span></button>
+    <button class="tab-btn active" data-tab="mystatus" onclick="switchTab('mystatus')">&#128203; Status Laporan <span class="tab-count" id="count-mystatus">0</span></button>
+    <button class="tab-btn" data-tab="inbox" onclick="switchTab('inbox')">Menunggu Saya <span class="tab-count" id="count-inbox">0</span></button>
     <button class="tab-btn" data-tab="returned" onclick="switchTab('returned')">Dikembalikan <span class="tab-count" id="count-returned">0</span></button>
     <button class="tab-btn" data-tab="all" onclick="switchTab('all')">Semua Riwayat <span class="tab-count" id="count-all">0</span></button>
     <button class="tab-btn" data-tab="recap" onclick="switchTab('recap')">&#128202; Rekap Bulanan</button>
@@ -575,6 +604,13 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
 
   <div id="history-count" style="display:none;font-size:12px;color:var(--txt-3);margin:-6px 0 10px"></div>
   <div id="list-area"><div class="list-loading"><div class="msg">Memuat...</div></div></div>
+
+  <!-- STATUS LAPORAN — read-only per-person view: what I submitted / what I
+       review, with a Submit -> Review -> Approval timeline per report. -->
+  <div id="mystatus-area" style="display:none">
+    <div class="ms-summary" id="ms-summary"></div>
+    <div id="ms-sections"></div>
+  </div>
 
   <!-- REKAP BULANAN — Submitted/Reviewed/Approved per bulan, opsional
        difilter ke satu submitter atau satu reviewer TechOp2 -->
@@ -1329,6 +1365,7 @@ function showApp(){
   }else{
     sigNote.style.display = 'none';
   }
+  switchTab(_activeTab);   // sync panel visibility to the default tab (Status Laporan)
   loadAll();
 }
 function refreshScopeNote(){
@@ -1443,6 +1480,7 @@ async function loadAll(){
   updateTabCounts();
   populateHistoryAreaOptions();
   if(_activeTab === 'recap'){ populateRecapPersonOptions(); renderRecapChart(); }
+  else if(_activeTab === 'mystatus'){ renderMyStatus(); }
   else renderList();
   maybeOpenFromUrl();
 }
@@ -1564,7 +1602,7 @@ async function cleanupDuplicateApprovals(approvals){
 }
 
 /* ── TABS / LIST ── */
-let _activeTab = 'inbox';
+let _activeTab = 'mystatus';
 function switchTab(tab){
   _activeTab = tab;
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===tab));
@@ -1572,20 +1610,147 @@ function switchTab(tab){
   document.getElementById('history-count').style.display = tab==='all' ? '' : 'none';
   if(tab==='all') populateHistoryAreaOptions();
   const isRecap = tab === 'recap';
+  const isMy = tab === 'mystatus';
   document.getElementById('list-toolbar').style.display = isRecap ? 'none' : '';
-  document.getElementById('list-area').style.display = isRecap ? 'none' : '';
+  document.getElementById('list-area').style.display = (isRecap || isMy) ? 'none' : '';
   document.getElementById('recap-area').style.display = isRecap ? '' : 'none';
-  if(isRecap){
-    populateRecapPersonOptions();
-    renderRecapChart();
-  }else{
-    renderList();
-  }
+  document.getElementById('mystatus-area').style.display = isMy ? '' : 'none';
+  if(isRecap){ populateRecapPersonOptions(); renderRecapChart(); }
+  else if(isMy){ renderMyStatus(); }
+  else{ renderList(); }
 }
 function updateTabCounts(){
   document.getElementById('count-inbox').textContent = inboxItems().length;
   document.getElementById('count-returned').textContent = _allApprovals.filter(a=>a.status==='returned_to_technician').length;
   document.getElementById('count-all').textContent = _allApprovals.length;
+  document.getElementById('count-mystatus').textContent = myStatusItems().length;
+}
+
+/* ── STATUS LAPORAN (read-only per-person view) ── */
+const _msKeys = () => [ (loggedInName||'').trim().toLowerCase(), (loggedInUser||'').trim().toLowerCase() ].filter(Boolean);
+function _msMatches(name){ const n=(name||'').trim().toLowerCase(); return !!n && _msKeys().includes(n); }
+function _msISubmitted(a){
+  if(_msMatches(a.submittedBy)) return true;
+  const cs = _checksheetCache[a.checksheetId];
+  return !!cs && (_msMatches(cs.checkedBy) || _msMatches(cs.uploadedBy) || _msMatches(cs.uploadedByUsername));
+}
+function _msIReviewed(a){ return a.review && _msMatches(a.review.reviewedBy); }
+function _msIApproved(a){ return a.approval && _msMatches(a.approval.approvedBy); }
+function _msInMyArea(a){
+  if(loggedInRole!=='techop2') return false;
+  return inMyReviewScope(a);
+}
+function myStatusSections(){
+  const r = loggedInRole;
+  if(r==='technician'){
+    return [{ h:'📤 Laporan yang saya submit', sub:'Semua laporan yang Anda kirim, beserta status review & approval-nya.',
+      items:_allApprovals.filter(_msISubmitted) }];
+  }
+  if(r==='techop2'){
+    return [
+      { h:'📥 Masuk untuk saya review', sub:'Laporan dari Level 1 di team/area Anda yang masih menunggu review.',
+        items:_allApprovals.filter(a=>a.status==='submitted' && _msInMyArea(a)) },
+      { h:'✅ Sudah saya review', sub:'Laporan yang sudah Anda teruskan ke Supervisor (atau dikembalikan).',
+        items:_allApprovals.filter(_msIReviewed) },
+      { h:'📤 Laporan yang saya submit', sub:'', items:_allApprovals.filter(_msISubmitted), hideEmpty:true },
+    ];
+  }
+  if(r==='supervisor'){
+    return [
+      { h:'📥 Menunggu approval saya', sub:'Sudah direview TechOp2, menunggu keputusan Anda.',
+        items:_allApprovals.filter(a=>a.status==='reviewed') },
+      { h:'✅ Sudah saya approve', sub:'', items:_allApprovals.filter(_msIApproved) },
+      { h:'📤 Laporan yang saya submit', sub:'', items:_allApprovals.filter(_msISubmitted), hideEmpty:true },
+    ];
+  }
+  return [{ h:'📋 Semua laporan', sub:'Admin melihat seluruh laporan di sistem.', items:_allApprovals.slice() }];
+}
+function myStatusItems(){
+  const seen = new Set();
+  myStatusSections().forEach(s => s.items.forEach(a => seen.add(a.id)));
+  return [...seen];
+}
+function _msStepper(a){
+  if(a.status==='returned_to_technician'){
+    const atApproval = a.returnedNote && a.returnedNote.stage==='approval';
+    return `<div class="ms-stepper">
+      ${_msStep('1','Submit','done')}${_msLn('done')}
+      ${_msStep('2','Review', atApproval?'done':'back')}${_msLn(atApproval?'done':'')}
+      ${_msStep('3','Approval', atApproval?'back':'')}${_msLn('')}
+      ${_msStep('✓','Selesai','')}
+    </div>`;
+  }
+  const st = {submitted:1, reviewed:2, approved:3}[a.status] || 1;
+  return `<div class="ms-stepper">
+    ${_msStep('1','Submit','done')}${_msLn(st>=2?'done':'')}
+    ${_msStep('2','Review', st>=2?'done':'cur')}${_msLn(st>=2?'done':'')}
+    ${_msStep('3','Approval', st===3?'done':(st===2?'cur':''))}${_msLn(st===3?'done':'')}
+    ${_msStep('✓','Selesai', st===3?'done':'')}
+  </div>`;
+}
+function _msStep(n,label,cls){ return `<div class="ms-step ${cls}"><span class="d">${n}</span>${escHtml(label)}</div>`; }
+function _msLn(cls){ return `<span class="ms-ln ${cls}"></span>`; }
+function _msCard(a){
+  const cs = _checksheetCache[a.checksheetId] || {};
+  const title = cs.assetName || a.assetName || cs.assetTag || a.assetTag || 'Laporan';
+  const who = a.submittedBy || cs.checkedBy || '—';
+  let detail = '';
+  if(a.review){
+    detail += `<div><b>Review</b> oleh ${escHtml(a.review.reviewedBy||'—')} · ${fmtDate(a.review.reviewedAt)}`
+      + (a.review.auto ? ' <i>(otomatis — submitter Level 2)</i>' : '')
+      + (a.review.comments ? `<br>"${escHtml(a.review.comments)}"` : '') + `</div>`;
+  }
+  if(a.approval){
+    detail += `<div style="margin-top:5px"><b>Approval</b> oleh ${escHtml(a.approval.approvedBy||'—')} · ${fmtDate(a.approval.approvedAt)}`
+      + (a.approval.notes ? `<br>"${escHtml(a.approval.notes)}"` : '') + `</div>`;
+  }
+  let ret = '';
+  if(a.returnedNote){
+    ret = `<div class="ms-noteq">↩︎ Dikembalikan oleh ${escHtml(a.returnedNote.by||'—')} (tahap ${a.returnedNote.stage==='approval'?'Approval':'Review'}) · ${fmtDate(a.returnedNote.returnedAt)}<br>"${escHtml(a.returnedNote.note||'—')}"</div>`;
+  }
+  const acts = [`<button class="btn btn-sm btn-pri" onclick="openDetail('${a.id}')">Detail lengkap</button>`];
+  if(a.status==='returned_to_technician' && a.checksheetFile && !a._src && _msISubmitted(a)){
+    acts.push(`<a class="btn btn-sm" target="_blank" rel="noopener" href="${escHtml(a.checksheetFile.replace(/ /g,'%20'))}?reviseOf=${encodeURIComponent(a.id)}">Perbaiki &amp; kirim ulang</a>`);
+  }
+  return `<div class="ms-card">
+    <div class="ms-card-top">
+      <div style="flex:1;min-width:170px">
+        <div class="ms-card-title">${escHtml(title)}</div>
+        <div class="ms-card-meta">WO ${escHtml(a._wo||'—')}${a._date?' · '+escHtml(a._date):''} · oleh ${escHtml(who)} · disubmit ${fmtDate(a.createdAt)}${a._src?' · via '+escHtml(a._src):''}</div>
+      </div>
+      <span class="card-badge ${a.status}">${escHtml(Approvals.STATUS_LABELS[a.status]||a.status)}</span>
+    </div>
+    ${_msStepper(a)}
+    ${ret}
+    ${detail ? `<div class="ms-detail">${detail}</div>` : ''}
+    <div class="ms-acts">${acts.join('')}</div>
+  </div>`;
+}
+function renderMyStatus(){
+  const secs = myStatusSections();
+  const seen = new Map();
+  secs.forEach(s => s.items.forEach(a => seen.set(a.id, a)));
+  const all = [...seen.values()];
+  const cnt = st => all.filter(a=>a.status===st).length;
+  document.getElementById('ms-summary').innerHTML = `
+    <div class="ms-sc rev"><div class="n">${cnt('submitted')}</div><div class="l">Menunggu Review</div></div>
+    <div class="ms-sc appr"><div class="n">${cnt('reviewed')}</div><div class="l">Menunggu Approval</div></div>
+    <div class="ms-sc done"><div class="n">${cnt('approved')}</div><div class="l">Disetujui</div></div>
+    <div class="ms-sc back"><div class="n">${cnt('returned_to_technician')}</div><div class="l">Dikembalikan</div></div>`;
+  const box = document.getElementById('ms-sections');
+  if(!loggedInRole){
+    box.innerHTML = '<div class="ms-empty">Login untuk melihat status laporan Anda.</div>';
+    return;
+  }
+  box.innerHTML = secs.map(s=>{
+    if(s.hideEmpty && !s.items.length) return '';
+    const sorted = s.items.slice().sort((x,y)=>(y.createdAt||'').localeCompare(x.createdAt||''));
+    return `<div class="ms-sec">
+      <div class="ms-sec-h">${escHtml(s.h)} <span class="c">${sorted.length}</span></div>
+      ${s.sub?`<div class="ms-sec-sub">${escHtml(s.sub)}</div>`:''}
+      ${sorted.length ? sorted.map(_msCard).join('') : '<div class="ms-empty">Belum ada laporan.</div>'}
+    </div>`;
+  }).join('') || '<div class="ms-empty">Belum ada laporan.</div>';
 }
 function inboxItems(){
   // TechOp2 inbox is scoped to the PIC's own team+area (see inMyReviewScope).
@@ -1906,7 +2071,9 @@ async function doDeleteApproval(){
     _allApprovals = _allApprovals.filter(a => a.id !== id);
     closeDetail();
     updateTabCounts();
-    if(_activeTab === 'recap') renderRecapChart(); else renderList();
+    if(_activeTab === 'recap') renderRecapChart();
+    else if(_activeTab === 'mystatus') renderMyStatus();
+    else renderList();
   }catch(e){
     alert('Gagal menghapus: '+e.message);
   }

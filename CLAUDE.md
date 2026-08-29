@@ -1811,39 +1811,37 @@ though the exact same photos already exist in Drive from the original submission
      `savePhotoDraft()` directly instead — check whether a sheet actually defines `autoSaveNow`
      before assuming the generic path covers it.)
 
-## `Status_Report.html` — per-person report status tracker
+### "Status Laporan" tab (`Review_Approval_Dashboard.html`)
 
-A third dashboard page (after `dashboard.html` and `Review_Approval_Dashboard.html`),
-read-only, so whoever submitted or reviewed a report can see where it is in the
-Submit → Review → Approval flow. Self-contained; loads `firebase-config.js` /
-`db-helper.js` / `approval-helper.js` / `auth-session.js` / `team-routing.js` (all with
-the `?v=` cache-bust suffix — see below), reuses the shared `AuthSession` login
-(already-logged-in on another tab → no re-prompt) and the `ra_theme` light/dark key.
-Linked from `index.html` (portal card, cat `report`), and the nav bar of both other
-dashboards.
+The **first / default tab** (`data-tab="mystatus"`, leftmost, before "Menunggu Saya"),
+read-only, so whoever submitted or reviewed a report can see where it sits in the
+Submit → Review → Approval flow without hunting through the review queues. It was
+briefly a separate `Status_Report.html` page — that was folded into this tab and the
+file deleted; there is no standalone status page.
 
-- **Role decides what's shown** (`sectionsFor(role)` + `render()`):
-  - `technician` (Level 1): one section, "Laporan yang saya submit" — every approval
-    where `matchesMe(a.submittedBy)` or the joined checksheet's `checkedBy`/`uploadedBy`/
+- **Role decides the sections** (`myStatusSections()`), rendered by `renderMyStatus()`
+  into `#mystatus-area`:
+  - `technician`: one section, "Laporan yang saya submit" — every approval where
+    `_msMatches(a.submittedBy)` or the cached checksheet's `checkedBy`/`uploadedBy`/
     `uploadedByUsername` matches. Same name-match heuristic (`loggedInName` OR
-    `loggedInUser`, lower-cased) as `dashboard.html`'s technician scoping — imperfect, so
-    a `#scope-note` banner tells them to contact admin if something's missing.
-  - `techop2` (Level 2): "Masuk untuk saya review" (`status==='submitted'` AND
-    `inMyArea(a)` — `TeamRouting.resolveScope`/`inScope` against the reviewer's team+areas),
-    "Sudah saya review" (`a.review.reviewedBy` matches me, incl. auto-reviews), and
-    "Laporan yang saya submit" (hidden when empty — a TechOp2 can also be a submitter).
-  - `supervisor` (Level 3): "Menunggu approval saya" (`status==='reviewed'`), "Sudah saya
-    approve" (`a.approval.approvedBy` matches me), "Laporan yang saya submit" (hidden when
-    empty).
+    `loggedInUser`, lower-cased) as `dashboard.html`'s technician scoping — imperfect.
+  - `techop2`: "Masuk untuk saya review" (`status==='submitted' && inMyReviewScope(a)` —
+    the exact same scope filter the "Menunggu Saya" inbox uses), "Sudah saya review"
+    (`a.review.reviewedBy` matches me, incl. auto-reviews), "Laporan yang saya submit"
+    (hidden when empty).
+  - `supervisor`: "Menunggu approval saya" (`status==='reviewed'`), "Sudah saya approve"
+    (`a.approval.approvedBy` matches me), "Laporan yang saya submit" (hidden when empty).
   - `admin`: one section, all approvals.
-- **`stepper(a)`** draws the Submit→Review→Approval→Selesai dot strip; a
-  `returned_to_technician` renders a red "back" state at the stage in `returnedNote.stage`.
-  Returned cards for the submitter also get a "Perbaiki & kirim ulang" button linking
-  `<checksheetFile>?reviseOf=<id>`. Every card has "Detail lengkap" →
-  `Review_Approval_Dashboard.html?id=<approvalId>` (that page's `maybeOpenFromUrl()` opens
-  the detail modal).
-- No dedup / no writes — pure read. `Approvals.getAll()` + `DB.getById()` per unique
-  `checksheetId` (cached). Auto-refreshes every 90s while the tab is visible.
+- `_msStepper(a)` draws the Submit→Review→Approval→Selesai dot strip; a
+  `returned_to_technician` renders a red "back" state at the stage in `returnedNote.stage`,
+  and the submitter's card gets a "Perbaiki & kirim ulang" link (`<checksheetFile>?reviseOf=<id>`).
+  "Detail lengkap" calls `openDetail(a.id)` directly (same page).
+- Pure read — reuses the already-loaded `_allApprovals` + `_checksheetCache` (populated by
+  `cleanupDuplicateApprovals()` / the `_wo`/`_date` fold in `loadAll()`); no extra fetch.
+  `switchTab('mystatus')` and `loadAll()`'s tab dispatch both route to `renderMyStatus()`;
+  `updateTabCounts()` fills `#count-mystatus` from `myStatusItems()` (deduped id set across
+  the role's sections). `showApp()` calls `switchTab(_activeTab)` once so the default tab's
+  panel visibility is synced on load.
 
 ## Cache-busting shared JS includes (`?v=` suffix)
 
