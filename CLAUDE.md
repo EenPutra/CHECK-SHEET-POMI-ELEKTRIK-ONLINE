@@ -1496,7 +1496,17 @@ This was an explicit user request; the design decisions were confirmed up front:
   array — technician picks exactly 1, techop2 1+, enforced by `areaListError(role, areas)` /
   `roleAllowsMultiArea(role)`). `dashboard_users.area` is a **string OR array** — always read
   via `toAreaList(a)` (parses a JSON-array string too), stored in `localStorage['dashboard_area']`
-  as a JSON array (both dashboards). `inMyReviewScope(a)` is true when `loggedInRole !==
+  as a JSON array (both dashboards). **The `area` written onto an `approvals` doc must be the
+  single plain area string, never the array or its JSON form.** An earlier `submitWithFiles()`
+  session-backfill stored `dashboard_area`'s raw value (`'["Powerblock"]'`) onto the approval,
+  which broke scope matching (`loggedInAreas.includes('["Powerblock"]')` is false → the PIC
+  couldn't review their own area's submissions). Fixed on three fronts: `approval-helper.js`
+  normalizes via a local `_firstArea()` (team-routing.js isn't loaded on check sheets) in both
+  `create()` and the `submitWithFiles()` backfill; `TeamRouting.resolveScope()`/`inScope()` and
+  the review dashboard's `scopeOfApproval()` normalize `a.area` on read (so already-broken docs
+  route correctly); and `loadAll()` self-heals — rewrites just the `area` field on any
+  `approvals` doc whose value still starts with `[` (idempotent, workflow-collection only).
+  `inMyReviewScope(a)` is true when `loggedInRole !==
   'techop2'` (Supervisor/Admin **never** scoped), or the reviewer has no scope set (fail open),
   or `s.team === loggedInTeam && loggedInAreas.includes(s.area)`. `inboxItems()` filters the
   TechOp2 `'submitted'` queue through it;

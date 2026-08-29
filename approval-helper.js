@@ -15,6 +15,18 @@
 //                                 the returned note for which one)
 // ============================================================
 
+// Normalize an `area` value to a single plain string. It can arrive as a real
+// string ('Powerblock'), an array (['Powerblock']), or a JSON-stringified
+// array ('["Powerblock"]') from localStorage['dashboard_area'] / older docs.
+function _firstArea(a) {
+  if (Array.isArray(a)) return a[0] || null;
+  if (typeof a === 'string' && a) {
+    try { const p = JSON.parse(a); if (Array.isArray(p)) return p[0] || null; } catch (e) {}
+    return a;
+  }
+  return null;
+}
+
 const Approvals = {
   COLLECTION: 'approvals',
 
@@ -32,7 +44,7 @@ const Approvals = {
       // these before the name lookup. Omitted (undefined) for normal check
       // sheets, so Firestore just doesn't store the keys.
       ...(meta.team ? { team: meta.team } : {}),
-      ...(meta.area ? { area: meta.area } : {}),
+      ...(_firstArea(meta.area) ? { area: _firstArea(meta.area) } : {}),
       ...(meta.src ? { src: meta.src } : {}),
       // When the submitter is themselves a TechOp2 (level 2), the TechOp2
       // review step is auto-completed and the item goes straight to the
@@ -167,7 +179,11 @@ const Approvals = {
       const sess = (typeof window !== 'undefined' && window.AuthSession && window.AuthSession.get) ? window.AuthSession.get() : null;
       if (sess) {
         if (!team && sess.team) team = sess.team;
-        if (!area && sess.area) area = Array.isArray(sess.area) ? sess.area[0] : sess.area;
+        // sess.area can be a string, an array, or a JSON-stringified array
+        // ('["Powerblock"]') — normalize all three to the single area string
+        // the approval doc / scope matching expect. team-routing.js isn't
+        // loaded on check sheets, so parse inline.
+        if (!area && sess.area) area = _firstArea(sess.area);
         if (opts.autoReview !== false && sess.role === 'techop2') {
           const who = sess.name || submittedBy || 'TechOp2';
           autoReview = {

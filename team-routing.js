@@ -64,7 +64,10 @@
   //     external-feed map before the dashboard_users directory.
   function resolveScope(rec) {
     rec = rec || {};
-    if (rec.team && rec.area) return { team: rec.team, area: rec.area, src: rec.src || null };
+    // rec.area may arrive as a real string, an array, or a JSON-stringified
+    // array ('["Powerblock"]') — older docs / session values. Normalize to the
+    // single area string every consumer expects.
+    if (rec.team && rec.area) return { team: rec.team, area: toAreaList(rec.area)[0] || null, src: rec.src || null };
     for (const n of (rec.names || [])) {
       const key = (n || '').trim().toLowerCase();
       if (!key) continue;
@@ -81,7 +84,10 @@
   // (team:null) is NOT in any specific scope.
   function inScope(scope, myTeam, myAreas) {
     if (!myTeam || !myAreas || !myAreas.length) return true;
-    return !!scope && scope.team === myTeam && myAreas.indexOf(scope.area) !== -1;
+    if (!scope || scope.team !== myTeam) return false;
+    // Defensive: an old approval doc may have area stored as '["Powerblock"]'.
+    const sa = toAreaList(scope.area)[0];
+    return myAreas.indexOf(sa) !== -1 || myAreas.indexOf(scope.area) !== -1;
   }
 
   window.TeamRouting = {

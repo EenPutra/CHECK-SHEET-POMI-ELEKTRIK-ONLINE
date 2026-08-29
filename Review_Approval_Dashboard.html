@@ -1377,8 +1377,11 @@ function scopeOfApproval(a){
   const ext = EXTERNAL_SUBMITTER_SCOPE[by];
   if(ext) return { team: ext.team, area: ext.area, src: ext.src };
   // Explicit routing stored on the approval doc (manual PDF uploads — see
-  // openManualUpload() — set team/area/src directly).
-  if(a.team && a.area) return { team: a.team, area: a.area, src: a.src || null };
+  // openManualUpload() — set team/area/src directly). `area` may have been
+  // stored as a JSON-stringified array ('["Powerblock"]') by an older submit
+  // path — toAreaList() normalizes that back to the plain area string so
+  // scope matching (and the card tag) work.
+  if(a.team && a.area) return { team: a.team, area: toAreaList(a.area)[0] || null, src: a.src || null };
   if(!_userDir) return { team:null, area:null };
   return _userDir['n:'+by] || _userDir['u:'+by] || { team:null, area:null };
 }
@@ -1402,6 +1405,19 @@ async function loadAll(){
     return;
   }
   await loadUserDir(true);
+  // Self-heal: an older submit path stored `area` as a JSON-stringified array
+  // ('["Powerblock"]'), which broke scope matching (the PIC couldn't review).
+  // Rewrite just that one field on the approvals doc when it's detectably
+  // malformed — idempotent, only touches the workflow collection.
+  await Promise.all(_allApprovals.map(async a => {
+    if(typeof a.area === 'string' && a.area.trim().charAt(0) === '['){
+      const clean = toAreaList(a.area)[0] || null;
+      if(clean && clean !== a.area){
+        try{ await db.collection('approvals').doc(a.id).update({ area: clean }); a.area = clean; }
+        catch(e){ console.warn('area self-heal gagal untuk', a.id, e && e.message); }
+      }
+    }
+  }));
   _allApprovals.forEach(a => {
     const s = scopeOfApproval(a);
     a._team = s.team; a._area = s.area; a._src = s.src || null;
