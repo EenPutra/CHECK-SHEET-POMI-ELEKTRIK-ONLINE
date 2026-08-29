@@ -1848,6 +1848,51 @@ function closeDetail(){
   }
 }
 
+// ── Admin: edit routing (nama / team / area) ──
+function admFillArea(selected){
+  const teamSel = document.getElementById('adm-team');
+  const areaSel = document.getElementById('adm-area');
+  if(!teamSel || !areaSel) return;
+  const want = selected !== undefined ? selected : areaSel.value;
+  const opts = TEAM_AREAS[teamSel.value] || [];
+  areaSel.innerHTML = '<option value="">—</option>' + opts.map(o => `<option value="${escHtml(o)}"${o===want?' selected':''}>${escHtml(o)}</option>`).join('');
+}
+async function doAdminEditRouting(){
+  if(loggedInRole !== 'admin' || !_curApproval) return;
+  const submittedBy = document.getElementById('adm-name').value.trim();
+  const team = document.getElementById('adm-team').value;
+  const area = document.getElementById('adm-area').value;
+  if(team && !area){ alert('Pilih Area untuk team '+team+'.'); return; }
+  if(area && !team){ alert('Pilih Team terlebih dahulu.'); return; }
+  if(team && !(TEAM_AREAS[team]||[]).includes(area)){ alert('Area tidak valid untuk team '+team+'.'); return; }
+  try{
+    await Approvals.adminEditRouting(_curApproval.id, { submittedBy, team: team||null, area: area||null, by: loggedInUser });
+    alert('Perubahan disimpan.');
+    closeDetail();
+    await loadAll();
+  }catch(e){ alert('Gagal menyimpan: '+e.message); }
+}
+async function doCancelReturn(){
+  if(loggedInRole !== 'admin' || !_curApproval) return;
+  if(!confirm('Batalkan pengembalian ke teknisi? Submission akan kembali ke antrean review/approval.')) return;
+  try{
+    await Approvals.cancelReturn(_curApproval.id, { by: loggedInUser });
+    alert('Pengembalian dibatalkan.');
+    closeDetail();
+    await loadAll();
+  }catch(e){ alert('Gagal: '+e.message); }
+}
+async function doCancelReview(){
+  if(loggedInRole !== 'admin' || !_curApproval) return;
+  if(!confirm('Batalkan review? Hasil review akan dihapus dan submission kembali ke antrean Review TechOp2.')) return;
+  try{
+    await Approvals.cancelReview(_curApproval.id, { by: loggedInUser });
+    alert('Review dibatalkan.');
+    closeDetail();
+    await loadAll();
+  }catch(e){ alert('Gagal: '+e.message); }
+}
+
 async function doDeleteApproval(){
   if(loggedInRole !== 'admin' || !_curApproval) return;
   const label = (_curChecksheet && (_curChecksheet.assetName||_curChecksheet.assetTag)) || _curApproval.assetName || _curApproval.assetTag || 'submission ini';
@@ -1941,14 +1986,51 @@ function renderDetail(a, cs){
   // underlying checksheet doc is never touched, so dashboard.html's
   // history/Load & Merge are unaffected.
   if(loggedInRole === 'admin'){
+    const curName = a.submittedBy || (cs && cs.checkedBy) || '';
+    const curTeam = a.team || a._team || '';
+    const curArea = _firstArea(a.area) || a._area || '';
+    const teamOpts = ['E7','C7'].map(t => `<option value="${t}"${curTeam===t?' selected':''}>${t}</option>`).join('');
     html += `<div class="dsec danger-zone">
-      <div class="dsec-title">&#9888;&#65039; Admin — Hapus dari Approval Sheet</div>
+      <div class="dsec-title">&#128295; Admin — Koreksi</div>
+
+      <div class="field-lbl">Nama Submitter / PIC</div>
+      <input class="dinput" id="adm-name" value="${escHtml(curName)}" placeholder="Nama yang tampil di kartu">
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <div style="flex:1">
+          <div class="field-lbl">Team</div>
+          <select class="dinput" id="adm-team" onchange="admFillArea()"><option value="">—</option>${teamOpts}</select>
+        </div>
+        <div style="flex:1">
+          <div class="field-lbl">Area</div>
+          <select class="dinput" id="adm-area"></select>
+        </div>
+      </div>
+      <div class="readonly-hint" style="margin:6px 0 8px">Menentukan PIC mana yang berhak review. Simpan lalu daftar antrean menyesuaikan.</div>
+      <button class="btn btn-sm btn-pri" onclick="doAdminEditRouting()">&#128190; Simpan Nama / Team / Area</button>
+
+      ${a.status==='returned_to_technician' ? `
+      <div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
+      <div class="readonly-hint" style="margin-bottom:8px">Membatalkan pengembalian: submission kembali ke antrean ${a.returnedNote && a.returnedNote.stage==='approval' && a.review ? 'Approval Supervisor' : 'Review TechOp2'} tanpa perlu submit ulang oleh teknisi.</div>
+      <button class="btn btn-sm" onclick="doCancelReturn()">&#8617;&#65039; Batalkan Pengembalian ke Teknisi</button>
+      ` : ''}
+
+      ${a.status==='reviewed' ? `
+      <div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
+      <div class="readonly-hint" style="margin-bottom:8px">Membatalkan review: hasil review dihapus dan submission kembali ke antrean Review TechOp2.</div>
+      <button class="btn btn-sm" onclick="doCancelReview()">&#8617;&#65039; Batalkan Review</button>
+      ` : ''}
+
+      <div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
       <div class="readonly-hint" style="margin-bottom:10px">Menghapus entri ini dari alur Review &amp; Approval saja. Data checklist asli TETAP tersimpan di database dan tetap terlihat di Dashboard.</div>
       <button class="btn btn-danger" onclick="doDeleteApproval()">&#128465;&#65039; Hapus dari Approval Sheet</button>
     </div>`;
   }
 
   document.getElementById('d-body').innerHTML = html;
+  if(document.getElementById('adm-team')){
+    document.getElementById('adm-team').value = (a.team || a._team || '');
+    admFillArea(_firstArea(a.area) || a._area || '');
+  }
   if(document.getElementById('sig-canvas-review')){ attachSignaturePad('sig-canvas-review'); prefillSignatureCanvas('sig-canvas-review'); }
   if(document.getElementById('sig-canvas-approval')){ attachSignaturePad('sig-canvas-approval'); prefillSignatureCanvas('sig-canvas-approval'); }
 

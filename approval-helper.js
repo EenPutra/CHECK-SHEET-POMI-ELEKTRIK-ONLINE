@@ -108,6 +108,51 @@ const Approvals = {
     });
   },
 
+  // ---- Admin corrections (Review_Approval_Dashboard.html, admin only) ----
+
+  // Undo a "returned to technician" — puts the item back into the queue it
+  // came from. stage 'review' -> back to 'submitted' (TechOp2 queue);
+  // stage 'approval' -> back to 'reviewed' (Supervisor queue). The review
+  // record (if any) is kept when going back to 'reviewed', cleared otherwise.
+  async cancelReturn(id, { by } = {}) {
+    const cur = await this.getById(id);
+    if (!cur) throw new Error('Approval tidak ditemukan.');
+    if (cur.status !== 'returned_to_technician') throw new Error('Item ini tidak sedang dikembalikan.');
+    const backToReviewed = cur.returnedNote && cur.returnedNote.stage === 'approval' && cur.review;
+    await db.collection(this.COLLECTION).doc(id).update({
+      status: backToReviewed ? 'reviewed' : 'submitted',
+      review: backToReviewed ? cur.review : null,
+      returnedNote: null,
+      adminNote: { action: 'cancel-return', by: by || '', at: new Date().toISOString() },
+      updatedAt: new Date().toISOString(),
+    });
+  },
+
+  // Undo a completed review — item drops back to the TechOp2 review queue
+  // ('submitted') and the review record is discarded.
+  async cancelReview(id, { by } = {}) {
+    const cur = await this.getById(id);
+    if (!cur) throw new Error('Approval tidak ditemukan.');
+    if (cur.status !== 'reviewed') throw new Error('Item ini belum/tidak berstatus reviewed.');
+    await db.collection(this.COLLECTION).doc(id).update({
+      status: 'submitted',
+      review: null,
+      adminNote: { action: 'cancel-review', by: by || '', at: new Date().toISOString() },
+      updatedAt: new Date().toISOString(),
+    });
+  },
+
+  // Edit routing / display fields on the approval doc (name, team, area).
+  // area is normalized to a single plain string (see _firstArea).
+  async adminEditRouting(id, { submittedBy, team, area, by } = {}) {
+    const patch = { updatedAt: new Date().toISOString(),
+      adminNote: { action: 'edit-routing', by: by || '', at: new Date().toISOString() } };
+    if (submittedBy !== undefined) patch.submittedBy = String(submittedBy || '').trim();
+    if (team !== undefined) patch.team = team ? String(team).trim() : null;
+    if (area !== undefined) patch.area = _firstArea(area) || null;
+    await db.collection(this.COLLECTION).doc(id).set(patch, { merge: true });
+  },
+
   async deleteById(id) {
     await db.collection(this.COLLECTION).doc(id).delete();
   },

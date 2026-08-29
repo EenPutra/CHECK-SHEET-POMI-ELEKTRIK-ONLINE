@@ -1432,6 +1432,25 @@ case still worked exactly as before, and the simulated network-error entry was n
   oversight. Unlike the automatic duplicate cleanup, this one is a manual, confirm-gated action
   (an admin can delete anything, including entries with real review/approval history, so it needs
   the human-in-the-loop confirmation the automatic cleanup deliberately avoids needing).
+- **The same admin `danger-zone` also has correction tools** (all `loggedInRole==='admin'`,
+  `approvals`-collection only, each `confirm()`/`alert()`-gated then `closeDetail()` +
+  `loadAll()`):
+  - **Edit Nama / Team / Area** (`doAdminEditRouting()` → `Approvals.adminEditRouting()`): a
+    name input + Team `<select>` (E7/C7) + dependent Area `<select>` (`admFillArea()` repopulates
+    from `TEAM_AREAS[team]`, prefilled from the doc in `renderDetail()`). Writes `submittedBy` /
+    `team` / `area` (area normalized via `_firstArea()`) so `scopeOfApproval()`'s `a.team && a.area`
+    branch re-routes the item to the right PIC. This is the fix path for a submission that landed
+    with the wrong / no area.
+  - **Batalkan Pengembalian ke Teknisi** (shown only when `status==='returned_to_technician'`;
+    `doCancelReturn()` → `Approvals.cancelReturn()`): status goes back to the queue it came from —
+    `returnedNote.stage==='approval'` + a `review` present → `'reviewed'` (Supervisor queue),
+    otherwise → `'submitted'` (TechOp2 queue); `returnedNote` cleared. No re-submit by the
+    technician needed.
+  - **Batalkan Review** (shown only when `status==='reviewed'`; `doCancelReview()` →
+    `Approvals.cancelReview()`): `review` discarded, status → `'submitted'` (back to the TechOp2
+    review queue).
+  Each writes an `adminNote: {action, by, at}` marker on the doc. `_firstArea()` lives in
+  `approval-helper.js` (global, since team-routing.js isn't loaded on check sheets).
 - **"Rekap Bulanan" is a 4th tab, not a panel bolted above the existing list** — `switchTab()`
   now also toggles `#list-toolbar`/`#list-area` vs `#recap-area` visibility (`display:none` on
   whichever isn't active) alongside the existing tab-button/active-class logic, and calls
