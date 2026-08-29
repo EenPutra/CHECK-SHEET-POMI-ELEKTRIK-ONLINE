@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Status Report — ELECTRIC 7 POMI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="db-helper.js?v=20260829a"></script>
+<script src="approval-helper.js?v=20260829b"></script>
+<script src="auth-session.js?v=20260829a"></script>
+<script src="team-routing.js?v=20260829b"></script>
+<script>
+(function(){try{var t=localStorage.getItem('ra_theme');
+  if(t!=='light'&&t!=='dark') t=matchMedia('(prefers-color-scheme:dark)').matches?'dark':'light';
+  document.documentElement.setAttribute('data-theme',t);
+}catch(e){document.documentElement.setAttribute('data-theme','light');}})();
+</script>
+<style>
+:root{
+  --bg:#f4f7fb; --bg-2:#eaf0f7; --surf:#ffffff; --surf-2:#f8fafc;
+  --bdr:#e3e8f0; --bdr-2:#d6dde7;
+  --txt:#0b1220; --txt-2:#475569; --txt-3:#94a3b8;
+  --pri:#2563eb; --pri-soft:#dbeafe; --pri-deep:#1d4ed8;
+  --acc:#f59e0b; --acc-soft:#fef3c7;
+  --ind:#6366f1; --ind-soft:#e0e7ff;
+  --ok:#10b981; --ok-soft:#d1fae5;
+  --ng:#f43f5e; --ng-soft:#ffe4e6;
+  --amber-ink:#92400e; --green-ink:#047857; --rose-ink:#9f1239;
+  --chip-bg:#e2e8f0; --chip-ink:#334155;
+  --overlay-scrim:rgba(11,18,32,.55);
+  --display:'Space Grotesk',system-ui,sans-serif;
+  --body:'Manrope',system-ui,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --shadow:0 2px 8px rgba(15,23,42,0.06),0 1px 2px rgba(15,23,42,0.04);
+}
+:root[data-theme="dark"]{
+  --bg:#0f172a; --bg-2:#131c30; --surf:#1b2536; --surf-2:#141d2e;
+  --bdr:#2c3850; --bdr-2:#3a4a66;
+  --txt:#e7edf6; --txt-2:#a8b5c8; --txt-3:#6b7a91;
+  --pri:#3b82f6; --pri-soft:#1d3355; --pri-deep:#7db0ff;
+  --acc:#fbbf24; --acc-soft:#3b2f13;
+  --ind:#818cf8; --ind-soft:#272b4e;
+  --ok:#34d399; --ok-soft:#123227;
+  --ng:#fb7185; --ng-soft:#3b1720;
+  --amber-ink:#fcd34d; --green-ink:#6ee7b7; --rose-ink:#fda4af;
+  --chip-bg:#2c3850; --chip-ink:#cbd5e1;
+  --overlay-scrim:rgba(2,6,15,.72);
+  --shadow:0 2px 8px rgba(0,0,0,0.45),0 1px 2px rgba(0,0,0,0.35);
+}
+:root{color-scheme:light}:root[data-theme="dark"]{color-scheme:dark}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--body);background:var(--bg);color:var(--txt);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased}
+button{font-family:var(--body);cursor:pointer}
+a{color:var(--pri-deep);text-decoration:none}a:hover{text-decoration:underline}
+
+.topbar{position:sticky;top:0;z-index:50;display:flex;align-items:center;gap:12px;flex-wrap:wrap;
+  padding:12px 20px;background:var(--surf);border-bottom:1px solid var(--bdr)}
+.topbar .logo{height:30px;width:auto;background:#fff;border-radius:5px;padding:2px 5px}
+.topbar h1{font-family:var(--display);font-size:16px;font-weight:700;letter-spacing:.3px}
+.topbar h1 span{color:var(--pri)}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.user-label{font-size:12.5px;color:var(--txt-2);font-weight:600}
+.user-label b{color:var(--txt)}
+.btn{border:1px solid var(--bdr-2);background:var(--surf-2);color:var(--txt);border-radius:8px;
+  padding:7px 13px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{background:var(--bg-2)}
+.btn.pri{background:var(--pri);border-color:var(--pri);color:#fff}.btn.pri:hover{background:var(--pri-deep)}
+.btn.icn{padding:7px 10px}
+.btn.sm{padding:5px 10px;font-size:12px}
+
+.wrap{max-width:1080px;margin:0 auto;padding:20px 16px 80px}
+.scope-note{background:var(--acc-soft);border:1px solid var(--acc);color:var(--amber-ink);
+  border-radius:10px;padding:10px 14px;font-size:12.5px;margin-bottom:16px;display:flex;gap:8px;align-items:flex-start}
+.summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:22px}
+.sc{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
+.sc .n{font-family:var(--display);font-size:24px;font-weight:700;line-height:1}
+.sc .l{font-size:11.5px;color:var(--txt-2);font-weight:600;margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+.sc.rev .n{color:var(--pri)}.sc.appr .n{color:var(--ind)}.sc.done .n{color:var(--ok)}.sc.back .n{color:var(--ng)}
+
+.sec{margin-bottom:26px}
+.sec-h{font-family:var(--display);font-size:14.5px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+.sec-h .cnt{font-family:var(--mono);font-size:12px;color:var(--txt-3);font-weight:500}
+.sec-sub{font-size:12px;color:var(--txt-2);margin-bottom:12px}
+
+.card{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:14px 16px;margin-bottom:11px;box-shadow:var(--shadow)}
+.card-top{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
+.card-title{font-weight:700;font-size:14px;flex:1;min-width:180px}
+.card-meta{font-family:var(--mono);font-size:11px;color:var(--txt-3);margin-top:2px}
+.badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap;letter-spacing:.3px}
+.badge.submitted{background:var(--pri-soft);color:var(--pri-deep)}
+.badge.reviewed{background:var(--ind-soft);color:var(--ind)}
+.badge.approved{background:var(--ok-soft);color:var(--green-ink)}
+.badge.returned_to_technician{background:var(--ng-soft);color:var(--rose-ink)}
+
+.stepper{display:flex;align-items:center;gap:0;margin:12px 0 4px;flex-wrap:wrap}
+.step{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--txt-3)}
+.step .dot{width:18px;height:18px;border-radius:50%;border:2px solid var(--bdr-2);display:grid;place-items:center;
+  font-size:10px;font-weight:700;background:var(--surf);flex-shrink:0}
+.step.done .dot{background:var(--ok);border-color:var(--ok);color:#fff}
+.step.cur .dot{background:var(--pri);border-color:var(--pri);color:#fff}
+.step.back .dot{background:var(--ng);border-color:var(--ng);color:#fff}
+.step.done,.step.cur{color:var(--txt)}
+.step.back{color:var(--ng)}
+.step-line{flex:1;min-width:16px;height:2px;background:var(--bdr-2);margin:0 6px}
+.step-line.done{background:var(--ok)}
+
+.card-detail{margin-top:10px;font-size:12.5px;color:var(--txt-2);border-top:1px dashed var(--bdr);padding-top:9px}
+.card-detail b{color:var(--txt)}
+.note-q{background:var(--ng-soft);border:1px solid var(--ng);border-radius:8px;padding:8px 11px;color:var(--rose-ink);font-size:12px;margin-top:7px}
+.card-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+
+.empty{color:var(--txt-3);font-size:12.5px;text-align:center;padding:22px;border:1px dashed var(--bdr-2);border-radius:12px}
+
+/* login */
+.login-overlay{position:fixed;inset:0;z-index:500;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;transition:opacity .35s}
+.login-overlay.hide{opacity:0;pointer-events:none}
+.login-box{background:var(--surf);border:1px solid var(--bdr);border-radius:16px;padding:30px 28px;width:100%;max-width:360px;box-shadow:var(--shadow)}
+.login-box h2{font-family:var(--display);font-size:19px;font-weight:700;margin-bottom:4px}
+.login-box p{font-size:12.5px;color:var(--txt-2);margin-bottom:18px}
+.login-box label{display:block;font-size:11.5px;font-weight:700;color:var(--txt-2);margin:12px 0 5px;text-transform:uppercase;letter-spacing:.4px}
+.login-box input{width:100%;border:1px solid var(--bdr-2);background:var(--surf-2);color:var(--txt);border-radius:9px;padding:10px 12px;font-size:14px}
+.login-box input:focus{outline:none;border-color:var(--pri)}
+.login-err{color:var(--ng);font-size:12px;margin-top:10px;min-height:16px}
+.login-box .btn{width:100%;justify-content:center;margin-top:16px;padding:11px}
+.login-foot{font-size:11.5px;color:var(--txt-3);margin-top:14px;text-align:center}
+@media(max-width:560px){.topbar h1{font-size:14px}.wrap{padding:16px 12px 70px}}
+</style>
+</head>
+<body>
+
+<div class="login-overlay" id="login-overlay">
+  <form class="login-box" onsubmit="doLogin(event)">
+    <h2>Status Report</h2>
+    <p>Masuk dengan akun dashboard Anda untuk melihat status laporan yang Anda submit / review.</p>
+    <label>Username</label>
+    <input id="login-user" autocomplete="username" autocapitalize="none">
+    <label>Password</label>
+    <input id="login-pass" type="password" autocomplete="current-password">
+    <div class="login-err" id="login-err"></div>
+    <button class="btn pri" id="login-btn" type="submit">MASUK</button>
+    <div class="login-foot">Belum punya akun? Daftar lewat <a href="Review_Approval_Dashboard.html">Review &amp; Approval Dashboard</a>.</div>
+  </form>
+</div>
+
+<div class="topbar" id="topbar" style="display:none">
+  <img class="logo" src="LOGO POMI.png" alt="POMI">
+  <h1>STATUS <span>REPORT</span></h1>
+  <div class="tb-right">
+    <span class="user-label" id="user-label"></span>
+    <button class="btn sm icn" id="theme-btn" title="Ganti tema" onclick="cycleTheme()">🌙</button>
+    <button class="btn sm" onclick="loadAll()">↻ Refresh</button>
+    <a class="btn sm" href="Review_Approval_Dashboard.html">Review Dashboard</a>
+    <a class="btn sm" href="index.html">← Portal</a>
+    <button class="btn sm" onclick="doLogout()">Keluar</button>
+  </div>
+</div>
+
+<div class="wrap" id="app" style="display:none">
+  <div class="scope-note" id="scope-note" style="display:none"></div>
+  <div class="summary" id="summary"></div>
+  <div id="sections"></div>
+</div>
+
+<script>
+let loggedInUser=null, loggedInRole=null, loggedInName=null, loggedInTeam=null, loggedInAreas=[];
+const TEAM_AREAS = TeamRouting.TEAM_AREAS;
+const toAreaList = TeamRouting.toAreaList;
+
+/* ── theme ── */
+function currentTheme(){ return document.documentElement.getAttribute('data-theme')==='dark'?'dark':'light'; }
+function cycleTheme(){
+  const next = currentTheme()==='dark'?'light':'dark';
+  document.documentElement.setAttribute('data-theme',next);
+  try{ localStorage.setItem('ra_theme',next); }catch(e){}
+  syncThemeBtn();
+}
+function syncThemeBtn(){ const b=document.getElementById('theme-btn'); if(b) b.textContent = currentTheme()==='dark'?'☀️':'🌙'; }
+
+/* ── auth ── */
+async function hashPass(str){
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function doLogin(e){
+  e.preventDefault();
+  const user = document.getElementById('login-user').value.trim().toLowerCase();
+  const pass = document.getElementById('login-pass').value;
+  const err = document.getElementById('login-err');
+  const btn = document.getElementById('login-btn');
+  if(!user||!pass){ err.textContent='Isi username dan password.'; return; }
+  btn.disabled=true; btn.textContent='Memverifikasi...'; err.textContent='';
+  try{
+    const hashed = await hashPass(pass);
+    const snap = await db.collection('dashboard_users').where('username','==',user).limit(1).get();
+    if(snap.empty){ err.textContent='Username tidak ditemukan.'; btn.disabled=false; btn.textContent='MASUK'; return; }
+    const u = snap.docs[0].data();
+    if(u.password !== hashed){ err.textContent='Password salah.'; btn.disabled=false; btn.textContent='MASUK'; return; }
+    loggedInUser = u.username; loggedInRole = u.role || null; loggedInName = u.name || u.username;
+    loggedInTeam = TEAM_AREAS[u.team] ? u.team : null;
+    loggedInAreas = toAreaList(u.area);
+    AuthSession.set({ user: loggedInUser, role: loggedInRole||'', name: loggedInName });
+    try{
+      if(loggedInTeam) localStorage.setItem('dashboard_team', loggedInTeam);
+      if(loggedInAreas.length) localStorage.setItem('dashboard_area', JSON.stringify(loggedInAreas));
+    }catch(_){}
+    showApp();
+  }catch(err2){
+    console.error(err2);
+    document.getElementById('login-err').textContent='Gagal terhubung ke database.';
+    btn.disabled=false; btn.textContent='MASUK';
+  }
+}
+async function checkSession(){
+  const s = AuthSession.get();
+  if(!s || !s.user){ return false; }
+  loggedInUser = s.user; loggedInRole = s.role || null; loggedInName = s.name || s.user;
+  loggedInTeam = TEAM_AREAS[s.team] ? s.team : null;
+  loggedInAreas = toAreaList(s.area);
+  // backfill role/team from Firestore if the session predates them
+  if(!loggedInRole || (!loggedInTeam && (loggedInRole==='technician'||loggedInRole==='techop2'))){
+    try{
+      const snap = await db.collection('dashboard_users').where('username','==',loggedInUser).limit(1).get();
+      if(!snap.empty){
+        const u = snap.docs[0].data();
+        loggedInRole = loggedInRole || u.role || null;
+        if(!loggedInTeam && TEAM_AREAS[u.team]){ loggedInTeam = u.team; loggedInAreas = toAreaList(u.area); }
+      }
+    }catch(e){}
+  }
+  return true;
+}
+function doLogout(){ AuthSession.clear(); location.reload(); }
+function showApp(){
+  document.getElementById('login-overlay').classList.add('hide');
+  setTimeout(()=>{ document.getElementById('login-overlay').style.display='none'; },350);
+  document.getElementById('topbar').style.display='flex';
+  document.getElementById('app').style.display='block';
+  document.getElementById('user-label').innerHTML = 'Masuk sebagai <b>'+esc(loggedInName)+'</b> · '+roleLabel(loggedInRole)
+    + (loggedInTeam ? ' · '+esc(loggedInTeam)+' / '+esc(loggedInAreas.join(', ')||'?') : '');
+  syncThemeBtn();
+  AuthSession.onExpire(()=>location.reload());
+  loadAll();
+}
+function roleLabel(r){ return ({technician:'Level 1 (Teknisi)',techop2:'Level 2 (TechOp2)',supervisor:'Level 3 (Supervisor)',admin:'Admin'})[r] || (r||'—'); }
+
+/* ── data ── */
+let _approvals=[], _csCache={};
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt(iso){ if(!iso) return '—'; const d=new Date(iso); if(isNaN(d)) return '—';
+  return d.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'})+' '+d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'}); }
+const myKeys = () => [ (loggedInName||'').trim().toLowerCase(), (loggedInUser||'').trim().toLowerCase() ].filter(Boolean);
+function matchesMe(name){ const n=(name||'').trim().toLowerCase(); return !!n && myKeys().includes(n); }
+function csOf(a){ return _csCache[a.checksheetId] || {}; }
+
+function iSubmitted(a){
+  if(matchesMe(a.submittedBy)) return true;
+  const cs = csOf(a);
+  return matchesMe(cs.checkedBy) || matchesMe(cs.uploadedBy) || matchesMe(cs.uploadedByUsername);
+}
+function iReviewed(a){ return a.review && matchesMe(a.review.reviewedBy); }
+function iApproved(a){ return a.approval && matchesMe(a.approval.approvedBy); }
+function inMyArea(a){
+  if(!loggedInTeam || !loggedInAreas.length) return false;
+  const cs = csOf(a);
+  const s = TeamRouting.resolveScope({ names:[a.submittedBy, cs.checkedBy, cs.uploadedBy], team:a.team, area:a.area, src:a.src });
+  return TeamRouting.inScope(s, loggedInTeam, loggedInAreas);
+}
+
+async function loadAll(){
+  const sc = document.getElementById('sections');
+  sc.innerHTML = '<div class="empty">Memuat…</div>';
+  try{
+    _approvals = await Approvals.getAll();
+  }catch(e){ sc.innerHTML = '<div class="empty">Gagal memuat: '+esc(e.message)+'</div>'; return; }
+  await TeamRouting.loadUserDir(true).catch(()=>{});
+  // join checksheets (unique ids, cached)
+  const ids = [...new Set(_approvals.map(a=>a.checksheetId).filter(Boolean).filter(id=>!(id in _csCache)))];
+  await Promise.all(ids.map(async id=>{
+    try{ _csCache[id] = await DB.getById(id) || {}; }catch(e){ _csCache[id] = {}; }
+  }));
+  _approvals.sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  render();
+}
+
+/* ── render ── */
+function stepper(a){
+  // returned?
+  if(a.status==='returned_to_technician'){
+    const stg = a.returnedNote && a.returnedNote.stage==='approval' ? 3 : 2;
+    return `<div class="stepper">
+      ${stepEl('1','Submit','done')}${lineEl('done')}
+      ${stepEl('2','Review', stg>2?'done':'back')}${lineEl(stg>2?'done':'')}
+      ${stepEl('3','Approval', stg>2?'back':'')}${lineEl('')}
+      ${stepEl('✓','Selesai','')}
+    </div>`;
+  }
+  const order = {submitted:1, reviewed:2, approved:4};
+  const st = order[a.status]||1;
+  return `<div class="stepper">
+    ${stepEl('1','Submit', st>=1?'done':'')}${lineEl(st>=2?'done':'')}
+    ${stepEl('2','Review', st>2?'done':(st===1?'cur':'done'))}${lineEl(st>2?'done':'')}
+    ${stepEl('3','Approval', a.status==='approved'?'done':(a.status==='reviewed'?'cur':''))}${lineEl(a.status==='approved'?'done':'')}
+    ${stepEl('✓','Selesai', a.status==='approved'?'done':'')}
+  </div>`;
+}
+function stepEl(n,label,cls){ return `<div class="step ${cls}"><span class="dot">${n}</span>${esc(label)}</div>`; }
+function lineEl(cls){ return `<span class="step-line ${cls}"></span>`; }
+
+function card(a){
+  const cs = csOf(a);
+  const title = cs.assetName || a.assetName || cs.assetTag || a.assetTag || 'Laporan';
+  const wo = cs.woNumber || '—';
+  const date = cs.executionDate || '';
+  const who = a.submittedBy || cs.checkedBy || '—';
+  let detail = '';
+  if(a.review){
+    detail += `<div><b>Review</b> oleh ${esc(a.review.reviewedBy||'—')} · ${fmt(a.review.reviewedAt)}`
+      + (a.review.auto ? ' <i>(otomatis — submitter Level 2)</i>' : '')
+      + (a.review.comments ? `<br>"${esc(a.review.comments)}"` : '') + `</div>`;
+  }
+  if(a.approval){
+    detail += `<div style="margin-top:5px"><b>Approval</b> oleh ${esc(a.approval.approvedBy||'—')} · ${fmt(a.approval.approvedAt)}`
+      + (a.approval.notes ? `<br>"${esc(a.approval.notes)}"` : '') + `</div>`;
+  }
+  let ret = '';
+  if(a.returnedNote){
+    ret = `<div class="note-q">↩︎ Dikembalikan oleh ${esc(a.returnedNote.by||'—')} (tahap ${a.returnedNote.stage==='approval'?'Approval':'Review'}) · ${fmt(a.returnedNote.returnedAt)}<br>"${esc(a.returnedNote.note||'—')}"</div>`;
+  }
+  const acts = [];
+  acts.push(`<a class="btn sm" href="Review_Approval_Dashboard.html?id=${encodeURIComponent(a.id)}">Detail lengkap</a>`);
+  if(a.status==='returned_to_technician' && a.checksheetFile && !a.src && iSubmitted(a)){
+    acts.push(`<a class="btn sm pri" target="_blank" rel="noopener" href="${esc(a.checksheetFile.replace(/ /g,'%20'))}?reviseOf=${encodeURIComponent(a.id)}">Perbaiki &amp; kirim ulang</a>`);
+  }
+  if(a.finalPdfUrl){
+    acts.push(`<a class="btn sm" href="Review_Approval_Dashboard.html?id=${encodeURIComponent(a.id)}">Unduh PDF Final</a>`);
+  }
+  return `<div class="card">
+    <div class="card-top">
+      <div>
+        <div class="card-title">${esc(title)}</div>
+        <div class="card-meta">WO ${esc(wo)}${date?' · '+esc(date):''} · oleh ${esc(who)} · disubmit ${fmt(a.createdAt)}${a.src?' · via '+esc(a.src):''}</div>
+      </div>
+      <span class="badge ${a.status}">${esc(Approvals.STATUS_LABELS[a.status]||a.status)}</span>
+    </div>
+    ${stepper(a)}
+    ${ret}
+    ${detail ? `<div class="card-detail">${detail}</div>` : ''}
+    <div class="card-actions">${acts.join('')}</div>
+  </div>`;
+}
+
+function sectionsFor(role){
+  if(role==='technician'){
+    return [{ h:'📤 Laporan yang saya submit', sub:'Semua laporan yang Anda kirim, beserta status review & approval-nya.',
+      items:_approvals.filter(iSubmitted) }];
+  }
+  if(role==='techop2'){
+    return [
+      { h:'📥 Masuk untuk saya review', sub:'Laporan dari Level 1 di team/area Anda yang masih menunggu review.',
+        items:_approvals.filter(a=>a.status==='submitted' && inMyArea(a)) },
+      { h:'✅ Sudah saya review', sub:'Laporan yang sudah Anda teruskan ke Supervisor (atau dikembalikan).',
+        items:_approvals.filter(iReviewed) },
+      { h:'📤 Laporan yang saya submit', sub:'', items:_approvals.filter(iSubmitted), hideEmpty:true },
+    ];
+  }
+  if(role==='supervisor'){
+    return [
+      { h:'📥 Menunggu approval saya', sub:'Laporan yang sudah direview TechOp2 dan menunggu keputusan Anda.',
+        items:_approvals.filter(a=>a.status==='reviewed') },
+      { h:'✅ Sudah saya approve', sub:'', items:_approvals.filter(iApproved) },
+      { h:'📤 Laporan yang saya submit', sub:'', items:_approvals.filter(iSubmitted), hideEmpty:true },
+    ];
+  }
+  // admin
+  return [{ h:'📋 Semua laporan', sub:'Admin melihat seluruh laporan di sistem.', items:_approvals }];
+}
+
+function render(){
+  const secs = sectionsFor(loggedInRole);
+  const shown = new Map();
+  secs.forEach(s => s.items.forEach(a => shown.set(a.id, a)));
+  const all = [...shown.values()];
+  const cnt = st => all.filter(a=>a.status===st).length;
+  document.getElementById('summary').innerHTML = `
+    <div class="sc rev"><div class="n">${cnt('submitted')}</div><div class="l">Menunggu Review</div></div>
+    <div class="sc appr"><div class="n">${cnt('reviewed')}</div><div class="l">Menunggu Approval</div></div>
+    <div class="sc done"><div class="n">${cnt('approved')}</div><div class="l">Disetujui</div></div>
+    <div class="sc back"><div class="n">${cnt('returned_to_technician')}</div><div class="l">Dikembalikan</div></div>`;
+
+  const note = document.getElementById('scope-note');
+  if(loggedInRole==='technician' || loggedInRole==='techop2'){
+    note.style.display='flex';
+    note.innerHTML = '<span>ℹ️</span><span>Laporan dicocokkan berdasarkan nama Anda ('+esc(loggedInName)+'). Jika ada laporan yang Anda submit/review tidak muncul, kemungkinan nama pada laporan berbeda — hubungi admin.</span>';
+  } else note.style.display='none';
+
+  const box = document.getElementById('sections');
+  box.innerHTML = secs.map(s=>{
+    if(s.hideEmpty && !s.items.length) return '';
+    return `<div class="sec">
+      <div class="sec-h">${esc(s.h)} <span class="cnt">${s.items.length}</span></div>
+      ${s.sub?`<div class="sec-sub">${esc(s.sub)}</div>`:''}
+      ${s.items.length ? s.items.map(card).join('') : '<div class="empty">Belum ada laporan.</div>'}
+    </div>`;
+  }).join('') || '<div class="empty">Belum ada laporan.</div>';
+}
+
+/* ── init ── */
+(async function(){
+  syncThemeBtn();
+  if(await checkSession()) showApp();
+  setInterval(()=>{ if(document.getElementById('app').style.display!=='none' && document.visibilityState==='visible') loadAll(); }, 90000);
+})();
+</script>
+</body>
+</html>
