@@ -215,6 +215,25 @@ const SubmitGuard = (function () {
     setProgress(0, 'Memeriksa submission sebelumnya...');
 
     try {
+      // Revision mode: the technician opened this check sheet via
+      // `?reviseOf=<approvalId>` (from the Review dashboard's "Perbaiki & kirim
+      // ulang" link or the revision banner). A revision ALWAYS overwrites its
+      // source approval in place — no "same visit?" WO matching, no choice
+      // modal. approval-helper.js then flips a 'returned_to_technician' source
+      // to 'revised' and keeps the return note as history.
+      let reviseOfId = null;
+      try { reviseOfId = window.LoadMergeModal && LoadMergeModal.getReviseOfApprovalId && LoadMergeModal.getReviseOfApprovalId(); } catch (e) {}
+      if (reviseOfId && typeof Approvals !== 'undefined') {
+        try {
+          setProgress(0, 'Menyiapkan revisi...');
+          const src = await Approvals.getById(reviseOfId);
+          if (src && src.checksheetId) {
+            return { mode: 'overwrite', targetId: src.checksheetId, approvalId: reviseOfId, revision: true };
+          }
+        } catch (e) { console.error('SubmitGuard: gagal resolve reviseOf', e); }
+        // couldn't resolve the source approval — fall through to normal matching
+      }
+
       const wo = (woNumber || '').trim().toLowerCase();
 
       let candidate = _sessionLast;

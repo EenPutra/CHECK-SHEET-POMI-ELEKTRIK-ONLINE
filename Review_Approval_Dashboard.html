@@ -12,14 +12,14 @@
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=20260830a"></script>
 <!-- ?v bumped on every change to a shared lib so GitHub Pages' 10-min asset
      cache doesn't serve a stale copy (symptom: "Approvals.xxx is not a function"). -->
-<script src="db-helper.js?v=20260829a"></script>
-<script src="storage-helper.js?v=20260829a"></script>
-<script src="approval-helper.js?v=20260829b"></script>
-<script src="auth-session.js?v=20260829a"></script>
-<script src="team-routing.js?v=20260829b"></script>
+<script src="db-helper.js?v=20260830a"></script>
+<script src="storage-helper.js?v=20260830a"></script>
+<script src="approval-helper.js?v=20260830a"></script>
+<script src="auth-session.js?v=20260830a"></script>
+<script src="team-routing.js?v=20260830a"></script>
 <style>
 :root{
   --bg:#f4f7fb; --bg-2:#eaf0f7; --surf:#ffffff; --surf-2:#f8fafc;
@@ -217,6 +217,7 @@ select.login-field:disabled{opacity:.55;cursor:not-allowed}
 .card-meta{font-size:11.5px;color:var(--txt-3);font-family:var(--mono);margin-top:3px}
 .card-badge{font-size:10.5px;font-weight:800;letter-spacing:.4px;padding:4px 11px;border-radius:20px;text-transform:uppercase;white-space:nowrap}
 .card-badge.submitted{background:var(--ind-soft);color:var(--ind)}
+.card-badge.revised{background:var(--pri-soft);color:var(--pri-deep)}
 .card-badge.reviewed{background:var(--acc-soft);color:var(--amber-ink)}
 .card-badge.approved{background:var(--ok-soft);color:var(--green-ink)}
 .card-badge.returned_to_technician{background:var(--ng-soft);color:var(--ng)}
@@ -583,6 +584,7 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
       <select class="filter-sel" id="status-filter" onchange="renderList()">
         <option value="">Semua status</option>
         <option value="submitted">Menunggu Review</option>
+        <option value="revised">Direvisi</option>
         <option value="reviewed">Menunggu Approval</option>
         <option value="approved">Disetujui</option>
         <option value="returned_to_technician">Dikembalikan</option>
@@ -1591,12 +1593,46 @@ async function cleanupDuplicateApprovals(approvals){
       if(gap <= gapMs && autoCleanEligible(cur.a)) toDelete.push(cur.a);
     }
   });
+  // Revision safety net: a returned entry that was re-submitted normally gets
+  // overwritten in place (submit-guard.js resolves ?reviseOf to an overwrite).
+  // But if that couldn't happen (blank WO No., or the check sheet opened
+  // without ?reviseOf), a SEPARATE new approval was created with `revisionOf`
+  // pointing back at the returned one. Collapse that: fold the returned entry's
+  // note into the new one's returnedHistory, flip the new one to 'revised',
+  // and delete the stale returned source.
+  const revisionCollapses = [];
+  for(const x of withKey){
+    const a = x.a;
+    if(!a.revisionOf) continue;
+    let src = null;
+    try{ src = await Approvals.getById(a.revisionOf); }catch(e){ continue; }
+    if(!src || src.status !== 'returned_to_technician') continue;
+    if(toDelete.some(d => d.id === src.id)) continue;
+    revisionCollapses.push({ neu: a, src });
+  }
+  for(const {neu, src} of revisionCollapses){
+    try{
+      const hist = Array.isArray(neu.returnedHistory) ? neu.returnedHistory.slice() : [];
+      if(Array.isArray(src.returnedHistory)) hist.push(...src.returnedHistory);
+      if(src.returnedNote) hist.push(src.returnedNote);
+      await db.collection('approvals').doc(neu.id).set({
+        status: (neu.status==='submitted') ? 'revised' : neu.status,
+        revisedAt: neu.revisedAt || new Date().toISOString(),
+        revisionCount: (src.revisionCount || 0) + 1,
+        returnedHistory: hist,
+        updatedAt: new Date().toISOString(),
+      }, { merge: true });
+      Object.assign(neu, { status:(neu.status==='submitted')?'revised':neu.status });
+      toDelete.push(src);
+    }catch(e){ console.error('Gagal collapse revisi', neu.id, e); }
+  }
+
   if(!toDelete.length) return [];
 
   const actuallyDeleted = [];
   for(const a of toDelete){
     try{ await Approvals.deleteById(a.id); actuallyDeleted.push(a); }
-    catch(e){ console.error('Gagal hapus approval duplikat', a.id, e); }
+    catch(e){ console.error('Gagal hapus approval duplikat/revisi', a.id, e); }
   }
   return actuallyDeleted;
 }
@@ -1648,8 +1684,8 @@ function myStatusSections(){
   }
   if(r==='techop2'){
     return [
-      { h:'📥 Masuk untuk saya review', sub:'Laporan dari Level 1 di team/area Anda yang masih menunggu review.',
-        items:_allApprovals.filter(a=>a.status==='submitted' && _msInMyArea(a)) },
+      { h:'📥 Masuk untuk saya review', sub:'Laporan dari Level 1 di team/area Anda yang menunggu review (termasuk yang sudah direvisi).',
+        items:_allApprovals.filter(a=>Approvals.isPendingReview(a.status) && _msInMyArea(a)) },
       { h:'✅ Sudah saya review', sub:'Laporan yang sudah Anda teruskan ke Supervisor (atau dikembalikan).',
         items:_allApprovals.filter(_msIReviewed) },
       { h:'📤 Laporan yang saya submit', sub:'', items:_allApprovals.filter(_msISubmitted), hideEmpty:true },
@@ -1680,10 +1716,11 @@ function _msStepper(a){
       ${_msStep('✓','Selesai','')}
     </div>`;
   }
-  const st = {submitted:1, reviewed:2, approved:3}[a.status] || 1;
+  const st = {submitted:1, revised:1, reviewed:2, approved:3}[a.status] || 1;
+  const revLabel = a.status==='revised' ? 'Review ulang' : 'Review';
   return `<div class="ms-stepper">
     ${_msStep('1','Submit','done')}${_msLn(st>=2?'done':'')}
-    ${_msStep('2','Review', st>=2?'done':'cur')}${_msLn(st>=2?'done':'')}
+    ${_msStep('2',revLabel, st>=2?'done':'cur')}${_msLn(st>=2?'done':'')}
     ${_msStep('3','Approval', st===3?'done':(st===2?'cur':''))}${_msLn(st===3?'done':'')}
     ${_msStep('✓','Selesai', st===3?'done':'')}
   </div>`;
@@ -1707,6 +1744,13 @@ function _msCard(a){
   let ret = '';
   if(a.returnedNote){
     ret = `<div class="ms-noteq">↩︎ Dikembalikan oleh ${escHtml(a.returnedNote.by||'—')} (tahap ${a.returnedNote.stage==='approval'?'Approval':'Review'}) · ${fmtDate(a.returnedNote.returnedAt)}<br>"${escHtml(a.returnedNote.note||'—')}"</div>`;
+  }
+  if(a.status==='revised' && a.revisedAt){
+    detail = `<div><b>Direvisi & dikirim ulang</b> · ${fmtDate(a.revisedAt)}${a.revisionCount?` (revisi ke-${a.revisionCount})`:''} — menunggu review ulang.</div>`
+      + (Array.isArray(a.returnedHistory) && a.returnedHistory.length
+          ? a.returnedHistory.map(h=>`<div style="margin-top:4px;color:var(--txt-3)">↩︎ pernah dikembalikan oleh ${escHtml(h.by||'—')} · ${fmtDate(h.returnedAt)}: "${escHtml(h.note||'—')}"</div>`).join('')
+          : '')
+      + detail;
   }
   const acts = [`<button class="btn btn-sm btn-pri" onclick="openDetail('${a.id}')">Detail lengkap</button>`];
   if(a.status==='returned_to_technician' && a.checksheetFile && !a._src && _msISubmitted(a)){
@@ -1754,12 +1798,14 @@ function renderMyStatus(){
 }
 function inboxItems(){
   // TechOp2 inbox is scoped to the PIC's own team+area (see inMyReviewScope).
-  if(loggedInRole==='techop2') return _allApprovals.filter(a=>a.status==='submitted' && inMyReviewScope(a));
+  // 'revised' = a returned item that's been fixed & resubmitted — same queue as
+  // 'submitted' (Approvals.isPendingReview()).
+  if(loggedInRole==='techop2') return _allApprovals.filter(a=>Approvals.isPendingReview(a.status) && inMyReviewScope(a));
   if(loggedInRole==='supervisor') return _allApprovals.filter(a=>a.status==='reviewed');
-  if(loggedInRole==='admin') return _allApprovals.filter(a=>a.status==='submitted'||a.status==='reviewed');
+  if(loggedInRole==='admin') return _allApprovals.filter(a=>Approvals.isPendingReview(a.status)||a.status==='reviewed');
   return [];
 }
-const STATUS_ORDER = ['submitted','reviewed','returned_to_technician','approved'];
+const STATUS_ORDER = ['submitted','revised','reviewed','returned_to_technician','approved'];
 function sortApprovals(items, mode){
   const newest = (a,b) => (b.createdAt||'').localeCompare(a.createdAt||'');
   const nm = a => (a.assetName||a.assetTag||'');
@@ -1884,6 +1930,11 @@ function computeRecapData(list){
   list.forEach(a => {
     const mSub = monthKey(a.createdAt);
     if(mSub){ months.add(mSub); sub[mSub] = (sub[mSub]||0)+1; }
+    // a revision is a re-submission event — count it in Submitted for its own month
+    if(a.revisedAt){
+      const mR = monthKey(a.revisedAt);
+      if(mR){ months.add(mR); sub[mR] = (sub[mR]||0)+1; }
+    }
     if(a.review && a.review.reviewedAt){
       const mRev = monthKey(a.review.reviewedAt);
       if(mRev){ months.add(mRev); rev[mRev] = (rev[mRev]||0)+1; }
@@ -2125,6 +2176,16 @@ function renderDetail(a, cs){
       ${a.checksheetFile && !a._src ? `<div style="margin-top:8px"><a class="btn btn-sm" target="_blank" rel="noopener" href="${a.checksheetFile}?reviseOf=${a.id}">&#9999;&#65039; Buka Check Sheet untuk Revisi</a></div>` : ''}
     </div>`;
   }
+  if(a.status==='revised' || (Array.isArray(a.returnedHistory) && a.returnedHistory.length)){
+    html += `<div class="dsec"><div class="dsec-title">&#128260; Riwayat Revisi</div>`;
+    if(a.revisedAt){
+      html += `<div class="note-box">Laporan ini <b>sudah diperbaiki &amp; dikirim ulang</b> pada ${fmtDate(a.revisedAt)}${a.revisionCount?` (revisi ke-${a.revisionCount})`:''}. Data yang dikembalikan sudah <b>ditimpa</b> oleh laporan hasil revisi — menunggu review ulang.</div>`;
+    }
+    (a.returnedHistory||[]).forEach((h,i) => {
+      html += `<div class="note-box returned" style="margin-top:8px">Pengembalian #${i+1} — oleh <b>${escHtml(h.by||'—')}</b> pada tahap <b>${h.stage==='approval'?'Approval':'Review'}</b> (${fmtDate(h.returnedAt)}):<br>"${escHtml(h.note||'—')}"</div>`;
+    });
+    html += `</div>`;
+  }
 
   if(a.review){
     html += `<div class="dsec"><div class="dsec-title">Review — TechOp2</div>
@@ -2307,9 +2368,9 @@ function renderActionSection(a, cs){
   // TechOp2 may only review submissions routed to their own team+area (the
   // same rule inboxItems() filters on) — enforced here too so a direct link
   // to an out-of-scope submission can't be reviewed.
-  const canReview = ((loggedInRole==='techop2' && inMyReviewScope(a)) || loggedInRole==='admin') && a.status==='submitted';
+  const canReview = ((loggedInRole==='techop2' && inMyReviewScope(a)) || loggedInRole==='admin') && Approvals.isPendingReview(a.status);
   const canApprove = (loggedInRole==='supervisor' || loggedInRole==='admin') && a.status==='reviewed';
-  if(loggedInRole==='techop2' && a.status==='submitted' && !inMyReviewScope(a)){
+  if(loggedInRole==='techop2' && Approvals.isPendingReview(a.status) && !inMyReviewScope(a)){
     return `<div class="dsec"><div class="dsec-title">Tindakan — Review</div>
       <div class="readonly-hint">Submission ini di luar cakupan team/area Anda (${a._team?escHtml(a._team)+' · '+escHtml(a._area||'?'):'team submitter tidak tercatat'}). PIC dari team tersebut yang akan mereview.</div>
     </div>`;

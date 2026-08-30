@@ -1317,12 +1317,32 @@ the current design — **do not "simplify" these away**:
     so a TechOp2 can fix the submitter's data mid-review instead of only bouncing it back.
     `initRevisionBanner()` adapts its wording by the approval's `status`: a `returnedNote`
     present → "merevisi submission yang dikembalikan"; `status==='submitted'` and no note →
-    "dibuka oleh reviewer untuk memperbaiki isian" + a hint to pick "Timpa" on resubmit. On
-    resubmit, `SubmitGuard.resolveSubmitTarget()` matches the existing checksheet+approval by
-    WO number (approval still `submitted`) and offers Overwrite → `DB.update()` +
-    `existingApprovalId` updates the SAME approval in place, no duplicate. (If WO No. is blank
-    SubmitGuard can't match → a second approval with `revisionOf` set is created instead; still
-    converges via `cleanupDuplicateApprovals` when tag+WO are both present.)
+    "dibuka oleh reviewer untuk memperbaiki isian" + a hint to pick "Timpa" on resubmit.
+  - **Revision always overwrites its source approval — new `revised` status.** On resubmit,
+    `SubmitGuard.resolveSubmitTarget()` checks `LoadMergeModal.getReviseOfApprovalId()` FIRST:
+    if set, it fetches that approval and returns `{mode:'overwrite', targetId:<its checksheetId>,
+    approvalId:<reviseOf>, revision:true}` directly — **no WO matching, no choice modal, and it
+    works regardless of the source's status** (this is the fix for revising a
+    `returned_to_technician` entry, which the old `canOverwrite` check refused because status
+    wasn't `submitted`). The check sheet then `DB.update()`s the SAME checksheet doc
+    (`createdAt` preserved) and passes `existingApprovalId`. In `Approvals.submitWithFiles()`'s
+    `existingApprovalId` branch: if the prior approval was `returned_to_technician`, this is a
+    REVISION — `status` → `'revised'` (or `'reviewed'` for a TechOp2 auto-review), the old
+    (pre-return) `review` is discarded, `returnedNote` is moved into a `returnedHistory[]` array,
+    and `revisedAt`/`revisionCount` are stamped. `checksheetId` is rewritten to the new doc.
+    Any other prior status (a plain `submitted` dup) keeps the existing behavior (stays
+    `submitted`). If SubmitGuard couldn't resolve `reviseOf` (blank/missing) and a **separate**
+    approval with `revisionOf` was created instead, `cleanupDuplicateApprovals()` collapses it:
+    folds the returned source's note into the new one's `returnedHistory`, flips it to
+    `'revised'`, deletes the stale returned source.
+  - **`'revised'` is behaviourally identical to `'submitted'`** for queueing / permissions —
+    `Approvals.isPendingReview(status)` (`=== 'submitted' || === 'revised'`) is used everywhere
+    that used to check `=== 'submitted'` (`inboxItems()`, `renderActionSection()`'s `canReview`,
+    the Status Laporan tab's review section). It's a distinct label ("Direvisi") + badge only so
+    reviewers can see the item went through a return→revise cycle; `renderDetail()` shows a
+    "Riwayat Revisi" section with each past `returnedHistory` entry. `STATUS_ORDER`,
+    `computeRecapData()` (a `revisedAt` counts as a Submitted event in its own month), the
+    status-filter dropdown, and `dashboard.html`'s `APPROVAL_BADGE_*` maps all know `revised`.
   - **Merge behavior across the two different OK/NG toggle conventions this codebase uses**
     (see "Per-file conventions worth matching" below): header fields and `inputValues` (the
     generic `<input>`/`<select>`/`<textarea>` sweep — where most of a technician's actual typed
@@ -1849,11 +1869,14 @@ GitHub Pages serves static assets with `Cache-Control: max-age=600`, so after a 
 lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 `storage-helper.js`, …) changes, a browser keeps the **old** copy for up to 10 minutes
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
-doesn't have yet (`"Approvals.cancelReturn is not a function"`). `Review_Approval_Dashboard.html`,
-`Motor_Witness_Test_Vendor.html` and `Status_Report.html` load these with a
-`?v=YYYYMMDDx` query string; **bump that suffix on every shared-lib change** so browsers
-fetch the new file immediately. Other pages still use bare `src` — roll the `?v=` out to
-a page when a shared-lib change actually affects it, or wait out the 10-minute cache.
+doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
+rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
+shared `?v=YYYYMMDDx` query string (currently `?v=20260830a`) — a Python one-liner rewrites
+all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
+suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
+new page HTML depends on. The revision-overwrite flow in particular is triggered from a
+check sheet's `submitToDb()`, so a stale `submit-guard.js` / `approval-helper.js` there
+would silently fall back to the old behavior.
 
 ## Technician login on check sheets — auto-filling "Checked By" (`technician-auth.js`)
 

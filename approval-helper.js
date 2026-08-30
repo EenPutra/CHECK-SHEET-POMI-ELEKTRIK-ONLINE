@@ -298,14 +298,36 @@ const Approvals = {
 
       report(95, 'Mencatat status approval...');
       if (existingApprovalId) {
-        await db.collection(this.COLLECTION).doc(existingApprovalId).set({
+        // Was this the "returned to technician" entry being re-submitted after
+        // a fix? If so, the resubmit is a REVISION: the returned entry is
+        // overwritten in place (new checksheetId/photos/pdf), its status
+        // becomes 'revised' (a distinct, re-review-pending state — or straight
+        // to 'reviewed' when the reviser is a TechOp2 auto-review), and the
+        // return note is moved into returnedHistory[] so the trail survives.
+        let prev = null;
+        try { prev = await this.getById(existingApprovalId); } catch (e) { /* best effort */ }
+        const wasReturned = prev && prev.status === 'returned_to_technician';
+        const patch = {
+          checksheetId,
           assetTag: assetTag || '', assetName: assetName || '', checksheetFile: checksheetFile || '',
           submittedBy: submittedBy || '',
-          status: autoReview ? 'reviewed' : 'submitted',
-          ...(autoReview ? { review: autoReview } : {}),
           ...(team ? { team } : {}), ...(area ? { area } : {}),
           updatedAt: new Date().toISOString(),
-        }, { merge: true });
+        };
+        if (wasReturned) {
+          patch.status = autoReview ? 'reviewed' : 'revised';
+          patch.review = autoReview || null;                  // discard the old (pre-return) review; a revision needs a fresh one
+          patch.revisedAt = new Date().toISOString();
+          patch.revisionCount = (prev.revisionCount || 0) + 1;
+          const hist = Array.isArray(prev.returnedHistory) ? prev.returnedHistory.slice() : [];
+          if (prev.returnedNote) hist.push(prev.returnedNote);
+          patch.returnedHistory = hist;
+          patch.returnedNote = null;
+        } else {
+          patch.status = autoReview ? 'reviewed' : 'submitted';
+          if (autoReview) patch.review = autoReview;
+        }
+        await db.collection(this.COLLECTION).doc(existingApprovalId).set(patch, { merge: true });
       } else {
         await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf, team, area, src, autoReview });
       }
@@ -319,8 +341,15 @@ const Approvals = {
 
   STATUS_LABELS: {
     submitted: 'Menunggu Review',
+    revised: 'Direvisi',
     reviewed: 'Menunggu Approval',
     approved: 'Disetujui',
     returned_to_technician: 'Dikembalikan ke Teknisi',
   },
+
+  // A 'revised' entry is behaviourally identical to 'submitted' for queueing /
+  // permissions — it's a distinct label only so reviewers can see the item
+  // has been through a return→revise cycle. Everywhere the code asks "is this
+  // waiting for TechOp2 review", use this instead of `=== 'submitted'`.
+  isPendingReview(status) { return status === 'submitted' || status === 'revised'; },
 };

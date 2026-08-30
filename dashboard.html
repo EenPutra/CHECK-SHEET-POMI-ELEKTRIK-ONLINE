@@ -11,11 +11,11 @@
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js"></script>
-<script src="db-helper.js"></script>
-<script src="approval-helper.js"></script>
-<script src="auth-session.js"></script>
-<script src="team-routing.js"></script>
+<script src="firebase-config.js?v=20260830a"></script>
+<script src="db-helper.js?v=20260830a"></script>
+<script src="approval-helper.js?v=20260830a"></script>
+<script src="auth-session.js?v=20260830a"></script>
+<script src="team-routing.js?v=20260830a"></script>
 <style>
 :root{
   --bg:#f4f7fb;
@@ -2429,10 +2429,10 @@ function renderTable(data) {
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 const APPROVAL_BADGE_COLORS = {
-  submitted: '#6366f1', reviewed: '#92400e', approved: '#047857', returned_to_technician: '#f43f5e',
+  submitted: '#6366f1', revised: '#1d4ed8', reviewed: '#92400e', approved: '#047857', returned_to_technician: '#f43f5e',
 };
 const APPROVAL_BADGE_BG = {
-  submitted: '#e0e7ff', reviewed: '#fef3c7', approved: '#d1fae5', returned_to_technician: '#ffe4e6',
+  submitted: '#e0e7ff', revised: '#dbeafe', reviewed: '#fef3c7', approved: '#d1fae5', returned_to_technician: '#ffe4e6',
 };
 function approvalBadge(checksheetId) {
   const a = approvalsByChecksheetId[checksheetId];
