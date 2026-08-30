@@ -810,7 +810,7 @@ async function generatePDF(opts={}){
     y=pdf.lastAutoTable.finalY+5;
   }
 
-  // Section A — now includes Vs Limit row (6b)
+  // Section A — includes Vs Limit row (4b), between DC Output Voltage (4) and DC Output Current (5)
   const colsA=['817A','827A','837A','847A','815A','825A','835A','845A','817B','827B','837B','847B','815B','825B','835B','845B'];
   const rowsA=[
     ['1','Ambient Temp.','<40°C',...colsA.map(c=>getInpVal('1_'+c)+'°C')],
@@ -1104,9 +1104,9 @@ async function submitToDb(){
       ['2','AC Input Voltage T/R (V)','380 V',c=>iv('2_'+c)],
       ['3','AC Input Current T/R (A)','< 275 A',c=>iv('3_'+c)],
       ['4','DC Output Voltage T/R (kV)','< 60 kV',c=>iv('4_'+c)],
+      ['4b','DC Voltage Limit Vs (kV)','< 60 kV',c=>iv('4b_'+c)],
       ['5','DC Output Current T/R (mA)','< 1200 mA',c=>iv('5_'+c)],
       ['6','DC Current Limit Is (mA)','< 1200 mA',c=>iv('6_'+c)],
-      ['6b','DC Voltage Limit Vs (kV)','< 60 kV',c=>iv('6b_'+c)],
       ['7','Oil Level T/R','> Oil fill mark',c=>iv('7_'+c)],
       ['8','Oil Temperature (°C)','< 90°C',c=>iv('8_'+c)],
       ['9','Oil Leakage','No Leak',c=>tv('9_'+c)],
