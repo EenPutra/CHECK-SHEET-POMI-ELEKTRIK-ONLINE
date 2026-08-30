@@ -206,7 +206,11 @@ const SubmitGuard = (function () {
   // to {mode:'cancel'} with no further work, regardless of how slow the
   // network call turns out to be or whether the button's own `disabled`
   // attribute has visually taken effect yet.
-  async function resolveSubmitTarget(woNumber) {
+  // pdfBuilder (optional): () => jsPDF | Promise<jsPDF>. When given AND
+  // window.PdfPreview is loaded, the submission is previewed BEFORE anything
+  // is written — the technician sees the exact PDF and can pick "Perbaiki
+  // Dulu" (returns {mode:'cancel'}, caller aborts) or "Lanjut Submit".
+  async function resolveSubmitTarget(woNumber, pdfBuilder) {
     if (!_config) throw new Error('SubmitGuard.init({assetTag}) belum dipanggil.');
     if (_busy) return { mode: 'cancel' };
     _busy = true;
@@ -215,6 +219,20 @@ const SubmitGuard = (function () {
     setProgress(0, 'Memeriksa submission sebelumnya...');
 
     try {
+      // ── PDF preview gate ──
+      if (pdfBuilder && typeof window !== 'undefined' && window.PdfPreview) {
+        setProgress(0, 'Menyiapkan preview PDF...');
+        let previewPdf = null;
+        try { previewPdf = await pdfBuilder(); } catch (e) { console.error('SubmitGuard: gagal build PDF preview', e); }
+        if (previewPdf && typeof previewPdf.output === 'function') {
+          hideProgressOverlayOnly();
+          const ok = await window.PdfPreview.confirm(previewPdf);
+          if (!ok) { _busy = false; _unlockButtons(); return { mode: 'cancel' }; }
+          showProgress();
+          setProgress(1, 'Melanjutkan submit...');
+        }
+      }
+
       // Revision mode: the technician opened this check sheet via
       // `?reviseOf=<approvalId>` (from the Review dashboard's "Perbaiki & kirim
       // ulang" link or the revision banner). A revision ALWAYS overwrites its

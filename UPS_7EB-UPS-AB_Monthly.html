@@ -8,16 +8,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20260830b"></script>
-<script src="db-helper.js?v=20260830b"></script>
-<script src="storage-helper.js?v=20260830b"></script>
-<script src="approval-helper.js?v=20260830b"></script>
-<script src="submit-guard.js?v=20260830b"></script>
-<script src="load-merge-modal.js?v=20260830b"></script>
-<script src="auth-session.js?v=20260830b"></script>
-<script src="technician-auth.js?v=20260830b"></script>
-<script src="img-helper.js?v=20260830b"></script>
-<script src="photo-kit.js?v=20260830b"></script>
+<script src="firebase-config.js?v=20260830c"></script>
+<script src="db-helper.js?v=20260830c"></script>
+<script src="storage-helper.js?v=20260830c"></script>
+<script src="approval-helper.js?v=20260830c"></script>
+<script src="submit-guard.js?v=20260830c"></script>
+<script src="pdf-preview.js?v=20260830c"></script>
+<script src="load-merge-modal.js?v=20260830c"></script>
+<script src="auth-session.js?v=20260830c"></script>
+<script src="technician-auth.js?v=20260830c"></script>
+<script src="img-helper.js?v=20260830c"></script>
+<script src="photo-kit.js?v=20260830c"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -204,7 +205,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-draft btn-sm" onclick="saveDraft()">💾 Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 Export PDF</button>
-    <button class="btn btn-sm" style="background:#059669;color:#fff;border:none" onclick="printPage()">🖨️ Print</button>
+    <button class="btn btn-sm" style="background:#059669;color:#fff;border:none" onclick="generatePDF()">🖨️ Print</button>
     <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
 </div>
@@ -477,7 +478,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
   <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
   <button class="btn btn-draft" style="background:var(--navy);color:#fff" onclick="saveDraft()">💾 Save Draft</button>
-  <button class="btn" style="background:#059669;color:#fff" onclick="printPage()">🖨️ Print</button>
+  <button class="btn" style="background:#059669;color:#fff" onclick="generatePDF()">🖨️ Print</button>
   <button class="btn btn-pdf" onclick="generatePDF()">📄 Export PDF</button>
   <button class="btn" style="background:#16a34a;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">📊 Submit to Database</button>
 </div>
@@ -1119,7 +1120,7 @@ async function submitToDb(){
   // duplicate-cleanup writeups for why this matters). Resolves straight to
   // {mode:'insert'} with no prompt at all for the common case (a genuinely
   // new visit).
-  const target=await SubmitGuard.resolveSubmitTarget(data.woNumber);
+  const target=await SubmitGuard.resolveSubmitTarget(data.woNumber, ()=>generatePDF({silent:true}));
   if(target.mode==='cancel') return;
 
   const submitBtns=[...document.querySelectorAll('[onclick="submitToDb()"]')];

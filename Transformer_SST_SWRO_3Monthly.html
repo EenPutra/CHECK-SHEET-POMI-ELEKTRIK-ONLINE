@@ -8,16 +8,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20260830b"></script>
-<script src="db-helper.js?v=20260830b"></script>
-<script src="storage-helper.js?v=20260830b"></script>
-<script src="approval-helper.js?v=20260830b"></script>
-<script src="submit-guard.js?v=20260830b"></script>
-<script src="load-merge-modal.js?v=20260830b"></script>
-<script src="auth-session.js?v=20260830b"></script>
-<script src="technician-auth.js?v=20260830b"></script>
-<script src="img-helper.js?v=20260830b"></script>
-<script src="photo-kit.js?v=20260830b"></script>
+<script src="firebase-config.js?v=20260830c"></script>
+<script src="db-helper.js?v=20260830c"></script>
+<script src="storage-helper.js?v=20260830c"></script>
+<script src="approval-helper.js?v=20260830c"></script>
+<script src="submit-guard.js?v=20260830c"></script>
+<script src="pdf-preview.js?v=20260830c"></script>
+<script src="load-merge-modal.js?v=20260830c"></script>
+<script src="auth-session.js?v=20260830c"></script>
+<script src="technician-auth.js?v=20260830c"></script>
+<script src="img-helper.js?v=20260830c"></script>
+<script src="photo-kit.js?v=20260830c"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#e8ece9;--bg2:#dde3de;--panel:rgba(255,255,255,0.80);--pb:rgba(180,200,185,0.55);--steel:#4a5e52;--sl:#6b8474;--red:#c0392b;--ok:#27ae60;--warn:#f39c12;--na:#8e44ad;--text:#1a2620;--t2:#3d5248;--t3:#7a9485;--sh:0 4px 24px rgba(30,60,40,0.10);--mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
@@ -764,7 +765,7 @@ async function submitToDb(){
   if (!data.executionDate) { DB.showSubmitResult(false, 'Isi tanggal eksekusi terlebih dahulu.'); return; }
   if (!data.checkedBy) { DB.showSubmitResult(false, 'Isi nama teknisi terlebih dahulu.'); return; }
 
-  const target = await SubmitGuard.resolveSubmitTarget(data.woNumber);
+  const target = await SubmitGuard.resolveSubmitTarget(data.woNumber, () => generatePDF(new Set(PDF_SHEETS.map(s => s.key)), { silent: true }));
   if (target.mode === 'cancel') return;
 
   let id;
