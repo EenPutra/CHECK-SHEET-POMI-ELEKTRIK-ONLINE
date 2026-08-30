@@ -43,6 +43,7 @@ const LoadMergeModal = (function () {
   let _reviseOfApprovalId = null;
   let _reviseOfChecksheetId = null;
   let _domReady = false;
+  let _lmmBusy = false;   // true while a revision-load / merge is running — blocks re-entry
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -101,6 +102,19 @@ const LoadMergeModal = (function () {
   background:#fef3c7;border:1.5px solid #f59e0b;border-radius:10px;font-size:12.5px;color:#92400e;
   line-height:1.5;font-family:'Barlow',system-ui,sans-serif;position:relative;z-index:500}
 #lmm-revision-banner b{display:block;margin-bottom:2px}
+#lmm-progress-overlay{display:none;position:fixed;inset:0;background:rgba(15,23,42,.86);z-index:26000;
+  align-items:center;justify-content:center;backdrop-filter:blur(4px);padding:16px;
+  font-family:'Barlow',system-ui,sans-serif}
+#lmm-progress-overlay.show{display:flex}
+.lmm-pbox{background:#fff;border-radius:14px;width:min(420px,100%);overflow:hidden;
+  box-shadow:0 20px 60px rgba(0,0,0,.35);color:#0f172a}
+.lmm-pbody{padding:26px 24px 24px;text-align:center}
+.lmm-picon{font-size:30px;margin-bottom:10px}
+.lmm-plabel{font-size:13px;color:#334155;margin-bottom:14px;min-height:18px}
+.lmm-ptrack{width:100%;height:14px;background:#e2e8f0;border-radius:999px;overflow:hidden;margin-bottom:8px}
+.lmm-pbar{height:100%;width:0%;background:linear-gradient(90deg,#2563eb,#7dd3fc);border-radius:999px;transition:width .25s ease}
+.lmm-ppct{font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:700;color:#1e3a5f}
+.lmm-phint{font-size:11px;color:#94a3b8;margin-top:10px}
     `;
     document.head.appendChild(style);
 
@@ -111,11 +125,25 @@ const LoadMergeModal = (function () {
       <div style="flex:1">
         <b id="lmm-revision-title">Form ini dibuka untuk merevisi submission.</b>
         <div id="lmm-revision-note">Memuat catatan revisi...</div>
-        <button class="lmm-btn" style="margin-top:8px" onclick="LoadMergeModal.loadRevisionSource()">&#128229; Muat Data Submission untuk Direvisi</button>
+        <button class="lmm-btn" id="lmm-rev-load-btn" style="margin-top:8px" onclick="LoadMergeModal.loadRevisionSource()">&#128229; Muat Data Submission untuk Direvisi</button>
       </div>`;
     // Insert as the very first element of <body> so it's visible
     // regardless of the host page's own layout structure.
     document.body.insertBefore(banner, document.body.firstChild);
+
+    const pOverlay = document.createElement('div');
+    pOverlay.id = 'lmm-progress-overlay';
+    pOverlay.innerHTML = `
+      <div class="lmm-pbox">
+        <div class="lmm-pbody">
+          <div class="lmm-picon">&#8987;</div>
+          <div class="lmm-plabel" id="lmm-plabel">Memuat...</div>
+          <div class="lmm-ptrack"><div class="lmm-pbar" id="lmm-pbar"></div></div>
+          <div class="lmm-ppct" id="lmm-ppct">0%</div>
+          <div class="lmm-phint">Jangan tutup atau tekan tombol lagi &mdash; tunggu sampai selesai.</div>
+        </div>
+      </div>`;
+    document.body.appendChild(pOverlay);
 
     const overlay = document.createElement('div');
     overlay.id = 'lmm-overlay';
@@ -333,25 +361,91 @@ const LoadMergeModal = (function () {
     }
   }
 
+  // ── Progress overlay (revision load / merge) ──
+  function _pShow(label) {
+    injectDom();
+    const o = document.getElementById('lmm-progress-overlay');
+    if (o) o.classList.add('show');
+    _pSet(0, label || 'Memulai...');
+  }
+  function _pSet(pct, label) {
+    const c = Math.max(0, Math.min(100, Math.round(pct)));
+    const bar = document.getElementById('lmm-pbar');
+    const p = document.getElementById('lmm-ppct');
+    const l = document.getElementById('lmm-plabel');
+    if (bar) bar.style.width = c + '%';
+    if (p) p.textContent = c + '%';
+    if (l && label) l.textContent = label;
+  }
+  function _pHide() {
+    const o = document.getElementById('lmm-progress-overlay');
+    if (o) o.classList.remove('show');
+  }
+  function _setRevBtn(disabled) {
+    const b = document.getElementById('lmm-rev-load-btn');
+    if (b) b.disabled = !!disabled;
+  }
+
+  // Downloads every photo URL in the bundle into Storage.toDataUrl()'s cache,
+  // reporting real 0..1 progress as (done photos)/(total photos), with a small
+  // in-photo fraction from each XHR's byte events. The host page's
+  // restorePhotosFromUrls() then hits the cache — instant, and a double-click
+  // re-downloads nothing.
+  async function _prefetchPhotos(photoUrls, onFrac) {
+    if (!photoUrls || typeof Storage === 'undefined' || typeof Storage.toDataUrl !== 'function') return;
+    const all = [];
+    Object.keys(photoUrls).forEach(g => (photoUrls[g] || []).forEach(e => { if (e && e.url) all.push(e.url); }));
+    const total = all.length;
+    if (!total) return;
+    for (let i = 0; i < total; i++) {
+      try {
+        await Storage.toDataUrl(all[i], ev => {
+          let inPhoto = 0;
+          if (ev && ev.total) inPhoto = Math.min(1, (ev.loaded || 0) / ev.total);
+          else if (ev && ev.phase === 'decode') inPhoto = 0.95;
+          if (typeof onFrac === 'function') onFrac((i + inPhoto) / total);
+        });
+      } catch (e) { console.error('prefetch foto gagal:', all[i], e); }
+      if (typeof onFrac === 'function') onFrac((i + 1) / total);
+    }
+  }
+
   async function _confirm() {
+    if (_lmmBusy) return;
     if (_sel.size === 0) return;
     const overwrite = document.getElementById('lmm-overwrite-toggle').checked;
     const chosen = _docs.filter(d => _sel.has(d.id));
     if (overwrite && !confirm('Mode Timpa akan mengganti field yang SUDAH diisi di form ini dengan data dari ' + chosen.length + ' submission terpilih. Lanjutkan?')) return;
 
-    const bundle = buildMergedBundle(chosen, _config.headerMap);
-    const filled = applyMergedBundleToForm(bundle, overwrite);
-    close();
+    _lmmBusy = true;
+    _pShow('Menyiapkan data...');
+    try {
+      const bundle = buildMergedBundle(chosen, _config.headerMap);
+      _pSet(10, 'Mengisi field form...');
+      const filled = applyMergedBundleToForm(bundle, overwrite);
+      close();
 
-    const hasPhotos = Object.keys(bundle.photoUrls).length > 0;
-    if (hasPhotos && typeof showNote === 'function') showNote('⏳ Memulihkan foto...', 'info');
-    const photosRestored = await restorePhotosIfSupported(bundle.photoUrls, overwrite);
-
-    if (typeof showNote === 'function') {
-      const photoPart = photosRestored ? ', ' + photosRestored + ' foto dipulihkan' : '';
-      showNote('✅ ' + chosen.length + ' submission digabungkan' + (overwrite ? ' (mode timpa)' : '') + ' — ' + filled + ' field terisi' + photoPart + '.', 'ok');
+      const hasPhotos = Object.keys(bundle.photoUrls).length > 0;
+      let photosRestored = 0;
+      if (hasPhotos) {
+        _pSet(15, 'Mengunduh foto...');
+        await _prefetchPhotos(bundle.photoUrls, frac => _pSet(15 + Math.round(78 * frac), 'Mengunduh foto... ' + Math.round(frac * 100) + '%'));
+        _pSet(94, 'Memulihkan foto ke form...');
+        photosRestored = await restorePhotosIfSupported(bundle.photoUrls, overwrite);
+      }
+      _pSet(100, 'Selesai');
+      if (typeof Storage !== 'undefined' && Storage.clearDataUrlCache) Storage.clearDataUrlCache();
+      if (typeof showNote === 'function') {
+        const photoPart = photosRestored ? ', ' + photosRestored + ' foto dipulihkan' : '';
+        showNote('✅ ' + chosen.length + ' submission digabungkan' + (overwrite ? ' (mode timpa)' : '') + ' — ' + filled + ' field terisi' + photoPart + '.', 'ok');
+      }
+      if (typeof autoSaveNow === 'function') autoSaveNow();
+    } catch (e) {
+      if (typeof showNote === 'function') showNote('❌ Gagal menggabungkan: ' + e.message, 'err');
+    } finally {
+      setTimeout(_pHide, 350);
+      _lmmBusy = false;
     }
-    if (typeof autoSaveNow === 'function') autoSaveNow();
   }
 
   // ── Revision banner (?reviseOf=<approvalId>) ──
@@ -386,23 +480,41 @@ const LoadMergeModal = (function () {
     }
   }
   async function loadRevisionSource() {
+    // Reentrancy guard — set SYNCHRONOUSLY so a double/triple-click on "Muat
+    // Data Submission untuk Direvisi" can't kick off parallel photo downloads
+    // (which is exactly what made restored photos pile up).
+    if (_lmmBusy) return;
     if (!_reviseOfChecksheetId) { if (typeof showNote === 'function') showNote('❌ Data submission untuk direvisi belum siap dimuat.', 'err'); return; }
+    _lmmBusy = true;
+    _setRevBtn(true);
+    _pShow('Mengambil data submission sebelumnya...');
     try {
-      if (typeof showNote === 'function') showNote('⏳ Memuat data submission sebelumnya...', 'info');
+      _pSet(5, 'Mengambil data submission sebelumnya...');
       const doc = await DB.getById(_reviseOfChecksheetId);
       if (!doc) { if (typeof showNote === 'function') showNote('❌ Submission sebelumnya tidak ditemukan.', 'err'); return; }
       const bundle = buildMergedBundle([doc], _config.headerMap);
+      _pSet(12, 'Mengisi field form...');
       const filled = applyMergedBundleToForm(bundle, true); // overwrite: restore the flagged submission in full, not a partial merge
 
       const hasPhotos = Object.keys(bundle.photoUrls).length > 0;
-      if (hasPhotos && typeof showNote === 'function') showNote('⏳ Memulihkan foto...', 'info');
-      const photosRestored = await restorePhotosIfSupported(bundle.photoUrls, true);
-
+      let photosRestored = 0;
+      if (hasPhotos) {
+        _pSet(15, 'Mengunduh foto...');
+        await _prefetchPhotos(bundle.photoUrls, frac => _pSet(15 + Math.round(78 * frac), 'Mengunduh foto... ' + Math.round(frac * 100) + '%'));
+        _pSet(94, 'Memulihkan foto ke form...');
+        photosRestored = await restorePhotosIfSupported(bundle.photoUrls, true);
+      }
+      _pSet(100, 'Selesai');
+      if (typeof Storage !== 'undefined' && Storage.clearDataUrlCache) Storage.clearDataUrlCache();
       const photoPart = photosRestored ? ', ' + photosRestored + ' foto dipulihkan' : '';
       if (typeof showNote === 'function') showNote('✅ Data submission dimuat (' + filled + ' field' + photoPart + ') — perbaiki sesuai catatan lalu Submit.', 'ok');
       if (typeof autoSaveNow === 'function') autoSaveNow();
     } catch (e) {
       if (typeof showNote === 'function') showNote('❌ Gagal memuat: ' + e.message, 'err');
+    } finally {
+      setTimeout(_pHide, 350);
+      _setRevBtn(false);
+      _lmmBusy = false;
     }
   }
 

@@ -87,9 +87,23 @@ const Storage = {
   // expect), not a blob: URL. Reuses fetchMeta's already-decoded base64
   // string directly — no redundant decode+re-encode round trip.
   async toDataUrl(url, onProgress) {
+    // Short-lived in-memory cache. load-merge-modal.js pre-fetches every photo
+    // (with a progress bar) before calling the host page's
+    // restorePhotosFromUrls(), which then calls toDataUrl() again for the same
+    // URLs — the cache makes that second pass instant, and also means a
+    // double-clicked "Muat Data" button re-downloads nothing. Capped so a big
+    // restore can't grow it without bound; callers may Storage.clearDataUrlCache()
+    // when done.
+    if (!this._dataUrlCache) this._dataUrlCache = new Map();
+    const hit = this._dataUrlCache.get(url);
+    if (hit) { if (typeof onProgress === 'function') { try { onProgress({ loaded: 1, total: 1 }); } catch (e) {} } return hit; }
     const { base64, mimeType } = await this.fetchMeta(url, onProgress);
-    return `data:${mimeType || 'image/jpeg'};base64,${base64}`;
+    const dataUrl = `data:${mimeType || 'image/jpeg'};base64,${base64}`;
+    if (this._dataUrlCache.size >= 60) this._dataUrlCache.delete(this._dataUrlCache.keys().next().value);
+    this._dataUrlCache.set(url, dataUrl);
+    return dataUrl;
   },
+  clearDataUrlCache() { if (this._dataUrlCache) this._dataUrlCache.clear(); },
 
   // Best-effort delete — used only for local/dev cleanup of test uploads.
   // Never called from a check sheet's normal submit/review flow.
