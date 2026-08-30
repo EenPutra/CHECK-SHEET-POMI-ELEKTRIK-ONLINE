@@ -2112,6 +2112,14 @@ async function doCancelReview(){
   }catch(e){ alert('Gagal: '+e.message); }
 }
 
+function _afterApprovalRemoved(id){
+  _allApprovals = _allApprovals.filter(a => a.id !== id);
+  closeDetail();
+  updateTabCounts();
+  if(_activeTab === 'recap') renderRecapChart();
+  else if(_activeTab === 'mystatus') renderMyStatus();
+  else renderList();
+}
 async function doDeleteApproval(){
   if(loggedInRole !== 'admin' || !_curApproval) return;
   const label = (_curChecksheet && (_curChecksheet.assetName||_curChecksheet.assetTag)) || _curApproval.assetName || _curApproval.assetTag || 'submission ini';
@@ -2119,14 +2127,62 @@ async function doDeleteApproval(){
   const id = _curApproval.id;
   try{
     await Approvals.deleteById(id);
-    _allApprovals = _allApprovals.filter(a => a.id !== id);
-    closeDetail();
-    updateTabCounts();
-    if(_activeTab === 'recap') renderRecapChart();
-    else if(_activeTab === 'mystatus') renderMyStatus();
-    else renderList();
+    _afterApprovalRemoved(id);
   }catch(e){
     alert('Gagal menghapus: '+e.message);
+  }
+}
+
+// PERMANENT delete: approval doc + the underlying checksheet doc + best-effort
+// removal of its Drive files. This is the one place in the whole app that
+// deletes from the append-only `checksheets` collection — everything else
+// (cleanupDuplicateApprovals, doDeleteApproval, the admin corrections) is
+// scoped to `approvals` only. Gated on typing "HAPUS".
+async function doPurgeAll(){
+  if(loggedInRole !== 'admin' || !_curApproval) return;
+  const apprId = _curApproval.id;
+  const csId = _curApproval.checksheetId;
+  const cs = _curChecksheet || null;
+  const label = (cs && (cs.assetName||cs.assetTag)) || _curApproval.assetName || _curApproval.assetTag || 'submission ini';
+
+  const typed = prompt('HAPUS PERMANEN "'+label+'"\n\nIni akan menghapus:\n• entri Review & Approval\n• data checklist aslinya dari database (hilang dari Dashboard: riwayat, grafik tren, export Excel)\n• foto & PDF terkait di Google Drive\n\nTIDAK BISA DIBATALKAN.\n\nKetik  HAPUS  (huruf besar) untuk melanjutkan:');
+  if(typed === null) return;
+  if(typed.trim() !== 'HAPUS'){ alert('Dibatalkan — teks konfirmasi tidak cocok.'); return; }
+
+  showFileProgress('Menghapus foto & PDF di Drive…');
+  let driveFails = 0, driveTried = 0;
+  try{
+    // best-effort Drive cleanup — Firestore is the source of truth, so a
+    // failed file delete only leaves an orphan blob, it never blocks the purge
+    const urls = [];
+    if(cs && cs.pdfUrl) urls.push(cs.pdfUrl);
+    if(cs && cs.photoUrls) Object.keys(cs.photoUrls).forEach(g => (cs.photoUrls[g]||[]).forEach(p => { if(p && p.url) urls.push(p.url); }));
+    if(_curApproval.finalPdfUrl) urls.push(_curApproval.finalPdfUrl);
+    for(let i=0;i<urls.length;i++){
+      driveTried++;
+      setFileProgressPct(Math.round((i/Math.max(1,urls.length))*70), 'Menghapus file '+(i+1)+'/'+urls.length+'…');
+      try{ if(typeof Storage!=='undefined' && Storage.deleteByUrl) await Storage.deleteByUrl(urls[i]); }
+      catch(e){ driveFails++; console.warn('Gagal hapus file Drive', urls[i], e); }
+    }
+
+    setFileProgressPct(80, 'Menghapus entri approval…');
+    await Approvals.deleteById(apprId);
+
+    if(csId){
+      setFileProgressPct(92, 'Menghapus data checklist…');
+      try{ await DB.deleteById(csId); }
+      catch(e){ hideFileProgress(); alert('Approval terhapus, tapi GAGAL menghapus data checklist: '+e.message+'\n\nCoba lagi dari Dashboard.'); _afterApprovalRemoved(apprId); return; }
+      if(_checksheetCache) delete _checksheetCache[csId];
+    }
+
+    setFileProgressPct(100, 'Selesai');
+    hideFileProgress();
+    _afterApprovalRemoved(apprId);
+    alert('Terhapus permanen: "'+label+'".'
+      + (driveTried ? '\nFile Drive: '+(driveTried-driveFails)+'/'+driveTried+' terhapus'+(driveFails?' ('+driveFails+' gagal — sisa file bisa dihapus manual di folder Drive)':'')+'.' : ''));
+  }catch(e){
+    hideFileProgress();
+    alert('Gagal menghapus permanen: '+e.message);
   }
 }
 
@@ -2254,6 +2310,10 @@ function renderDetail(a, cs){
       <div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
       <div class="readonly-hint" style="margin-bottom:10px">Menghapus entri ini dari alur Review &amp; Approval saja. Data checklist asli TETAP tersimpan di database dan tetap terlihat di Dashboard.</div>
       <button class="btn btn-danger" onclick="doDeleteApproval()">&#128465;&#65039; Hapus dari Approval Sheet</button>
+
+      <div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
+      <div class="readonly-hint" style="margin-bottom:10px"><b style="color:var(--ng)">Hapus PERMANEN.</b> Menghapus entri approval <b>dan</b> data checklist aslinya dari database, beserta foto &amp; PDF di Google Drive. Data ini akan <b>hilang dari Dashboard</b> (riwayat, grafik tren, export Excel) dan tidak bisa dikembalikan.</div>
+      <button class="btn btn-danger" style="background:var(--ng);color:#fff;border-color:var(--ng)" onclick="doPurgeAll()">&#9940; Hapus PERMANEN (termasuk data Dashboard)</button>
     </div>`;
   }
 

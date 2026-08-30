@@ -1452,6 +1452,18 @@ case still worked exactly as before, and the simulated network-error entry was n
   oversight. Unlike the automatic duplicate cleanup, this one is a manual, confirm-gated action
   (an admin can delete anything, including entries with real review/approval history, so it needs
   the human-in-the-loop confirmation the automatic cleanup deliberately avoids needing).
+- **A SECOND admin button — "⛔ Hapus PERMANEN (termasuk data Dashboard)"** (`doPurgeAll()`) —
+  is the ONE place in the whole app that deletes from the append-only `checksheets` collection.
+  It removes the `approvals` doc **and** the underlying `checksheets` doc **and** best-effort
+  deletes the submission's Drive files (`cs.pdfUrl` + every `cs.photoUrls[*][*].url` +
+  `approval.finalPdfUrl` via `Storage.deleteByUrl()` — a failed file delete only orphans a blob,
+  never blocks the purge). The checksheet data then vanishes from `dashboard.html` (history,
+  stat cards, Excel export, Transformer PM trend chart) and from Load & Merge. Gated on **typing
+  the literal string `HAPUS`** into a `prompt()` (a one-tap `confirm()` OK felt too weak for
+  this). Drives the `#file-progress` overlay. If `Approvals.deleteById()` succeeds but
+  `DB.deleteById(csId)` then fails, the user is told the approval is gone but the checklist
+  data isn't — retry from Dashboard. `_afterApprovalRemoved(id)` (shared with `doDeleteApproval()`)
+  updates local state + re-renders the active tab.
 - **The same admin `danger-zone` also has correction tools** (all `loggedInRole==='admin'`,
   `approvals`-collection only, each `confirm()`/`alert()`-gated then `closeDetail()` +
   `loadAll()`):
