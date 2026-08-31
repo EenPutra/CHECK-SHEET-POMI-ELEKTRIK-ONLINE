@@ -228,8 +228,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .annot-fmt select{border:1.5px solid var(--bdr);border-radius:6px;height:29px;font-family:inherit;font-size:12px;padding:0 4px;background:#fff;color:var(--navy)}
 .annot-canvas-wrap{position:relative;overflow:auto;padding:14px;background:#eef4fb;flex:1;display:flex;align-items:center;justify-content:center;min-height:200px}
 #annot-canvas{background:#fff;box-shadow:0 2px 12px rgba(15,23,42,.22);touch-action:none;max-width:100%}
-#annot-te{position:absolute;z-index:5;border:2px dashed var(--blue);background:rgba(255,255,255,.92);border-radius:3px;
-  padding:2px 4px;font-family:Manrope,Arial,sans-serif;line-height:1.25;resize:none;outline:none;overflow:hidden;box-shadow:0 4px 14px rgba(15,23,42,.25)}
+#annot-te{position:absolute;z-index:5;box-sizing:border-box;border:2px dashed var(--blue);background:rgba(255,255,255,.92);border-radius:3px;
+  padding:2px 4px;font-family:Manrope,Arial,sans-serif;line-height:1.28;resize:none;outline:none;overflow:hidden;box-shadow:0 4px 14px rgba(15,23,42,.25);
+  white-space:pre-wrap;word-break:break-word;overflow-wrap:break-word}
 .annot-ft{display:flex;gap:8px;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid var(--bdr);background:#fff;flex-wrap:wrap}
 .annot-ft .hint{font-size:11.5px;color:var(--txt4)}
 .annot-ft-btns{display:flex;gap:8px}
@@ -1241,10 +1242,11 @@ const AnnotEditor = (function(){
   }
   // MS-Word-style "shrink text on overflow": largest px <= a.size*sc that fits
   // the fixed box (width AND height). Never grows past the chosen size.
+  var TXT_PAD = 6; // px inset per side (matches #annot-te border+padding, box-sizing:border-box)
   function fitFontPx(c, a, sc, textOverride){
     const b = bbox(a);
-    const boxW = Math.max((b.x2 - b.x1) * sc - 8, 8);
-    const boxH = Math.max((b.y2 - b.y1) * sc - 6, 8);
+    const boxW = Math.max((b.x2 - b.x1) * sc - TXT_PAD * 2, 6);
+    const boxH = Math.max((b.y2 - b.y1) * sc - TXT_PAD * 2, 6);
     const text = textOverride != null ? textOverride : (a.text || '');
     let px = (a.size || 20) * sc;
     const minPx = Math.max(6, 7 * sc);
@@ -1256,15 +1258,32 @@ const AnnotEditor = (function(){
     }
     return px;
   }
+  // Word-wrap to the box width. A single word wider than the box is broken
+  // character-by-character so text never spills past the drawn box.
   function wrapLines(c, text, maxW){
     const out = [];
     (text || '').split('\n').forEach(para => {
-      const words = para.split(/(\s+)/);
+      if(para === ''){ out.push(''); return; }
+      const tokens = para.split(/(\s+)/);
       let line = '';
-      words.forEach(w => {
-        const test = line + w;
-        if(c.measureText(test).width > maxW && line.trim()){ out.push(line.replace(/\s+$/,'')); line = w.replace(/^\s+/,''); }
-        else line = test;
+      const push = () => { out.push(line.replace(/\s+$/, '')); line = ''; };
+      tokens.forEach(tok => {
+        if(tok === '') return;
+        if(/^\s+$/.test(tok)){ line += tok; return; }
+        // whole word fits on the current line?
+        if(c.measureText(line + tok).width <= maxW || !line.trim()){
+          if(c.measureText(tok).width <= maxW){ line += tok; return; }
+          // word alone is too wide — hard-break it
+          for(const ch of tok){
+            if(c.measureText(line + ch).width > maxW && line !== ''){ push(); }
+            line += ch;
+          }
+          return;
+        }
+        push();
+        // retry the word on the fresh line (may still need hard-breaking)
+        if(c.measureText(tok).width <= maxW){ line = tok; }
+        else { for(const ch of tok){ if(c.measureText(line + ch).width > maxW && line !== ''){ push(); } line += ch; } }
       });
       out.push(line);
     });
@@ -1408,6 +1427,7 @@ const AnnotEditor = (function(){
     te.style.display = 'none';
     if(!skipDelete && !a.text.trim()){ S.anns.splice(idx, 1); S.sel = -1; }
     render();
+    syncUI();
   }
 
   function drawArrowHead(c, x1, y1, x2, y2, size){
@@ -1450,14 +1470,15 @@ const AnnotEditor = (function(){
       c.save();
       c.beginPath(); c.rect(bxl, bxt, bw, bh); c.clip();
       c.fillStyle = a.color;
-      const lines = wrapLines(c, a.text || '', bw - 8);
+      const innerW = Math.max(bw - TXT_PAD * 2, 4);
+      const lines = wrapLines(c, a.text || '', innerW);
       const lh = fs * 1.28;
       lines.forEach((ln, li) => {
         const lw = c.measureText(ln).width;
-        let lx = bxl + 4;
+        let lx = bxl + TXT_PAD;
         if(a.align === 'center') lx = bxl + (bw - lw) / 2;
-        else if(a.align === 'right') lx = bxl + bw - 4 - lw;
-        c.fillText(ln, lx, bxt + 3 + li * lh);
+        else if(a.align === 'right') lx = bxl + bw - TXT_PAD - lw;
+        c.fillText(ln, lx, bxt + TXT_PAD - 2 + li * lh);
       });
       c.restore();
     }
@@ -1492,7 +1513,8 @@ const AnnotEditor = (function(){
       const scale = Math.min(maxW / natW, maxH / natH, 1);
       cv.width = Math.round(natW * scale);
       cv.height = Math.round(natH * scale);
-      const baseSize = Math.max(16, Math.round(natH * 0.05));
+      const want = Math.max(16, Math.round(natH * 0.05));
+      const baseSize = FONT_SIZES.reduce((a, b) => Math.abs(b - want) < Math.abs(a - want) ? b : a);
       S = { anns: [], tool: 'rect', color: COLORS[0], width: WIDTHS[1], scale, natW, natH, sel: -1, editing: -1,
             new: null, drag: null, txt: { size: baseSize, bold: true, italic: false, align: 'left' } };
       te.style.display = 'none';
