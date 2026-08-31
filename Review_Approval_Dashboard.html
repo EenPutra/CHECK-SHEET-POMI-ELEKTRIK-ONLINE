@@ -2425,16 +2425,21 @@ function openRemoteFile(url){
   });
 }
 
-// Uniform downloaded-PDF filename: "<YYYYMMDD> <WO> <Report name>[ suffix].pdf"
+// Uniform downloaded-PDF filename:
+//   "<YYYY>-<MM>-<DD> <WO> <Asset tag> <Report name>[ suffix].pdf"
 function pdfDownloadName(a, cs, suffix){
   a = a || _curApproval || {};
   cs = cs || _curChecksheet || {};
   const rawDate = ((cs.executionDate || a._date || '').trim()) || String(a.createdAt || '').slice(0, 10);
-  const ymd = (rawDate.replace(/[^0-9]/g, '').slice(0, 8)) || 'TanpaTanggal';
+  const digits = rawDate.replace(/[^0-9]/g, '').slice(0, 8);
+  const ymd = digits.length === 8 ? `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}` : 'TanpaTanggal';
   const clean = s => String(s || '').replace(/[\\/:*?"<>|\r\n\t]+/g, '-').replace(/\s+/g, ' ').trim();
   const wo   = clean(cs.woNumber || a._wo) || 'TanpaWO';
-  const name = clean(cs.assetName || a.assetName || cs.assetTag || a.assetTag) || 'Laporan';
-  return `${ymd} ${wo} ${name}${suffix ? ' ' + suffix : ''}.pdf`;
+  const tag  = clean(cs.assetTag || a.assetTag) || 'TanpaTag';
+  let name   = clean(cs.assetName || a.assetName);
+  if(!name || name.toLowerCase() === tag.toLowerCase()) name = '';   // don't repeat the tag
+  const parts = [ymd, wo, tag, name, suffix].filter(Boolean);
+  return parts.join(' ') + '.pdf';
 }
 // Fetch a drive-proxy PDF and save it with a real filename (not open in a tab).
 function downloadRemoteFile(url, filename){

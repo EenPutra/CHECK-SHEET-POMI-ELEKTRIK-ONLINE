@@ -1258,9 +1258,11 @@ the current design — **do not "simplify" these away**:
   for "Buka PDF Asli" (opens in a tab via `openRemoteFile()`) and the approve flow's original-PDF
   fetch. **PDF *downloads* ("Unduh PDF Asli" / "Unduh PDF Final") go through `downloadRemoteFile(url,
   filename)`** — `Storage.toObjectUrl()` then a synthetic `<a download>` click — with a **uniform
-  filename from `pdfDownloadName(a, cs, suffix)`: `"<YYYYMMDD> <WO> <Report name>[ suffix].pdf"`**
-  (date from `cs.executionDate` → `a._date` → `createdAt`; WO from `cs.woNumber`/`a._wo`; name from
-  `assetName`/`assetTag`; filesystem-unsafe chars → `-`; `'FINAL'` suffix for the approved PDF).
+  filename from `pdfDownloadName(a, cs, suffix)`:
+  `"<YYYY>-<MM>-<DD> <WO> <Asset tag> <Report name>[ suffix].pdf"`**
+  (date from `cs.executionDate` → `a._date` → `createdAt`; WO from `cs.woNumber`/`a._wo`; tag from
+  `cs.assetTag`/`a.assetTag`; name from `assetName`, dropped when it equals the tag; empty parts
+  omitted; filesystem-unsafe chars → `-`; `'FINAL'` suffix for the approved PDF).
   The detail view shows the computed name above the buttons.
   `deleteByUrl(url)` is best-effort, dev/test cleanup only. **`DRIVE_PROXY_URL`**
   at the top of this file is the one deployment-specific value — must match whatever Web App
