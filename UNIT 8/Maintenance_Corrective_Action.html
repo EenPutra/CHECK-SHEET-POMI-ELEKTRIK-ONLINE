@@ -189,6 +189,21 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .nb-heading-inp{width:100%;margin-bottom:8px}
 .nb-empty{color:var(--txt4);font-size:12.5px;text-align:center;padding:14px;border:1.5px dashed var(--bdr);border-radius:8px}
 
+/* Rich-text toolbar + editable area for E/F/G text blocks */
+.rte-toolbar{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:5px 6px;border:1.5px solid var(--bdr);border-bottom:0;border-radius:6px 6px 0 0;background:var(--bg2)}
+.rte-toolbar .sep{width:1px;height:20px;background:var(--bdr);margin:0 3px}
+.rte-btn{border:1px solid var(--bdr);background:#fff;color:var(--navy);border-radius:5px;min-width:26px;height:26px;padding:0 6px;
+  font-size:12.5px;line-height:1;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center}
+.rte-btn:hover{border-color:var(--blue);color:var(--blue)}
+.rte-btn.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.rte-btn b{font-weight:800}.rte-btn i{font-style:italic}.rte-btn u{text-decoration:underline}
+.rte-sw{width:18px;height:18px;border-radius:4px;border:2px solid #fff;box-shadow:0 0 0 1px var(--bdr);cursor:pointer;padding:0}
+.rte-size{border:1px solid var(--bdr);border-radius:5px;height:26px;font-family:inherit;font-size:12px;padding:0 4px;background:#fff;color:var(--navy)}
+.nb-rte{width:100%;min-height:92px;border:1.5px solid var(--bdr);border-radius:0 0 6px 6px;padding:9px 11px;font-family:inherit;
+  font-size:13.5px;line-height:1.5;color:var(--txt);background:#fff;overflow-y:auto;outline:none}
+.nb-rte:focus{border-color:var(--blue)}
+.nb-rte:empty:before{content:attr(data-ph);color:var(--txt4)}
+
 /* IMAGE ANNOTATION EDITOR — white + blue theme (matches check sheet) */
 .annot-overlay{position:fixed;inset:0;background:rgba(15,23,42,.58);z-index:10000;display:none;align-items:center;justify-content:center;padding:14px}
 .annot-overlay.show{display:flex}
@@ -208,8 +223,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .annot-width button.active{border-color:var(--blue);background:#eaf3ff}
 .annot-width button i{display:block;background:var(--navy);border-radius:2px}
 .annot-textval{border:1.5px solid var(--bdr);border-radius:6px;padding:5px 8px;font-size:12.5px;font-family:inherit;min-width:130px}
-.annot-canvas-wrap{overflow:auto;padding:14px;background:#eef4fb;flex:1;display:flex;align-items:center;justify-content:center;min-height:200px}
+.annot-fmt{display:flex;gap:4px;align-items:center}
+.annot-fmt .annot-tool{padding:5px 8px;min-width:28px}
+.annot-fmt select{border:1.5px solid var(--bdr);border-radius:6px;height:29px;font-family:inherit;font-size:12px;padding:0 4px;background:#fff;color:var(--navy)}
+.annot-canvas-wrap{position:relative;overflow:auto;padding:14px;background:#eef4fb;flex:1;display:flex;align-items:center;justify-content:center;min-height:200px}
 #annot-canvas{background:#fff;box-shadow:0 2px 12px rgba(15,23,42,.22);touch-action:none;max-width:100%}
+#annot-te{position:absolute;z-index:5;border:2px dashed var(--blue);background:rgba(255,255,255,.92);border-radius:3px;
+  padding:2px 4px;font-family:Manrope,Arial,sans-serif;line-height:1.25;resize:none;outline:none;overflow:hidden;box-shadow:0 4px 14px rgba(15,23,42,.25)}
 .annot-ft{display:flex;gap:8px;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid var(--bdr);background:#fff;flex-wrap:wrap}
 .annot-ft .hint{font-size:11.5px;color:var(--txt4)}
 .annot-ft-btns{display:flex;gap:8px}
@@ -868,18 +888,24 @@ function nbMove(key, idx, dir){
 function nbRemove(key, idx){
   const b = NB[key][idx];
   if(!b) return;
-  const hasContent = (b.type === 'text' && (b.heading || b.text)) || (b.type === 'image' && b.photos.length);
+  const hasContent = (b.type === 'text' && (b.heading || nbHtmlToPlain(b.text))) || (b.type === 'image' && b.photos.length);
   if(hasContent && !confirm('Hapus block ini beserta isinya?')) return;
   NB[key].splice(idx, 1);
   nbRender(key);
   autoSaveNow();
 }
 function nbFindBlock(key, id){ return (NB[key] || []).find(x => x.id === id); }
+function nbEscHtml(s){ return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+function nbHtmlToPlain(html){
+  let s = (html || '').replace(/<(br|\/div|\/p|\/li|\/h[1-6])\s*>/gi, '\n');
+  const d = document.createElement('div'); d.innerHTML = s;
+  return (d.textContent || '').replace(/ /g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+}
 function nbSyncMirror(key){
   const el = document.getElementById(NB_MIRROR[key]);
   if(!el) return;
   el.value = (NB[key] || []).map(b => b.type === 'text'
-    ? ((b.heading ? '[' + b.heading + '] ' : '') + (b.text || ''))
+    ? ((b.heading ? '[' + b.heading + '] ' : '') + nbHtmlToPlain(b.text || ''))
     : ('[Foto: ' + b.photos.length + ']')
   ).filter(s => s.trim()).join('\n\n');
 }
@@ -889,6 +915,30 @@ function nbOnText(key, id, field, val){
   b[field] = val;
   nbSyncMirror(key);
   scheduleAutoSave();
+}
+// Rich-text editor (contenteditable) command hooks for E/F/G text blocks.
+function nbRteCmd(id, cmd, val){
+  const el = document.getElementById(id + '-rte');
+  if(!el) return;
+  el.focus();
+  try{ document.execCommand('styleWithCSS', false, true); }catch(e){}
+  try{ document.execCommand(cmd, false, val || null); }catch(e){}
+  nbRteSync(id);
+}
+function nbRteSize(id, sz){
+  const el = document.getElementById(id + '-rte');
+  if(!el) return;
+  el.focus();
+  try{ document.execCommand('fontSize', false, sz); }catch(e){}
+  nbRteSync(id);
+}
+function nbRteSync(id){
+  const el = document.getElementById(id + '-rte');
+  if(!el) return;
+  for(const k of NB_KEYS){
+    const b = (NB[k] || []).find(x => x.id === id);
+    if(b){ b.text = el.innerHTML; nbSyncMirror(k); scheduleAutoSave(); return; }
+  }
 }
 function nbRender(key){
   const host = document.getElementById('nb-list-' + key);
@@ -901,11 +951,11 @@ function nbRender(key){
     return;
   }
   host.innerHTML = list.map((b,i) => nbCard(key, b, i, list.length)).join('');
-  // innerHTML rebuild wipes textarea/input values — restore them, render photos
+  // innerHTML rebuild wipes field values — restore them, render photos
   list.forEach(b => {
     if(b.type === 'text'){
       const hd = document.getElementById(b.id + '-heading'); if(hd) hd.value = b.heading || '';
-      const tx = document.getElementById(b.id + '-text');    if(tx) tx.value = b.text || '';
+      const rte = document.getElementById(b.id + '-rte'); if(rte) rte.innerHTML = b.text || '';
     }else{
       nbRenderPhotos(key, b);
     }
@@ -922,11 +972,34 @@ function nbCard(key, b, i, n){
     + '</div>';
   let body;
   if(b.type === 'text'){
+    const rid = b.id;
+    const cmd = (c, v, label, title, tag) => '<button type="button" class="rte-btn" title="' + title + '" onclick="nbRteCmd(\'' + rid + '\',\'' + c + '\'' + (v ? (',\'' + v + '\'') : '') + ')">' + (tag ? ('<' + tag + '>' + label + '</' + tag + '>') : label) + '</button>';
+    const RTE_COLORS = ['#111827','#e11d48','#f97316','#16a34a','#2563eb','#7c3aed'];
+    const colorBtns = RTE_COLORS.map(c => '<button type="button" class="rte-sw" style="background:' + c + '" title="Warna teks" onclick="nbRteCmd(\'' + rid + '\',\'foreColor\',\'' + c + '\')"></button>').join('');
+    const toolbar = '<div class="rte-toolbar">'
+      + cmd('bold', '', 'B', 'Tebal', 'b')
+      + cmd('italic', '', 'I', 'Miring', 'i')
+      + cmd('underline', '', 'U', 'Garis bawah', 'u')
+      + '<span class="sep"></span>'
+      + '<select class="rte-size" title="Ukuran font" onchange="nbRteSize(\'' + rid + '\',this.value)">'
+      +   '<option value="2">Kecil</option><option value="3" selected>Normal</option>'
+      +   '<option value="5">Besar</option><option value="6">Sangat Besar</option>'
+      + '</select>'
+      + '<span class="sep"></span>'
+      + cmd('justifyLeft', '', '&#8676;', 'Rata kiri')
+      + cmd('justifyCenter', '', '&#8677;&#8676;', 'Rata tengah')
+      + cmd('justifyRight', '', '&#8677;', 'Rata kanan')
+      + '<span class="sep"></span>'
+      + colorBtns
+      + '<span class="sep"></span>'
+      + cmd('removeFormat', '', '&#10005;', 'Hapus format')
+      + '</div>';
     body = '<div class="nb-body">'
-      + '<input class="nb-heading-inp" id="' + b.id + '-heading" type="text" placeholder="Sub-judul (opsional) — mis. Kondisi Awal, Hasil Ukur, Tindakan..."'
-      + ' oninput="nbOnText(\'' + key + '\',\'' + b.id + '\',\'heading\',this.value)">'
-      + '<textarea id="' + b.id + '-text" placeholder="Tulis penjelasan di sini. Panjang bebas — kolom pada PDF menyesuaikan otomatis."'
-      + ' oninput="nbOnText(\'' + key + '\',\'' + b.id + '\',\'text\',this.value)"></textarea>'
+      + '<input class="nb-heading-inp" id="' + rid + '-heading" type="text" placeholder="Sub-judul (opsional) — mis. Kondisi Awal, Hasil Ukur, Tindakan..."'
+      + ' oninput="nbOnText(\'' + key + '\',\'' + rid + '\',\'heading\',this.value)">'
+      + toolbar
+      + '<div class="nb-rte" id="' + rid + '-rte" contenteditable="true" data-ph="Tulis penjelasan di sini. Panjang bebas, format (tebal/miring/warna/rata) diterapkan ke PDF."'
+      + ' oninput="nbRteSync(\'' + rid + '\')" onblur="nbRteSync(\'' + rid + '\')"></div>'
       + '</div>';
   }else{
     body = '<div class="nb-body">'
@@ -1033,7 +1106,8 @@ function nbRotatePhoto(key, id, i, deg){
 const AnnotEditor = (function(){
   const COLORS = ['#e11d48','#f97316','#facc15','#16a34a','#2563eb','#ffffff','#111827'];
   const WIDTHS = [3, 5, 8, 12];
-  let ov, cv, ctx, img;
+  const FONT_SIZES = [16, 20, 26, 34, 46];
+  let ov, cv, ctx, img, te;
   let S = null;            // session state
   let onSaveCb = null;
 
@@ -1051,35 +1125,42 @@ const AnnotEditor = (function(){
       +   '<button class="annot-tool" data-tool="ellipse">&#9711; Lingkaran</button>'
       +   '<button class="annot-tool" data-tool="arrow">&#8594; Panah</button>'
       +   '<button class="annot-tool" data-tool="text">&#127991; Teks</button>'
-      +   '<input class="annot-textval" id="annot-textval" type="text" placeholder="isi teks, lalu klik gambar">'
       +   '<span class="sep"></span>'
       +   '<span id="annot-swatches" style="display:flex;gap:6px;align-items:center"></span>'
       +   '<span class="sep"></span>'
       +   '<span class="annot-width" id="annot-widths"></span>'
       +   '<span class="sep"></span>'
+      +   '<span class="annot-fmt" id="annot-fmt">'
+      +     '<select id="annot-fs" title="Ukuran teks"></select>'
+      +     '<button class="annot-tool" id="annot-b" title="Tebal" style="font-weight:800">B</button>'
+      +     '<button class="annot-tool" id="annot-i" title="Miring" style="font-style:italic">I</button>'
+      +     '<button class="annot-tool" data-align="left" title="Rata kiri">&#8676;</button>'
+      +     '<button class="annot-tool" data-align="center" title="Rata tengah">&#8677;&#8676;</button>'
+      +     '<button class="annot-tool" data-align="right" title="Rata kanan">&#8677;</button>'
+      +   '</span>'
+      +   '<span class="sep"></span>'
       +   '<button class="annot-tool" id="annot-undo">&#8630; Undo</button>'
       +   '<button class="annot-tool danger" id="annot-delsel">&#10005; Hapus terpilih</button>'
       +   '<button class="annot-tool danger" id="annot-clear">Hapus semua</button>'
       + '</div>'
-      + '<div class="annot-canvas-wrap"><canvas id="annot-canvas"></canvas></div>'
+      + '<div class="annot-canvas-wrap"><canvas id="annot-canvas"></canvas><textarea id="annot-te" style="display:none" spellcheck="false"></textarea></div>'
       + '<div class="annot-ft">'
-      +   '<span class="hint">Tarik pada gambar untuk menggambar. Tool "Pilih" untuk memindah / menghapus mark-up.</span>'
+      +   '<span class="hint">Tarik pada gambar untuk menggambar. Tool "Teks" = tarik kotak lalu ketik. "Pilih" untuk pindah / hapus / dobel-klik teks untuk edit.</span>'
       +   '<span class="annot-ft-btns"><button type="button" class="cancel" id="annot-cancel">Batal</button><button type="button" class="save" id="annot-save">Simpan</button></span>'
       + '</div>'
       + '</div>';
     document.body.appendChild(ov);
     cv = ov.querySelector('#annot-canvas');
     ctx = cv.getContext('2d');
+    te = ov.querySelector('#annot-te');
 
-    // swatches
     const sw = ov.querySelector('#annot-swatches');
     COLORS.forEach(c => {
       const b = document.createElement('button');
       b.className = 'annot-sw'; b.style.background = c; b.dataset.color = c;
-      b.onclick = () => { S.color = c; syncUI(); };
+      b.onclick = () => { S.color = c; applyToSel(a => a.color = c); syncUI(); render(); };
       sw.appendChild(b);
     });
-    // widths
     const wr = ov.querySelector('#annot-widths');
     WIDTHS.forEach(w => {
       const b = document.createElement('button');
@@ -1088,13 +1169,21 @@ const AnnotEditor = (function(){
       b.onclick = () => { S.width = w; syncUI(); };
       wr.appendChild(b);
     });
+    const fsSel = ov.querySelector('#annot-fs');
+    FONT_SIZES.forEach(s => { const o = document.createElement('option'); o.value = s; o.textContent = s + ' px'; fsSel.appendChild(o); });
+    fsSel.onchange = () => { S.txt.size = +fsSel.value; applyToSel(a => a.size = +fsSel.value); render(); if(S.editing >= 0) styleEditor(S.anns[S.editing]); };
+    ov.querySelector('#annot-b').onclick = () => { S.txt.bold = !S.txt.bold; applyToSel(a => a.bold = S.txt.bold); syncUI(); render(); if(S.editing >= 0) styleEditor(S.anns[S.editing]); };
+    ov.querySelector('#annot-i').onclick = () => { S.txt.italic = !S.txt.italic; applyToSel(a => a.italic = S.txt.italic); syncUI(); render(); if(S.editing >= 0) styleEditor(S.anns[S.editing]); };
+    ov.querySelectorAll('#annot-fmt [data-align]').forEach(b => {
+      b.onclick = () => { S.txt.align = b.dataset.align; applyToSel(a => a.align = b.dataset.align); syncUI(); render(); if(S.editing >= 0) styleEditor(S.anns[S.editing]); };
+    });
 
     ov.querySelectorAll('.annot-tool[data-tool]').forEach(b => {
-      b.onclick = () => { S.tool = b.dataset.tool; S.sel = -1; syncUI(); render(); };
+      b.onclick = () => { commitEditor(); S.tool = b.dataset.tool; S.sel = -1; syncUI(); render(); };
     });
-    ov.querySelector('#annot-undo').onclick = () => { S.anns.pop(); S.sel = -1; render(); };
-    ov.querySelector('#annot-delsel').onclick = () => { if(S.sel >= 0){ S.anns.splice(S.sel,1); S.sel = -1; render(); } };
-    ov.querySelector('#annot-clear').onclick = () => { if(S.anns.length && confirm('Hapus semua mark-up?')){ S.anns = []; S.sel = -1; render(); } };
+    ov.querySelector('#annot-undo').onclick = () => { commitEditor(); S.anns.pop(); S.sel = -1; render(); };
+    ov.querySelector('#annot-delsel').onclick = () => { if(S.sel >= 0){ commitEditor(true); S.anns.splice(S.sel,1); S.sel = -1; render(); } };
+    ov.querySelector('#annot-clear').onclick = () => { if(S.anns.length && confirm('Hapus semua mark-up?')){ commitEditor(true); S.anns = []; S.sel = -1; render(); } };
     ov.querySelector('#annot-x').onclick = close;
     ov.querySelector('#annot-cancel').onclick = close;
     ov.querySelector('#annot-save').onclick = save;
@@ -1103,41 +1192,72 @@ const AnnotEditor = (function(){
     cv.addEventListener('pointerdown', pDown);
     cv.addEventListener('pointermove', pMove);
     window.addEventListener('pointerup', pUp);
+    cv.addEventListener('dblclick', e => {
+      const i = hit(toImg(e));
+      if(i >= 0 && S.anns[i].type === 'text'){ S.sel = i; S.tool = 'select'; syncUI(); openEditor(i); }
+    });
+    te.addEventListener('input', () => autoGrow());
+    te.addEventListener('blur', () => commitEditor());
+    te.addEventListener('keydown', e => {
+      if(e.key === 'Escape'){ e.preventDefault(); commitEditor(); }
+      if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); commitEditor(); }
+    });
     document.addEventListener('keydown', e => {
       if(!ov.classList.contains('show')) return;
-      if((e.key === 'Delete' || e.key === 'Backspace') && S.sel >= 0 && document.activeElement.tagName !== 'INPUT'){
+      const t = document.activeElement && document.activeElement.tagName;
+      if((e.key === 'Delete' || e.key === 'Backspace') && S.sel >= 0 && S.editing < 0 && t !== 'INPUT' && t !== 'TEXTAREA' && t !== 'SELECT'){
         S.anns.splice(S.sel,1); S.sel = -1; render(); e.preventDefault();
       }
     });
   }
 
+  function applyToSel(fn){
+    if(S && S.sel >= 0 && S.anns[S.sel] && S.anns[S.sel].type === 'text') fn(S.anns[S.sel]);
+  }
   function syncUI(){
     ov.querySelectorAll('.annot-tool[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === S.tool));
     ov.querySelectorAll('.annot-sw').forEach(b => b.classList.toggle('active', b.dataset.color === S.color));
     ov.querySelectorAll('#annot-widths button').forEach(b => b.classList.toggle('active', +b.dataset.w === S.width));
-    cv.style.cursor = S.tool === 'select' ? 'default' : 'crosshair';
+    const selTxt = (S.sel >= 0 && S.anns[S.sel] && S.anns[S.sel].type === 'text') ? S.anns[S.sel] : null;
+    const t = selTxt || S.txt;
+    ov.querySelector('#annot-fs').value = String(t.size);
+    ov.querySelector('#annot-b').classList.toggle('active', !!t.bold);
+    ov.querySelector('#annot-i').classList.toggle('active', !!t.italic);
+    ov.querySelectorAll('#annot-fmt [data-align]').forEach(b => b.classList.toggle('active', b.dataset.align === (t.align || 'left')));
+    cv.style.cursor = S.tool === 'select' ? 'default' : (S.tool === 'text' ? 'text' : 'crosshair');
   }
 
-  // pointer -> natural-image coords
   function toImg(e){
     const r = cv.getBoundingClientRect();
     return { x: (e.clientX - r.left) / S.scale, y: (e.clientY - r.top) / S.scale };
   }
   function bbox(a){
-    const x1 = Math.min(a.x1,a.x2), x2 = Math.max(a.x1,a.x2);
-    const y1 = Math.min(a.y1,a.y2), y2 = Math.max(a.y1,a.y2);
-    return {x1,y1,x2,y2};
+    return { x1: Math.min(a.x1,a.x2), x2: Math.max(a.x1,a.x2), y1: Math.min(a.y1,a.y2), y2: Math.max(a.y1,a.y2) };
+  }
+  function fontStr(a, sc){
+    return (a.bold ? '700 ' : '400 ') + (a.italic ? 'italic ' : '') + ((a.size || 20) * sc) + 'px Manrope, Arial, sans-serif';
+  }
+  function wrapLines(c, text, maxW){
+    const out = [];
+    (text || '').split('\n').forEach(para => {
+      const words = para.split(/(\s+)/);
+      let line = '';
+      words.forEach(w => {
+        const test = line + w;
+        if(c.measureText(test).width > maxW && line.trim()){ out.push(line.replace(/\s+$/,'')); line = w.replace(/^\s+/,''); }
+        else line = test;
+      });
+      out.push(line);
+    });
+    return out.length ? out : [''];
   }
   function hit(p){
     for(let i = S.anns.length - 1; i >= 0; i--){
-      const a = S.anns[i];
-      if(a.type === 'text'){
-        const w = (a.text.length * a.size * 0.6), h = a.size * 1.2;
-        if(p.x >= a.x1 - 4 && p.x <= a.x1 + w + 4 && p.y >= a.y1 - h && p.y <= a.y1 + 6) return i;
-      }else if(a.type === 'arrow'){
+      const a = S.anns[i], b = bbox(a);
+      if(a.type === 'arrow'){
         if(distSeg(p, a) < 10 / S.scale + a.w) return i;
       }else{
-        const b = bbox(a), m = 6 / S.scale + a.w;
+        const m = 6 / S.scale + (a.w || 4);
         if(p.x >= b.x1 - m && p.x <= b.x2 + m && p.y >= b.y1 - m && p.y <= b.y2 + m) return i;
       }
     }
@@ -1152,21 +1272,18 @@ const AnnotEditor = (function(){
   }
 
   function pDown(e){
+    if(S.editing >= 0){ commitEditor(); return; }
     cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
     const p = toImg(e);
     if(S.tool === 'select'){
       const i = hit(p);
       S.sel = i;
       if(i >= 0) S.drag = { p, orig: JSON.parse(JSON.stringify(S.anns[i])) };
-      render();
+      syncUI(); render();
       return;
     }
     if(S.tool === 'text'){
-      const t = (ov.querySelector('#annot-textval').value || '').trim();
-      if(!t){ ov.querySelector('#annot-textval').focus(); return; }
-      S.anns.push({ type:'text', x1:p.x, y1:p.y, x2:p.x, y2:p.y, text:t, color:S.color, size: Math.max(14, S.width * 4) });
-      S.sel = S.anns.length - 1;
-      render();
+      S.new = { type:'text', x1:p.x, y1:p.y, x2:p.x, y2:p.y, text:'', color:S.color, size:S.txt.size, bold:S.txt.bold, italic:S.txt.italic, align:S.txt.align };
       return;
     }
     S.new = { type:S.tool, x1:p.x, y1:p.y, x2:p.x, y2:p.y, color:S.color, w:S.width };
@@ -1183,14 +1300,64 @@ const AnnotEditor = (function(){
     if(S.new){ S.new.x2 = p.x; S.new.y2 = p.y; render(); }
   }
   function pUp(){
-    if(!S) return;
-    if(S.new){
-      const d = Math.hypot(S.new.x2 - S.new.x1, S.new.y2 - S.new.y1);
-      if(d > 4 / S.scale){ S.anns.push(S.new); S.sel = S.anns.length - 1; }
-      S.new = null;
+    if(!S || !S.new){ if(S) S.drag = null; return; }
+    const n = S.new; S.new = null;
+    if(n.type === 'text'){
+      const b = bbox(n);
+      if(b.x2 - b.x1 < 40){ n.x1 = b.x1; n.x2 = b.x1 + Math.min(260, S.natW * 0.5); }
+      else { n.x1 = b.x1; n.x2 = b.x2; }
+      n.y1 = b.y1; n.y2 = Math.max(b.y2, b.y1 + n.size * 1.4);
+      S.anns.push(n);
+      S.sel = S.anns.length - 1;
+      render();
+      openEditor(S.sel);
+    }else{
+      const d = Math.hypot(n.x2 - n.x1, n.y2 - n.y1);
+      if(d > 4 / S.scale){ S.anns.push(n); S.sel = S.anns.length - 1; }
       render();
     }
     S.drag = null;
+  }
+
+  // ── inline text-box editor overlay ──
+  function styleEditor(a){
+    te.style.fontWeight = a.bold ? '700' : '400';
+    te.style.fontStyle = a.italic ? 'italic' : 'normal';
+    te.style.fontSize = ((a.size || 20) * S.scale) + 'px';
+    te.style.color = a.color;
+    te.style.textAlign = a.align || 'left';
+  }
+  function autoGrow(){
+    te.style.height = 'auto';
+    te.style.height = Math.max(24, te.scrollHeight) + 'px';
+  }
+  function openEditor(idx){
+    const a = S.anns[idx];
+    if(!a || a.type !== 'text') return;
+    S.editing = idx;
+    const b = bbox(a);
+    te.style.left = (cv.offsetLeft + b.x1 * S.scale) + 'px';
+    te.style.top = (cv.offsetTop + b.y1 * S.scale) + 'px';
+    te.style.width = Math.max(60, (b.x2 - b.x1) * S.scale) + 'px';
+    styleEditor(a);
+    te.value = a.text || '';
+    te.style.display = 'block';
+    autoGrow();
+    te.focus();
+    te.select();
+    syncUI();
+  }
+  function commitEditor(skipDelete){
+    if(!S || S.editing < 0) return;
+    const idx = S.editing; S.editing = -1;
+    const a = S.anns[idx];
+    if(!a){ te.style.display = 'none'; return; }
+    a.text = te.value;
+    const b = bbox(a);
+    a.y1 = b.y1; a.y2 = b.y1 + Math.max(te.scrollHeight / S.scale, a.size * 1.2);
+    te.style.display = 'none';
+    if(!skipDelete && !a.text.trim()){ S.anns.splice(idx, 1); S.sel = -1; }
+    render();
   }
 
   function drawArrowHead(c, x1, y1, x2, y2, size){
@@ -1203,7 +1370,7 @@ const AnnotEditor = (function(){
     c.closePath();
     c.fill();
   }
-  // Draw one annotation. sc = coord scale (display); when baking, sc = 1.
+  // sc = coord scale (display); when baking, sc = 1.
   function drawAnn(c, a, sc, selected){
     c.save();
     c.strokeStyle = a.color; c.fillStyle = a.color;
@@ -1220,24 +1387,30 @@ const AnnotEditor = (function(){
       c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
       drawArrowHead(c, x1, y1, x2, y2, (a.w || 3) * sc);
     }else if(a.type === 'text'){
-      const fs = a.size * sc;
-      c.font = '700 ' + fs + 'px Manrope, Arial, sans-serif';
-      c.textBaseline = 'alphabetic';
-      const tw = c.measureText(a.text).width;
-      c.fillStyle = 'rgba(255,255,255,.82)';
-      c.fillRect(x1 - 3, y1 - fs, tw + 6, fs + 6);
+      if(S && S.editing >= 0 && S.anns[S.editing] === a){ c.restore(); return; } // hidden while editing
+      const bx = bbox(a);
+      const fs = (a.size || 20) * sc;
+      const bw = Math.max((bx.x2 - bx.x1) * sc, 20);
+      c.font = fontStr(a, sc);
+      c.textBaseline = 'top';
+      const lines = wrapLines(c, a.text || '', bw - 8);
+      const lh = fs * 1.28;
+      const th = lines.length * lh + 6;
+      c.fillStyle = 'rgba(255,255,255,0.82)';
+      c.fillRect(bx.x1 * sc, bx.y1 * sc, bw, th);
       c.fillStyle = a.color;
-      c.fillText(a.text, x1, y1);
+      lines.forEach((ln, li) => {
+        const lw = c.measureText(ln).width;
+        let lx = bx.x1 * sc + 4;
+        if(a.align === 'center') lx = bx.x1 * sc + (bw - lw) / 2;
+        else if(a.align === 'right') lx = bx.x1 * sc + bw - 4 - lw;
+        c.fillText(ln, lx, bx.y1 * sc + 3 + li * lh);
+      });
     }
     if(selected){
       const b = bbox({x1:x1,y1:y1,x2:x2,y2:y2});
       c.strokeStyle = '#2563eb'; c.setLineDash([5,4]); c.lineWidth = 1.5;
-      if(a.type === 'text'){
-        const fs = a.size * sc, tw = c.measureText(a.text).width;
-        c.strokeRect(x1 - 4, y1 - fs - 2, tw + 8, fs + 8);
-      }else{
-        c.strokeRect(b.x1 - 4, b.y1 - 4, (b.x2 - b.x1) + 8, (b.y2 - b.y1) + 8);
-      }
+      c.strokeRect(b.x1 - 4, b.y1 - 4, (b.x2 - b.x1) + 8, (b.y2 - b.y1) + 8);
       c.setLineDash([]);
     }
     c.restore();
@@ -1256,12 +1429,14 @@ const AnnotEditor = (function(){
     img.onload = () => {
       const natW = img.naturalWidth, natH = img.naturalHeight;
       const maxW = Math.min(window.innerWidth * 0.92, 1200);
-      const maxH = window.innerHeight * 0.60;
+      const maxH = window.innerHeight * 0.58;
       const scale = Math.min(maxW / natW, maxH / natH, 1);
       cv.width = Math.round(natW * scale);
       cv.height = Math.round(natH * scale);
-      S = { anns: [], tool: 'rect', color: COLORS[0], width: WIDTHS[1], scale, natW, natH, sel: -1, new: null, drag: null };
-      ov.querySelector('#annot-textval').value = '';
+      const baseSize = Math.max(16, Math.round(natH * 0.05));
+      S = { anns: [], tool: 'rect', color: COLORS[0], width: WIDTHS[1], scale, natW, natH, sel: -1, editing: -1,
+            new: null, drag: null, txt: { size: baseSize, bold: true, italic: false, align: 'left' } };
+      te.style.display = 'none';
       syncUI();
       render();
       ov.classList.add('show');
@@ -1269,15 +1444,16 @@ const AnnotEditor = (function(){
     img.onerror = () => { showNote('❌ Gagal memuat gambar untuk anotasi.', 'err'); };
     img.src = entry.src || entry.dataUrl;
   }
-  function close(){ ov.classList.remove('show'); S = null; onSaveCb = null; }
+  function close(){ if(te) te.style.display = 'none'; ov.classList.remove('show'); S = null; onSaveCb = null; }
   async function save(){
     if(!S){ close(); return; }
-    const natW = S.natW, natH = S.natH;
+    commitEditor();
+    const natW = S.natW, natH = S.natH, anns = S.anns.slice();
     const out = document.createElement('canvas');
     out.width = natW; out.height = natH;
     const oc = out.getContext('2d');
     oc.drawImage(img, 0, 0, natW, natH);
-    S.anns.forEach(a => drawAnn(oc, a, 1, false));
+    anns.forEach(a => drawAnn(oc, a, 1, false));
     const dataUrl = out.toDataURL('image/jpeg', 0.92);
     const cb = onSaveCb;
     close();
@@ -1318,7 +1494,7 @@ function nbReseedFromMirrorIfEmpty(){
     if(NB[k].length) return;
     const mv = (document.getElementById(NB_MIRROR[k]) || {}).value || '';
     if(mv.trim()){
-      NB[k] = [{ id:nbUid(), type:'text', heading:'', text:mv.trim() }];
+      NB[k] = [{ id:nbUid(), type:'text', heading:'', text: nbEscHtml(mv.trim()) }];
       nbRender(k);
     }
   });
@@ -1869,6 +2045,145 @@ async function generatePDF(opts){
     }
   }
   function drawPhotoGrid(key){ drawPhotoList(PHOTOS[key] || []); }
+
+  // ── Rich-text (E/F/G text blocks) — parse the contenteditable HTML into
+  //    styled runs and render with real bold/italic/underline/colour/alignment,
+  //    word-wrapped, on a light quote-block background, page-break safe. ──
+  function richColor(str){
+    if(!str) return DARK;
+    str = String(str).trim().toLowerCase();
+    const NAMED = {black:[17,24,39],white:[255,255,255],red:[225,29,72],orange:[249,115,22],
+      yellow:[202,138,4],green:[22,163,74],blue:[37,99,235],purple:[124,58,237],gray:[100,116,139],grey:[100,116,139]};
+    if(NAMED[str]) return NAMED[str];
+    let m = str.match(/^#([0-9a-f]{3})$/i);
+    if(m) return [parseInt(m[1][0]+m[1][0],16), parseInt(m[1][1]+m[1][1],16), parseInt(m[1][2]+m[1][2],16)];
+    m = str.match(/^#([0-9a-f]{6})$/i);
+    if(m) return [parseInt(m[1].slice(0,2),16), parseInt(m[1].slice(2,4),16), parseInt(m[1].slice(4,6),16)];
+    m = str.match(/rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+    if(m) return [+m[1], +m[2], +m[3]];
+    return DARK;
+  }
+  function richFontPt(v){
+    // <font size> 1..7  OR  css keyword / px / pt
+    const map = {1:8, 2:9, 3:10.5, 4:12, 5:15, 6:19, 7:26};
+    if(map[v]) return map[v];
+    const s = String(v).trim();
+    const kw = {'xx-small':8,'x-small':9,'small':9.5,'medium':10.5,'large':13,'x-large':17,'xx-large':22};
+    if(kw[s]) return kw[s];
+    let m = s.match(/([\d.]+)\s*px/); if(m) return Math.max(6, +m[1] * 0.75);
+    m = s.match(/([\d.]+)\s*pt/); if(m) return +m[1];
+    m = s.match(/([\d.]+)\s*em/); if(m) return +m[1] * 10.5;
+    return 10.5;
+  }
+  function parseRich(html){
+    const root = document.createElement('div');
+    root.innerHTML = html || '';
+    const paras = [];
+    let cur = { align:'left', runs:[] };
+    const flush = () => { paras.push(cur); cur = { align:'left', runs:[] }; };
+    function walk(node, st){
+      node.childNodes.forEach(ch => {
+        if(ch.nodeType === 3){
+          const t = ch.nodeValue.replace(/ /g, ' ');
+          if(t) cur.runs.push(Object.assign({ t:t }, st));
+        }else if(ch.nodeType === 1){
+          const tag = ch.tagName.toLowerCase();
+          const cs = (ch.getAttribute('style') || '').toLowerCase();
+          const s2 = Object.assign({}, st);
+          if(tag === 'b' || tag === 'strong') s2.b = true;
+          if(tag === 'i' || tag === 'em') s2.i = true;
+          if(tag === 'u' || tag === 'ins') s2.u = true;
+          if(/font-weight:\s*(bold|[6-9]00)/.test(cs)) s2.b = true;
+          if(/font-weight:\s*(normal|[1-5]00)/.test(cs)) s2.b = false;
+          if(/font-style:\s*italic/.test(cs)) s2.i = true;
+          if(/text-decoration[^;]*underline/.test(cs)) s2.u = true;
+          let m = cs.match(/(?:^|[^-])color:\s*([^;]+)/); if(m) s2.color = m[1].trim();
+          if(ch.getAttribute && ch.getAttribute('color')) s2.color = ch.getAttribute('color');
+          m = cs.match(/font-size:\s*([^;]+)/); if(m) s2.size = richFontPt(m[1].trim());
+          const fsz = ch.getAttribute && ch.getAttribute('size'); if(fsz) s2.size = richFontPt(+fsz);
+          const isBlock = /^(div|p|li|h[1-6]|blockquote|tr)$/.test(tag);
+          if(tag === 'br'){ flush(); return; }
+          if(isBlock){
+            if(cur.runs.length) flush();
+            const am = cs.match(/text-align:\s*(left|center|right|justify)/);
+            if(am) cur.align = am[1] === 'justify' ? 'left' : am[1];
+            walk(ch, s2);
+            if(cur.runs.length) flush();
+          }else{
+            walk(ch, s2);
+          }
+        }
+      });
+    }
+    walk(root, {});
+    if(cur.runs.length) paras.push(cur);
+    return paras;
+  }
+  function drawRichBlock(html, hint){
+    const paras = parseRich(html);
+    const hasText = paras.some(p => p.runs.some(r => (r.t || '').trim()));
+    if(!hasText){
+      plainTextBox('', hint);
+      y += 3;
+      return;
+    }
+    const padX = 3.2, boxW = CW, innerW = boxW - padX * 2;
+    const sf = pdf.internal.scaleFactor;
+    const setFont = wd => {
+      pdf.setFont('times', (wd.b && wd.i) ? 'bolditalic' : wd.b ? 'bold' : wd.i ? 'italic' : 'normal');
+      pdf.setFontSize(wd.size || 10.5);
+    };
+    y += 1;
+    paras.forEach(par => {
+      const words = [];
+      par.runs.forEach(r => {
+        san(r.t).split(/(\s+)/).forEach(p => {
+          if(p !== '') words.push({ t:p, b:!!r.b, i:!!r.i, u:!!r.u, color:r.color, size:r.size || 10.5, sp:/^\s+$/.test(p) });
+        });
+      });
+      if(!words.length){ // blank line
+        const lh = 10.5 / sf * 1.15;
+        checkY(lh); pdf.setFillColor(248, 250, 252); pdf.rect(M, y, boxW, lh, 'F'); y += lh;
+        return;
+      }
+      let line = [], lineW = 0, maxSize = 0;
+      const flushLine = () => {
+        const lh = (maxSize || 10.5) / sf * 1.3;
+        checkY(lh + 1);
+        pdf.setFillColor(248, 250, 252); pdf.rect(M, y, boxW, lh, 'F');
+        // trim trailing space widths for alignment
+        let content = line.slice();
+        while(content.length && content[content.length - 1].sp) content.pop();
+        const textW = content.reduce((w, wd) => w + wd._w, 0);
+        let x = M + padX;
+        if(par.align === 'center') x = M + (boxW - textW) / 2;
+        else if(par.align === 'right') x = M + boxW - padX - textW;
+        const baseY = y + lh - (maxSize || 10.5) / sf * 0.32;
+        content.forEach(wd => {
+          setFont(wd);
+          pdf.setTextColor.apply(pdf, richColor(wd.color));
+          pdf.text(wd.t, x, baseY);
+          if(wd.u && !wd.sp){
+            pdf.setDrawColor.apply(pdf, richColor(wd.color)); pdf.setLineWidth(0.3);
+            pdf.line(x, baseY + 0.7, x + wd._w, baseY + 0.7);
+          }
+          x += wd._w;
+        });
+        y += lh;
+        line = []; lineW = 0; maxSize = 0;
+      };
+      words.forEach(wd => {
+        setFont(wd);
+        wd._w = pdf.getTextWidth(wd.t);
+        if(!wd.sp && lineW + wd._w > innerW && line.length){ flushLine(); }
+        if(!line.length && wd.sp) return; // no leading space on a fresh line
+        line.push(wd); lineW += wd._w; maxSize = Math.max(maxSize, wd.size);
+      });
+      if(line.length) flushLine();
+    });
+    y += 3;
+  }
+
   // Sections E/F/G — render the ordered block list (text boxes + image blocks)
   // built in the form, so the PDF flows as a narrative report with evidence
   // in context.
@@ -1888,8 +2203,7 @@ async function generatePDF(opts){
           pdf.text(san(b.heading), M, y+4);
           y += 6.5;
         }
-        plainTextBox(san(b.text || ''), b.heading ? '' : hint);
-        y += 3;
+        drawRichBlock(b.text || '', b.heading ? '' : hint);
       }else{
         if(!b.photos.length) return;
         drawPhotoList(b.photos);
@@ -2129,7 +2443,7 @@ async function submitToDb(){
     const rows = [];
     (NB[key] || []).forEach((b,i) => {
       if(b.type === 'text'){
-        rows.push({ no:String(i+1), desc: b.heading || 'Teks', values:{ Value: b.text || '—' } });
+        rows.push({ no:String(i+1), desc: b.heading || 'Teks', values:{ Value: nbHtmlToPlain(b.text) || '—' } });
       }else{
         b.photos.forEach(p => PHOTOS[key].push(p));
         const caps = b.photos.map(p => p.caption).filter(Boolean);

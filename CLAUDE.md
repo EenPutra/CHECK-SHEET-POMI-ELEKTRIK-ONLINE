@@ -2044,15 +2044,31 @@ same idea as `Work_Activity_Record.html`'s `BLOCKS`, but rendered into the jsPDF
 `window.print()` CSS). This replaced the earlier "one textarea + one photo gallery per section"
 design at the user's explicit request ("bisa ditambahkan pilihan add text box, add image ...
 bisa diatur posisinya sehingga flow report lebih mudah dibaca"). State: `NB = {chronology:[],
-findings:[], corrective_action:[]}`, each block `{id, type:'text', heading, text}` or `{id,
-type:'image', photos:[PhotoKit entries]}`. Key functions (all take the section key):
-`nbAdd`/`nbMove`/`nbRemove`/`nbRender`/`nbCard`, image-block photo ops `nbPickPhotos`/
-`nbRenderPhotos`/`nbRecropPhoto`/`nbRotatePhoto`/`nbRemovePhoto`/`nbPhotoCaption` (reuse
-`compressUnder1MB` + PhotoKit, same as the section-K `pickPhotos`). The PDF renders each block in
-order via `narrativeBlocksSection(label, key, hint)` — a text block is an optional navy bold
-heading + `plainTextBox()` (autoTable auto-height, so arbitrary length never overlaps), an image
-block is `drawPhotoList(block.photos)` (2-up, PhotoKit-sized). `san()` strips non-latin1 glyphs
-from headings/captions for jsPDF Times.
+findings:[], corrective_action:[]}`, each block `{id, type:'text', heading, text}` (`text` is
+**rich-text HTML**, see below) or `{id, type:'image', photos:[PhotoKit entries]}`. Key functions
+(all take the section key): `nbAdd`/`nbMove`/`nbRemove`/`nbRender`/`nbCard`, image-block photo ops
+`nbPickPhotos`/`nbRenderPhotos`/`nbRecropPhoto`/`nbRotatePhoto`/`nbRemovePhoto`/`nbPhotoCaption`
+(reuse `compressUnder1MB` + PhotoKit, same as the section-K `pickPhotos`). The PDF renders each
+block in order via `narrativeBlocksSection(label, key, hint)` — a text block is an optional navy
+bold heading + `drawRichBlock()` (see below), an image block is `drawPhotoList(block.photos)`
+(2-up, PhotoKit-sized). `san()` strips non-latin1 glyphs from headings/captions for jsPDF Times.
+- **Text blocks are a `contenteditable` rich-text editor** (user request: "buat pilihan text
+  type juga seperti warna, bold, italic, reguler, allignment"). Per-block toolbar: B / I / U
+  (`document.execCommand` with `styleWithCSS`), a font-size `<select>` (`fontSize` 2/3/5/6), L/C/R
+  alignment (`justify*`), 6 colour swatches (`foreColor`), and Hapus format (`removeFormat`).
+  `b.text` stores the editor's `innerHTML`. `nbHtmlToPlain()` flattens it for the hidden
+  `<textarea id="<key>-text">` mirror (backward compat) and for the `base.sheets` dashboard rows;
+  `nbEscHtml()` wraps plain text back to HTML for the mirror-reseed / pre-block migration path.
+  `base.narrativeBlocks[k]` keeps the HTML so a revision-restore rebuilds formatting
+  (`rte.innerHTML = b.text`). The block text no longer flows through `inputValues` (contenteditable
+  has no form value) — `narrativeBlocks` + the mirror are authoritative.
+- **`drawRichBlock(html, hint)` (inside `generatePDF()`)** parses the editor HTML into styled runs
+  (`parseRich()` walks the DOM tree, tracking bold/italic/underline/colour from tags + inline
+  `style` + legacy `<font>`; block elements / `<br>` split paragraphs and carry `text-align`),
+  then word-wraps and draws each line with real `pdf.setFont('times', 'bold'|'italic'|'bolditalic')`,
+  `richColor()` (hex/rgb/named → RGB, falls back to `DARK`), per-paragraph alignment, and a light
+  `[248,250,252]` quote-block background painted per line so page breaks are free. `richFontPt()`
+  maps `<font size>` 1–7 and CSS px/pt/keyword to points.
 - **Backward compat / restore plumbing.** Each section keeps a **hidden** `<textarea
   id="<key>-text">` mirror, kept in sync by `nbSyncMirror()` with a plain-text flattening of the
   blocks — so `DB.collectCheckSheetData()`'s sweep, old dashboard rendering, and (crucially)
@@ -2082,15 +2098,24 @@ from headings/captions for jsPDF Times.
 - **Image annotation editor** (`window.AnnotEditor`, self-injecting modal, white+blue theme
   matching the sheet). Every evidence photo — E/F/G image blocks (`nbAnnotatePhoto`) and the
   section-K gallery (`annotatePhotoAt`) — has an "✎ Anotasi" button opening a canvas editor with
-  rectangle / ellipse / arrow / text-box tools, 7 colour swatches, 4 stroke widths, a "Pilih"
+  rectangle / ellipse / arrow / **text-box** tools, 7 colour swatches, 4 stroke widths, a "Pilih"
   tool to drag/delete an existing mark-up (hit-test + `Delete` key), Undo, Hapus terpilih, Hapus
   semua. Annotations are stored in **natural-image pixel coords** (canvas display is scaled to
   fit; `S.scale` converts), and on Simpan they're **baked onto the image** at natural resolution
   → `compressUnder1MB` → the entry's `src`/`dataUrl`/`w`/`h` are replaced — same destructive
   model as the existing rotate/crop tools (no separate annotation layer stored, so drafts /
-  Firestore / the PDF need no new fields). Text tool: type into the toolbar's `#annot-textval`
-  field first, then click to place. A new unsupported shape/colour would extend `AnnotEditor`'s
-  `COLORS`/`WIDTHS`/`drawAnn()`, not a per-file change.
+  Firestore / the PDF need no new fields).
+- **Text tool is a drawn box with inline formatting** (user request: "kita membuat box dimana
+  nanti didalamnya kita bisa isi text dan bisa di ganti juga text font sizenya, bold, italic
+  juga"). Drag to draw the box → an absolutely-positioned `#annot-te` `<textarea>` overlay opens
+  over it on the canvas → type (word-wraps to the box width) → blur / Esc / Ctrl+Enter commits;
+  empty text discards the box. Double-click a text mark-up with "Pilih" to re-edit. Toolbar
+  `#annot-fmt` group (font-size `<select>` `FONT_SIZES`, B, I, L/C/R align) edits the selected
+  text mark-up live, or sets `S.txt` defaults for the next one; the colour swatches also retint a
+  selected text mark-up. `drawAnn()`'s text branch wraps + aligns within the box on a translucent
+  white backing; it's skipped for the mark-up currently being edited (the overlay shows it
+  instead). A new shape/colour would extend `AnnotEditor`'s `COLORS`/`WIDTHS`/`FONT_SIZES`/
+  `drawAnn()`, not a per-file change.
 Section K (Attachments/Evidence Log) stays a single flat general-purpose PhotoKit gallery
 (`PHOTOS.attachments`) for anything not tied to an E/F/G block.
 
