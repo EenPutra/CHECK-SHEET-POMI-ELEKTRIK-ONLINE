@@ -2214,12 +2214,15 @@ different wording/colours, re-derive these constants from it again rather than g
   photo-gallery decision already made earlier in this project (see the narrative-photo bullet
   above); matching the reference's visual chrome (section bar colour/text) doesn't mean
   reverting a decision the user already made about K's actual content.
-- **Section L renders the reference's exact 3-column signature table** (`Prepared By (TECH OP
-  1/2)` / `Verified By (TECH OP 2/3)` / `Approved By (MAINT. SPV)`, with Name/Position/Date rows
-  under each) but only fills in `Name`/`Date` for the Prepared By column, from `checked-by`/
-  `wo-date` — Verified By and Approved By stay blank with a footnote below the table, since (per
-  the design decision earlier in this section) those signatures are genuinely captured elsewhere
-  via the Review & Approval workflow, not re-collected here.
+- **Section L renders the reference's 3-column signature table** (`Prepared By (TECH OP 1/2)` /
+  `Verified By (TECH OP 2/3)` / `Approved By (MAINT. SPV)`, each with a tall empty signature cell
+  then a Name/Position/Date cell) — built with **`pdf.autoTable`** (a local `authTheme` with
+  `cellPadding {top:3,left:3.5,…}` + `minCellHeight` per row), not hand-drawn `pdf.rect()`, after
+  an earlier hand-drawn version came out cramped (text touching the borders, rows ~4.5mm apart).
+  The Prepared By column fills `Name` from `checked-by`, `Position` from a Section-A
+  **`#prepared-position`** field (added for this — swept into `inputValues` + `base.sheets.info`
+  rows 11/12 for free), `Date` from `wo-date`; Verified By / Approved By stay `—` with a footnote,
+  since those names/positions/signatures are captured via the Review & Approval workflow.
 
 ## `UNIT 8/LV_Motor_Bearing_Replacement.html` — motor rebuild/bearing check sheet
 

@@ -333,6 +333,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Time of Failure</label><input type="time" id="failure-time"></div>
       <div class="mf"><label>Date of Report</label><input type="date" id="wo-date"></div>
       <div class="mf"><label>Prepared By</label><input type="text" id="checked-by" placeholder="Nama teknisi"></div>
+      <div class="mf"><label>Position / Jabatan</label><input type="text" id="prepared-position" placeholder="mis. Tech Op 1 / Tech Op 2"></div>
     </div>
   </div>
 </div>
@@ -585,7 +586,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   </div>
   <div class="sec-body">
     <div style="font-size:12.5px;color:var(--txt4);line-height:1.6">
-      Prepared By: diisi otomatis dari akun teknisi yang submit (Section A). Verified By (TechOp2) dan
+      Prepared By: Nama &amp; Position diambil dari Section A ("Prepared By" dan "Position / Jabatan"),
+      Date dari "Date of Report". Verified By (TechOp2) dan
       Approved By (Supervisor) beserta tanda tangan digital dilakukan melalui alur
       <b>Review &amp; Approval Dashboard</b> setelah laporan ini di-submit — lihat status persetujuan di sana.
     </div>
@@ -2459,38 +2461,41 @@ async function generatePDF(opts){
 
   // ── L. REPORT AUTHORIZATION ──
   sectionHeader('L. REPORT AUTHORIZATION');
-  const colW = CW/3;
-  checkY(28);
-  const boxY = y;
-  const headers = ['Prepared By (TECH OP 1/2)','Verified By (TECH OP 2/3)','Approved By (MAINT. SPV)'];
-  pdf.setFillColor(...LABEL_BG);
-  pdf.rect(M, boxY, CW, 6, 'F');
-  pdf.setDrawColor(...BORDER); pdf.setLineWidth(0.15);
-  headers.forEach((h,i)=>{
-    pdf.rect(M+i*colW, boxY, colW, 6, 'D');
-    pdf.setFont('times','bold'); pdf.setFontSize(7.6); pdf.setTextColor(...BLACK);
-    pdf.text(h, M+i*colW+2, boxY+4, {maxWidth:colW-4});
-  });
-  const sigH = 14;
-  headers.forEach((h,i)=>{ pdf.rect(M+i*colW, boxY+6, colW, sigH, 'D'); });
-  const infoY = boxY+6+sigH;
-  const infoH = 14;
+  checkY(58);
+  const colW = CW / 3;
   const cols = [
-    {name: gv('checked-by')||'', pos:'', date: fmtDatePdf(gv('wo-date'))||''},
-    {name:'', pos:'', date:''},
-    {name:'', pos:'', date:''},
+    { name: gv('checked-by') || '', pos: gv('prepared-position') || '', date: fmtDatePdf(gv('wo-date')) || '' },
+    { name: '', pos: '', date: '' },
+    { name: '', pos: '', date: '' },
   ];
-  cols.forEach((c,i)=>{
-    pdf.rect(M+i*colW, infoY, colW, infoH, 'D');
-    pdf.setFont('times','bold'); pdf.setFontSize(7.6); pdf.setTextColor(...BLACK);
-    pdf.text('Name: '+c.name, M+i*colW+2, infoY+4.5, {maxWidth:colW-4});
-    pdf.text('Position: '+c.pos, M+i*colW+2, infoY+9, {maxWidth:colW-4});
-    pdf.text('Date: '+c.date, M+i*colW+2, infoY+13.5, {maxWidth:colW-4});
+  const authTheme = {
+    theme: 'grid',
+    styles: { font: 'times', fontSize: 8, cellPadding: { top: 3, right: 3, bottom: 3, left: 3.5 }, textColor: BLACK, lineColor: BORDER, lineWidth: 0.2, valign: 'top' },
+    headStyles: { fillColor: LABEL_BG, textColor: BLACK, fontStyle: 'bold', halign: 'left', fontSize: 8, cellPadding: { top: 2.5, right: 3, bottom: 2.5, left: 3.5 } },
+    margin: { left: M, right: M },
+    willDrawPage: () => ensureBg(),
+    columnStyles: { 0: { cellWidth: colW }, 1: { cellWidth: colW }, 2: { cellWidth: colW } },
+  };
+  pdf.autoTable({
+    ...authTheme,
+    startY: y,
+    head: [['Prepared By (TECH OP 1/2)', 'Verified By (TECH OP 2/3)', 'Approved By (MAINT. SPV)']],
+    body: [
+      // signature space — generous, empty
+      [{ content: ' ', styles: { minCellHeight: 22 } },
+       { content: ' ', styles: { minCellHeight: 22 } },
+       { content: ' ', styles: { minCellHeight: 22 } }],
+      // name / position / date — line-spaced, not cramped
+      cols.map(c => ({
+        content: 'Name       : ' + (c.name || '—') + '\n\nPosition  : ' + (c.pos || '—') + '\n\nDate        : ' + (c.date || '—'),
+        styles: { minCellHeight: 24, fontStyle: 'normal', lineHeightFactor: 1.15 },
+      })),
+    ],
   });
-  y = infoY + infoH + 3;
-  pdf.setFont('times','italic'); pdf.setFontSize(7); pdf.setTextColor(100,116,139);
-  pdf.text('Verified By and Approved By signatures are captured digitally via the Review & Approval Dashboard after this report is submitted.', M, y+3, {maxWidth:CW});
-  y += 7;
+  y = pdf.lastAutoTable.finalY + 4;
+  pdf.setFont('times', 'italic'); pdf.setFontSize(7.2); pdf.setTextColor(100, 116, 139);
+  pdf.text('Verified By and Approved By names, positions and signatures are captured digitally via the Review & Approval Dashboard after this report is submitted.', M, y + 3, { maxWidth: CW });
+  y += 8;
 
   // ── SAVE / SILENT ──
   const wo = (gv('wo-no') || 'MCA').replace(/[^A-Za-z0-9_-]/g,'_');
@@ -2548,6 +2553,8 @@ async function submitToDb(){
       {no:'8', desc:'Permit/PAS No.', values:{Value: gv('permit-no')||'—'}},
       {no:'9', desc:'Date/Time of Failure', values:{Value: (gv('failure-date')||'—')+' '+(gv('failure-time')||'')}},
       {no:'10', desc:'Date of Report', values:{Value: gv('wo-date')||'—'}},
+      {no:'11', desc:'Prepared By', values:{Value: gv('checked-by')||'—'}},
+      {no:'12', desc:'Prepared By Position', values:{Value: gv('prepared-position')||'—'}},
     ]},
     failure: {title:'B — Failure/Problem Description', columns:['Value'], rows:[
       {no:'1', desc:'Failure Description', values:{Value: gv('failure-desc')||'—'}},
