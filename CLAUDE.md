@@ -2079,6 +2079,18 @@ from headings/captions for jsPDF Times.
   photo data URLs), written in the same try/catch as `mca_draft_photos` (shares the quota risk);
   `nbDeserialize()` on `loadDraft`, cleared by `resetForm`. Discrete block actions call
   `autoSaveNow()` immediately (not debounced), same as the section-K photo actions.
+- **Image annotation editor** (`window.AnnotEditor`, self-injecting modal, white+blue theme
+  matching the sheet). Every evidence photo — E/F/G image blocks (`nbAnnotatePhoto`) and the
+  section-K gallery (`annotatePhotoAt`) — has an "✎ Anotasi" button opening a canvas editor with
+  rectangle / ellipse / arrow / text-box tools, 7 colour swatches, 4 stroke widths, a "Pilih"
+  tool to drag/delete an existing mark-up (hit-test + `Delete` key), Undo, Hapus terpilih, Hapus
+  semua. Annotations are stored in **natural-image pixel coords** (canvas display is scaled to
+  fit; `S.scale` converts), and on Simpan they're **baked onto the image** at natural resolution
+  → `compressUnder1MB` → the entry's `src`/`dataUrl`/`w`/`h` are replaced — same destructive
+  model as the existing rotate/crop tools (no separate annotation layer stored, so drafts /
+  Firestore / the PDF need no new fields). Text tool: type into the toolbar's `#annot-textval`
+  field first, then click to place. A new unsupported shape/colour would extend `AnnotEditor`'s
+  `COLORS`/`WIDTHS`/`drawAnn()`, not a per-file change.
 Section K (Attachments/Evidence Log) stays a single flat general-purpose PhotoKit gallery
 (`PHOTOS.attachments`) for anything not tied to an E/F/G block.
 

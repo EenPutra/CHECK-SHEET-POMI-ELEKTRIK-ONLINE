@@ -189,6 +189,34 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .nb-heading-inp{width:100%;margin-bottom:8px}
 .nb-empty{color:var(--txt4);font-size:12.5px;text-align:center;padding:14px;border:1.5px dashed var(--bdr);border-radius:8px}
 
+/* IMAGE ANNOTATION EDITOR — white + blue theme (matches check sheet) */
+.annot-overlay{position:fixed;inset:0;background:rgba(15,23,42,.58);z-index:10000;display:none;align-items:center;justify-content:center;padding:14px}
+.annot-overlay.show{display:flex}
+.annot-box{background:#fff;border:1px solid var(--bdr);border-radius:12px;max-width:96vw;max-height:95vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 24px 70px rgba(15,23,42,.4)}
+.annot-hd{background:var(--navy);color:#fff;padding:10px 16px;font-weight:700;font-size:14px;display:flex;justify-content:space-between;align-items:center;gap:12px}
+.annot-hd button{background:rgba(255,255,255,.15);border:0;color:#fff;font-size:15px;width:28px;height:28px;border-radius:6px;cursor:pointer;line-height:1}
+.annot-tools{display:flex;flex-wrap:wrap;gap:6px;padding:9px 14px;background:var(--bg2);border-bottom:1px solid var(--bdr);align-items:center}
+.annot-tools .sep{width:1px;height:22px;background:var(--bdr);margin:0 3px}
+.annot-tool{border:1.5px solid var(--bdr);background:#fff;color:var(--navy);border-radius:6px;padding:5px 10px;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit;line-height:1.3}
+.annot-tool:hover{border-color:var(--blue);color:var(--blue)}
+.annot-tool.active{background:var(--blue);border-color:var(--blue);color:#fff}
+.annot-tool.danger:hover{border-color:#dc2626;color:#dc2626}
+.annot-sw{width:22px;height:22px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1.5px var(--bdr);cursor:pointer;padding:0}
+.annot-sw.active{box-shadow:0 0 0 2px var(--navy)}
+.annot-width{display:flex;gap:4px;align-items:center}
+.annot-width button{width:26px;height:24px;border:1.5px solid var(--bdr);background:#fff;border-radius:5px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.annot-width button.active{border-color:var(--blue);background:#eaf3ff}
+.annot-width button i{display:block;background:var(--navy);border-radius:2px}
+.annot-textval{border:1.5px solid var(--bdr);border-radius:6px;padding:5px 8px;font-size:12.5px;font-family:inherit;min-width:130px}
+.annot-canvas-wrap{overflow:auto;padding:14px;background:#eef4fb;flex:1;display:flex;align-items:center;justify-content:center;min-height:200px}
+#annot-canvas{background:#fff;box-shadow:0 2px 12px rgba(15,23,42,.22);touch-action:none;max-width:100%}
+.annot-ft{display:flex;gap:8px;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid var(--bdr);background:#fff;flex-wrap:wrap}
+.annot-ft .hint{font-size:11.5px;color:var(--txt4)}
+.annot-ft-btns{display:flex;gap:8px}
+.annot-ft-btns button{border-radius:7px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;border:1.5px solid var(--bdr)}
+.annot-ft-btns .cancel{background:#f1f5f9;color:var(--navy)}
+.annot-ft-btns .save{background:var(--blue);border-color:var(--blue);color:#fff}
+
 /* NOTICE */
 .notice{padding:10px 16px;border-radius:6px;font-size:13px;display:none;margin:12px 0 0}
 .notice.ok{background:#dcfce7;border:1px solid #86efac;color:#15803d;display:block}
@@ -936,6 +964,7 @@ function nbRenderPhotos(key, b){
     + '<span style="font-size:10px;color:var(--txt4);font-family:var(--mono)">Foto ' + (i+1) + '</span>'
     + '<button class="p-btn" onclick="nbRotatePhoto(\'' + key + '\',\'' + b.id + '\',' + i + ',-90)" title="Putar kiri">&#8634;</button>'
     + '<button class="p-btn" onclick="nbRotatePhoto(\'' + key + '\',\'' + b.id + '\',' + i + ',90)" title="Putar kanan">&#8635;</button>'
+    + '<button class="p-btn" onclick="nbAnnotatePhoto(\'' + key + '\',\'' + b.id + '\',' + i + ')" title="Tambah panah/kotak/teks">&#9998; Anotasi</button>'
     + '<button class="p-btn" onclick="nbRecropPhoto(\'' + key + '\',\'' + b.id + '\',' + i + ')" title="Crop &amp; ukuran cetak">&#9986; Crop</button>'
     + '<button class="p-btn del" onclick="nbRemovePhoto(\'' + key + '\',\'' + b.id + '\',' + i + ')" title="Hapus">&#10005; Hapus</button>'
     + '</div>'
@@ -993,6 +1022,293 @@ function nbRotatePhoto(key, id, i, deg){
   };
   img.src = cur.src;
 }
+
+// ═══════════════════════════════════════════════════
+//  IMAGE ANNOTATION EDITOR (window.AnnotEditor)
+//  Self-injecting modal. Add rectangle / ellipse / arrow / text-box mark-ups
+//  over an evidence photo, pick a colour + stroke width, reposition or delete
+//  a mark-up, then bake it onto the image (same destructive model as the
+//  rotate / crop tools already in this file). White + blue theme.
+// ═══════════════════════════════════════════════════
+const AnnotEditor = (function(){
+  const COLORS = ['#e11d48','#f97316','#facc15','#16a34a','#2563eb','#ffffff','#111827'];
+  const WIDTHS = [3, 5, 8, 12];
+  let ov, cv, ctx, img;
+  let S = null;            // session state
+  let onSaveCb = null;
+
+  function inject(){
+    if(ov) return;
+    ov = document.createElement('div');
+    ov.className = 'annot-overlay';
+    ov.id = 'annot-overlay';
+    ov.innerHTML =
+      '<div class="annot-box">'
+      + '<div class="annot-hd"><span>&#9998; Anotasi Gambar</span><button type="button" id="annot-x" title="Tutup">&#10005;</button></div>'
+      + '<div class="annot-tools">'
+      +   '<button class="annot-tool" data-tool="select">&#9995; Pilih</button>'
+      +   '<button class="annot-tool" data-tool="rect">&#9633; Kotak</button>'
+      +   '<button class="annot-tool" data-tool="ellipse">&#9711; Lingkaran</button>'
+      +   '<button class="annot-tool" data-tool="arrow">&#8594; Panah</button>'
+      +   '<button class="annot-tool" data-tool="text">&#127991; Teks</button>'
+      +   '<input class="annot-textval" id="annot-textval" type="text" placeholder="isi teks, lalu klik gambar">'
+      +   '<span class="sep"></span>'
+      +   '<span id="annot-swatches" style="display:flex;gap:6px;align-items:center"></span>'
+      +   '<span class="sep"></span>'
+      +   '<span class="annot-width" id="annot-widths"></span>'
+      +   '<span class="sep"></span>'
+      +   '<button class="annot-tool" id="annot-undo">&#8630; Undo</button>'
+      +   '<button class="annot-tool danger" id="annot-delsel">&#10005; Hapus terpilih</button>'
+      +   '<button class="annot-tool danger" id="annot-clear">Hapus semua</button>'
+      + '</div>'
+      + '<div class="annot-canvas-wrap"><canvas id="annot-canvas"></canvas></div>'
+      + '<div class="annot-ft">'
+      +   '<span class="hint">Tarik pada gambar untuk menggambar. Tool "Pilih" untuk memindah / menghapus mark-up.</span>'
+      +   '<span class="annot-ft-btns"><button type="button" class="cancel" id="annot-cancel">Batal</button><button type="button" class="save" id="annot-save">Simpan</button></span>'
+      + '</div>'
+      + '</div>';
+    document.body.appendChild(ov);
+    cv = ov.querySelector('#annot-canvas');
+    ctx = cv.getContext('2d');
+
+    // swatches
+    const sw = ov.querySelector('#annot-swatches');
+    COLORS.forEach(c => {
+      const b = document.createElement('button');
+      b.className = 'annot-sw'; b.style.background = c; b.dataset.color = c;
+      b.onclick = () => { S.color = c; syncUI(); };
+      sw.appendChild(b);
+    });
+    // widths
+    const wr = ov.querySelector('#annot-widths');
+    WIDTHS.forEach(w => {
+      const b = document.createElement('button');
+      b.dataset.w = w;
+      b.innerHTML = '<i style="width:' + (w+4) + 'px;height:' + Math.max(2, Math.round(w/1.6)) + 'px"></i>';
+      b.onclick = () => { S.width = w; syncUI(); };
+      wr.appendChild(b);
+    });
+
+    ov.querySelectorAll('.annot-tool[data-tool]').forEach(b => {
+      b.onclick = () => { S.tool = b.dataset.tool; S.sel = -1; syncUI(); render(); };
+    });
+    ov.querySelector('#annot-undo').onclick = () => { S.anns.pop(); S.sel = -1; render(); };
+    ov.querySelector('#annot-delsel').onclick = () => { if(S.sel >= 0){ S.anns.splice(S.sel,1); S.sel = -1; render(); } };
+    ov.querySelector('#annot-clear').onclick = () => { if(S.anns.length && confirm('Hapus semua mark-up?')){ S.anns = []; S.sel = -1; render(); } };
+    ov.querySelector('#annot-x').onclick = close;
+    ov.querySelector('#annot-cancel').onclick = close;
+    ov.querySelector('#annot-save').onclick = save;
+    ov.addEventListener('mousedown', e => { if(e.target === ov) close(); });
+
+    cv.addEventListener('pointerdown', pDown);
+    cv.addEventListener('pointermove', pMove);
+    window.addEventListener('pointerup', pUp);
+    document.addEventListener('keydown', e => {
+      if(!ov.classList.contains('show')) return;
+      if((e.key === 'Delete' || e.key === 'Backspace') && S.sel >= 0 && document.activeElement.tagName !== 'INPUT'){
+        S.anns.splice(S.sel,1); S.sel = -1; render(); e.preventDefault();
+      }
+    });
+  }
+
+  function syncUI(){
+    ov.querySelectorAll('.annot-tool[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === S.tool));
+    ov.querySelectorAll('.annot-sw').forEach(b => b.classList.toggle('active', b.dataset.color === S.color));
+    ov.querySelectorAll('#annot-widths button').forEach(b => b.classList.toggle('active', +b.dataset.w === S.width));
+    cv.style.cursor = S.tool === 'select' ? 'default' : 'crosshair';
+  }
+
+  // pointer -> natural-image coords
+  function toImg(e){
+    const r = cv.getBoundingClientRect();
+    return { x: (e.clientX - r.left) / S.scale, y: (e.clientY - r.top) / S.scale };
+  }
+  function bbox(a){
+    const x1 = Math.min(a.x1,a.x2), x2 = Math.max(a.x1,a.x2);
+    const y1 = Math.min(a.y1,a.y2), y2 = Math.max(a.y1,a.y2);
+    return {x1,y1,x2,y2};
+  }
+  function hit(p){
+    for(let i = S.anns.length - 1; i >= 0; i--){
+      const a = S.anns[i];
+      if(a.type === 'text'){
+        const w = (a.text.length * a.size * 0.6), h = a.size * 1.2;
+        if(p.x >= a.x1 - 4 && p.x <= a.x1 + w + 4 && p.y >= a.y1 - h && p.y <= a.y1 + 6) return i;
+      }else if(a.type === 'arrow'){
+        if(distSeg(p, a) < 10 / S.scale + a.w) return i;
+      }else{
+        const b = bbox(a), m = 6 / S.scale + a.w;
+        if(p.x >= b.x1 - m && p.x <= b.x2 + m && p.y >= b.y1 - m && p.y <= b.y2 + m) return i;
+      }
+    }
+    return -1;
+  }
+  function distSeg(p, a){
+    const dx = a.x2 - a.x1, dy = a.y2 - a.y1;
+    const L2 = dx*dx + dy*dy || 1;
+    let t = ((p.x - a.x1) * dx + (p.y - a.y1) * dy) / L2;
+    t = Math.max(0, Math.min(1, t));
+    return Math.hypot(p.x - (a.x1 + t*dx), p.y - (a.y1 + t*dy));
+  }
+
+  function pDown(e){
+    cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
+    const p = toImg(e);
+    if(S.tool === 'select'){
+      const i = hit(p);
+      S.sel = i;
+      if(i >= 0) S.drag = { p, orig: JSON.parse(JSON.stringify(S.anns[i])) };
+      render();
+      return;
+    }
+    if(S.tool === 'text'){
+      const t = (ov.querySelector('#annot-textval').value || '').trim();
+      if(!t){ ov.querySelector('#annot-textval').focus(); return; }
+      S.anns.push({ type:'text', x1:p.x, y1:p.y, x2:p.x, y2:p.y, text:t, color:S.color, size: Math.max(14, S.width * 4) });
+      S.sel = S.anns.length - 1;
+      render();
+      return;
+    }
+    S.new = { type:S.tool, x1:p.x, y1:p.y, x2:p.x, y2:p.y, color:S.color, w:S.width };
+  }
+  function pMove(e){
+    if(!S) return;
+    const p = toImg(e);
+    if(S.drag && S.sel >= 0){
+      const a = S.anns[S.sel], o = S.drag.orig, dx = p.x - S.drag.p.x, dy = p.y - S.drag.p.y;
+      a.x1 = o.x1 + dx; a.y1 = o.y1 + dy; a.x2 = o.x2 + dx; a.y2 = o.y2 + dy;
+      render();
+      return;
+    }
+    if(S.new){ S.new.x2 = p.x; S.new.y2 = p.y; render(); }
+  }
+  function pUp(){
+    if(!S) return;
+    if(S.new){
+      const d = Math.hypot(S.new.x2 - S.new.x1, S.new.y2 - S.new.y1);
+      if(d > 4 / S.scale){ S.anns.push(S.new); S.sel = S.anns.length - 1; }
+      S.new = null;
+      render();
+    }
+    S.drag = null;
+  }
+
+  function drawArrowHead(c, x1, y1, x2, y2, size){
+    const ang = Math.atan2(y2 - y1, x2 - x1);
+    const h = Math.max(10, size * 3.2);
+    c.beginPath();
+    c.moveTo(x2, y2);
+    c.lineTo(x2 - h * Math.cos(ang - Math.PI / 7), y2 - h * Math.sin(ang - Math.PI / 7));
+    c.lineTo(x2 - h * Math.cos(ang + Math.PI / 7), y2 - h * Math.sin(ang + Math.PI / 7));
+    c.closePath();
+    c.fill();
+  }
+  // Draw one annotation. sc = coord scale (display); when baking, sc = 1.
+  function drawAnn(c, a, sc, selected){
+    c.save();
+    c.strokeStyle = a.color; c.fillStyle = a.color;
+    c.lineWidth = Math.max(1, (a.w || 3) * sc);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    const x1 = a.x1 * sc, y1 = a.y1 * sc, x2 = a.x2 * sc, y2 = a.y2 * sc;
+    if(a.type === 'rect'){
+      c.strokeRect(Math.min(x1,x2), Math.min(y1,y2), Math.abs(x2-x1), Math.abs(y2-y1));
+    }else if(a.type === 'ellipse'){
+      c.beginPath();
+      c.ellipse((x1+x2)/2, (y1+y2)/2, Math.abs(x2-x1)/2, Math.abs(y2-y1)/2, 0, 0, Math.PI*2);
+      c.stroke();
+    }else if(a.type === 'arrow'){
+      c.beginPath(); c.moveTo(x1,y1); c.lineTo(x2,y2); c.stroke();
+      drawArrowHead(c, x1, y1, x2, y2, (a.w || 3) * sc);
+    }else if(a.type === 'text'){
+      const fs = a.size * sc;
+      c.font = '700 ' + fs + 'px Manrope, Arial, sans-serif';
+      c.textBaseline = 'alphabetic';
+      const tw = c.measureText(a.text).width;
+      c.fillStyle = 'rgba(255,255,255,.82)';
+      c.fillRect(x1 - 3, y1 - fs, tw + 6, fs + 6);
+      c.fillStyle = a.color;
+      c.fillText(a.text, x1, y1);
+    }
+    if(selected){
+      const b = bbox({x1:x1,y1:y1,x2:x2,y2:y2});
+      c.strokeStyle = '#2563eb'; c.setLineDash([5,4]); c.lineWidth = 1.5;
+      if(a.type === 'text'){
+        const fs = a.size * sc, tw = c.measureText(a.text).width;
+        c.strokeRect(x1 - 4, y1 - fs - 2, tw + 8, fs + 8);
+      }else{
+        c.strokeRect(b.x1 - 4, b.y1 - 4, (b.x2 - b.x1) + 8, (b.y2 - b.y1) + 8);
+      }
+      c.setLineDash([]);
+    }
+    c.restore();
+  }
+  function render(){
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    S.anns.forEach((a, i) => drawAnn(ctx, a, S.scale, i === S.sel));
+    if(S.new) drawAnn(ctx, S.new, S.scale, false);
+  }
+
+  function open(entry, cb){
+    inject();
+    onSaveCb = cb;
+    img = new Image();
+    img.onload = () => {
+      const natW = img.naturalWidth, natH = img.naturalHeight;
+      const maxW = Math.min(window.innerWidth * 0.92, 1200);
+      const maxH = window.innerHeight * 0.60;
+      const scale = Math.min(maxW / natW, maxH / natH, 1);
+      cv.width = Math.round(natW * scale);
+      cv.height = Math.round(natH * scale);
+      S = { anns: [], tool: 'rect', color: COLORS[0], width: WIDTHS[1], scale, natW, natH, sel: -1, new: null, drag: null };
+      ov.querySelector('#annot-textval').value = '';
+      syncUI();
+      render();
+      ov.classList.add('show');
+    };
+    img.onerror = () => { showNote('❌ Gagal memuat gambar untuk anotasi.', 'err'); };
+    img.src = entry.src || entry.dataUrl;
+  }
+  function close(){ ov.classList.remove('show'); S = null; onSaveCb = null; }
+  async function save(){
+    if(!S){ close(); return; }
+    const natW = S.natW, natH = S.natH;
+    const out = document.createElement('canvas');
+    out.width = natW; out.height = natH;
+    const oc = out.getContext('2d');
+    oc.drawImage(img, 0, 0, natW, natH);
+    S.anns.forEach(a => drawAnn(oc, a, 1, false));
+    const dataUrl = out.toDataURL('image/jpeg', 0.92);
+    const cb = onSaveCb;
+    close();
+    try{
+      const c = await compressUnder1MB(dataUrl, natW, natH);
+      if(cb) await cb(c.src, c.w, c.h);
+    }catch(e){ console.error('Anotasi simpan gagal:', e); showNote('❌ Gagal menyimpan anotasi.', 'err'); }
+  }
+  return { open };
+})();
+
+function nbAnnotatePhoto(key, id, i){
+  const b = nbFindBlock(key, id);
+  const cur = b && b.photos[i];
+  if(!cur) return;
+  AnnotEditor.open(cur, async (src, w, h) => {
+    cur.src = src; cur.dataUrl = src; cur.w = w; cur.h = h;
+    nbRenderPhotos(key, b);
+    autoSaveNow();
+  });
+}
+function annotatePhotoAt(key, i){
+  const cur = (PHOTOS[key] || [])[i];
+  if(!cur) return;
+  AnnotEditor.open(cur, async (src, w, h) => {
+    cur.src = src; cur.dataUrl = src; cur.w = w; cur.h = h;
+    renderPhotos(key);
+    autoSaveNow();
+  });
+}
+
 // Rebuild a section's single text block from the hidden mirror when NB is
 // empty — covers a returned-for-revision restore of a text-only report (the
 // merge module fills the mirror but never calls restorePhotosFromUrls if
@@ -1108,6 +1424,7 @@ function renderPhotos(key){
           <span style="font-size:10px;color:var(--txt4);font-family:var(--mono)">Foto ${i+1}</span>
           <button class="p-btn" onclick="rotatePhoto('${key}',${i},-90)" title="Putar kiri">↺</button>
           <button class="p-btn" onclick="rotatePhoto('${key}',${i},90)" title="Putar kanan">↻</button>
+          <button class="p-btn" onclick="annotatePhotoAt('${key}',${i})" title="Tambah panah/kotak/teks">✎ Anotasi</button>
           <button class="p-btn" onclick="recropPhotoAt('${key}',${i})" title="Crop &amp; ukuran cetak">✂ Crop</button>
           <button class="p-btn del" onclick="removePhoto('${key}',${i})" title="Hapus">✕ Hapus</button>
         </div>
