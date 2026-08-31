@@ -2038,21 +2038,49 @@ repo and are worth understanding before extending it:
     documented in the HV_CHECKS `special` rows bullet above, reused here for the same reason
     (a single `Value`-column sheet can't represent a multi-row table with real columns).
 
-**Sections E (Chronology), F (Findings), G (Corrective Action) each carry their own dedicated
-evidence-photo gallery, placed immediately after that section's own textarea** — both on screen
-and in the generated PDF (`narrativeSection()` draws the text block via `autoTable`, then that
-section's photos immediately below, before moving on to the next lettered section) — rather than
-one photo gallery for the whole report. This was an explicit user requirement (raised after the
-initial design was agreed, specifically so the exported PDF "reads as a narrative report with
-evidence in context," easy for both engineers and management to follow) — a class of requirement
-distinct from every other check sheet in this repo, where photos are evidence *for a checklist
-item*, not *for a paragraph of prose*. Section K (Attachments/Evidence Log) is a fourth,
-general-purpose gallery for anything not specific to E/F/G (drawings, trend exports, etc.) — kept
-per the user's explicit choice when asked whether it was still needed alongside the three
-narrative galleries. `PHOTOS` is keyed by `chronology`/`findings`/`corrective_action`/
-`attachments` (not by asset/inverter/tab like every other keyed-`PHOTOS` sheet in this repo) —
-`restorePhotosFromUrls()` is otherwise the same generic per-key restore pattern as
-`PLTS_AshDisposal_PM.html`'s, just with these four keys instead of per-inverter ones.
+**Sections E (Chronology), F (Findings), G (Corrective Action) are ordered BLOCK BUILDERS —
+"+ Tambah Teks" / "+ Tambah Gambar", unlimited count, reorderable (▲▼), per-block delete** — the
+same idea as `Work_Activity_Record.html`'s `BLOCKS`, but rendered into the jsPDF report (not
+`window.print()` CSS). This replaced the earlier "one textarea + one photo gallery per section"
+design at the user's explicit request ("bisa ditambahkan pilihan add text box, add image ...
+bisa diatur posisinya sehingga flow report lebih mudah dibaca"). State: `NB = {chronology:[],
+findings:[], corrective_action:[]}`, each block `{id, type:'text', heading, text}` or `{id,
+type:'image', photos:[PhotoKit entries]}`. Key functions (all take the section key):
+`nbAdd`/`nbMove`/`nbRemove`/`nbRender`/`nbCard`, image-block photo ops `nbPickPhotos`/
+`nbRenderPhotos`/`nbRecropPhoto`/`nbRotatePhoto`/`nbRemovePhoto`/`nbPhotoCaption` (reuse
+`compressUnder1MB` + PhotoKit, same as the section-K `pickPhotos`). The PDF renders each block in
+order via `narrativeBlocksSection(label, key, hint)` — a text block is an optional navy bold
+heading + `plainTextBox()` (autoTable auto-height, so arbitrary length never overlaps), an image
+block is `drawPhotoList(block.photos)` (2-up, PhotoKit-sized). `san()` strips non-latin1 glyphs
+from headings/captions for jsPDF Times.
+- **Backward compat / restore plumbing.** Each section keeps a **hidden** `<textarea
+  id="<key>-text">` mirror, kept in sync by `nbSyncMirror()` with a plain-text flattening of the
+  blocks — so `DB.collectCheckSheetData()`'s sweep, old dashboard rendering, and (crucially)
+  revision-restore all still have something to read. `nbReseedFromMirrorIfEmpty()` rebuilds a
+  single text block from that mirror whenever `NB[key]` is empty but the mirror has content —
+  this is what restores a text-only returned report on revision (the merge module fills the
+  hidden mirror via `inputValues` but never calls `restorePhotosFromUrls` when there were no
+  photos) and auto-migrates any pre-block-builder submission.
+- **Firestore.** `base.sheets.chronology/findings/corrective` get one row per block (`nbSheetRows()`
+  — text → `{desc: heading||'Teks', Value: text}`, image → `{desc:'Foto', Value:'(N foto: caps)'}`),
+  readable in the dashboard detail view. `base.narrativeBlocks = {chronology:[{type,heading,text}
+  | {type:'image',count,captions}], ...}` stores the block STRUCTURE so a revision-restore can
+  rebuild the exact layout. Each image block's photos are flattened **in block order** into
+  `PHOTOS[key]` (still keyed `chronology`/`findings`/`corrective_action`) right before
+  `Approvals.submitWithFiles({photos: PHOTOS})`, so the upload path is unchanged.
+- **`restorePhotosFromUrls(photoUrls, overwrite)`.** For E/F/G: if `?reviseOf=` is set,
+  `_fetchSourceNarrativeBlocks()` pulls `narrativeBlocks` off the source checksheet doc
+  (Approvals.getById → DB.getById, cached) and rebuilds each section's blocks — text straight
+  from the structure, images sliced from the flat `photoUrls[key]` list by each image block's
+  `count`. No `reviseOf` (plain multi-doc Load & Merge, rare for these unique failure-event
+  reports) → all a section's restored photos land in one appended image block, text not
+  restored. Section K (`attachments`) is the unchanged flat per-key restore.
+- **Draft.** `localStorage['mca_draft_blocks']` = `JSON.stringify(nbSerialize())` (full blocks incl
+  photo data URLs), written in the same try/catch as `mca_draft_photos` (shares the quota risk);
+  `nbDeserialize()` on `loadDraft`, cleared by `resetForm`. Discrete block actions call
+  `autoSaveNow()` immediately (not debounced), same as the section-K photo actions.
+Section K (Attachments/Evidence Log) stays a single flat general-purpose PhotoKit gallery
+(`PHOTOS.attachments`) for anything not tied to an E/F/G block.
 
 **Section L (Report Authorization) is deliberately NOT built as on-page signature fields.** It
 reuses the existing Review & Approval workflow end-to-end instead of duplicating it: Prepared By

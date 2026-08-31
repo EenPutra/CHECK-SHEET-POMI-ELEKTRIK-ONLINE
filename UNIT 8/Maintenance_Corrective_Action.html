@@ -173,6 +173,22 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .narrative-photo-block{margin-top:12px;padding-top:12px;border-top:1px dashed var(--bdr)}
 .narrative-photo-label{font-size:11px;font-weight:700;color:var(--navy);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
 
+/* NARRATIVE BLOCKS (E/F/G) — add-text / add-image, reorderable */
+.nb-toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.nb-list{display:flex;flex-direction:column;gap:14px}
+.nb-block{border:1px solid var(--bdr);border-radius:10px;background:var(--bg);overflow:hidden}
+.nb-head{display:flex;align-items:center;gap:6px;padding:6px 10px;background:var(--bg2);border-bottom:1px solid var(--bdr)}
+.nb-badge{font-size:10px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--navy);flex:1}
+.nb-ctrl{border:1px solid var(--bdr);background:var(--surf);color:var(--navy);border-radius:5px;padding:2px 8px;
+  font-size:12px;line-height:1.4;cursor:pointer;font-family:inherit}
+.nb-ctrl:hover{border-color:var(--blue);color:var(--blue)}
+.nb-ctrl.del:hover{border-color:#dc2626;color:#dc2626}
+.nb-ctrl:disabled{opacity:.32;cursor:default}
+.nb-body{padding:10px}
+.nb-body textarea{width:100%;min-height:92px}
+.nb-heading-inp{width:100%;margin-bottom:8px}
+.nb-empty{color:var(--txt4);font-size:12.5px;text-align:center;padding:14px;border:1.5px dashed var(--bdr);border-radius:8px}
+
 /* NOTICE */
 .notice{padding:10px 16px;border-radius:6px;font-size:13px;display:none;margin:12px 0 0}
 .notice.ok{background:#dcfce7;border:1px solid #86efac;color:#15803d;display:block}
@@ -344,15 +360,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
-    <div class="mf"><label>Chronology</label><textarea id="chronology-text" style="min-height:110px" placeholder="Uraikan kronologi kejadian secara berurutan (tanggal/jam bila perlu)..."></textarea></div>
-    <div class="narrative-photo-block">
-      <div class="narrative-photo-label">📷 Foto Kronologi</div>
-      <div class="photo-drop" onclick="pickPhotos('chronology',this)">
-        <div class="photo-drop-ico">&#128247;</div>
-        <div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong><br><small style="font-size:11px">Kamera atau galeri &middot; bisa banyak sekaligus</small></div>
-      </div>
-      <div class="photo-grid" id="photo-grid-chronology"></div>
+    <div class="nb-toolbar">
+      <button class="btn-add" onclick="nbAdd('chronology','text')">+ Tambah Teks</button>
+      <button class="btn-add" onclick="nbAdd('chronology','image')">+ Tambah Gambar</button>
     </div>
+    <div class="nb-list" id="nb-list-chronology"></div>
+    <textarea id="chronology-text" style="display:none" aria-hidden="true"></textarea>
   </div>
 </div>
 
@@ -364,15 +377,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
-    <div class="mf"><label>Findings</label><textarea id="findings-text" style="min-height:110px" placeholder="Uraikan hasil temuan/inspeksi..."></textarea></div>
-    <div class="narrative-photo-block">
-      <div class="narrative-photo-label">📷 Foto Temuan</div>
-      <div class="photo-drop" onclick="pickPhotos('findings',this)">
-        <div class="photo-drop-ico">&#128247;</div>
-        <div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong><br><small style="font-size:11px">Kamera atau galeri &middot; bisa banyak sekaligus</small></div>
-      </div>
-      <div class="photo-grid" id="photo-grid-findings"></div>
+    <div class="nb-toolbar">
+      <button class="btn-add" onclick="nbAdd('findings','text')">+ Tambah Teks</button>
+      <button class="btn-add" onclick="nbAdd('findings','image')">+ Tambah Gambar</button>
     </div>
+    <div class="nb-list" id="nb-list-findings"></div>
+    <textarea id="findings-text" style="display:none" aria-hidden="true"></textarea>
   </div>
 </div>
 
@@ -384,15 +394,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
-    <div class="mf"><label>Corrective Action</label><textarea id="corrective-text" style="min-height:110px" placeholder="Uraikan tindakan perbaikan yang sudah dilakukan..."></textarea></div>
-    <div class="narrative-photo-block">
-      <div class="narrative-photo-label">📷 Foto Tindakan Perbaikan</div>
-      <div class="photo-drop" onclick="pickPhotos('corrective_action',this)">
-        <div class="photo-drop-ico">&#128247;</div>
-        <div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong><br><small style="font-size:11px">Kamera atau galeri &middot; bisa banyak sekaligus</small></div>
-      </div>
-      <div class="photo-grid" id="photo-grid-corrective_action"></div>
+    <div class="nb-toolbar">
+      <button class="btn-add" onclick="nbAdd('corrective_action','text')">+ Tambah Teks</button>
+      <button class="btn-add" onclick="nbAdd('corrective_action','image')">+ Tambah Gambar</button>
     </div>
+    <div class="nb-list" id="nb-list-corrective_action"></div>
+    <textarea id="corrective-text" style="display:none" aria-hidden="true"></textarea>
   </div>
 </div>
 
@@ -791,10 +798,226 @@ function updateStats(){
   document.getElementById('h-wo').textContent = gv('wo-no') || '—';
   document.getElementById('h-team').textContent = document.querySelectorAll('#team-body tr').length;
   document.getElementById('h-reco').textContent = document.querySelectorAll('#reco-body tr').length;
-  const totalPhotos = PHOTO_KEYS.reduce((n,k)=>n+(PHOTOS[k]||[]).length,0);
+  const nbPhotos = NB_KEYS.reduce((n,k)=> n + (NB[k]||[]).reduce((m,b)=> m + (b.type==='image'?b.photos.length:0), 0), 0);
+  const totalPhotos = nbPhotos + (PHOTOS.attachments||[]).length;
   document.getElementById('h-photos').textContent = totalPhotos;
   const attCnt = document.getElementById('photo-cnt-attachments');
   if(attCnt) attCnt.textContent = (PHOTOS.attachments||[]).length + ' foto';
+}
+
+// ═══════════════════════════════════════════════════
+//  NARRATIVE BLOCKS (Sections E / F / G) — add text box / add image,
+//  unlimited count, reorderable (▲▼). Mirrors the block-builder idea from
+//  Work_Activity_Record.html, but rendered into the jsPDF report (not print
+//  CSS). Each block: {id, type:'text', heading, text} | {id, type:'image', photos:[]}.
+//  A hidden <textarea id="<key>-text"> mirror is kept in sync for backward
+//  compat (old dashboards / pre-block submissions / revision-restore fallback).
+// ═══════════════════════════════════════════════════
+const NB_KEYS = ['chronology','findings','corrective_action'];
+const NB_MIRROR = { chronology:'chronology-text', findings:'findings-text', corrective_action:'corrective-text' };
+const NB = {}; NB_KEYS.forEach(k => NB[k] = []);
+let _nbUid = 0;
+function nbUid(){ return 'nb' + (++_nbUid); }
+
+function nbAdd(key, type){
+  const b = type === 'image'
+    ? { id:nbUid(), type:'image', photos:[] }
+    : { id:nbUid(), type:'text', heading:'', text:'' };
+  NB[key].push(b);
+  nbRender(key);
+  autoSaveNow();
+  const el = document.getElementById(b.id);
+  if(el) el.scrollIntoView({behavior:'smooth', block:'center'});
+}
+function nbMove(key, idx, dir){
+  const ni = idx + dir;
+  if(ni < 0 || ni >= NB[key].length) return;
+  const a = NB[key];
+  const t = a[idx]; a[idx] = a[ni]; a[ni] = t;
+  nbRender(key);
+  autoSaveNow();
+}
+function nbRemove(key, idx){
+  const b = NB[key][idx];
+  if(!b) return;
+  const hasContent = (b.type === 'text' && (b.heading || b.text)) || (b.type === 'image' && b.photos.length);
+  if(hasContent && !confirm('Hapus block ini beserta isinya?')) return;
+  NB[key].splice(idx, 1);
+  nbRender(key);
+  autoSaveNow();
+}
+function nbFindBlock(key, id){ return (NB[key] || []).find(x => x.id === id); }
+function nbSyncMirror(key){
+  const el = document.getElementById(NB_MIRROR[key]);
+  if(!el) return;
+  el.value = (NB[key] || []).map(b => b.type === 'text'
+    ? ((b.heading ? '[' + b.heading + '] ' : '') + (b.text || ''))
+    : ('[Foto: ' + b.photos.length + ']')
+  ).filter(s => s.trim()).join('\n\n');
+}
+function nbOnText(key, id, field, val){
+  const b = nbFindBlock(key, id);
+  if(!b) return;
+  b[field] = val;
+  nbSyncMirror(key);
+  scheduleAutoSave();
+}
+function nbRender(key){
+  const host = document.getElementById('nb-list-' + key);
+  if(!host) return;
+  const list = NB[key] || [];
+  if(!list.length){
+    host.innerHTML = '<div class="nb-empty">Belum ada konten. Klik "+ Tambah Teks" atau "+ Tambah Gambar" untuk menyusun laporan.</div>';
+    nbSyncMirror(key);
+    updateStats();
+    return;
+  }
+  host.innerHTML = list.map((b,i) => nbCard(key, b, i, list.length)).join('');
+  // innerHTML rebuild wipes textarea/input values — restore them, render photos
+  list.forEach(b => {
+    if(b.type === 'text'){
+      const hd = document.getElementById(b.id + '-heading'); if(hd) hd.value = b.heading || '';
+      const tx = document.getElementById(b.id + '-text');    if(tx) tx.value = b.text || '';
+    }else{
+      nbRenderPhotos(key, b);
+    }
+  });
+  nbSyncMirror(key);
+  updateStats();
+}
+function nbCard(key, b, i, n){
+  const head = '<div class="nb-head">'
+    + '<span class="nb-badge">' + (b.type === 'image' ? '&#128247; Gambar ' : '&#9998; Teks ') + (i+1) + '</span>'
+    + '<button class="nb-ctrl" ' + (i === 0 ? 'disabled' : '') + ' onclick="nbMove(\'' + key + '\',' + i + ',-1)" title="Naikkan">&#9650;</button>'
+    + '<button class="nb-ctrl" ' + (i === n-1 ? 'disabled' : '') + ' onclick="nbMove(\'' + key + '\',' + i + ',1)" title="Turunkan">&#9660;</button>'
+    + '<button class="nb-ctrl del" onclick="nbRemove(\'' + key + '\',' + i + ')" title="Hapus block">&#10005;</button>'
+    + '</div>';
+  let body;
+  if(b.type === 'text'){
+    body = '<div class="nb-body">'
+      + '<input class="nb-heading-inp" id="' + b.id + '-heading" type="text" placeholder="Sub-judul (opsional) — mis. Kondisi Awal, Hasil Ukur, Tindakan..."'
+      + ' oninput="nbOnText(\'' + key + '\',\'' + b.id + '\',\'heading\',this.value)">'
+      + '<textarea id="' + b.id + '-text" placeholder="Tulis penjelasan di sini. Panjang bebas — kolom pada PDF menyesuaikan otomatis."'
+      + ' oninput="nbOnText(\'' + key + '\',\'' + b.id + '\',\'text\',this.value)"></textarea>'
+      + '</div>';
+  }else{
+    body = '<div class="nb-body">'
+      + '<div class="photo-drop" onclick="nbPickPhotos(\'' + key + '\',\'' + b.id + '\',this)">'
+      + '<div class="photo-drop-ico">&#128247;</div>'
+      + '<div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong><br><small style="font-size:11px">Kamera atau galeri &middot; bisa banyak sekaligus</small></div>'
+      + '</div>'
+      + '<div class="photo-grid" id="nb-grid-' + b.id + '" style="margin-top:10px"></div>'
+      + '</div>';
+  }
+  return '<div class="nb-block" id="' + b.id + '">' + head + body + '</div>';
+}
+function nbPickPhotos(key, id, el){
+  const b = nbFindBlock(key, id);
+  if(!b) return;
+  PhotoKit.upload(el, {multiple:true}, async entry => {
+    if(!entry) return;
+    const c = await compressUnder1MB(entry.src, entry.w, entry.h);
+    entry.src = c.src; entry.dataUrl = c.src; entry.w = c.w; entry.h = c.h;
+    entry.caption = '';
+    b.photos.push(entry);
+    nbRenderPhotos(key, b);
+    nbSyncMirror(key);
+    autoSaveNow();
+  });
+}
+function nbRenderPhotos(key, b){
+  const grid = document.getElementById('nb-grid-' + b.id);
+  if(!grid) return;
+  if(!b.photos.length){ grid.innerHTML = ''; return; }
+  grid.innerHTML = b.photos.map((p,i) => ''
+    + '<div class="photo-item">'
+    + '<div class="photo-img-wrap"><img src="' + p.src + '" alt="foto ' + (i+1) + '"></div>'
+    + '<div class="photo-ctrl">'
+    + '<span style="font-size:10px;color:var(--txt4);font-family:var(--mono)">Foto ' + (i+1) + '</span>'
+    + '<button class="p-btn" onclick="nbRotatePhoto(\'' + key + '\',\'' + b.id + '\',' + i + ',-90)" title="Putar kiri">&#8634;</button>'
+    + '<button class="p-btn" onclick="nbRotatePhoto(\'' + key + '\',\'' + b.id + '\',' + i + ',90)" title="Putar kanan">&#8635;</button>'
+    + '<button class="p-btn" onclick="nbRecropPhoto(\'' + key + '\',\'' + b.id + '\',' + i + ')" title="Crop &amp; ukuran cetak">&#9986; Crop</button>'
+    + '<button class="p-btn del" onclick="nbRemovePhoto(\'' + key + '\',\'' + b.id + '\',' + i + ')" title="Hapus">&#10005; Hapus</button>'
+    + '</div>'
+    + '<input class="photo-cap" type="text" placeholder="Caption / keterangan foto ' + (i+1) + '..." value="'
+    + (p.caption || '').replace(/"/g,'&quot;') + '" oninput="nbPhotoCaption(\'' + key + '\',\'' + b.id + '\',' + i + ',this.value)">'
+    + '</div>').join('');
+}
+function nbPhotoCaption(key, id, i, val){
+  const b = nbFindBlock(key, id);
+  if(b && b.photos[i]){ b.photos[i].caption = val; scheduleAutoSave(); }
+}
+function nbRemovePhoto(key, id, i){
+  if(!confirm('Hapus foto ini?')) return;
+  const b = nbFindBlock(key, id);
+  if(!b) return;
+  b.photos.splice(i, 1);
+  nbRenderPhotos(key, b);
+  nbSyncMirror(key);
+  autoSaveNow();
+}
+function nbRecropPhoto(key, id, i){
+  const b = nbFindBlock(key, id);
+  const cur = b && b.photos[i];
+  if(!cur) return;
+  PhotoKit.recrop(cur, async e => {
+    if(!e) return;
+    const c = await compressUnder1MB(e.src, e.w, e.h);
+    e.src = c.src; e.dataUrl = c.src; e.w = c.w; e.h = c.h;
+    e.caption = cur.caption || '';
+    b.photos[i] = e;
+    nbRenderPhotos(key, b);
+    autoSaveNow();
+  });
+}
+function nbRotatePhoto(key, id, i, deg){
+  const b = nbFindBlock(key, id);
+  const cur = b && b.photos[i];
+  if(!cur) return;
+  const img = new Image();
+  img.onload = async () => {
+    const Wn = img.naturalWidth, Hn = img.naturalHeight;
+    const norm = ((deg % 360) + 360) % 360;
+    const swap = norm === 90 || norm === 270;
+    const cv = document.createElement('canvas');
+    cv.width = swap ? Hn : Wn; cv.height = swap ? Wn : Hn;
+    const ctx = cv.getContext('2d');
+    ctx.translate(cv.width/2, cv.height/2);
+    ctx.rotate(deg * Math.PI / 180);
+    ctx.drawImage(img, -Wn/2, -Hn/2);
+    const c = await compressUnder1MB(cv.toDataURL('image/jpeg', 0.92), cv.width, cv.height);
+    cur.src = c.src; cur.dataUrl = c.src; cur.w = c.w; cur.h = c.h;
+    if(swap && cur.widthCm && cur.heightCm){ const t = cur.widthCm; cur.widthCm = cur.heightCm; cur.heightCm = t; }
+    nbRenderPhotos(key, b);
+    autoSaveNow();
+  };
+  img.src = cur.src;
+}
+// Rebuild a section's single text block from the hidden mirror when NB is
+// empty — covers a returned-for-revision restore of a text-only report (the
+// merge module fills the mirror but never calls restorePhotosFromUrls if
+// there were no photos) and any pre-block-builder submission.
+function nbReseedFromMirrorIfEmpty(){
+  NB_KEYS.forEach(k => {
+    if(NB[k].length) return;
+    const mv = (document.getElementById(NB_MIRROR[k]) || {}).value || '';
+    if(mv.trim()){
+      NB[k] = [{ id:nbUid(), type:'text', heading:'', text:mv.trim() }];
+      nbRender(k);
+    }
+  });
+}
+// Serialize / restore NB for the local draft.
+function nbSerialize(){ const o = {}; NB_KEYS.forEach(k => o[k] = NB[k]); return o; }
+function nbDeserialize(obj){
+  if(!obj || typeof obj !== 'object') return;
+  NB_KEYS.forEach(k => {
+    NB[k] = Array.isArray(obj[k]) ? obj[k].map(b => b.type === 'image'
+      ? { id: b.id || nbUid(), type:'image', photos: Array.isArray(b.photos) ? b.photos : [] }
+      : { id: b.id || nbUid(), type:'text', heading: b.heading || '', text: b.text || '' }) : [];
+  });
+  // keep the uid counter ahead of any restored ids
+  NB_KEYS.forEach(k => NB[k].forEach(b => { const m = /^nb(\d+)$/.exec(b.id || ''); if(m) _nbUid = Math.max(_nbUid, +m[1]); }));
 }
 
 // ═══════════════════════════════════════════════════
@@ -925,40 +1148,94 @@ function removePhoto(key, idx){
   autoSaveNow();
 }
 
+// Fetch one URL -> PhotoKit entry (data URL + measured w/h).
+async function _restoreOnePhoto(src){
+  if(!src || !src.url) return null;
+  const dataUrl = await Storage.toDataUrl(src.url);
+  const entry = { src: dataUrl, dataUrl, w: src.w, h: src.h, widthCm: src.widthCm, heightCm: src.heightCm, caption: src.caption || '' };
+  if((!entry.w || !entry.h) && window.PhotoKit && typeof PhotoKit.prepare === 'function'){
+    try{ const filled = await PhotoKit.prepare([entry]); if(filled && filled[0]) Object.assign(entry, filled[0]); }
+    catch(e){ /* keep entry without measured w/h */ }
+  }
+  return entry;
+}
+
+// When this form was opened for revision (?reviseOf=), pull the E/F/G block
+// STRUCTURE (text + heading + per-image-block photo count) straight off the
+// source checksheet doc's base.narrativeBlocks so restore rebuilds the exact
+// block layout, not just a flat photo dump. Cached — one fetch per session.
+let _srcNarrativeBlocks; // undefined = not fetched, null = none / n/a
+async function _fetchSourceNarrativeBlocks(){
+  if(_srcNarrativeBlocks !== undefined) return _srcNarrativeBlocks;
+  _srcNarrativeBlocks = null;
+  try{
+    const rid = window.LoadMergeModal && LoadMergeModal.getReviseOfApprovalId && LoadMergeModal.getReviseOfApprovalId();
+    if(rid && typeof Approvals !== 'undefined'){
+      const appr = await Approvals.getById(rid);
+      if(appr && appr.checksheetId){
+        const doc = await DB.getById(appr.checksheetId);
+        if(doc && doc.narrativeBlocks && typeof doc.narrativeBlocks === 'object') _srcNarrativeBlocks = doc.narrativeBlocks;
+      }
+    }
+  }catch(e){ _srcNarrativeBlocks = null; }
+  return _srcNarrativeBlocks;
+}
+
 // Called by load-merge-modal.js after a Load & Merge / revision-banner
 // restore, once the Drive photoUrls for the source submission(s) are known.
 async function restorePhotosFromUrls(photoUrls, overwrite){
   if(!photoUrls || typeof photoUrls !== 'object') return 0;
   let restored = 0;
-  for(const key of Object.keys(photoUrls)){
-    const list = photoUrls[key];
-    if(!Array.isArray(list) || !list.length) continue;
-    if(!overwrite && PHOTOS[key] && PHOTOS[key].length) continue;
-    const entries = [];
-    for(const src of list){
-      if(!src || !src.url) continue;
-      try{
-        const dataUrl = await Storage.toDataUrl(src.url);
-        const entry = {
-          src: dataUrl, dataUrl,
-          w: src.w, h: src.h,
-          widthCm: src.widthCm, heightCm: src.heightCm,
-          caption: src.caption || '',
-        };
-        if((!entry.w || !entry.h) && window.PhotoKit && typeof PhotoKit.prepare === 'function'){
-          try{ const filled = await PhotoKit.prepare([entry]); if(filled && filled[0]) Object.assign(entry, filled[0]); }
-          catch(e){ /* fall back to entry without measured w/h */ }
-        }
-        entries.push(entry);
-      }catch(e){
-        console.error('restorePhotosFromUrls: gagal memuat foto', src.url, e);
-      }
+
+  // ── E / F / G narrative blocks ──
+  const nbStruct = await _fetchSourceNarrativeBlocks();
+  for(const key of NB_KEYS){
+    const flat = Array.isArray(photoUrls[key]) ? photoUrls[key] : [];
+    const struct = nbStruct && Array.isArray(nbStruct[key]) ? nbStruct[key] : null;
+    if(!struct && !flat.length) continue;
+    if(!overwrite && NB[key].length) continue;
+
+    const imgs = [];
+    for(const s of flat){
+      try{ const e = await _restoreOnePhoto(s); if(e) imgs.push(e); }
+      catch(err){ console.error('restore blok foto gagal', s && s.url, err); }
     }
-    if(!entries.length) continue;
-    PHOTOS[key] = entries;
-    renderPhotos(key);
-    restored += entries.length;
+
+    const blocks = [];
+    if(struct){
+      let ptr = 0;
+      struct.forEach(sb => {
+        if(sb && sb.type === 'image'){
+          const cnt = Math.max(0, sb.count || 0);
+          const slice = imgs.slice(ptr, ptr + cnt); ptr += cnt;
+          (sb.captions || []).forEach((c,ci) => { if(slice[ci] && !slice[ci].caption) slice[ci].caption = c; });
+          blocks.push({ id:nbUid(), type:'image', photos:slice });
+          restored += slice.length;
+        }else{
+          blocks.push({ id:nbUid(), type:'text', heading:(sb && sb.heading) || '', text:(sb && sb.text) || '' });
+        }
+      });
+      if(ptr < imgs.length){ blocks.push({ id:nbUid(), type:'image', photos:imgs.slice(ptr) }); restored += imgs.length - ptr; }
+    }else if(imgs.length){
+      // no structure available (multi-doc merge) — one image block with all of it
+      blocks.push({ id:nbUid(), type:'image', photos:imgs });
+      restored += imgs.length;
+    }
+    if(blocks.length){ NB[key] = blocks; nbRender(key); }
   }
+
+  // ── K. Attachments (flat gallery, unchanged) ──
+  if(Array.isArray(photoUrls.attachments) && photoUrls.attachments.length && (overwrite || !(PHOTOS.attachments || []).length)){
+    const entries = [];
+    for(const s of photoUrls.attachments){
+      try{ const e = await _restoreOnePhoto(s); if(e) entries.push(e); }
+      catch(err){ console.error('restore attachment foto gagal', s && s.url, err); }
+    }
+    if(entries.length){ PHOTOS.attachments = entries; renderPhotos('attachments'); restored += entries.length; }
+  }
+
+  nbReseedFromMirrorIfEmpty();
+  updateStats();
   return restored;
 }
 window.restorePhotosFromUrls = restorePhotosFromUrls;
@@ -990,7 +1267,10 @@ function persistDraft(silent){
     return;
   }
   let photoErr = null;
-  try{ localStorage.setItem('mca_draft_photos', JSON.stringify(PHOTOS)); }
+  try{
+    localStorage.setItem('mca_draft_photos', JSON.stringify(PHOTOS));
+    localStorage.setItem('mca_draft_blocks', JSON.stringify(nbSerialize()));
+  }
   catch(e){ photoErr = e; }
   if(silent) flashAutosaveIndicator(photoErr);
   else showNote(photoErr
@@ -1009,7 +1289,7 @@ function flashAutosaveIndicator(photoErr){
   clearTimeout(_autosaveFlashTimer);
   _autosaveFlashTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
-function autoSaveNow(){ persistDraft(true); }
+function autoSaveNow(){ nbReseedFromMirrorIfEmpty(); persistDraft(true); }
 let _autoSaveTimer = null;
 function scheduleAutoSave(){
   clearTimeout(_autoSaveTimer);
@@ -1045,6 +1325,12 @@ function loadDraft(){
         PHOTO_KEYS.forEach(k => { if(!PHOTOS[k]) PHOTOS[k] = []; renderPhotos(k); });
       }
     }catch(e){}
+    try{
+      const rawB = localStorage.getItem('mca_draft_blocks');
+      if(rawB) nbDeserialize(JSON.parse(rawB));
+    }catch(e){}
+    nbReseedFromMirrorIfEmpty();
+    NB_KEYS.forEach(k => nbRender(k));
     updateStats();
     showNote('📂 Draft dimuat.', 'info');
   }catch(e){}
@@ -1061,7 +1347,8 @@ function resetForm(){
   switchRcaMethod();
   toggleDetectionOther();
   PHOTO_KEYS.forEach(k => { PHOTOS[k] = []; renderPhotos(k); });
-  try{ localStorage.removeItem('mca_draft'); localStorage.removeItem('mca_draft_photos'); }catch(e){}
+  NB_KEYS.forEach(k => { NB[k] = []; nbRender(k); });
+  try{ localStorage.removeItem('mca_draft'); localStorage.removeItem('mca_draft_photos'); localStorage.removeItem('mca_draft_blocks'); }catch(e){}
   updateStats();
   showNote('🔄 Form direset.', 'info');
 }
@@ -1230,9 +1517,18 @@ async function generatePDF(opts){
   function textBox(text, hint, minH){
     plainTextBox(text, hint);
   }
-  function drawPhotoGrid(key){
-    const photos = PHOTOS[key] || [];
-    if(!photos.length) return;
+  // Strip glyphs jsPDF's built-in Times can't render (smart quotes, dashes...).
+  function san(s){
+    return String(s == null ? '' : s)
+      .replace(/[‘’‚′]/g, "'")
+      .replace(/[“”„″]/g, '"')
+      .replace(/[–—−]/g, '-')
+      .replace(/…/g, '...')
+      .replace(/ /g, ' ')
+      .replace(/[^\x00-\xFF]/g, '');
+  }
+  function drawPhotoList(photos){
+    if(!photos || !photos.length) return;
     const GAP=5, PH_MAX=70, PH_MAX_SOLO=95;
     for(let i=0;i<photos.length;i+=2){
       const pair = photos.slice(i,i+2);
@@ -1249,23 +1545,40 @@ async function generatePDF(opts){
         pdf.setDrawColor(...BORDER); pdf.setLineWidth(0.2); pdf.rect(px+f.dx,rowY,f.w,f.h,'D');
         if(p.caption){
           pdf.setFont('times','italic'); pdf.setFontSize(7); pdf.setTextColor(100,116,139);
-          pdf.text(p.caption, px+PW/2, rowY+rowH+3.5, {align:'center',maxWidth:PW-2});
+          pdf.text(san(p.caption), px+PW/2, rowY+rowH+3.5, {align:'center',maxWidth:PW-2});
         }
       });
       y = rowY + rowH + 8;
     }
   }
-  function narrativeSection(label, textVal, hint, photoKey){
+  function drawPhotoGrid(key){ drawPhotoList(PHOTOS[key] || []); }
+  // Sections E/F/G — render the ordered block list (text boxes + image blocks)
+  // built in the form, so the PDF flows as a narrative report with evidence
+  // in context.
+  function narrativeBlocksSection(label, key, hint){
     sectionHeader(label);
-    textBox(textVal, hint, 24);
-    y += 3;
-    const photos = PHOTOS[photoKey] || [];
-    if(photos.length){
-      checkY(6);
-      pdf.setFont('times','bold'); pdf.setFontSize(8); pdf.setTextColor(...SECTION_NAVY);
-      pdf.text('Evidence Photos ('+photos.length+')', M, y+3); y += 6;
-      drawPhotoGrid(photoKey);
+    const blocks = NB[key] || [];
+    if(!blocks.length){
+      plainTextBox('', hint);
+      y += 4;
+      return;
     }
+    blocks.forEach(b => {
+      if(b.type === 'text'){
+        if(b.heading){
+          checkY(22); // keep heading with the first lines of its text
+          pdf.setFont('times','bold'); pdf.setFontSize(9.2); pdf.setTextColor(...SECTION_NAVY);
+          pdf.text(san(b.heading), M, y+4);
+          y += 6.5;
+        }
+        plainTextBox(san(b.text || ''), b.heading ? '' : hint);
+        y += 3;
+      }else{
+        if(!b.photos.length) return;
+        drawPhotoList(b.photos);
+        y += 3;
+      }
+    });
     y += 3;
   }
 
@@ -1315,9 +1628,9 @@ async function generatePDF(opts){
   y = pdf.lastAutoTable.finalY + 5;
 
   // ── E / F / G ── narrative + in-context photos
-  narrativeSection('E. CHRONOLOGY OF EVENT', gv('chronology-text'), 'Time-ordered sequence of what happened, from detection to make-safe.', 'chronology');
-  narrativeSection('F. FINDINGS / INSPECTION RESULTS', gv('findings-text'), 'Physical condition observed, measurements, test results.', 'findings');
-  narrativeSection('G. IMMEDIATE / CORRECTIVE ACTION ALREADY DONE', gv('corrective-text'), 'Actions taken to restore the asset or make it safe.', 'corrective_action');
+  narrativeBlocksSection('E. CHRONOLOGY OF EVENT', 'chronology', 'Time-ordered sequence of what happened, from detection to make-safe.');
+  narrativeBlocksSection('F. FINDINGS / INSPECTION RESULTS', 'findings', 'Physical condition observed, measurements, test results.');
+  narrativeBlocksSection('G. IMMEDIATE / CORRECTIVE ACTION ALREADY DONE', 'corrective_action', 'Actions taken to restore the asset or make it safe.');
 
   // ── H. ROOT CAUSE ANALYSIS ──
   sectionHeader('H. ROOT CAUSE ANALYSIS');
@@ -1490,6 +1803,26 @@ async function submitToDb(){
 
   const base = DB.collectCheckSheetData('mca', MCA_ASSET_TAG, MCA_ASSET_NAME, 'CORRECTIVE');
 
+  // Sections E/F/G are ordered block lists (text + image). Flatten each
+  // section's image-block photos into PHOTOS[key] IN BLOCK ORDER for the
+  // evidence-photo upload, and build a readable row-per-block sheet for the
+  // dashboard detail view.
+  NB_KEYS.forEach(k => { PHOTOS[k] = []; });
+  function nbSheetRows(key){
+    const rows = [];
+    (NB[key] || []).forEach((b,i) => {
+      if(b.type === 'text'){
+        rows.push({ no:String(i+1), desc: b.heading || 'Teks', values:{ Value: b.text || '—' } });
+      }else{
+        b.photos.forEach(p => PHOTOS[key].push(p));
+        const caps = b.photos.map(p => p.caption).filter(Boolean);
+        rows.push({ no:String(i+1), desc:'Foto', values:{ Value: '(' + b.photos.length + ' foto' + (caps.length ? ': ' + caps.join('; ') : '') + ')' } });
+      }
+    });
+    if(!rows.length) rows.push({ no:'', desc:'', values:{ Value:'—' } });
+    return rows;
+  }
+
   base.sheets = {
     info: {title:'A — WO & Asset Identification', columns:['Value'], rows:[
       {no:'1', desc:'WO No.', values:{Value: gv('wo-no')||'—'}},
@@ -1516,9 +1849,9 @@ async function submitToDb(){
       {no:'4', desc:'Force Outage/Shutdown Duration', values:{Value: (gv('outage-hours')||'0')+' jam'}},
     ]},
     team: {title:'D. MAINTENANCE ACTION TEAM', columns:['Nama','Posisi/Role'], rows: collectTeamRows()},
-    chronology: {title:'E. CHRONOLOGY OF EVENT', columns:['Value'], rows:[{no:'', desc:'', values:{Value: gv('chronology-text')||'—'}}]},
-    findings: {title:'F — Findings/Inspection Results', columns:['Value'], rows:[{no:'', desc:'', values:{Value: gv('findings-text')||'—'}}]},
-    corrective: {title:'G — Immediate/Corrective Action', columns:['Value'], rows:[{no:'', desc:'', values:{Value: gv('corrective-text')||'—'}}]},
+    chronology: {title:'E. CHRONOLOGY OF EVENT', columns:['Value'], rows: nbSheetRows('chronology')},
+    findings: {title:'F — Findings/Inspection Results', columns:['Value'], rows: nbSheetRows('findings')},
+    corrective: {title:'G — Immediate/Corrective Action', columns:['Value'], rows: nbSheetRows('corrective_action')},
     rca: {title:'H. ROOT CAUSE ANALYSIS ('+rcaMethodLabel()+')', columns:['Value'], rows: (function(){
       const rows = [{no:'', desc:'Metode RCA', values:{Value: rcaMethodLabel()}}];
       const method = gv('rca-method');
@@ -1538,6 +1871,15 @@ async function submitToDb(){
   if(gv('rca-method')==='fmea'){
     base.sheets.rca_fmea = {title:'H — FMEA Detail', columns:['Failure Mode','Effect','S','Cause','O','Control','D','RPN','Recommended Action'], rows: collectFmeaRows()};
   }
+
+  // E/F/G block structure (text + heading + per-image-block photo count) so a
+  // later revision-restore rebuilds the exact block layout, not a flat dump.
+  base.narrativeBlocks = {};
+  NB_KEYS.forEach(k => {
+    base.narrativeBlocks[k] = (NB[k] || []).map(b => b.type === 'image'
+      ? { type:'image', count:b.photos.length, captions:b.photos.map(p => p.caption || '') }
+      : { type:'text', heading:b.heading || '', text:b.text || '' });
+  });
 
   base.rcaMethod = gv('rca-method');
   base.photoCounts = {};
@@ -1596,6 +1938,7 @@ addRecoRow();
 addPartRow();
 addFmeaRow();
 loadDraft();
+NB_KEYS.forEach(k => nbRender(k));
 switchRcaMethod();
 toggleDetectionOther();
 updateStats();
