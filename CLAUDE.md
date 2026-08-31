@@ -1255,7 +1255,13 @@ the current design — **do not "simplify" these away**:
   the base64→bytes step; omit it and you get the old plain `fetch()`.
   `Review_Approval_Dashboard.html`'s `#file-progress` overlay
   (`showFileProgress`/`updateFileProgress`/`setFileProgressPhase`/`hideFileProgress`) uses this
-  for "Buka PDF Asli" / "Unduh PDF Final" and the approve flow's original-PDF fetch.
+  for "Buka PDF Asli" (opens in a tab via `openRemoteFile()`) and the approve flow's original-PDF
+  fetch. **PDF *downloads* ("Unduh PDF Asli" / "Unduh PDF Final") go through `downloadRemoteFile(url,
+  filename)`** — `Storage.toObjectUrl()` then a synthetic `<a download>` click — with a **uniform
+  filename from `pdfDownloadName(a, cs, suffix)`: `"<YYYYMMDD> <WO> <Report name>[ suffix].pdf"`**
+  (date from `cs.executionDate` → `a._date` → `createdAt`; WO from `cs.woNumber`/`a._wo`; name from
+  `assetName`/`assetTag`; filesystem-unsafe chars → `-`; `'FINAL'` suffix for the approved PDF).
+  The detail view shows the computed name above the buttons.
   `deleteByUrl(url)` is best-effort, dev/test cleanup only. **`DRIVE_PROXY_URL`**
   at the top of this file is the one deployment-specific value — must match whatever Web App
   URL `drive-proxy.gs` is actually deployed at (ends in `/exec`); if it still contains the

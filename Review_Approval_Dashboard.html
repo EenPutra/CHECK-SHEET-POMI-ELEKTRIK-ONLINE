@@ -2203,9 +2203,12 @@ function renderDetail(a, cs){
       <div class="info-cell"><div class="k">Team / Area (PIC)</div><div class="v">${a._team ? escHtml(a._team)+' · '+escHtml(a._area||'?') : '<span style="color:var(--txt-3);font-weight:500">Team submitter tidak tercatat</span>'}${a._src?` <span style="color:var(--ind);font-weight:600">· via ${escHtml(a._src)}</span>`:''}</div></div>
     </div></div>`;
 
-  html += `<div class="dsec"><div class="dsec-title">Dokumen</div><div class="file-links">
-    ${cs?.pdfUrl ? `<button class="btn btn-sm" onclick="openRemoteFile('${cs.pdfUrl}')">&#128196; Buka PDF Asli</button>` : '<span class="readonly-hint">PDF asli belum tersedia (upload mungkin gagal/belum selesai).</span>'}
-    ${a.finalPdfUrl ? `<button class="btn btn-sm btn-ok" onclick="openRemoteFile('${a.finalPdfUrl}')">&#9989; Unduh PDF Final (Approved)</button>` : ''}
+  html += `<div class="dsec"><div class="dsec-title">Dokumen</div>
+    <div class="readonly-hint" style="margin-bottom:6px">Nama file unduhan: <code>${escHtml(pdfDownloadName(a, cs, ''))}</code></div>
+    <div class="file-links">
+    ${cs?.pdfUrl ? `<button class="btn btn-sm" onclick="openRemoteFile('${cs.pdfUrl}')">&#128196; Buka PDF Asli</button>
+      <button class="btn btn-sm" onclick="downloadCurrentPdf('orig')">&#11015;&#65039; Unduh PDF Asli</button>` : '<span class="readonly-hint">PDF asli belum tersedia (upload mungkin gagal/belum selesai).</span>'}
+    ${a.finalPdfUrl ? `<button class="btn btn-sm btn-ok" onclick="downloadCurrentPdf('final')">&#9989; Unduh PDF Final (Approved)</button>` : ''}
   </div></div>`;
 
   const photoUrls = cs?.photoUrls || {};
@@ -2420,6 +2423,42 @@ function openRemoteFile(url){
     if(win) win.document.body.innerHTML = 'Gagal memuat file: '+escHtml(e.message);
     else alert('Gagal memuat file: '+e.message);
   });
+}
+
+// Uniform downloaded-PDF filename: "<YYYYMMDD> <WO> <Report name>[ suffix].pdf"
+function pdfDownloadName(a, cs, suffix){
+  a = a || _curApproval || {};
+  cs = cs || _curChecksheet || {};
+  const rawDate = ((cs.executionDate || a._date || '').trim()) || String(a.createdAt || '').slice(0, 10);
+  const ymd = (rawDate.replace(/[^0-9]/g, '').slice(0, 8)) || 'TanpaTanggal';
+  const clean = s => String(s || '').replace(/[\\/:*?"<>|\r\n\t]+/g, '-').replace(/\s+/g, ' ').trim();
+  const wo   = clean(cs.woNumber || a._wo) || 'TanpaWO';
+  const name = clean(cs.assetName || a.assetName || cs.assetTag || a.assetTag) || 'Laporan';
+  return `${ymd} ${wo} ${name}${suffix ? ' ' + suffix : ''}.pdf`;
+}
+// Fetch a drive-proxy PDF and save it with a real filename (not open in a tab).
+function downloadRemoteFile(url, filename){
+  showFileProgress('Menyiapkan unduhan…');
+  Storage.toObjectUrl(url, updateFileProgress).then(objUrl => {
+    finishFileProgress();
+    const el = document.createElement('a');
+    el.href = objUrl;
+    el.download = filename || 'document.pdf';
+    document.body.appendChild(el);
+    el.click();
+    setTimeout(() => { try { URL.revokeObjectURL(objUrl); } catch (e) {} el.remove(); }, 30000);
+  }).catch(e => { hideFileProgress(); alert('Gagal mengunduh file: ' + e.message); });
+}
+function downloadCurrentPdf(which){
+  const a = _curApproval, cs = _curChecksheet;
+  if(!a){ return; }
+  if(which === 'final'){
+    if(!a.finalPdfUrl){ alert('PDF final belum tersedia.'); return; }
+    downloadRemoteFile(a.finalPdfUrl, pdfDownloadName(a, cs, 'FINAL'));
+  }else{
+    if(!cs || !cs.pdfUrl){ alert('PDF asli belum tersedia.'); return; }
+    downloadRemoteFile(cs.pdfUrl, pdfDownloadName(a, cs, ''));
+  }
 }
 
 function renderActionSection(a, cs){
