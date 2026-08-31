@@ -215,22 +215,48 @@
     _resizeT = setTimeout(() => { if (_lastPdf) _renderAllPages(_lastPdf); }, 300);
   });
 
+  // Trigger a real file download from a built jsPDF object WITHOUT relying on
+  // jsPDF's own pdf.save() (which we've monkey-patched) or on having captured
+  // its original — pdf.output('blob') + a synthetic <a download> click is
+  // exactly what jsPDF.save() does internally, and it can't recurse into our
+  // hook. Falls back to the captured original, then to a last-resort save().
+  function _forceDownload(pdf, name) {
+    name = name || 'document.pdf';
+    try {
+      const blob = pdf.output('blob');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = name; a.rel = 'noopener';
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} try { a.remove(); } catch (e) {} }, 6000);
+      return true;
+    } catch (e) {
+      console.error('PdfPreview: unduh via blob gagal', e);
+      try {
+        if (typeof PdfPreview._realSave === 'function') {
+          _bypass = true;
+          try { PdfPreview._realSave.call(pdf, name); } finally { _bypass = false; }
+          return true;
+        }
+      } catch (e2) { console.error('PdfPreview: fallback save gagal', e2); }
+      return false;
+    }
+  }
+
   function _close(which) {
     _renderToken++; // cancel any in-flight render
     _lastPdf = null; clearTimeout(_resizeT);
     document.getElementById('pdfprev-overlay').classList.remove('show');
     const wrap = document.getElementById('pdfprev-pages');
     if (wrap) wrap.innerHTML = '<div class="pdfprev-loading">Memuat preview…</div>';
-    try { if (_blobUrl) URL.revokeObjectURL(_blobUrl); } catch (e) {}
 
     if (_mode === 'download') {
       const ps = _pendingSave; _pendingSave = null;
-      if (which === 'primary' && ps) {
-        _bypass = true;
-        try { PdfPreview._realSave.call(ps.pdf, ps.name); }
-        finally { _bypass = false; }
-      }
+      if (which === 'primary' && ps) _forceDownload(ps.pdf, ps.name);
     }
+    try { if (_blobUrl) URL.revokeObjectURL(_blobUrl); } catch (e) {}
     _blobUrl = null;
     if (_resolve) { const r = _resolve; _resolve = null; r(which); }
   }
@@ -240,10 +266,20 @@
     if (window.__pdfPreviewOwn) return false;
     const jspdf = window.jspdf && window.jspdf.jsPDF;
     if (!jspdf || !jspdf.API) return false;
-    if (PdfPreview._realSave) return true;
-    PdfPreview._realSave = jspdf.API.save;
+    if (PdfPreview._installed) return true;
+    // Only capture a genuine original (not a re-hook of our own wrapper, not
+    // undefined on a jsPDF build that puts save elsewhere) — but hook anyway so
+    // pdf.save() always previews; _forceDownload() no longer needs _realSave.
+    if (typeof jspdf.API.save === 'function' && String(jspdf.API.save).indexOf('/*pdfprev*/') === -1) {
+      PdfPreview._realSave = jspdf.API.save;
+    }
+    PdfPreview._installed = true;
     jspdf.API.save = function (name) {
-      if (_bypass) return PdfPreview._realSave.call(this, name);
+      /*pdfprev*/
+      if (_bypass) {
+        if (typeof PdfPreview._realSave === 'function') return PdfPreview._realSave.call(this, name);
+        return _forceDownload(this, name);
+      }
       const self = this;
       _mode = 'download';
       _pendingSave = { pdf: self, name: name || 'document.pdf' };
@@ -272,7 +308,8 @@
   window.PdfPreview = {
     installSaveHook, confirm, _close,
     _realSave: null,
-    download(pdf, name) { _bypass = true; try { (PdfPreview._realSave || pdf.save).call(pdf, name); } finally { _bypass = false; } },
+    _installed: false,
+    download(pdf, name) { return _forceDownload(pdf, name); },
   };
 
   if (!installSaveHook()) {

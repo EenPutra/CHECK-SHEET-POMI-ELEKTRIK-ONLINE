@@ -1883,12 +1883,33 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260830a`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20260831a`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a
 check sheet's `submitToDb()`, so a stale `submit-guard.js` / `approval-helper.js` there
 would silently fall back to the old behavior.
+
+## `pdf-preview.js` — the shared "preview before it goes anywhere" modal
+
+Self-injecting like `submit-guard.js`. Monkey-patches `window.jspdf.jsPDF.API.save` so every
+check sheet's "Download PDF" button opens a full-document preview (pdf.js → stacked `<canvas>`,
+all pages, mobile-safe) first; `SubmitGuard.resolveSubmitTarget(wo, pdfBuilder)` calls
+`PdfPreview.confirm()` for the same preview on the submit path.
+
+- **"Unduh PDF" does NOT go through `pdf.save()` / a captured original.** An earlier version
+  captured `jsPDF.API.save` into `_realSave` at hook time and called it on the primary button —
+  but on the jsPDF 2.5.1 UMD build `jsPDF.API.save` isn't reliably a plain function on `API` at
+  that instant, so `_realSave` ended up `undefined` and clicking "Unduh PDF" threw
+  `Cannot read properties of undefined (reading 'call')` — the preview looked fine, the download
+  never happened. Fixed with `_forceDownload(pdf, name)`: `pdf.output('blob')` →
+  `URL.createObjectURL` → a synthetic hidden `<a download>` click (exactly what jsPDF.save does
+  internally, minus the fragile prototype dependency, and it can't recurse into the hook).
+  `_realSave` is now only a best-effort fallback if `output('blob')` itself throws.
+  `PdfPreview.download()` and the `_bypass` branch both route through `_forceDownload` too.
+  `_installed` (not `_realSave`) is the "hook already applied" guard now.
+- Verified headless (CDP `Browser.setDownloadBehavior` + `downloadWillBegin`/`downloadProgress`):
+  clicking "Unduh PDF" writes a valid multi-page `MCA_*.pdf` to disk.
 
 ## Technician login on check sheets — auto-filling "Checked By" (`technician-auth.js`)
 
@@ -2105,17 +2126,20 @@ bold heading + `drawRichBlock()` (see below), an image block is `drawPhotoList(b
   → `compressUnder1MB` → the entry's `src`/`dataUrl`/`w`/`h` are replaced — same destructive
   model as the existing rotate/crop tools (no separate annotation layer stored, so drafts /
   Firestore / the PDF need no new fields).
-- **Text tool is a drawn box with inline formatting** (user request: "kita membuat box dimana
-  nanti didalamnya kita bisa isi text dan bisa di ganti juga text font sizenya, bold, italic
-  juga"). Drag to draw the box → an absolutely-positioned `#annot-te` `<textarea>` overlay opens
-  over it on the canvas → type (word-wraps to the box width) → blur / Esc / Ctrl+Enter commits;
-  empty text discards the box. Double-click a text mark-up with "Pilih" to re-edit. Toolbar
-  `#annot-fmt` group (font-size `<select>` `FONT_SIZES`, B, I, L/C/R align) edits the selected
-  text mark-up live, or sets `S.txt` defaults for the next one; the colour swatches also retint a
-  selected text mark-up. `drawAnn()`'s text branch wraps + aligns within the box on a translucent
-  white backing; it's skipped for the mark-up currently being edited (the overlay shows it
-  instead). A new shape/colour would extend `AnnotEditor`'s `COLORS`/`WIDTHS`/`FONT_SIZES`/
-  `drawAnn()`, not a per-file change.
+- **Text tool is a fixed-size drawn box, MS-Word style** (user: "kita membuat box dimana ...
+  text tidak akan melebihi kotak tersebut seperti layaknya add text box pada ms word"). Drag to
+  draw the box (a bare click gives a sensible default ~42%-width × 3-line box) → a
+  `position:absolute` `#annot-te` `<textarea>` overlay opens over it at the box's exact size →
+  type (word-wraps to the box width) → blur / Esc / Ctrl+Enter commits; empty text discards the
+  box. The box **never grows to fit the text** — `fitFontPx()` shrinks the effective font down
+  (to a ~7px floor) until the wrapped text fits the box's width AND height, and `drawAnn()`
+  `ctx.clip()`s to the box, so text is always contained (the toolbar font-size is the *maximum*,
+  not a fixed size). Resize any mark-up (not just text) from the blue BR-corner handle shown when
+  it's selected with "Pilih" — `overHandle()` / `S.resize`; text re-fits to the new box live.
+  Double-click a text mark-up to re-edit. Toolbar `#annot-fmt` group (font-size `<select>`
+  `FONT_SIZES`, B, I, L/C/R align) edits the selected text mark-up live, or sets `S.txt` defaults
+  for the next one; colour swatches also retint a selected text mark-up. A new shape/colour would
+  extend `AnnotEditor`'s `COLORS`/`WIDTHS`/`FONT_SIZES`/`drawAnn()`, not a per-file change.
 Section K (Attachments/Evidence Log) stays a single flat general-purpose PhotoKit gallery
 (`PHOTOS.attachments`) for anything not tied to an E/F/G block.
 

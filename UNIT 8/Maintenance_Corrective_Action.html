@@ -8,17 +8,17 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="../firebase-config.js?v=20260830c"></script>
-<script src="../db-helper.js?v=20260830c"></script>
-<script src="../storage-helper.js?v=20260830c"></script>
-<script src="../approval-helper.js?v=20260830c"></script>
-<script src="../submit-guard.js?v=20260830c"></script>
-<script src="../pdf-preview.js?v=20260830e"></script>
-<script src="../load-merge-modal.js?v=20260830c"></script>
-<script src="../auth-session.js?v=20260830c"></script>
-<script src="../technician-auth.js?v=20260830c"></script>
-<script src="../img-helper.js?v=20260830c"></script>
-<script src="../photo-kit.js?v=20260830c"></script>
+<script src="../firebase-config.js?v=20260831a"></script>
+<script src="../db-helper.js?v=20260831a"></script>
+<script src="../storage-helper.js?v=20260831a"></script>
+<script src="../approval-helper.js?v=20260831a"></script>
+<script src="../submit-guard.js?v=20260831a"></script>
+<script src="../pdf-preview.js?v=20260831a"></script>
+<script src="../load-merge-modal.js?v=20260831a"></script>
+<script src="../auth-session.js?v=20260831a"></script>
+<script src="../technician-auth.js?v=20260831a"></script>
+<script src="../img-helper.js?v=20260831a"></script>
+<script src="../photo-kit.js?v=20260831a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -1196,7 +1196,9 @@ const AnnotEditor = (function(){
       const i = hit(toImg(e));
       if(i >= 0 && S.anns[i].type === 'text'){ S.sel = i; S.tool = 'select'; syncUI(); openEditor(i); }
     });
-    te.addEventListener('input', () => autoGrow());
+    te.addEventListener('input', () => {
+      if(S && S.editing >= 0 && S.anns[S.editing]){ S.anns[S.editing].text = te.value; styleEditor(S.anns[S.editing]); }
+    });
     te.addEventListener('blur', () => commitEditor());
     te.addEventListener('keydown', e => {
       if(e.key === 'Escape'){ e.preventDefault(); commitEditor(); }
@@ -1234,8 +1236,25 @@ const AnnotEditor = (function(){
   function bbox(a){
     return { x1: Math.min(a.x1,a.x2), x2: Math.max(a.x1,a.x2), y1: Math.min(a.y1,a.y2), y2: Math.max(a.y1,a.y2) };
   }
-  function fontStr(a, sc){
-    return (a.bold ? '700 ' : '400 ') + (a.italic ? 'italic ' : '') + ((a.size || 20) * sc) + 'px Manrope, Arial, sans-serif';
+  function fontStrPx(a, px){
+    return (a.bold ? '700 ' : '400 ') + (a.italic ? 'italic ' : '') + px + 'px Manrope, Arial, sans-serif';
+  }
+  // MS-Word-style "shrink text on overflow": largest px <= a.size*sc that fits
+  // the fixed box (width AND height). Never grows past the chosen size.
+  function fitFontPx(c, a, sc, textOverride){
+    const b = bbox(a);
+    const boxW = Math.max((b.x2 - b.x1) * sc - 8, 8);
+    const boxH = Math.max((b.y2 - b.y1) * sc - 6, 8);
+    const text = textOverride != null ? textOverride : (a.text || '');
+    let px = (a.size || 20) * sc;
+    const minPx = Math.max(6, 7 * sc);
+    while(px > minPx){
+      c.font = fontStrPx(a, px);
+      const lines = wrapLines(c, text, boxW);
+      if(lines.length * px * 1.28 <= boxH) break;
+      px -= Math.max(0.5, px * 0.07);
+    }
+    return px;
   }
   function wrapLines(c, text, maxW){
     const out = [];
@@ -1271,11 +1290,24 @@ const AnnotEditor = (function(){
     return Math.hypot(p.x - (a.x1 + t*dx), p.y - (a.y1 + t*dy));
   }
 
+  // distance (image units) to the bottom-right resize handle of a normalised box
+  function overHandle(p, a){
+    if(a.type === 'arrow') return false;
+    const b = bbox(a);
+    return Math.hypot(p.x - b.x2, p.y - b.y2) < 13 / S.scale;
+  }
   function pDown(e){
     if(S.editing >= 0){ commitEditor(); return; }
     cv.setPointerCapture && cv.setPointerCapture(e.pointerId);
     const p = toImg(e);
     if(S.tool === 'select'){
+      // resize the already-selected mark-up from its BR corner
+      if(S.sel >= 0 && S.anns[S.sel] && overHandle(p, S.anns[S.sel])){
+        const a = S.anns[S.sel], b = bbox(a);
+        a.x1 = b.x1; a.y1 = b.y1; a.x2 = b.x2; a.y2 = b.y2; // normalise so x2/y2 are the far corner
+        S.resize = { p };
+        return;
+      }
       const i = hit(p);
       S.sel = i;
       if(i >= 0) S.drag = { p, orig: JSON.parse(JSON.stringify(S.anns[i])) };
@@ -1291,22 +1323,39 @@ const AnnotEditor = (function(){
   function pMove(e){
     if(!S) return;
     const p = toImg(e);
+    if(S.resize && S.sel >= 0){
+      const a = S.anns[S.sel];
+      a.x2 = Math.max(p.x, a.x1 + 12 / S.scale);
+      a.y2 = Math.max(p.y, a.y1 + 12 / S.scale);
+      render();
+      return;
+    }
     if(S.drag && S.sel >= 0){
       const a = S.anns[S.sel], o = S.drag.orig, dx = p.x - S.drag.p.x, dy = p.y - S.drag.p.y;
       a.x1 = o.x1 + dx; a.y1 = o.y1 + dy; a.x2 = o.x2 + dx; a.y2 = o.y2 + dy;
       render();
       return;
     }
-    if(S.new){ S.new.x2 = p.x; S.new.y2 = p.y; render(); }
+    if(S.new){
+      S.new.x2 = p.x; S.new.y2 = p.y; render();
+      return;
+    }
+    // hover cursor over the resize handle
+    if(S.tool === 'select' && S.sel >= 0 && S.anns[S.sel]){
+      cv.style.cursor = overHandle(p, S.anns[S.sel]) ? 'nwse-resize' : 'default';
+    }
   }
   function pUp(){
-    if(!S || !S.new){ if(S) S.drag = null; return; }
+    if(!S){ return; }
+    if(S.resize){ S.resize = null; S.drag = null; render(); return; }
+    if(!S.new){ S.drag = null; return; }
     const n = S.new; S.new = null;
     if(n.type === 'text'){
       const b = bbox(n);
-      if(b.x2 - b.x1 < 40){ n.x1 = b.x1; n.x2 = b.x1 + Math.min(260, S.natW * 0.5); }
-      else { n.x1 = b.x1; n.x2 = b.x2; }
-      n.y1 = b.y1; n.y2 = Math.max(b.y2, b.y1 + n.size * 1.4);
+      let w = b.x2 - b.x1, h = b.y2 - b.y1;
+      if(w < 40) w = Math.min(320, S.natW * 0.42);   // click (not drag) -> sensible default box
+      if(h < 28) h = n.size * 3.2;                    // ~3 lines tall
+      n.x1 = b.x1; n.y1 = b.y1; n.x2 = b.x1 + w; n.y2 = b.y1 + h;
       S.anns.push(n);
       S.sel = S.anns.length - 1;
       render();
@@ -1319,17 +1368,18 @@ const AnnotEditor = (function(){
     S.drag = null;
   }
 
-  // ── inline text-box editor overlay ──
+  // ── inline text-box editor overlay — a FIXED-size box (the one you dragged);
+  //    text wraps to the width and the font auto-shrinks so it never spills
+  //    outside, exactly like an MS Word text box. Resize it with the corner
+  //    handle after selecting it. ──
   function styleEditor(a){
     te.style.fontWeight = a.bold ? '700' : '400';
     te.style.fontStyle = a.italic ? 'italic' : 'normal';
-    te.style.fontSize = ((a.size || 20) * S.scale) + 'px';
     te.style.color = a.color;
     te.style.textAlign = a.align || 'left';
-  }
-  function autoGrow(){
-    te.style.height = 'auto';
-    te.style.height = Math.max(24, te.scrollHeight) + 'px';
+    te.style.lineHeight = '1.28';
+    const px = fitFontPx(cv.getContext('2d'), a, S.scale, te.value);
+    te.style.fontSize = px + 'px';
   }
   function openEditor(idx){
     const a = S.anns[idx];
@@ -1338,13 +1388,15 @@ const AnnotEditor = (function(){
     const b = bbox(a);
     te.style.left = (cv.offsetLeft + b.x1 * S.scale) + 'px';
     te.style.top = (cv.offsetTop + b.y1 * S.scale) + 'px';
-    te.style.width = Math.max(60, (b.x2 - b.x1) * S.scale) + 'px';
-    styleEditor(a);
+    te.style.width = Math.max(40, (b.x2 - b.x1) * S.scale) + 'px';
+    te.style.height = Math.max(20, (b.y2 - b.y1) * S.scale) + 'px';
+    te.style.overflow = 'hidden';
     te.value = a.text || '';
+    styleEditor(a);
     te.style.display = 'block';
-    autoGrow();
     te.focus();
     te.select();
+    render();
     syncUI();
   }
   function commitEditor(skipDelete){
@@ -1352,9 +1404,7 @@ const AnnotEditor = (function(){
     const idx = S.editing; S.editing = -1;
     const a = S.anns[idx];
     if(!a){ te.style.display = 'none'; return; }
-    a.text = te.value;
-    const b = bbox(a);
-    a.y1 = b.y1; a.y2 = b.y1 + Math.max(te.scrollHeight / S.scale, a.size * 1.2);
+    a.text = te.value;                    // box size stays exactly as drawn/resized
     te.style.display = 'none';
     if(!skipDelete && !a.text.trim()){ S.anns.splice(idx, 1); S.sel = -1; }
     render();
@@ -1389,29 +1439,38 @@ const AnnotEditor = (function(){
     }else if(a.type === 'text'){
       if(S && S.editing >= 0 && S.anns[S.editing] === a){ c.restore(); return; } // hidden while editing
       const bx = bbox(a);
-      const fs = (a.size || 20) * sc;
-      const bw = Math.max((bx.x2 - bx.x1) * sc, 20);
-      c.font = fontStr(a, sc);
+      const bxl = bx.x1 * sc, bxt = bx.y1 * sc;
+      const bw = Math.max((bx.x2 - bx.x1) * sc, 12);
+      const bh = Math.max((bx.y2 - bx.y1) * sc, 12);
+      const fs = fitFontPx(c, a, sc);           // shrink-to-fit the fixed box
+      c.font = fontStrPx(a, fs);
       c.textBaseline = 'top';
+      c.fillStyle = 'rgba(255,255,255,0.82)';
+      c.fillRect(bxl, bxt, bw, bh);             // box stays the size you drew
+      c.save();
+      c.beginPath(); c.rect(bxl, bxt, bw, bh); c.clip();
+      c.fillStyle = a.color;
       const lines = wrapLines(c, a.text || '', bw - 8);
       const lh = fs * 1.28;
-      const th = lines.length * lh + 6;
-      c.fillStyle = 'rgba(255,255,255,0.82)';
-      c.fillRect(bx.x1 * sc, bx.y1 * sc, bw, th);
-      c.fillStyle = a.color;
       lines.forEach((ln, li) => {
         const lw = c.measureText(ln).width;
-        let lx = bx.x1 * sc + 4;
-        if(a.align === 'center') lx = bx.x1 * sc + (bw - lw) / 2;
-        else if(a.align === 'right') lx = bx.x1 * sc + bw - 4 - lw;
-        c.fillText(ln, lx, bx.y1 * sc + 3 + li * lh);
+        let lx = bxl + 4;
+        if(a.align === 'center') lx = bxl + (bw - lw) / 2;
+        else if(a.align === 'right') lx = bxl + bw - 4 - lw;
+        c.fillText(ln, lx, bxt + 3 + li * lh);
       });
+      c.restore();
     }
     if(selected){
       const b = bbox({x1:x1,y1:y1,x2:x2,y2:y2});
       c.strokeStyle = '#2563eb'; c.setLineDash([5,4]); c.lineWidth = 1.5;
       c.strokeRect(b.x1 - 4, b.y1 - 4, (b.x2 - b.x1) + 8, (b.y2 - b.y1) + 8);
       c.setLineDash([]);
+      if(a.type !== 'arrow'){                   // BR resize handle
+        c.fillStyle = '#2563eb';
+        c.fillRect(b.x2 - 4, b.y2 - 4, 8, 8);
+        c.strokeStyle = '#fff'; c.lineWidth = 1; c.strokeRect(b.x2 - 4, b.y2 - 4, 8, 8);
+      }
     }
     c.restore();
   }
