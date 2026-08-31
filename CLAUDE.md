@@ -2215,12 +2215,23 @@ different wording/colours, re-derive these constants from it again rather than g
   more useful than free text for a 10-column FMEA row. Only 5-Why (whose data really is 5 flat
   Q&A lines) and the shared Root Cause/Contributing Factors fields use the reference's exact
   shaded-box, bold-label-inline-value look.
-- **Section K keeps the PhotoKit gallery** (real embedded photos) rather than reverting to the
+- **Section J is CONCLUSION** — added at the user's request ("tambah kolom conclution setelah
+  Recomendation"), which pushed **Main Parts → K, Attachments → L, Report Authorization → M**
+  (all four section-header strings updated in the HTML *and* the PDF `sectionHeader()` calls,
+  plus the `attachments` `PHOTO_LABELS` constant and the `base.sheets` titles). It's a single
+  `contenteditable` rich-text field (`#conclusion-rte`, generic `rteCmd()`/`rteSize()` helpers —
+  same B/I/U/size/align/colour toolbar as the E/F/G blocks) with a hidden `<textarea
+  id="conclusion">` mirror holding the editor HTML for the draft/`inputValues`/merge-restore
+  path (`onConclusionInput()` syncs on edit, `syncConclusionFromMirror()` pushes HTML back to
+  the editor on load/restore — called from `autoSaveNow()`, `loadDraft()`, and init). PDF:
+  `drawRichBlock(getConclusionHtml(), hint)` (the same rich renderer E/F/G use). `base.sheets.
+  conclusion` stores the plain-text flattening; `base.conclusionHtml` stores the HTML.
+- **Section L (Attachments) keeps the PhotoKit gallery** (real embedded photos) rather than reverting to the
   reference's blank `No./Description/Reference File` text table — that table shape predates the
   photo-gallery decision already made earlier in this project (see the narrative-photo bullet
   above); matching the reference's visual chrome (section bar colour/text) doesn't mean
-  reverting a decision the user already made about K's actual content.
-- **Section L renders the reference's 3-column signature table** (`Prepared By (TECH OP 1/2)` /
+  reverting a decision the user already made about its actual content.
+- **Section M renders the reference's 3-column signature table** (`Prepared By (TECH OP 1/2)` /
   `Verified By (TECH OP 2/3)` / `Approved By (MAINT. SPV)`, each with a tall empty signature cell
   then a Name/Position/Date cell) — built with **`pdf.autoTable`** (a local `authTheme` with
   `cellPadding {top:3,left:3.5,…}` + `minCellHeight` per row), not hand-drawn `pdf.rect()`, after

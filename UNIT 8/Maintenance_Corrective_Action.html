@@ -542,11 +542,47 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   </div>
 </div>
 
-<!-- J: MAIN PARTS / CONSUMABLES / TOOLS -->
+<!-- J: CONCLUSION -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📝</div>
+    <div><div class="sec-hdr-title">J. CONCLUSION</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="rte-toolbar">
+      <button type="button" class="rte-btn" title="Tebal" onclick="rteCmd('conclusion-rte','bold')"><b>B</b></button>
+      <button type="button" class="rte-btn" title="Miring" onclick="rteCmd('conclusion-rte','italic')"><i>I</i></button>
+      <button type="button" class="rte-btn" title="Garis bawah" onclick="rteCmd('conclusion-rte','underline')"><u>U</u></button>
+      <span class="sep"></span>
+      <select class="rte-size" title="Ukuran font" onchange="rteSize('conclusion-rte',this.value)">
+        <option value="2">Kecil</option><option value="3" selected>Normal</option><option value="5">Besar</option><option value="6">Sangat Besar</option>
+      </select>
+      <span class="sep"></span>
+      <button type="button" class="rte-btn" title="Rata kiri" onclick="rteCmd('conclusion-rte','justifyLeft')">&#8676;</button>
+      <button type="button" class="rte-btn" title="Rata tengah" onclick="rteCmd('conclusion-rte','justifyCenter')">&#8677;&#8676;</button>
+      <button type="button" class="rte-btn" title="Rata kanan" onclick="rteCmd('conclusion-rte','justifyRight')">&#8677;</button>
+      <span class="sep"></span>
+      <button type="button" class="rte-sw" style="background:#111827" title="Warna teks" onclick="rteCmd('conclusion-rte','foreColor','#111827')"></button>
+      <button type="button" class="rte-sw" style="background:#e11d48" title="Warna teks" onclick="rteCmd('conclusion-rte','foreColor','#e11d48')"></button>
+      <button type="button" class="rte-sw" style="background:#f97316" title="Warna teks" onclick="rteCmd('conclusion-rte','foreColor','#f97316')"></button>
+      <button type="button" class="rte-sw" style="background:#16a34a" title="Warna teks" onclick="rteCmd('conclusion-rte','foreColor','#16a34a')"></button>
+      <button type="button" class="rte-sw" style="background:#2563eb" title="Warna teks" onclick="rteCmd('conclusion-rte','foreColor','#2563eb')"></button>
+      <span class="sep"></span>
+      <button type="button" class="rte-btn" title="Hapus format" onclick="rteCmd('conclusion-rte','removeFormat')">&#10005;</button>
+    </div>
+    <div class="nb-rte" id="conclusion-rte" contenteditable="true"
+      data-ph="Rangkuman akhir: penyebab kegagalan, tindakan perbaikan yang telah diselesaikan, dan status akhir aset (kembali beroperasi / menunggu part / dll)."
+      oninput="onConclusionInput()" onblur="onConclusionInput()"></div>
+    <textarea id="conclusion" style="display:none" aria-hidden="true"></textarea>
+  </div>
+</div>
+
+<!-- K: MAIN PARTS / CONSUMABLES / TOOLS -->
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">🔧</div>
-    <div><div class="sec-hdr-title">J. MAIN PARTS / CONSUMABLES / TOOLS USED</div></div>
+    <div><div class="sec-hdr-title">K. MAIN PARTS / CONSUMABLES / TOOLS USED</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -564,7 +600,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">📎</div>
-    <div><div class="sec-hdr-title">K. ATTACHMENTS / EVIDENCE LOG</div></div>
+    <div><div class="sec-hdr-title">L. ATTACHMENTS / EVIDENCE LOG</div></div>
     <span class="sec-hdr-cnt" id="photo-cnt-attachments">0 foto</span>
     <span class="sec-hdr-arrow">▼</span>
   </div>
@@ -581,7 +617,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">🖋️</div>
-    <div><div class="sec-hdr-title">L. REPORT AUTHORIZATION</div></div>
+    <div><div class="sec-hdr-title">M. REPORT AUTHORIZATION</div></div>
     <span class="sec-hdr-arrow">▼</span>
   </div>
   <div class="sec-body">
@@ -941,6 +977,46 @@ function nbRteSync(id){
   for(const k of NB_KEYS){
     const b = (NB[k] || []).find(x => x.id === id);
     if(b){ b.text = el.innerHTML; nbSyncMirror(k); scheduleAutoSave(); return; }
+  }
+}
+
+// ── Section J — CONCLUSION (single rich-text field) ──
+// Generic contenteditable command helpers (elId = the editor element's id).
+function rteCmd(elId, cmd, val){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.focus();
+  try{ document.execCommand('styleWithCSS', false, true); }catch(e){}
+  try{ document.execCommand(cmd, false, val || null); }catch(e){}
+  el.dispatchEvent(new Event('input'));
+}
+function rteSize(elId, sz){
+  const el = document.getElementById(elId);
+  if(!el) return;
+  el.focus();
+  try{ document.execCommand('fontSize', false, sz); }catch(e){}
+  el.dispatchEvent(new Event('input'));
+}
+function getConclusionHtml(){
+  const el = document.getElementById('conclusion-rte');
+  return el ? el.innerHTML : (document.getElementById('conclusion') || {}).value || '';
+}
+// The hidden <textarea id="conclusion"> mirror holds the editor HTML, so the
+// generic input sweep in persistDraft()/DB.collectCheckSheetData() and the
+// merge/revision restore carry it for free.
+function onConclusionInput(){
+  const el = document.getElementById('conclusion-rte');
+  const mir = document.getElementById('conclusion');
+  if(el && mir) mir.value = el.innerHTML;
+  scheduleAutoSave();
+}
+function syncConclusionFromMirror(){
+  const el = document.getElementById('conclusion-rte');
+  const mir = document.getElementById('conclusion');
+  if(!el || !mir) return;
+  const elEmpty = !el.textContent.trim() && !/<(img|hr)/i.test(el.innerHTML);
+  if(elEmpty && (mir.value || '').trim()){
+    el.innerHTML = /<[a-z!/][\s\S]*>/i.test(mir.value) ? mir.value : nbEscHtml(mir.value);
   }
 }
 function nbRender(key){
@@ -1605,7 +1681,7 @@ const PHOTO_LABELS = {
   chronology: 'E. CHRONOLOGY OF EVENT',
   findings: 'F. FINDINGS / INSPECTION RESULTS',
   corrective_action: 'G. IMMEDIATE / CORRECTIVE ACTION ALREADY DONE',
-  attachments: 'K. ATTACHMENTS / EVIDENCE LOG',
+  attachments: 'L. ATTACHMENTS / EVIDENCE LOG',
 };
 const PHOTOS = {};
 PHOTO_KEYS.forEach(k => PHOTOS[k] = []);
@@ -1800,7 +1876,7 @@ async function restorePhotosFromUrls(photoUrls, overwrite){
     if(blocks.length){ NB[key] = blocks; nbRender(key); }
   }
 
-  // ── K. Attachments (flat gallery, unchanged) ──
+  // ── L. Attachments (flat gallery, unchanged) ──
   if(Array.isArray(photoUrls.attachments) && photoUrls.attachments.length && (overwrite || !(PHOTOS.attachments || []).length)){
     const entries = [];
     for(const s of photoUrls.attachments){
@@ -1865,7 +1941,7 @@ function flashAutosaveIndicator(photoErr){
   clearTimeout(_autosaveFlashTimer);
   _autosaveFlashTimer = setTimeout(() => el.classList.remove('show'), 2500);
 }
-function autoSaveNow(){ nbReseedFromMirrorIfEmpty(); persistDraft(true); }
+function autoSaveNow(){ nbReseedFromMirrorIfEmpty(); syncConclusionFromMirror(); persistDraft(true); }
 let _autoSaveTimer = null;
 function scheduleAutoSave(){
   clearTimeout(_autoSaveTimer);
@@ -1907,6 +1983,7 @@ function loadDraft(){
     }catch(e){}
     nbReseedFromMirrorIfEmpty();
     NB_KEYS.forEach(k => nbRender(k));
+    syncConclusionFromMirror();
     updateStats();
     showNote('📂 Draft dimuat.', 'info');
   }catch(e){}
@@ -1924,6 +2001,7 @@ function resetForm(){
   toggleDetectionOther();
   PHOTO_KEYS.forEach(k => { PHOTOS[k] = []; renderPhotos(k); });
   NB_KEYS.forEach(k => { NB[k] = []; nbRender(k); });
+  { const cr = document.getElementById('conclusion-rte'); if(cr) cr.innerHTML = ''; const cm = document.getElementById('conclusion'); if(cm) cm.value = ''; }
   try{ localStorage.removeItem('mca_draft'); localStorage.removeItem('mca_draft_photos'); localStorage.removeItem('mca_draft_blocks'); }catch(e){}
   updateStats();
   showNote('🔄 Form direset.', 'info');
@@ -2439,15 +2517,19 @@ async function generatePDF(opts){
     columnStyles:{0:{cellWidth:9},2:{cellWidth:14,halign:'center'},4:{cellWidth:22,halign:'center'}}});
   y = pdf.lastAutoTable.finalY + 5;
 
-  // ── J. MAIN PARTS / CONSUMABLES / TOOLS USED ──
-  sectionHeader('J. MAIN PARTS / CONSUMABLES / TOOLS USED');
+  // ── J. CONCLUSION ──
+  sectionHeader('J. CONCLUSION');
+  drawRichBlock(getConclusionHtml(), 'Rangkuman akhir: penyebab kegagalan, tindakan perbaikan yang telah diselesaikan, dan status akhir aset.');
+
+  // ── K. MAIN PARTS / CONSUMABLES / TOOLS USED ──
+  sectionHeader('K. MAIN PARTS / CONSUMABLES / TOOLS USED');
   const partRowsPdf = collectPartsRows().map(r=>[r.no, r.desc==='—'?'':r.desc, r.values.Category==='—'?'':r.values.Category, r.values['Qty/Unit']==='—'?'':r.values['Qty/Unit'], r.values.Remarks==='—'?'':r.values.Remarks]);
   pdf.autoTable({...kvTheme, startY:y, head:[['No.','Item Description','Category','Qty / Unit','Remarks']], body:partRowsPdf.length?partRowsPdf:[['1','','','','']],
     columnStyles:{0:{cellWidth:9}}});
   y = pdf.lastAutoTable.finalY + 5;
 
-  // ── K. ATTACHMENTS / EVIDENCE LOG ──
-  sectionHeader('K. ATTACHMENTS / EVIDENCE LOG');
+  // ── L. ATTACHMENTS / EVIDENCE LOG ──
+  sectionHeader('L. ATTACHMENTS / EVIDENCE LOG');
   if((PHOTOS.attachments||[]).length){
     drawPhotoGrid('attachments');
   }else{
@@ -2459,8 +2541,8 @@ async function generatePDF(opts){
   }
   y += 4;
 
-  // ── L. REPORT AUTHORIZATION ──
-  sectionHeader('L. REPORT AUTHORIZATION');
+  // ── M. REPORT AUTHORIZATION ──
+  sectionHeader('M. REPORT AUTHORIZATION');
   checkY(58);
   const colW = CW / 3;
   const cols = [
@@ -2585,7 +2667,8 @@ async function submitToDb(){
       return rows;
     })()},
     recommendations: {title:'I — Recommendation Further Action', columns:['Rekomendasi','Type','PIC','Due Date','Status'], rows: collectRecoRows()},
-    parts: {title:'J — Main Parts/Consumables/Tools Used', columns:['Item','Category','Qty/Unit','Remarks'], rows: collectPartsRows()},
+    conclusion: {title:'J — Conclusion', columns:['Value'], rows:[{no:'', desc:'', values:{Value: nbHtmlToPlain(getConclusionHtml()) || '—'}}]},
+    parts: {title:'K — Main Parts/Consumables/Tools Used', columns:['Item','Category','Qty/Unit','Remarks'], rows: collectPartsRows()},
   };
   if(gv('rca-method')==='fmea'){
     base.sheets.rca_fmea = {title:'H — FMEA Detail', columns:['Failure Mode','Effect','S','Cause','O','Control','D','RPN','Recommended Action'], rows: collectFmeaRows()};
@@ -2600,6 +2683,7 @@ async function submitToDb(){
       : { type:'text', heading:b.heading || '', text:b.text || '' });
   });
 
+  base.conclusionHtml = getConclusionHtml();
   base.rcaMethod = gv('rca-method');
   base.photoCounts = {};
   PHOTO_KEYS.forEach(k => { base.photoCounts[k] = (PHOTOS[k]||[]).length; });
@@ -2658,6 +2742,7 @@ addPartRow();
 addFmeaRow();
 loadDraft();
 NB_KEYS.forEach(k => nbRender(k));
+syncConclusionFromMirror();
 switchRcaMethod();
 toggleDetectionOther();
 updateStats();
