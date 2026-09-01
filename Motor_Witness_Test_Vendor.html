@@ -1261,23 +1261,27 @@ function bmDiagramSvg(){
 
 /* ── Bearing clearance check — journal bearing (filler gauge) + pedestal (plastic gauge) ── */
 const BJC_GROUPS = ['1','2','3'];
-const BJC_SUBS = ['A','B','C'];
+// per the client diagram: point 1 & 3 have A–D, point 2 has A–C
+const BJC_SUBS_BY_GROUP = { '1': ['A','B','C','D'], '2': ['A','B','C'], '3': ['A','B','C','D'] };
+const BJC_SUBS = g => BJC_SUBS_BY_GROUP[g] || ['A','B','C'];
+const BJC_ROW_COUNT = BJC_GROUPS.reduce((n, g) => n + BJC_SUBS(g).length, 0);
 const BPC_SUBS = ['A','B'];
 const _clrIn = id => `<td><input type="text" class="ti" id="${id}"></td>`;
 
 function renderBearingClearance(){
   const host = document.getElementById('bjc-tbl'); if (!host) return;
   let body = '';
-  // journal bearing: groups 1/2/3 x A/B/C
+  // journal bearing: point 1 & 3 -> A/B/C/D, point 2 -> A/B/C
   BJC_GROUPS.forEach(g => {
-    BJC_SUBS.forEach((sub, si) => {
+    const subs = BJC_SUBS(g);
+    subs.forEach((sub, si) => {
       body += '<tr>';
-      if (si === 0) body += `<td class="grp" rowspan="3">${g}</td>`;
+      if (si === 0) body += `<td class="grp" rowspan="${subs.length}">${g}</td>`;
       body += `<td>${sub}</td>${_clrIn('bjc-nde-'+g+'-'+sub+'-rv')}${_clrIn('bjc-nde-'+g+'-'+sub+'-fv')}`;
-      if (g === '1' && si === 0) body += `<td class="cmt" rowspan="9"><textarea id="bjc-nde-cmt" placeholder="cth. Good Condition"></textarea></td>`;
-      if (si === 0) body += `<td class="grp" rowspan="3">${g}</td>`;
+      if (g === '1' && si === 0) body += `<td class="cmt" rowspan="${BJC_ROW_COUNT}"><textarea id="bjc-nde-cmt" placeholder="cth. Good Condition"></textarea></td>`;
+      if (si === 0) body += `<td class="grp" rowspan="${subs.length}">${g}</td>`;
       body += `<td>${sub}</td>${_clrIn('bjc-de-'+g+'-'+sub+'-rv')}${_clrIn('bjc-de-'+g+'-'+sub+'-fv')}`;
-      if (g === '1' && si === 0) body += `<td class="cmt" rowspan="9"><textarea id="bjc-de-cmt" placeholder="cth. Good Condition"></textarea></td>`;
+      if (g === '1' && si === 0) body += `<td class="cmt" rowspan="${BJC_ROW_COUNT}"><textarea id="bjc-de-cmt" placeholder="cth. Good Condition"></textarea></td>`;
       body += '</tr>';
     });
   });
@@ -1303,7 +1307,7 @@ function renderBearingClearance(){
 
 function renderBearingMeas(){
   const rec = document.getElementById('bm-received');
-  if (rec) rec.innerHTML = `<div class="bm-diagram">${bmDiagramSvg()}<div class="cap">Kiri: bearing → journal bearing (titik 1/2/3 sepanjang shaft × A/B/C keliling · filler gauge). Kanan: bearing → pedestal / housing (titik 4 · A/B · plastic gauge). B = posisi bawah/terbeban.</div></div>
+  if (rec) rec.innerHTML = `<div class="bm-diagram">${bmDiagramSvg()}<div class="cap">Kiri: bearing → journal bearing (titik 1 &amp; 3 = A–D, titik 2 = A–C · filler gauge). Kanan: bearing → pedestal / housing (titik 4 · A/B · plastic gauge).</div></div>
     <div class="tbl-wrap"><table class="bm-tbl">
       <thead><tr><th style="width:230px;text-align:left">Received Data</th><th>DE / Drive End</th><th>NDE / Non Drive End</th></tr></thead>
       <tbody>${[['sbid','Sleeve Brg inside Diameter (mm)'],['sjd','Shaft Journal Diameter (mm)'],['rsc','Req. standard clearance (mm)'],['l1','L1 (Sleeve length) (mm)']]
@@ -1655,10 +1659,10 @@ function buildMechSheets(){
   out.bearing_recv = { title:'F — Bearing Received Data', columns:['Parameter','DE / Drive End','NDE / Non Drive End'], rows:
     [['sbid','Sleeve Brg inside Diameter (mm)'],['sjd','Shaft Journal Diameter (mm)'],['rsc','Req. standard clearance (mm)'],['l1','L1 (Sleeve length) (mm)']]
       .map(r=>({ no:'', desc:r[1], values:{ Parameter:r[1], 'DE / Drive End': iv('bm-rd-'+r[0]+'-de'), 'NDE / Non Drive End': iv('bm-rd-'+r[0]+'-nde') } })) };
-  // Clearence Check Bearing to Journal Bearing (filler gauge) — 1/2/3 x A/B/C, per end
+  // Clearence Check Bearing to Journal Bearing (filler gauge) — pt 1 & 3: A–D, pt 2: A–C, per end
   const jCols = ['MP','Sub','NDE Recv','NDE Fin','DE Recv','DE Fin'];
   const jRows = [];
-  BJC_GROUPS.forEach(g => BJC_SUBS.forEach(sub => jRows.push({ no:'', desc:g+sub, values:{
+  BJC_GROUPS.forEach(g => BJC_SUBS(g).forEach(sub => jRows.push({ no:'', desc:g+sub, values:{
     MP:g, Sub:sub,
     'NDE Recv': iv('bjc-nde-'+g+'-'+sub+'-rv'), 'NDE Fin': iv('bjc-nde-'+g+'-'+sub+'-fv'),
     'DE Recv': iv('bjc-de-'+g+'-'+sub+'-rv'), 'DE Fin': iv('bjc-de-'+g+'-'+sub+'-fv') } })));
@@ -2057,14 +2061,19 @@ async function generatePDF(selSet, opts){
     const pC = pedestal.rows.find(r=>r.values.MP==='Comments') || {values:{}};
     const grpSty = {fontStyle:'bold', fillColor:[236,242,239], valign:'middle', halign:'center'};
     const cmtSty = {valign:'middle', halign:'center', fontStyle:'bold', textColor:[20,110,50]};
+    // count rows per measurement-point group so a group with A–D spans 4, A–C spans 3
+    const grpCount = {};
+    jRows.forEach(r=>{ grpCount[r.values.MP] = (grpCount[r.values.MP]||0) + 1; });
     const body = [];
+    const seen = {};
     jRows.forEach((r,idx)=>{
-      const first = (idx % 3) === 0;
+      const mp = r.values.MP;
+      const first = !seen[mp]; seen[mp] = true;
       const ln = [];
-      if(first) ln.push({content:r.values.MP, rowSpan:3, styles:grpSty});
+      if(first) ln.push({content:mp, rowSpan:grpCount[mp], styles:grpSty});
       ln.push(sanitize(r.values.Sub), sanitize(r.values['NDE Recv']||'-'), sanitize(r.values['NDE Fin']||'-'));
       if(idx===0) ln.push({content:sanitize(jC.values['NDE Recv']||''), rowSpan:jRows.length, styles:cmtSty});
-      if(first) ln.push({content:r.values.MP, rowSpan:3, styles:grpSty});
+      if(first) ln.push({content:mp, rowSpan:grpCount[mp], styles:grpSty});
       ln.push(sanitize(r.values.Sub), sanitize(r.values['DE Recv']||'-'), sanitize(r.values['DE Fin']||'-'));
       if(idx===0) ln.push({content:sanitize(jC.values['DE Recv']||''), rowSpan:jRows.length, styles:cmtSty});
       body.push(ln);
