@@ -8,17 +8,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20260831a"></script>
-<script src="db-helper.js?v=20260831a"></script>
-<script src="storage-helper.js?v=20260831a"></script>
-<script src="approval-helper.js?v=20260831a"></script>
-<script src="submit-guard.js?v=20260831a"></script>
-<script src="pdf-preview.js?v=20260831a"></script>
-<script src="load-merge-modal.js?v=20260831a"></script>
-<script src="auth-session.js?v=20260831a"></script>
-<script src="technician-auth.js?v=20260831a"></script>
-<script src="img-helper.js?v=20260831a"></script>
-<script src="photo-kit.js?v=20260831a"></script>
+<script src="firebase-config.js?v=20260901a"></script>
+<script src="db-helper.js?v=20260901a"></script>
+<script src="storage-helper.js?v=20260901a"></script>
+<script src="approval-helper.js?v=20260901a"></script>
+<script src="submit-guard.js?v=20260901a"></script>
+<script src="pdf-preview.js?v=20260901a"></script>
+<script src="load-merge-modal.js?v=20260901a"></script>
+<script src="cloud-draft.js?v=20260901a"></script>
+<script src="auth-session.js?v=20260901a"></script>
+<script src="technician-auth.js?v=20260901a"></script>
+<script src="img-helper.js?v=20260901a"></script>
+<script src="photo-kit.js?v=20260901a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -212,7 +213,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <a class="btn-back" href="index.html" title="Back to Portal">&#8592; Portal</a>
 
     <span class="tb-time" id="clock">--:--:--</span>
-    <button class="btn btn-ol btn-sm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn btn-ol btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
+    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">🖨️ Print / PDF</button>
     <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
@@ -450,7 +452,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <!-- ACTION ROW -->
 <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
   <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
-  <button class="btn" style="background:var(--navy);color:#fff" onclick="saveDraft()">💾 Save Draft</button>
+  <button class="btn" style="background:var(--navy);color:#fff" onclick="CloudDraft.save()">💾 Save Draft</button>
+    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
   <button class="btn btn-pdf" onclick="generatePDF()">🖨️ Print / Save PDF</button>
   <button class="btn" style="background:#16a34a;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">&#128202; Submit to Database</button>
 </div>
@@ -926,6 +929,7 @@ LoadMergeModal.init({
 });
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "done-by" });
+CloudDraft.init({ formId:'lcb4', assetTag:'7EP-LC-B4', assetName:'Load Center B4 Switchgear', frequency:'PERIODIC' });
 SubmitGuard.init({ assetTag:'7EP-LC-B4' });
 
 // Auto-load last submission from database
@@ -1052,7 +1056,7 @@ async function submitToDb(){
     console.error('Upload foto/PDF/approval record gagal:', e);
   }
 
-  SubmitGuard.markSubmitted(id,{woNumber:data.woNumber,executionDate:data.executionDate,checkedBy:data.checkedBy});
+  SubmitGuard.markSubmitted(id,{woNumber:data.woNumber,executionDate:data.executionDate,checkedBy:data.checkedBy}); try{ CloudDraft.markSubmitted(); }catch(e){}
   SubmitGuard.setProgress(100,'Selesai!');
   setTimeout(()=>SubmitGuard.hideProgress(),500);
 

@@ -1891,6 +1891,45 @@ file deleted; there is no standalone status page.
   the role's sections). `showApp()` calls `switchTab(_activeTab)` once so the default tab's
   panel visibility is synced on load.
 
+## `cloud-draft.js` — "Simpan ke Database (Lanjut Nanti)" on every check sheet
+
+A check sheet's draft button now ALSO writes the whole form state to the **isolated
+`checksheet_drafts` Firestore collection** — never `checksheets` — so a half-finished report can
+be picked back up on any device, and only "Submit to Database" ever creates a real submission +
+review record. Rolled out to **all 25 portal-linked check sheets** (self-injecting module like
+`submit-guard.js`). Firestore Rules must allow the collection:
+`match /checksheet_drafts/{doc} { allow read, write: if true; }` — the module degrades gracefully
+(localStorage-only + a clear toast) on `permission-denied`.
+
+- **`CloudDraft.save()`** (the "💾 Simpan ke Database" button): runs the host's own
+  `saveDraft()`/`persistDraft()` first (local), then `DB.collectCheckSheetData(formId, tag, name,
+  freq)` for `inputValues` + `toggleStates` (works even on sheets whose `submitToDb()` builds the
+  doc manually), uploads every evidence photo to Drive (`Storage.uploadDataUrl` → progress
+  overlay), and `db.collection('checksheet_drafts').doc(<id>).set({..., status:'draft', savedBy,
+  photoUrls, extra})`. The draft id is kept in `localStorage['cd_<formId>_<tag>']` so re-saving
+  updates the same doc. Photos are auto-detected from `window.PHOTOS` / `window.FILES` when the
+  host doesn't pass an explicit `photos` getter.
+- **`CloudDraft.openResume()`** (the "📥 Lanjutkan Draft" button): lists every `checksheet_drafts`
+  doc for this `formId` (asset tag / WO / date / who saved / when), and on "Lanjutkan" restores
+  via `LoadMergeModal.applyMergedBundleToForm(bundle, true)` (text + toggles) +
+  `window.restorePhotosFromUrls(photoUrls, true)` (photos) + `cfg.applyExtra()` + `cfg.afterRestore()`,
+  then adopts that draft id so continued saves update it.
+- **`CloudDraft.markSubmitted()`** — call it in `submitToDb()` on success (wired into every
+  sheet right after `SubmitGuard.markSubmitted(...)`): deletes the draft doc + clears the
+  localStorage id, so a completed report doesn't linger as a resumable draft.
+- **`CloudDraft.init({ formId, assetTag, assetName, frequency, photos?, collectExtra?, applyExtra?,
+  afterRestore? })`** — one call per file, inserted right after `TechnicianAuth.init(...)` (the
+  single reliable top-level init anchor). `assetTag` is a **getter** for multi-asset sheets
+  (`4000_Hours_Mill_PM`, `DMH`, `Hoist`, `HV_Motor_6Monthly`, `HV_Motor_SWGR`, `LV_Motor_MCC`) —
+  and those getters read the **DOM tag field** (`#tag-search` / `#tag-no` / `#sel-unit`), wrapped
+  in try/catch, NOT a bare JS variable (an early rollout used `()=>tag` and threw a `ReferenceError`
+  at save time because `tag` was only a function parameter). MCA additionally passes `photos`
+  (flatten NB image blocks + `PHOTOS.attachments`), `collectExtra`/`applyExtra` (the
+  `narrativeBlocks` structure — staged into `_cloudNB`, which `_fetchSourceNarrativeBlocks()`
+  checks first), and `afterRestore` (re-render blocks + conclusion + RCA panels).
+- The 3 legacy dups (`esp_checksheet.html`, `4000 Hours Mill/*.html`) are NOT wired, same as
+  submit-guard.
+
 ## Cache-busting shared JS includes (`?v=` suffix)
 
 GitHub Pages serves static assets with `Cache-Control: max-age=600`, so after a shared
@@ -1899,7 +1938,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260831a`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20260901a`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a

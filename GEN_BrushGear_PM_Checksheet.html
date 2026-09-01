@@ -8,17 +8,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20260831a"></script>
-<script src="db-helper.js?v=20260831a"></script>
-<script src="storage-helper.js?v=20260831a"></script>
-<script src="approval-helper.js?v=20260831a"></script>
-<script src="submit-guard.js?v=20260831a"></script>
-<script src="pdf-preview.js?v=20260831a"></script>
-<script src="load-merge-modal.js?v=20260831a"></script>
-<script src="auth-session.js?v=20260831a"></script>
-<script src="technician-auth.js?v=20260831a"></script>
-<script src="img-helper.js?v=20260831a"></script>
-<script src="photo-kit.js?v=20260831a"></script>
+<script src="firebase-config.js?v=20260901a"></script>
+<script src="db-helper.js?v=20260901a"></script>
+<script src="storage-helper.js?v=20260901a"></script>
+<script src="approval-helper.js?v=20260901a"></script>
+<script src="submit-guard.js?v=20260901a"></script>
+<script src="pdf-preview.js?v=20260901a"></script>
+<script src="load-merge-modal.js?v=20260901a"></script>
+<script src="cloud-draft.js?v=20260901a"></script>
+<script src="auth-session.js?v=20260901a"></script>
+<script src="technician-auth.js?v=20260901a"></script>
+<script src="img-helper.js?v=20260901a"></script>
+<script src="photo-kit.js?v=20260901a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -309,7 +310,8 @@ body::before{content:none}
     <a class="btn-back" href="index.html" title="Back to Portal">&#8592; Portal</a>
 
     <span class="tb-clock" id="clock">--:--:--</span>
-    <button class="btn btn-ghost btn-sm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn btn-ghost btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
+    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-db btn-sm" onclick="saveToDatabase()">☁️ Save DB</button>
     <button class="btn btn-amber btn-sm" onclick="generatePDF()">📥 Download PDF</button>
   </div>
@@ -568,7 +570,8 @@ body::before{content:none}
 <!-- ACTION ROW -->
 <div class="action-row">
   <button class="btn" style="background:#f1f5f9;color:var(--ink2);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
-  <button class="btn btn-ghost" style="background:var(--ink2);color:#fff" onclick="saveDraft()">💾 Save Draft</button>
+  <button class="btn btn-ghost" style="background:var(--ink2);color:#fff" onclick="CloudDraft.save()">💾 Save Draft</button>
+    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
   <button class="btn btn-db" onclick="saveToDatabase()">☁️ Save to Database</button>
   <button class="btn btn-amber" onclick="generatePDF()">📥 Download PDF</button>
 </div>
@@ -1143,7 +1146,7 @@ async function saveToDatabase(){
     filesOk=false;
     console.error('Upload foto/PDF/approval record gagal:',e);
   }
-  SubmitGuard.markSubmitted(docId,{woNumber:gv2('wo-no'),executionDate:gv2('wo-date'),checkedBy:gv2('checked-by')});
+  SubmitGuard.markSubmitted(docId,{woNumber:gv2('wo-no'),executionDate:gv2('wo-date'),checkedBy:gv2('checked-by')}); try{ CloudDraft.markSubmitted(); }catch(e){}
   SubmitGuard.setProgress(100,'Selesai!');
   setTimeout(()=>SubmitGuard.hideProgress(),500);
 
@@ -1489,6 +1492,7 @@ updateFileCountLabel();
 LoadMergeModal.init({assetTag:'7TG-GEN-100'});
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "checked-by" });
+CloudDraft.init({ formId:'genbrush', assetTag:'7TG-GEN-100', assetName:'Generator Brush Gear PM', frequency:'PERIODIC' });
 SubmitGuard.init({ assetTag:'7TG-GEN-100', submitFnName:'saveToDatabase' });
 
 // Set default date/time

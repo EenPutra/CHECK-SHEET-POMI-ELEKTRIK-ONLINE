@@ -11,17 +11,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20260831a"></script>
-<script src="db-helper.js?v=20260831a"></script>
-<script src="storage-helper.js?v=20260831a"></script>
-<script src="approval-helper.js?v=20260831a"></script>
-<script src="submit-guard.js?v=20260831a"></script>
-<script src="pdf-preview.js?v=20260831a"></script>
-<script src="load-merge-modal.js?v=20260831a"></script>
-<script src="auth-session.js?v=20260831a"></script>
-<script src="technician-auth.js?v=20260831a"></script>
-<script src="img-helper.js?v=20260831a"></script>
-<script src="photo-kit.js?v=20260831a"></script>
+<script src="firebase-config.js?v=20260901a"></script>
+<script src="db-helper.js?v=20260901a"></script>
+<script src="storage-helper.js?v=20260901a"></script>
+<script src="approval-helper.js?v=20260901a"></script>
+<script src="submit-guard.js?v=20260901a"></script>
+<script src="pdf-preview.js?v=20260901a"></script>
+<script src="load-merge-modal.js?v=20260901a"></script>
+<script src="cloud-draft.js?v=20260901a"></script>
+<script src="auth-session.js?v=20260901a"></script>
+<script src="technician-auth.js?v=20260901a"></script>
+<script src="img-helper.js?v=20260901a"></script>
+<script src="photo-kit.js?v=20260901a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 /* ===== BLUE THEME — light (default) ===== */
@@ -233,7 +234,8 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
     <a class="btn-back" href="index.html">&#8592; Portal</a>
     <span class="clock" id="clock">--:--:--</span><div class="tsep"></div>
     <button class="theme-btn" id="theme-btn" title="Ganti tema (light / dark)" onclick="cycleTheme()">🌙</button>
-    <button class="btn bo bsm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn bo bsm" onclick="CloudDraft.save()">💾 Draft</button>
+    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn br bsm" onclick="openPdfModal()">📥 PDF</button>
     <button class="btn bg bsm" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
@@ -575,7 +577,8 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
   </div>
 
   <div class="action-row" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-top:12px">
-    <button class="btn bo" onclick="saveDraft()">💾 Save Draft</button>
+    <button class="btn bo" onclick="CloudDraft.save()">💾 Save Draft</button>
+    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn bg" style="font-size:15px;padding:10px 22px" onclick="submitToDb()">&#128202; Submit to Database</button>
     <button class="btn bp" onclick="resetForm()">🔄 Reset</button>
     <button class="btn br" onclick="openPdfModal()">📥 Download PDF</button>
@@ -1421,7 +1424,7 @@ async function submitToDb(){
     console.error('submitWithFiles gagal:', e);
     DB.showSubmitResult(false, 'Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah: '+e.message);
   }
-  SubmitGuard.markSubmitted(id, { woNumber: base.woNumber, executionDate: base.executionDate, checkedBy });
+  SubmitGuard.markSubmitted(id, { woNumber: base.woNumber, executionDate: base.executionDate, checkedBy }); try{ CloudDraft.markSubmitted(); }catch(e){}
   // submission is safely in the DB — clear the autosave drafts (local + cloud) so
   // a later reload doesn't offer to restore data that's already been submitted.
   clearTimeout(_cloudTimer); clearTimeout(_autoTimer);
@@ -1820,6 +1823,7 @@ LoadMergeModal.init({ assetTag: MW_TAG });
 LoadMergeModal.initRevisionBanner();
 SubmitGuard.init({ assetTag: MW_TAG });
 TechnicianAuth.init({ checkedByFieldId: 'checked-by' });
+CloudDraft.init({ formId:'mw', assetTag:()=>gv('asset-tag')||MW_TAG, assetName:MW_NAME, frequency:'WITNESS' });
 document.getElementById('asset-tag').addEventListener('change', ()=>{ const t=gv('asset-tag')||MW_TAG; LoadMergeModal.init({ assetTag:t }); SubmitGuard.init({ assetTag:t }); });
 </script>
 </body>

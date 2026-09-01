@@ -8,17 +8,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="../firebase-config.js?v=20260831a"></script>
-<script src="../db-helper.js?v=20260831a"></script>
-<script src="../storage-helper.js?v=20260831a"></script>
-<script src="../approval-helper.js?v=20260831a"></script>
-<script src="../submit-guard.js?v=20260831a"></script>
-<script src="../pdf-preview.js?v=20260831a"></script>
-<script src="../load-merge-modal.js?v=20260831a"></script>
-<script src="../auth-session.js?v=20260831a"></script>
-<script src="../technician-auth.js?v=20260831a"></script>
-<script src="../img-helper.js?v=20260831a"></script>
-<script src="../photo-kit.js?v=20260831a"></script>
+<script src="../firebase-config.js?v=20260901a"></script>
+<script src="../db-helper.js?v=20260901a"></script>
+<script src="../storage-helper.js?v=20260901a"></script>
+<script src="../approval-helper.js?v=20260901a"></script>
+<script src="../submit-guard.js?v=20260901a"></script>
+<script src="../pdf-preview.js?v=20260901a"></script>
+<script src="../load-merge-modal.js?v=20260901a"></script>
+<script src="../cloud-draft.js?v=20260901a"></script>
+<script src="../auth-session.js?v=20260901a"></script>
+<script src="../technician-auth.js?v=20260901a"></script>
+<script src="../img-helper.js?v=20260901a"></script>
+<script src="../photo-kit.js?v=20260901a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -280,7 +281,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <a class="btn-back" href="../index.html" title="Back to Portal">&#8592; Portal</a>
     <span class="autosave-ind" id="autosave-indicator"></span>
     <span class="tb-time" id="clock">--:--:--</span>
-    <button class="btn btn-draft btn-sm" onclick="saveDraft()">💾 Draft</button>
+    <button class="btn btn-draft btn-sm" onclick="CloudDraft.save()">💾 Simpan ke DB</button>
+    <button class="btn btn-sm" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 PDF</button>
     <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
@@ -633,7 +635,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <!-- ACTION ROW -->
 <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
   <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
-  <button class="btn btn-draft" style="background:var(--navy);color:#fff" onclick="saveDraft()">💾 Save Draft</button>
+  <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft dari Database</button>
+  <button class="btn btn-draft" style="background:var(--navy);color:#fff" onclick="CloudDraft.save()">💾 Simpan ke Database (Lanjut Nanti)</button>
   <button class="btn btn-pdf" onclick="generatePDF()">📄 Download PDF</button>
   <button class="btn" style="background:#16a34a;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">&#128202; Submit to Database</button>
 </div>
@@ -1817,7 +1820,9 @@ async function _restoreOnePhoto(src){
 // source checksheet doc's base.narrativeBlocks so restore rebuilds the exact
 // block layout, not just a flat photo dump. Cached — one fetch per session.
 let _srcNarrativeBlocks; // undefined = not fetched, null = none / n/a
+let _cloudNB = null;     // narrativeBlocks structure staged by a cloud-draft resume
 async function _fetchSourceNarrativeBlocks(){
+  if(_cloudNB) return _cloudNB;   // cloud-draft resume
   if(_srcNarrativeBlocks !== undefined) return _srcNarrativeBlocks;
   _srcNarrativeBlocks = null;
   try{
@@ -2729,6 +2734,7 @@ async function submitToDb(){
     showNote('⚠️ Data tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review/approval.', 'err');
   }
   SubmitGuard.markSubmitted(id, {woNumber: base.woNumber, executionDate: base.executionDate, checkedBy});
+  try{ CloudDraft.markSubmitted(); }catch(e){}   // clear the "lanjut nanti" draft — this visit is now a real submission
   SubmitGuard.setProgress(100,'Selesai!');
   setTimeout(()=>SubmitGuard.hideProgress(),500);
 }
@@ -2750,6 +2756,52 @@ LoadMergeModal.init({ assetTag: MCA_ASSET_TAG });
 SubmitGuard.init({ assetTag: MCA_ASSET_TAG });
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: 'checked-by' });
+
+// ── Cloud draft ("Simpan ke Database (Lanjut Nanti)") ──
+function _mcaCollectDraftPhotos(){
+  const out = {};
+  NB_KEYS.forEach(k => {
+    const imgs = [];
+    (NB[k] || []).forEach(b => { if(b.type === 'image') b.photos.forEach(p => imgs.push(p)); });
+    if(imgs.length) out[k] = imgs;
+  });
+  if((PHOTOS.attachments || []).length) out.attachments = PHOTOS.attachments.slice();
+  return out;
+}
+CloudDraft.init({
+  formId: 'mca',
+  assetTag: MCA_ASSET_TAG,
+  assetName: MCA_ASSET_NAME,
+  frequency: 'CORRECTIVE',
+  photos: _mcaCollectDraftPhotos,
+  collectExtra: () => {
+    const nb = {};
+    NB_KEYS.forEach(k => {
+      nb[k] = (NB[k] || []).map(b => b.type === 'image'
+        ? { type:'image', count:b.photos.length, captions:b.photos.map(p => p.caption || '') }
+        : { type:'text', heading:b.heading || '', text:b.text || '' });
+    });
+    return { narrativeBlocks: nb };
+  },
+  applyExtra: (x) => {
+    _cloudNB = (x && x.narrativeBlocks) || null;
+    if(_cloudNB){
+      NB_KEYS.forEach(k => {
+        const arr = _cloudNB[k];
+        NB[k] = Array.isArray(arr) ? arr.map(b => b.type === 'image'
+          ? { id:nbUid(), type:'image', photos:[] }
+          : { id:nbUid(), type:'text', heading:b.heading || '', text:b.text || '' }) : [];
+      });
+      NB_KEYS.forEach(k => nbRender(k));
+    }
+  },
+  afterRestore: () => {
+    switchRcaMethod(); toggleDetectionOther();
+    NB_KEYS.forEach(k => nbRender(k));
+    syncConclusionFromMirror();
+    updateStats();
+  },
+});
 </script>
 </body>
 </html>
