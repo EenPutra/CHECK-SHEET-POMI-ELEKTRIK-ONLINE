@@ -2150,11 +2150,10 @@ async function generatePDF(selSet, opts){
       [{content:'Measurement Point', colSpan:2}, 'Receiving value', 'Finishing value', {content:'Measurement Point', colSpan:2}, 'Receiving value', 'Finishing value'],
     ];
     checkY(24);
-    pdf.autoTable({ ...theme, startY:y, head, body,
+    pdf.autoTable({ ...theme, startY:y, head, body, tableWidth: W - M*2,
       styles:{...theme.styles, halign:'center', valign:'middle', fontSize:7.4, cellPadding:1.3, lineColor:[120,120,120]},
       headStyles:{...theme.headStyles, fillColor:[217,217,217], textColor:[28,28,28], halign:'center', valign:'middle', fontSize:7, lineColor:[120,120,120]},
-      columnStyles:{ 0:{cellWidth:8}, 1:{cellWidth:9}, 2:{cellWidth:19}, 3:{cellWidth:19}, 4:{cellWidth:22},
-                     5:{cellWidth:8}, 6:{cellWidth:9}, 7:{cellWidth:19}, 8:{cellWidth:19}, 9:{cellWidth:22} },
+      columnStyles:{ 0:{cellWidth:9}, 1:{cellWidth:9}, 5:{cellWidth:9}, 6:{cellWidth:9} },
       willDrawPage:()=>ensureBg(),
     });
     y = pdf.lastAutoTable.finalY + 4;
