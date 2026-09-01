@@ -1827,19 +1827,17 @@ async function submitToDb(){
     kv('C.3','Remark Surge', gv('rmk-surge')||'—'), kv('C.4','Hasil Corona (surge)', tv('corona_surge')),
   ]);
   base.sheets.corona_surge = { title:'C — Corona Count During Surge Test', columns:['Voltage','T1-T2 DE','T1-T2 NDE','T2-T3 DE','T2-T3 NDE','T1-T3 DE','T1-T3 NDE'], rows:
-    [0,1,2].map(r=>({ no:'', desc:'', values:{
+    [0,1,2].map(r=>({ no:'', desc:String(r+1), values:{
       Voltage: gv('csv_v'+r)||'—', 'T1-T2 DE': gv('csv_t12de'+r)||'—', 'T1-T2 NDE': gv('csv_t12nde'+r)||'—',
       'T2-T3 DE': gv('csv_t23de'+r)||'—', 'T2-T3 NDE': gv('csv_t23nde'+r)||'—',
-      'T1-T3 DE': gv('csv_t13de'+r)||'—', 'T1-T3 NDE': gv('csv_t13nde'+r)||'—' } }))
-      .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
+      'T1-T3 DE': gv('csv_t13de'+r)||'—', 'T1-T3 NDE': gv('csv_t13nde'+r)||'—' } })) };
 
   Object.assign(base.sheets, buildTdpdSheets());
   base.sheets.corona_td = { title:'D — Corona Count During TD/PD Test', columns:['Voltage','Ph-U DE','Ph-U NDE','Ph-V DE','Ph-V NDE','Ph-W DE','Ph-W NDE','Ph-UVW DE','Ph-UVW NDE'], rows:
-    [0,1,2,3,4].map(r=>({ no:'', desc:'', values:{
+    [0,1,2,3,4].map(r=>({ no:'', desc:String(r+1), values:{
       Voltage: gv('ctd_v'+r)||'—', 'Ph-U DE': gv('ctd_ude'+r)||'—', 'Ph-U NDE': gv('ctd_unde'+r)||'—',
       'Ph-V DE': gv('ctd_vde'+r)||'—', 'Ph-V NDE': gv('ctd_vnde'+r)||'—', 'Ph-W DE': gv('ctd_wde'+r)||'—', 'Ph-W NDE': gv('ctd_wnde'+r)||'—',
-      'Ph-UVW DE': gv('ctd_uvwde'+r)||'—', 'Ph-UVW NDE': gv('ctd_uvwnde'+r)||'—' } }))
-      .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
+      'Ph-UVW DE': gv('ctd_uvwde'+r)||'—', 'Ph-UVW NDE': gv('ctd_uvwnde'+r)||'—' } })) };
 
   Object.assign(base.sheets, buildHipotSheets());
   base.sheets.hipot_mtx = { title:'E — IR/PI Matrix (Hi-Pot)', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('hipot') };
@@ -2314,7 +2312,7 @@ async function generatePDF(selSet, opts){
     secBar('C. Surge Comparison & Corona Test');
     subTitle('Surge Comparison');
     kvGrid(S.surge.rows);
-    if(S.corona_surge.rows.length){ subTitle('Corona Count During Surge Test'); dataTable(S.corona_surge, null); }
+    subTitle('Corona Count During Surge Test'); dataTable(S.corona_surge, 'No');
     sectionAttach('c');
     sectionPhotos('c');
   }
@@ -2324,7 +2322,7 @@ async function generatePDF(selSet, opts){
     kvGrid(S.pd.rows);
     subTitle('Tan Delta');
     kvGrid(S.td.rows);
-    if(S.corona_td.rows.length){ subTitle('Corona Count During TD / PD Test'); dataTable(S.corona_td, null); }
+    subTitle('Corona Count During TD / PD Test'); dataTable(S.corona_td, 'No');
     sectionAttach('d');
     sectionPhotos('d');
   }
@@ -2440,12 +2438,10 @@ function _pdfSnapshot(){
     kv('C.3','Remark', gv('rmk-surge')||'—'), kv('C.4','Hasil Corona', tv('corona_surge')),
   ]);
   S.corona_surge = { title:'C', columns:['Voltage','T1-T2 DE','T1-T2 NDE','T2-T3 DE','T2-T3 NDE','T1-T3 DE','T1-T3 NDE'], rows:
-    [0,1,2].map(r=>({ no:'', desc:'', values:{ Voltage: gv('csv_v'+r)||'—', 'T1-T2 DE':gv('csv_t12de'+r)||'—','T1-T2 NDE':gv('csv_t12nde'+r)||'—','T2-T3 DE':gv('csv_t23de'+r)||'—','T2-T3 NDE':gv('csv_t23nde'+r)||'—','T1-T3 DE':gv('csv_t13de'+r)||'—','T1-T3 NDE':gv('csv_t13nde'+r)||'—' } }))
-      .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
+    [0,1,2].map(r=>({ no:'', desc:String(r+1), values:{ Voltage: gv('csv_v'+r)||'—', 'T1-T2 DE':gv('csv_t12de'+r)||'—','T1-T2 NDE':gv('csv_t12nde'+r)||'—','T2-T3 DE':gv('csv_t23de'+r)||'—','T2-T3 NDE':gv('csv_t23nde'+r)||'—','T1-T3 DE':gv('csv_t13de'+r)||'—','T1-T3 NDE':gv('csv_t13nde'+r)||'—' } })) };
   Object.assign(S, buildTdpdSheets());
   S.corona_td = { title:'D', columns:['Voltage','Ph-U DE','Ph-U NDE','Ph-V DE','Ph-V NDE','Ph-W DE','Ph-W NDE','Ph-UVW DE','Ph-UVW NDE'], rows:
-    [0,1,2,3,4].map(r=>({ no:'', desc:'', values:{ Voltage:gv('ctd_v'+r)||'—','Ph-U DE':gv('ctd_ude'+r)||'—','Ph-U NDE':gv('ctd_unde'+r)||'—','Ph-V DE':gv('ctd_vde'+r)||'—','Ph-V NDE':gv('ctd_vnde'+r)||'—','Ph-W DE':gv('ctd_wde'+r)||'—','Ph-W NDE':gv('ctd_wnde'+r)||'—','Ph-UVW DE':gv('ctd_uvwde'+r)||'—','Ph-UVW NDE':gv('ctd_uvwnde'+r)||'—' } }))
-      .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
+    [0,1,2,3,4].map(r=>({ no:'', desc:String(r+1), values:{ Voltage:gv('ctd_v'+r)||'—','Ph-U DE':gv('ctd_ude'+r)||'—','Ph-U NDE':gv('ctd_unde'+r)||'—','Ph-V DE':gv('ctd_vde'+r)||'—','Ph-V NDE':gv('ctd_vnde'+r)||'—','Ph-W DE':gv('ctd_wde'+r)||'—','Ph-W NDE':gv('ctd_wnde'+r)||'—','Ph-UVW DE':gv('ctd_uvwde'+r)||'—','Ph-UVW NDE':gv('ctd_uvwnde'+r)||'—' } })) };
   Object.assign(S, buildHipotSheets());
   S.hipot_mtx = { title:'E', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('hipot') };
   S.corona_hp = { title:'E', columns:['Leak Current (µA)','Corona Count','Result'], rows:
