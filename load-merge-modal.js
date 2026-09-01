@@ -540,6 +540,10 @@ const LoadMergeModal = (function () {
   return {
     init, open, close, initRevisionBanner, loadRevisionSource,
     getReviseOfApprovalId: () => _reviseOfApprovalId,
+    // Let a host set/clear the revise target itself (not just from ?reviseOf=)
+    // — used by Motor_Witness_Test_Vendor.html when a technician chooses to
+    // overwrite an already-submitted test session as a revision.
+    setReviseOf: (approvalId, checksheetId) => { _reviseOfApprovalId = approvalId || null; if (checksheetId != null) _reviseOfChecksheetId = checksheetId; },
     buildMergedBundle, applyMergedBundleToForm,
     _selectAll, _toggle, _render, _confirm,
   };

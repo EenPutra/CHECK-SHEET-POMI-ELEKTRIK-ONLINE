@@ -197,6 +197,17 @@ table.ct tr:last-child td{border-bottom:none}
 #motor-gate .mg-tt-btn .ic{font-size:26px}
 #motor-gate .mg-tt-btn b{display:block;font-family:var(--raj);letter-spacing:1px;font-size:14px;margin:4px 0 2px}
 #motor-gate .mg-tt-btn .sub{font-size:11px;color:var(--t3)}
+.session-tabs{display:flex;gap:6px;flex-wrap:wrap;padding:2px 2px 10px;align-items:center}
+.session-tab{border:1.5px solid var(--pb);border-radius:8px 8px 0 0;background:var(--field-bg);padding:6px 12px;cursor:pointer;font-family:var(--raj);font-weight:600;font-size:11.5px;letter-spacing:.5px;color:var(--t2);white-space:nowrap}
+.session-tab:hover{background:var(--field-focus-bg);border-color:var(--sl)}
+.session-tab.active{background:var(--panel-solid);border-color:var(--sl);border-bottom-color:var(--panel-solid);color:var(--steel);box-shadow:0 -2px 6px -3px rgba(30,58,99,.3)}
+.session-tab .st-badge{font-size:9px;padding:1px 5px;border-radius:4px;margin-left:5px;font-weight:800}
+.session-tab .st-draft{background:var(--warn);color:#fff}
+.session-tab .st-sub{background:var(--sl);color:#fff}
+.session-tab .st-appr{background:var(--ok);color:#fff}
+#session-banner{background:var(--info-bg);border:1px solid var(--info-bd);color:var(--info-tx);border-radius:8px;padding:9px 14px;margin:0 2px 10px;font-size:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#session-banner b{font-family:var(--raj);letter-spacing:.5px}
+#session-banner button{font-size:11px;padding:4px 10px}
 .pi-out{font-family:var(--mono);font-weight:700;color:var(--steel)}
 .pi-out.bad{color:var(--ng)}
 /* photos */
@@ -275,12 +286,15 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
     </div>
   </div>
 
-  <div style="padding:0 2px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-    <button class="btn bo bsm" onclick="openLoadMerge()">📥 Muat / Lanjutkan dari Database</button>
+  <div style="padding:0 2px 8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <button class="btn bo bsm" onclick="openMotorGate()">⚙️ Ganti Motor / Sesi</button>
+    <span id="motor-chip-top" class="motor-chip" style="display:none"></span>
     <span id="testtype-chip" class="motor-chip" style="display:none"></span>
-    <span style="font-size:11px;color:var(--t3)">Ambil / gabung witness test sebelumnya untuk motor yang sama.</span>
   </div>
+  <div id="session-tabs" class="session-tabs" style="display:none"></div>
+  <div id="session-banner" style="display:none"></div>
   <input type="hidden" id="test-type">
+  <input type="hidden" id="session-id">
 
   <!-- A. WO & MOTOR DATA + INSPEKSI AWAL -->
   <div class="panel open" id="p-a">
@@ -632,6 +646,15 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px">
           <button class="btn bo bsm" type="button" onclick="mgShowPick()">← Kembali</button>
           <button class="btn bg bsm" type="button" style="min-width:160px" onclick="mgSaveMotor()">💾 Simpan &amp; Lanjut</button>
+        </div>
+      </div>
+      <div id="mg-sessions" style="display:none">
+        <div class="subttl" style="margin-top:0">Sesi Test — <span id="mg-ss-motor" style="color:var(--ink)"></span></div>
+        <div class="hint" style="margin:0 0 6px">Lanjutkan / lihat sesi yang sudah tersimpan, atau buat sesi test baru.</div>
+        <div class="mg-list" id="mg-ss-list"><div class="hint">Memuat…</div></div>
+        <div style="display:flex;gap:8px;justify-content:space-between;margin-top:6px">
+          <button class="btn bo bsm" type="button" onclick="mgShowPick()">← Motor lain</button>
+          <button class="btn bg bsm" type="button" style="min-width:150px" onclick="mgNewSession()">➕ Buat Test Baru</button>
         </div>
       </div>
       <div id="mg-testtype" style="display:none">
@@ -1465,6 +1488,19 @@ async function submitToDb(){
   // matrix values by id too (so a revision/merge restore brings them back)
   document.querySelectorAll('.mtx .ti, .ct .ti').forEach(el=>{ if(el.id && el.value) base.inputValues[el.id]=el.value; });
 
+  // Phase 3 — continuing an already-submitted session: choose revisi vs sesi baru
+  let _reviseThis = false;
+  if(_editingSession && _editingSession.checksheetId && _editingSession.approvalId){
+    _reviseThis = confirm(
+      'Sesi test ini sudah tersimpan di database (status: ' +
+      (Approvals.STATUS_LABELS[_editingSession.status] || _editingSession.status) + ').\n\n' +
+      '[  OK  ]  Timpa sebagai REVISI sesi tersebut — data diperbarui, review diulang.\n' +
+      '[Batal] Simpan sebagai SESI TEST BARU — sesi lama tetap utuh sebagai pembanding.');
+    LoadMergeModal.setReviseOf(_reviseThis ? _editingSession.approvalId : null, _reviseThis ? _editingSession.checksheetId : null);
+  } else {
+    LoadMergeModal.setReviseOf(null);
+  }
+
   SubmitGuard.init({ assetTag: base.assetTag });
   const target = await SubmitGuard.resolveSubmitTarget(base.woNumber, () => generatePDF(new Set(currentTestSections()), { silent:true }));
   if(target.mode==='cancel') return;
@@ -1474,6 +1510,8 @@ async function submitToDb(){
     SubmitGuard.setProgress(5,'Menyimpan data checklist...');
     id = target.mode==='overwrite' ? await DB.update(target.targetId, base) : await DB.save(base);
     DB.showSubmitResult(true, 'Data berhasil disimpan! ID: '+id);
+    _editingSession = null;   // this session is now committed
+    try{ LoadMergeModal.setReviseOf(null); }catch(e){}
   }catch(e){
     SubmitGuard.hideProgress();
     DB.showSubmitResult(false, 'Gagal menyimpan: '+e.message);
@@ -1497,6 +1535,12 @@ async function submitToDb(){
     DB.showSubmitResult(false, 'Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah: '+e.message);
   }
   SubmitGuard.markSubmitted(id, { woNumber: base.woNumber, executionDate: base.executionDate, checkedBy }); try{ CloudDraft.markSubmitted(); }catch(e){}
+  // Phase 3 — this session is now saved; refresh the tab bar, clear the "editing" state
+  try{ LoadMergeModal.setReviseOf(null); }catch(e){}
+  _editingSession = null;
+  document.getElementById('session-id').value = id;
+  if(_activeMotor){ mmSessions(_activeMotor.tag).then(ss=>{ _sessions = ss; document.getElementById('session-id').value = id; renderSessionTabs(); }); }
+  renderSessionBanner();
   // submission is safely in the DB — clear the autosave drafts (local + cloud) so
   // a later reload doesn't offer to restore data that's already been submitted.
   clearTimeout(_cloudTimer); clearTimeout(_autoTimer);
@@ -1953,7 +1997,142 @@ function mgChooseTestType(t){
   document.getElementById('motor-gate').style.display = 'none';
   document.body.style.overflow = '';
   document.getElementById('mg-testtype').style.display = 'none';
+  renderSessionTabs();
   note('✅ Jenis test: ' + TEST_LABEL[t].replace(/^\S+\s/, ''), 'ok');
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 3 — SESSIONS (multi-tab) + lanjutkan / test baru + revisi-vs-baru
+   ════════════════════════════════════════════════════════════════════ */
+let _sessions = [];        // {id, _isDraft, testType, executionDate, checkedBy, _status, _approvalId, ...}
+let _editingSession = null; // the loaded session this form is currently working on
+
+const _sd = s => { try { return new Date(s).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: '2-digit' }); } catch (e) { return s || '—'; } };
+const _tabIco = t => (t === 'solorun' ? '▶️' : t === 'electrical' ? '⚡' : '📋');
+
+async function mmSessions(tag){
+  const out = [];
+  try {
+    const subs = await DB.getAll({ assetTag: tag });
+    (subs || []).forEach(d => out.push(Object.assign({ _isDraft: false }, d)));
+  } catch (e) { console.warn('sessions: getAll gagal', e); }
+  try {
+    let drafts = [];
+    if (window.CloudDraft && CloudDraft.listDrafts) drafts = await CloudDraft.listDrafts();
+    (drafts || []).forEach(d => { if (!out.some(o => o.id === d.id)) out.push(Object.assign({ _isDraft: true }, d)); });
+  } catch (e) {}
+  out.sort((a, b) => String(b.updatedAt || b.executionDate || b.createdAt || '').localeCompare(String(a.updatedAt || a.executionDate || a.createdAt || '')));
+  return out;
+}
+
+// pick an existing motor -> go to session list (or straight to test-type if none)
+async function mgOpenMotorSessions(m){
+  applyMotor(m, { keepGate: true, silent: true });
+  document.getElementById('mg-pick').style.display = 'none';
+  document.getElementById('mg-register').style.display = 'none';
+  document.getElementById('mg-testtype').style.display = 'none';
+  document.getElementById('mg-sessions').style.display = '';
+  document.getElementById('mg-ss-motor').textContent = m.tag || '—';
+  const box = document.getElementById('mg-ss-list');
+  box.innerHTML = '<div class="hint">Memuat sesi test…</div>';
+  _sessions = await mmSessions(m.tag);
+  if (!_sessions.length) { mgShowTestType(); return; }   // no history -> new session
+  box.innerHTML = _sessions.map((s, i) => {
+    const st = s._isDraft ? 'Draft' : (s._status ? (Approvals.STATUS_LABELS[s._status] || s._status) : 'Tersimpan');
+    return `<button class="mg-row" type="button" onclick="mgLoadSession(${i})">
+      <span>${_tabIco(s.testType)}</span>
+      <span><b>${_esc((TEST_LABEL[s.testType] || 'Test').replace(/^\S+\s/, ''))} — ${_esc(_sd(s.executionDate || s.updatedAt))}</b>
+      <span class="mg-meta">${_esc(s.checkedBy || s.savedByName || '—')} · ${_esc(st)}${s._isDraft ? '' : ' · WO ' + _esc(s.woNumber || '—')}</span></span></button>`;
+  }).join('');
+}
+async function mgLoadSession(i){ if (_sessions[i]) await loadSession(_sessions[i]); }
+
+function mgNewSession(){
+  clearSessionForm();
+  _editingSession = null;
+  const sid = document.getElementById('session-id'); if (sid) sid.value = '';
+  mgShowTestType();
+}
+function clearSessionForm(){
+  // wipe everything EXCEPT the locked nameplate + the test-plan/vendor bits
+  const keep = new Set(NAMEPLATE.map(x => x[0]).concat(['test-type', 'session-id']));
+  document.querySelectorAll('input,select,textarea').forEach(el => {
+    if (el.type === 'file' || !el.id || keep.has(el.id)) return;
+    if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+  });
+  Object.keys(ST).forEach(k => delete ST[k]);
+  document.querySelectorAll('.rb').forEach(b => b.classList.remove('a'));
+  if (typeof PHOTOS === 'object') Object.keys(PHOTOS).forEach(k => { PHOTOS[k] = []; });
+  if (typeof renderAllPhotos === 'function') renderAllPhotos();
+  upStats(); if (typeof drawAllIRCharts === 'function') drawAllIRCharts();
+}
+
+async function loadSession(s){
+  if (_editingSession && !confirm('Pindah sesi? Perubahan pada sesi ini yang belum di-Simpan/Submit akan ditinggalkan.')) return;
+  document.getElementById('motor-gate').style.display = 'none';
+  document.body.style.overflow = '';
+  clearSessionForm();
+
+  // text fields + toggles
+  const d = { _st: s.toggleStates || {} };
+  Object.entries(s.inputValues || {}).forEach(([k, v]) => { d['f_' + k] = v; });
+  applyDraftData(d);
+  // matrix cells (ids present in inputValues but not matched by DRAFT_SEL sometimes)
+  Object.entries(s.inputValues || {}).forEach(([k, v]) => { const el = document.getElementById(k); if (el && !el.value) el.value = v; });
+
+  applyTestType(s.testType || gv('test-type') || 'electrical');
+  document.getElementById('session-id').value = s.id;
+
+  // photos
+  if (s.photoUrls && typeof window.restorePhotosFromUrls === 'function') {
+    try { await window.restorePhotosFromUrls(s.photoUrls, true); } catch (e) { console.warn('restore foto sesi:', e); }
+  }
+
+  if (s._isDraft) {
+    _editingSession = { draftId: s.id, isDraft: true };
+    if (window.CloudDraft && CloudDraft.adopt) CloudDraft.adopt(s.id, s);
+    note('☁️ Draft sesi dimuat — lanjutkan pengisian.', 'ok');
+  } else {
+    // a submitted session — fetch its approval so a "revisi" submit can target it
+    let ap = null;
+    try { ap = await Approvals.getByChecksheetId(s.id); } catch (e) {}
+    _editingSession = { checksheetId: s.id, approvalId: ap && ap.id, status: (ap && ap.status) || s._status || 'submitted' };
+    note('📋 Sesi test tersimpan dimuat. Saat Submit, Anda bisa pilih: revisi sesi ini atau simpan sesi baru.', 'info');
+  }
+  renderSessionBanner();
+  renderSessionTabs();
+  if (typeof drawAllIRCharts === 'function') drawAllIRCharts();
+}
+
+function renderSessionBanner(){
+  const b = document.getElementById('session-banner');
+  if (!b) return;
+  if (!_editingSession) { b.style.display = 'none'; return; }
+  b.style.display = 'flex';
+  if (_editingSession.isDraft) {
+    b.innerHTML = '☁️ <b>Melanjutkan draft sesi</b> — Simpan / Submit saat siap. <button class="btn bo bsm" type="button" onclick="mgNewSession()">➕ Test baru</button>';
+  } else {
+    b.innerHTML = '📋 <b>Sesi test tersimpan</b> (' + _esc(Approvals.STATUS_LABELS[_editingSession.status] || _editingSession.status) + ') — Submit akan menanyakan: revisi sesi ini atau sesi baru. <button class="btn bo bsm" type="button" onclick="mgNewSession()">➕ Test baru</button>';
+  }
+}
+function renderSessionTabs(){
+  const bar = document.getElementById('session-tabs');
+  if (!bar) return;
+  if (!_activeMotor || !_sessions.length) { bar.style.display = 'none'; return; }
+  const cur = gv('session-id');
+  bar.style.display = 'flex';
+  const tabs = _sessions.map((s, i) => {
+    const bcls = s._isDraft ? 'st-draft' : (s._status === 'approved' ? 'st-appr' : 'st-sub');
+    const blbl = s._isDraft ? 'DRAFT' : (s._status === 'approved' ? 'APPROVED' : 'SUBMIT');
+    return `<button class="session-tab${s.id === cur ? ' active' : ''}" type="button" onclick="mgLoadSession(${i})">${_tabIco(s.testType)} ${_esc(_sd(s.executionDate || s.updatedAt))}<span class="st-badge ${bcls}">${blbl}</span></button>`;
+  }).join('');
+  const newTab = `<button class="session-tab${!cur ? ' active' : ''}" type="button" onclick="mgNewSession()">➕ Sesi Baru</button>`;
+  bar.innerHTML = tabs + newTab;
+}
+// keep the motor chip in the top bar in sync
+function refreshMotorChip(){
+  const c = document.getElementById('motor-chip-top');
+  if (c && _activeMotor) { c.style.display = ''; c.textContent = '⚙️ ' + (_activeMotor.tag || '—'); }
 }
 
 async function mmList(){
@@ -2004,6 +2183,8 @@ function applyMotor(m, opts){
     if (gate) gate.style.display = 'none';
     document.body.style.overflow = '';
   }
+  refreshMotorChip();
+  mmSessions(t).then(ss => { _sessions = ss; renderSessionTabs(); }).catch(() => {});
   if (!opts.silent) note('✅ Motor aktif: ' + (m.tag || '—'), 'ok');
   if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
 }
@@ -2042,12 +2223,8 @@ async function mgShowPick(){
   }
   box.innerHTML = rows;
 }
-// picking an existing motor from the list = start a NEW session for it
-function mgPick(i){
-  if (!_mgList[i]) return;
-  applyMotor(_mgList[i], { keepGate: true, silent: true });
-  mgShowTestType();
-}
+// picking an existing motor -> show its sessions (or new-session flow)
+function mgPick(i){ if (_mgList[i]) mgOpenMotorSessions(_mgList[i]); }
 function mgResumeLocalDraft(){
   // loadDraft() already restored the local draft (fields + #test-type). Lock the
   // nameplate from a matching motor_master; keep the draft's testType if any.
