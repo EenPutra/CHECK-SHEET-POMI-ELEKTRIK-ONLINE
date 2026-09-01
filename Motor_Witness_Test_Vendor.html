@@ -1973,26 +1973,32 @@ async function generatePDF(selSet, opts){
   function checkY(need){ if(y+need > BOT){ pdf.addPage(); y=TOP; ensureBg(); } }
   const theme = {
     startY:0, theme:'grid', margin:{ left:M, right:M, top:TOP, bottom:H-BOT },
-    styles:{ font:'times', fontSize:8.4, cellPadding:1.9, textColor:[26,38,32], lineColor:[190,210,198], lineWidth:.15, overflow:'linebreak' },
-    headStyles:{ font:'times', fillColor:[236,242,239], textColor:[70,110,90], fontStyle:'bold', fontSize:8, halign:'center' },
+    styles:{ font:'helvetica', fontSize:8, cellPadding:1.9, textColor:[19,35,56], lineColor:[183,205,236], lineWidth:.15, overflow:'linebreak' },
+    headStyles:{ font:'helvetica', fillColor:[231,238,250], textColor:[53,103,171], fontStyle:'bold', fontSize:7.6, halign:'center' },
+    alternateRowStyles:{ fillColor:[248,251,255] },
     willDrawPage:()=>ensureBg(),
   };
   // ---- HTML-mirroring layout helpers ----
-  const NAVY=[30,58,99], NAVY2=[53,103,171], LBL_BG=[231,238,250], LBL_TX=[30,58,99];
+  const NAVY=[30,58,99], NAVY2=[53,103,171], LBL_BG=[231,238,250], LBL_TX=[53,103,171];
+  const INK=[19,35,56], MUTE=[106,130,166], LINE=[183,205,236], CRITc=[30,135,75], NAc=[109,75,184];
   const half=(W-M*2)/2;
   function secBar(title){
-    checkY(14);
-    pdf.setFillColor(...NAVY); pdf.rect(M,y,W-M*2,8,'F');
-    pdf.setTextColor(255,255,255); pdf.setFont('times','bold'); pdf.setFontSize(10.5);
-    pdf.text(sanitize(title), M+3.5, y+5.5);
-    y+=11.5;
+    checkY(15);
+    pdf.setFillColor(...LBL_BG); pdf.setDrawColor(...LINE); pdf.setLineWidth(.2);
+    pdf.roundedRect(M,y,W-M*2,9,1.4,1.4,'FD');
+    pdf.setFillColor(...NAVY2); pdf.rect(M,y,1.6,9,'F');
+    pdf.setTextColor(...NAVY); pdf.setFont('helvetica','bold'); pdf.setFontSize(10);
+    pdf.text(sanitize(title).toUpperCase(), M+5, y+6);
+    y+=12.5;
   }
   function subTitle(t){
     checkY(9);
-    pdf.setFont('times','bold'); pdf.setFontSize(8.6); pdf.setTextColor(...NAVY2);
-    pdf.text(sanitize(t).toUpperCase(), M, y+3.2);
-    pdf.setDrawColor(185,205,232); pdf.setLineWidth(.2); pdf.line(M, y+4.5, W-M, y+4.5);
-    y+=7.2;
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(...NAVY2);
+    pdf.text(sanitize(t).toUpperCase(), M, y+3.4);
+    try{ pdf.setLineDashPattern([.8,.7],0); }catch(e){}
+    pdf.setDrawColor(...LINE); pdf.setLineWidth(.25); pdf.line(M, y+4.8, W-M, y+4.8);
+    try{ pdf.setLineDashPattern([],0); }catch(e){}
+    y+=7.4;
   }
   function kvGrid(rows){
     const flat=(rows||[]).filter(r=>r&&r.desc).map(r=>[
@@ -2000,17 +2006,21 @@ async function generatePDF(selSet, opts){
       sanitize(r.values && r.values.Value!==undefined ? r.values.Value : (r.values?Object.values(r.values).join(' / '):''))
     ]);
     if(!flat.length) return;
-    const body=[];
-    for(let i=0;i<flat.length;i+=2){ const a=flat[i], b=flat[i+1]||['','']; body.push([a[0],a[1],b[0],b[1]]); }
-    checkY(Math.min(BOT-TOP, body.length*7+4));
-    pdf.autoTable({ ...theme, startY:y, body,
-      columnStyles:{
-        0:{cellWidth:38, fontStyle:'bold', fillColor:LBL_BG, textColor:LBL_TX},
-        1:{cellWidth:half-38},
-        2:{cellWidth:38, fontStyle:'bold', fillColor:LBL_BG, textColor:LBL_TX},
-        3:{cellWidth:half-38},
-      } });
-    y=pdf.lastAutoTable.finalY+4;
+    const COLS=3, GAP=3, cw=(W-M*2-GAP*(COLS-1))/COLS, fh=9.4;
+    for(let i=0;i<flat.length;i+=COLS){
+      checkY(fh+2);
+      for(let c=0;c<COLS && i+c<flat.length;c++){
+        const [lab,val]=flat[i+c]; const x=M+c*(cw+GAP);
+        pdf.setFont('helvetica','bold'); pdf.setFontSize(5.6); pdf.setTextColor(...MUTE);
+        pdf.text(sanitize(lab).toUpperCase(), x+0.5, y+2.4);
+        pdf.setFillColor(243,247,253); pdf.setDrawColor(...LINE); pdf.setLineWidth(.2);
+        pdf.roundedRect(x, y+3.2, cw, 5.6, 1, 1, 'FD');
+        pdf.setFont('helvetica','normal'); pdf.setFontSize(7.4); pdf.setTextColor(...INK);
+        pdf.text(pdf.splitTextToSize(val||'-', cw-3)[0]||'-', x+1.6, y+7);
+      }
+      y+=fh;
+    }
+    y+=1.5;
   }
   function checkTable(sheet){
     if(!sheet || !sheet.rows.length) return;
@@ -2020,9 +2030,17 @@ async function generatePDF(selSet, opts){
       ...cols.map(c=>sanitize(r.values[c]!==undefined?r.values[c]:'-'))
     ]);
     checkY(18);
-    pdf.autoTable({ ...theme, startY:y, head:[['No','Item','Kriteria',...cols]], body,
-      columnStyles:{0:{cellWidth:8},1:{cellWidth:42},2:{cellWidth:44}},
-      didParseCell:d=>{ const v=d.cell.text[0]; if(v==='OK'){d.cell.styles.textColor=[30,135,75];d.cell.styles.fontStyle='bold';} if(v==='NG'){d.cell.styles.textColor=[192,57,43];d.cell.styles.fontStyle='bold';} if(v==='N/A'){d.cell.styles.textColor=[123,83,156];} } });
+    pdf.autoTable({ ...theme, startY:y, head:[['No','Item','Acceptance Criteria',...cols]], body,
+      styles:{...theme.styles, cellPadding:1.6, fontSize:7.6},
+      columnStyles:{0:{cellWidth:7, halign:'center'},1:{cellWidth:38, fontStyle:'bold', textColor:INK},2:{cellWidth:48, textColor:CRITc, fontSize:7.2},
+        3:{cellWidth: cols.length>1 ? 18 : 22, halign:'center'}},
+      didParseCell:d=>{
+        if(d.section!=='body' || d.column.index<3) return;
+        const v=d.cell.text[0];
+        if(v==='OK'){ d.cell.styles.textColor=CRITc; d.cell.styles.fontStyle='bold'; }
+        else if(v==='NG'){ d.cell.styles.textColor=[192,57,43]; d.cell.styles.fontStyle='bold'; }
+        else if(v==='N/A'||v==='NA'){ d.cell.styles.textColor=NAc; d.cell.styles.fontStyle='bold'; }
+      } });
     y=pdf.lastAutoTable.finalY+4;
   }
   function dataTable(sheet, firstLabel){
@@ -2037,7 +2055,7 @@ async function generatePDF(selSet, opts){
     checkY(16);
     pdf.autoTable({ ...theme, startY:y, head:[head], body,
       headStyles:{...theme.headStyles, fillColor:LBL_BG, textColor:LBL_TX},
-      didParseCell:d=>{ const v=d.cell.text[0]; if(v==='OK'){d.cell.styles.textColor=[30,135,75];} if(v==='NG'){d.cell.styles.textColor=[192,57,43];} } });
+      didParseCell:d=>{ const v=d.cell.text[0]; if(v==='OK'){d.cell.styles.textColor=CRITc;d.cell.styles.fontStyle='bold';} else if(v==='NG'){d.cell.styles.textColor=[192,57,43];d.cell.styles.fontStyle='bold';} else if(v==='N/A'||v==='NA'){d.cell.styles.textColor=NAc;d.cell.styles.fontStyle='bold';} } });
     y=pdf.lastAutoTable.finalY+4;
   }
 
@@ -2056,12 +2074,12 @@ async function generatePDF(selSet, opts){
     pdf.line(cx+d*S71, cy-d*S71, cx-d*S71, cy+d*S71);
     pdf.line(cx, cy-d, cx, cy+d);
     pdf.line(cx-d, cy, cx+d, cy);
-    pdf.setTextColor(90,100,110); pdf.setFont('times','normal'); pdf.setFontSize(5.4);
+    pdf.setTextColor(90,100,110); pdf.setFont('helvetica','normal'); pdf.setFontSize(5.4);
     pdf.text('12 Top', cx, cy-r-1.2, {align:'center'});
     pdf.text('6 Bottom', cx, cy+r+2.6, {align:'center'});
     pdf.text('3', cx+r+1.4, cy+0.8, {align:'center'}); pdf.text('9', cx-r-1.4, cy+0.8, {align:'center'});
     pdf.text('Rotor', cx, cy-r*0.34, {align:'center'});
-    pdf.setTextColor(31,56,100); pdf.setFont('times','bold'); pdf.setFontSize(7.5);
+    pdf.setTextColor(31,56,100); pdf.setFont('helvetica','bold'); pdf.setFontSize(7.5);
     const pr = r*0.82;
     pdf.text('A', cx-pr*S71, cy-pr*S71+1, {align:'center'});
     pdf.text('B', cx+pr*S71, cy-pr*S71+1, {align:'center'});
@@ -2072,7 +2090,7 @@ async function generatePDF(selSet, opts){
       const val = g[lbl];
       pdf.setFillColor(253,233,184); pdf.setDrawColor(224,167,44); pdf.setLineWidth(0.3);
       pdf.roundedRect(px-bw/2, py-bh/2, bw, bh, 1, 1, 'FD');
-      pdf.setTextColor(90,67,0); pdf.setFont('times','bold'); pdf.setFontSize(7.2);
+      pdf.setTextColor(90,67,0); pdf.setFont('helvetica','bold'); pdf.setFontSize(7.2);
       pdf.text(sanitize((val && val!=='-') ? (lbl+': '+val) : lbl), px, py+1.9, {align:'center'});
     };
     box(cx-off*S71, cy-off*S71, 'A');
@@ -2100,9 +2118,9 @@ async function generatePDF(selSet, opts){
   function clrBand(title, sub){
     checkY(9);
     pdf.setFillColor(191,191,191); pdf.rect(M,y,W-M*2,7,'F');
-    pdf.setTextColor(28,28,28); pdf.setFont('times','bold'); pdf.setFontSize(8.4);
+    pdf.setTextColor(28,28,28); pdf.setFont('helvetica','bold'); pdf.setFontSize(8.4);
     pdf.text(sanitize(title), W/2, y+3.1, {align:'center'});
-    pdf.setFont('times','italic'); pdf.setFontSize(6.6);
+    pdf.setFont('helvetica','italic'); pdf.setFontSize(6.6);
     pdf.text(sanitize(sub), W/2, y+5.8, {align:'center'});
     y += 8.5;
   }
@@ -2170,7 +2188,7 @@ async function generatePDF(selSet, opts){
     try{ list=(typeof attachForSave==='function'?attachForSave():[]).filter(a=>(a.sec||'')===sec && a.url); }catch(e){}
     if(!list.length) return;
     subTitle('Report PDF Terlampir');
-    pdf.setFont('times','normal'); pdf.setFontSize(8); pdf.setTextColor(40,40,40);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(40,40,40);
     list.forEach(a=>{ checkY(6); pdf.text(sanitize('- '+(a.name||'file.pdf')+'   ('+(a.size?(a.size/1048576).toFixed(2)+' MB':'-')+')'), M+2, y+3); y+=5; });
     pdf.setFontSize(6.8); pdf.setTextColor(120,120,120);
     pdf.text('File dapat dibuka dari check sheet / dashboard Review & Approval.', M+2, y+2.5); y+=6;
@@ -2188,7 +2206,7 @@ async function generatePDF(selSet, opts){
       g.forEach((p,pi)=>{
         const xo=M+pi*(cw+4);
         try{ PhotoKit.draw(pdf,p,xo,y,cw,MAXH,{align:'center'}); }catch(e){}
-        if(p.caption){ pdf.setFont('times','italic'); pdf.setFontSize(7.4); pdf.setTextColor(110,130,160); pdf.text(sanitize(p.caption).slice(0,70), xo, y+rh+3.4); }
+        if(p.caption){ pdf.setFont('helvetica','italic'); pdf.setFontSize(7.4); pdf.setTextColor(110,130,160); pdf.text(sanitize(p.caption).slice(0,70), xo, y+rh+3.4); }
       });
       y+=rh+7;
     }
@@ -2203,11 +2221,11 @@ async function generatePDF(selSet, opts){
     const logoW = 28, logoH = (logo && logo.w) ? logoW*(logo.h/logo.w) : 12;
     if(logo){ try{ pdf.addImage(logo.url,'PNG',M,y,logoW,logoH); }catch(e){} }
     const tx = M + logoW + 9;
-    pdf.setFont('times','bold'); pdf.setFontSize(13); pdf.setTextColor(...NAVY);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(...NAVY);
     pdf.text('WITNESS PLAN', tx, y+4.5);
-    pdf.setFont('times','bold'); pdf.setFontSize(10.5); pdf.setTextColor(...NAVY2);
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(10.5); pdf.setTextColor(...NAVY2);
     pdf.text('Recondition / Rewinding Motor', tx, y+10.5);
-    pdf.setFont('times','normal'); pdf.setFontSize(7.6); pdf.setTextColor(95,115,145);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7.6); pdf.setTextColor(95,115,145);
     pdf.text('Vendor Workshop Inspection  -  PT POMI  -  Unit '+(gv('unit-sel')||'-'), tx, y+15.5);
     y += Math.max(logoH, 16) + 5;
     pdf.setDrawColor(...NAVY2); pdf.setLineWidth(.4); pdf.line(M,y,W-M,y); y+=5;
@@ -2317,8 +2335,8 @@ async function generatePDF(selSet, opts){
      ['sig-super','Reviewed By - Supervisor', gv('sig-super-name')||gv('reviewed-by')]].forEach((s,i)=>{
       const xo=M+i*(sw+6);
       pdf.setFillColor(244,247,252); pdf.setDrawColor(185,205,232); pdf.roundedRect(xo,y,sw,34,2,2,'FD');
-      pdf.setFont('times','bold'); pdf.setFontSize(7.6); pdf.setTextColor(...NAVY2); pdf.text(sanitize(s[1]), xo+2, y+5);
-      pdf.setFont('times','normal'); pdf.setFontSize(8); pdf.setTextColor(...NAVY); pdf.text(sanitize(s[2]||''), xo+2, y+11);
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(7.6); pdf.setTextColor(...NAVY2); pdf.text(sanitize(s[1]), xo+2, y+5);
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8); pdf.setTextColor(...NAVY); pdf.text(sanitize(s[2]||''), xo+2, y+11);
       const du=sigDataUrl(s[0]); if(du) try{ pdf.addImage(du,'PNG',xo+2,y+13,sw-4,17); }catch(e){}
       pdf.setDrawColor(185,205,232); pdf.line(xo+2,y+31,xo+sw-2,y+31);
     });
@@ -2326,7 +2344,7 @@ async function generatePDF(selSet, opts){
   }
 
   const pages = pdf.internal.getNumberOfPages();
-  for(let p=1;p<=pages;p++){ pdf.setPage(p); pdf.setFont('times','normal'); pdf.setFontSize(7.5); pdf.setTextColor(150); pdf.text('Hal '+p+'/'+pages, W-M, H-6, {align:'right'}); pdf.text(sanitize('PLTU - Witness Test Motor'), M, H-6); }
+  for(let p=1;p<=pages;p++){ pdf.setPage(p); pdf.setFont('helvetica','normal'); pdf.setFontSize(7.5); pdf.setTextColor(150); pdf.text('Hal '+p+'/'+pages, W-M, H-6, {align:'right'}); pdf.text(sanitize('PLTU - Witness Test Motor'), M, H-6); }
 
   const fn = `witness_motor_${(gv('asset-tag')||'motor').replace(/[^A-Za-z0-9_-]/g,'_')}_${(gv('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')}.pdf`;
   if(opts.silent){ /* caller reads returned pdf */ } else { pdf.save(fn); note('✅ PDF: '+fn,'ok'); }
