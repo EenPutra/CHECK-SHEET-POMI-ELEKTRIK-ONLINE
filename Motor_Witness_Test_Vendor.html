@@ -1719,6 +1719,11 @@ function inspSheet(){
 function rtdRows(prefix){
   const r=[]; for(let n=1;n<=18;n++){ const v=gv(prefix+n); if(v) r.push(kv('T'+n,'RTD T'+n+' (°C)', v)); } return r;
 }
+// full 18-point winding RTD/TC grid (Point / °C) — mirrors the on-screen table
+function rtdWindingSheet(prefix, title){
+  const rows=[]; for(let n=1;n<=18;n++) rows.push({ no:'', desc:'T'+n, values:{ Point:'T'+n, '°C': gv(prefix+n)||'—' } });
+  return { title, columns:['Point','°C'], rows };
+}
 function mtxRows(prefix){
   const rows=[];
   MTX_TIMES.forEach(tm=>{
@@ -1774,11 +1779,12 @@ async function submitToDb(){
   base.sheets.inspeksi = inspSheet();
   base.sheets.heater = mkSheet('A — Heater Motor Measurement', ['Value'], [
     kv(1,'Type Heater', iv('ht-type')), kv(2,'Resistance Total (Ω)', iv('ht-r')), kv(3,'Current (A)', iv('ht-i')),
-    kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE (°C)', iv('ht-de')), kv(6,'Raise Temp NDE (°C)', iv('ht-nde')),
-  ].concat(rtdRows('rtdh')).concat([
-    kv('BRTD-DE1','Bearing RTD/TC DE-1 (°C)', iv('brtd-de1')), kv('BRTD-DE2','Bearing RTD/TC DE-2 (°C)', iv('brtd-de2')),
-    kv('BRTD-NDE1','Bearing RTD/TC NDE-1 (°C)', iv('brtd-nde1')), kv('BRTD-NDE2','Bearing RTD/TC NDE-2 (°C)', iv('brtd-nde2')),
-  ]));
+    kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE-Side (°C)', iv('ht-de')), kv(6,'Raise Temp NDE-Side (°C)', iv('ht-nde')),
+  ]);
+  base.sheets.rtd_winding = rtdWindingSheet('rtdh', 'A — Motor Temperature Sensor (Winding RTD / TC)');
+  base.sheets.rtd_bearing = mkSheet('A — Bearing RTD / TC Sensor (°C)', ['Value'], [
+    kv(1,'DE-1', iv('brtd-de1')), kv(2,'DE-2', iv('brtd-de2')), kv(3,'NDE-1', iv('brtd-nde1')), kv(4,'NDE-2', iv('brtd-nde2')),
+  ]);
 
   base.sheets.stator = mkSheet('B — Stator Winding Resistance & Insulation', ['Value'], [
     kv('B.1','Winding R T1-T4 (mΩ)', iv('wr-14')), kv('B.2','Winding R T2-T5 (mΩ)', iv('wr-25')),
@@ -2022,6 +2028,26 @@ async function generatePDF(selSet, opts){
     }
     y+=1.5;
   }
+  // 18-point winding RTD/TC grid rendered as 3 Point/deg-C column-pairs (matches the check sheet)
+  function rtdWindingGrid(sheet){
+    const rows = (sheet && sheet.rows) || [];
+    if(!rows.length) return;
+    const per = Math.ceil(rows.length/3);
+    const body = [];
+    for(let i=0;i<per;i++){
+      const line=[];
+      for(let g=0;g<3;g++){ const r=rows[g*per+i]; line.push(r? sanitize(r.values.Point): '', r? sanitize(r.values['°C']||'-'): ''); }
+      body.push(line);
+    }
+    checkY(Math.min(BOT-TOP, body.length*6+8));
+    pdf.autoTable({ ...theme, startY:y,
+      head:[['Point','deg C','Point','deg C','Point','deg C']], body,
+      styles:{...theme.styles, halign:'center', fontSize:7.4, cellPadding:1.4},
+      headStyles:{...theme.headStyles, fillColor:LBL_BG, textColor:LBL_TX, fontSize:7},
+      columnStyles:{0:{cellWidth:16},2:{cellWidth:16},4:{cellWidth:16}},
+      willDrawPage:()=>ensureBg() });
+    y=pdf.lastAutoTable.finalY+4;
+  }
   function checkTable(sheet){
     if(!sheet || !sheet.rows.length) return;
     const cols=sheet.columns;
@@ -2250,8 +2276,12 @@ async function generatePDF(selSet, opts){
     kvGrid(S.motordata.rows);
     subTitle('Inspeksi');
     checkTable(S.inspeksi);
-    subTitle('Heater Motor Measurement & RTD Winding/Phase Temp (deg C)');
+    subTitle('Heater Motor Measurement');
     kvGrid(S.heater.rows.filter(r=>r.values && r.values.Value!==undefined));
+    subTitle('Motor Temperature Sensor - Winding RTD / TC (deg C)');
+    rtdWindingGrid(S.rtd_winding);
+    subTitle('Bearing RTD / TC Sensor (deg C)');
+    kvGrid(S.rtd_bearing.rows.filter(r=>r.values && r.values.Value!==undefined));
     sectionPhotos('a');
   }
   if(selSet.has('b')){
@@ -2370,11 +2400,12 @@ function _pdfSnapshot(){
   S.inspeksi = inspSheet();
   S.heater = mkSheet('A', ['Value'], [
     kv(1,'Type Heater', iv('ht-type')), kv(2,'Resistance Total (Ω)', iv('ht-r')), kv(3,'Current (A)', iv('ht-i')),
-    kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE (°C)', iv('ht-de')), kv(6,'Raise Temp NDE (°C)', iv('ht-nde')),
-  ].concat(rtdRows('rtdh')).concat([
-    kv('BRTD-DE1','Bearing RTD/TC DE-1 (°C)', iv('brtd-de1')), kv('BRTD-DE2','Bearing RTD/TC DE-2 (°C)', iv('brtd-de2')),
-    kv('BRTD-NDE1','Bearing RTD/TC NDE-1 (°C)', iv('brtd-nde1')), kv('BRTD-NDE2','Bearing RTD/TC NDE-2 (°C)', iv('brtd-nde2')),
-  ]));
+    kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE-Side (°C)', iv('ht-de')), kv(6,'Raise Temp NDE-Side (°C)', iv('ht-nde')),
+  ]);
+  S.rtd_winding = rtdWindingSheet('rtdh', 'A');
+  S.rtd_bearing = mkSheet('A', ['Value'], [
+    kv(1,'DE-1', iv('brtd-de1')), kv(2,'DE-2', iv('brtd-de2')), kv(3,'NDE-1', iv('brtd-nde1')), kv(4,'NDE-2', iv('brtd-nde2')),
+  ]);
   S.stator = mkSheet('B', ['Value'], [
     kv('B.1','Winding R T1-T4 (mΩ)', iv('wr-14')), kv('B.2','Winding R T2-T5 (mΩ)', iv('wr-25')), kv('B.3','Winding R T3-T6 (mΩ)', iv('wr-36')),
     kv('B.4','Max Unbalance (%)', iv('wr-unb')), kv('B.5','Hasil Winding Resistance', tv('wr_result')),
