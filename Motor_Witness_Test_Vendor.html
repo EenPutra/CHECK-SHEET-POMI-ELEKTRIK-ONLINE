@@ -197,6 +197,9 @@ table.ct tr:last-child td{border-bottom:none}
 .bm-tbl th.sub{background:var(--sec-hdr-bg);color:var(--sl)}
 .bm-tbl td.rowlbl{background:var(--sec-hdr-bg);color:var(--sl);font-weight:700;text-align:left;white-space:nowrap}
 .bm-tbl .ti{min-width:52px}
+.bm-diagram{border:1px solid var(--pb);border-radius:10px;background:var(--field-bg);padding:10px;margin:8px 0}
+.bm-diagram svg{width:100%;max-width:440px;height:auto;display:block;margin:0 auto}
+.bm-diagram .cap{font-size:10.5px;color:var(--t3);text-align:center;margin-top:4px}
 .time-add{margin:8px 0 2px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
 /* Phase 1 — motor master gate + locked nameplate fields */
@@ -1267,9 +1270,35 @@ function bmEndTable(end){
   const body = BM_ROWS.map(r => `<tr><td class="rowlbl">${r}</td>${BM_COLK.map(k => `<td><input type="text" class="ti" id="bm-${end}-${r}-${k}"></td>`).join('')}</tr>`).join('');
   return `<table class="bm-tbl">${th}<tbody>${body}</tbody></table>`;
 }
+function bmDiagramSvg(){
+  return `<svg viewBox="0 0 430 200" aria-hidden="true">
+    <path d="M42,58 h122 v34 h-122 z" fill="#eef2f7" stroke="#3b4a63" stroke-width="1.4"/>
+    <path d="M42,92 h122 v42 h-122 z" fill="#f6f8fb" stroke="#3b4a63" stroke-width="1.4"/>
+    <ellipse cx="103" cy="92" rx="33" ry="19" fill="#fff" stroke="#3b4a63" stroke-width="1.2"/>
+    <line x1="58" y1="52" x2="58" y2="140" stroke="#3b4a63" stroke-width="1"/>
+    <line x1="150" y1="52" x2="150" y2="140" stroke="#3b4a63" stroke-width="1"/>
+    <line x1="42" y1="92" x2="164" y2="92" stroke="#3b4a63" stroke-width="1" stroke-dasharray="3 2"/>
+    <line x1="72" y1="134" x2="72" y2="142" stroke="#3b4a63"/><text x="69" y="153" font-size="10" fill="#556">1</text>
+    <line x1="134" y1="134" x2="134" y2="142" stroke="#3b4a63"/><text x="131" y="153" font-size="10" fill="#556">2</text>
+    <line x1="178" y1="72" x2="178" y2="112" stroke="#c0392b" stroke-width="1"/>
+    <path d="M178,72 l-3,6 h6 z M178,112 l-3,-6 h6 z" fill="#c0392b"/>
+    <text x="184" y="96" font-size="12" font-weight="700" fill="#c0392b">D</text>
+    <line x1="42" y1="162" x2="164" y2="162" stroke="#1f3864" stroke-width="1"/>
+    <path d="M42,162 l6,-3 v6 z M164,162 l-6,-3 v6 z" fill="#1f3864"/>
+    <text x="95" y="177" font-size="10" font-weight="700" fill="#1f3864">L1</text>
+    <circle cx="322" cy="100" r="46" fill="#fff" stroke="#3b4a63" stroke-width="1.6"/>
+    <circle cx="322" cy="100" r="3" fill="#3b4a63"/>
+    <line x1="288" y1="66" x2="272" y2="50" stroke="#1f3864"/><text x="256" y="48" font-size="12" font-weight="700" fill="#1f3864">U</text>
+    <line x1="322" y1="54" x2="322" y2="32" stroke="#1f3864"/><text x="318" y="28" font-size="12" font-weight="700" fill="#1f3864">V</text>
+    <line x1="356" y1="66" x2="372" y2="50" stroke="#1f3864"/><text x="376" y="48" font-size="12" font-weight="700" fill="#1f3864">W</text>
+    <text x="150" y="30" font-size="9" fill="#889">Sleeve bearing</text>
+    <text x="292" y="162" font-size="9" fill="#889">Shaft journal</text>
+  </svg>`;
+}
 function renderBearingMeas(){
   const rec = document.getElementById('bm-received');
-  if (rec) rec.innerHTML = `<div class="tbl-wrap"><table class="bm-tbl">
+  if (rec) rec.innerHTML = `<div class="bm-diagram">${bmDiagramSvg()}<div class="cap">U · V · W = titik ukur bore (per Side 1 &amp; Side 2). D = diameter journal. 1 / 2 = posisi sepanjang sleeve. L1 = panjang sleeve.</div></div>
+    <div class="tbl-wrap"><table class="bm-tbl">
       <thead><tr><th style="width:230px;text-align:left">Received Data</th><th>DE / Drive End</th><th>NDE / Non Drive End</th></tr></thead>
       <tbody>${[['sbid','Sleeve Brg inside Diameter (mm)'],['sjd','Shaft Journal Diameter (mm)'],['rsc','Req. standard clearance (mm)'],['l1','L1 (Sleeve length) (mm)']]
         .map(r => `<tr><td class="rowlbl">${r[1]}</td><td><input type="text" class="ti" id="bm-rd-${r[0]}-de"></td><td><input type="text" class="ti" id="bm-rd-${r[0]}-nde"></td></tr>`).join('')}</tbody>
