@@ -224,6 +224,9 @@ table.ct tr:last-child td{border-bottom:none}
 .cmp-badge{display:inline-block;padding:1px 8px;border-radius:5px;font-weight:800;font-size:10.5px}
 .cmp-ok{background:var(--ok-bg);color:var(--ok)} .cmp-ng{background:var(--ng-bg);color:var(--ng)} .cmp-na{background:var(--na-soft);color:var(--na)}
 .cmp-col-hd{font-size:10px;color:var(--t3);font-weight:400;display:block;margin-top:2px}
+.cmp-att{display:flex;flex-direction:column;gap:3px;margin:5px 0}
+.cmp-att-btn{font:inherit;font-size:10px;font-weight:600;text-align:left;padding:3px 6px;border:1px solid var(--pb);border-radius:5px;background:var(--field-bg);color:var(--sl);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.cmp-att-btn:hover{border-color:var(--sl);background:var(--field-focus-bg)}
 .cmp-full-btn{margin-top:5px;font-size:10px;padding:3px 8px}
 .cmp-sheet{margin-bottom:16px}
 .cmp-sheet-t{font-family:var(--raj);font-weight:700;letter-spacing:1px;color:var(--steel);font-size:12.5px;margin-bottom:5px;border-left:3px solid var(--sl);padding-left:8px}
@@ -254,6 +257,14 @@ table.ct tr:last-child td{border-bottom:none}
 .photo-drop.sm{padding:11px;margin-bottom:10px}
 .photo-drop.sm .photo-drop-ico{font-size:18px}
 .photo-drop.sm .photo-drop-txt{font-size:11.5px}
+/* vendor PDF attachments */
+.att-row{display:flex;align-items:center;gap:9px;padding:8px 10px;border:1px solid var(--pb);border-radius:8px;background:var(--field-bg);margin-bottom:6px}
+.att-ico{font-size:17px;flex-shrink:0}
+.att-name{flex:1;font-size:12.5px;color:var(--ink);word-break:break-all;line-height:1.35}
+.att-sz{color:var(--t3);font-size:10.5px;font-family:var(--mono);white-space:nowrap}
+.att-st{font-size:11px;color:var(--t3);white-space:nowrap}
+.att-st.err{color:var(--ng)}
+.att-row .btn{flex-shrink:0}
 /* header logo */
 .hdr-logo{height:44px;width:auto;object-fit:contain;filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
 :root[data-theme="dark"] .hdr-logo,html:not([data-theme="light"]) .hdr-logo{background:#fff;border-radius:6px;padding:4px 6px}
@@ -608,6 +619,20 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div class="mf full"><label>Hasil Solo Run</label><div id="tog-solo" class="rc" style="justify-content:flex-start"></div></div>
         <div class="mf full"><label>Remark Solo Run</label><textarea id="rmk-solo" placeholder="Catatan solo run…"></textarea></div>
       </div>
+    </div>
+  </div>
+
+  <!-- Lampiran / File PDF Vendor (selalu tampil, apa pun jenis test) -->
+  <div class="panel open" id="p-att">
+    <div class="sec-hdr" onclick="toggleSec('p-att')"><span class="sec-ico">📎</span><span class="sec-t">Lampiran — File PDF Vendor</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-body">
+      <div class="hint" style="margin-top:0">Lampirkan file PDF hasil testing dari vendor (report megger, surge, PI/DAR, dsb). Tersimpan per sesi test — bisa dibuka lagi kapan saja, termasuk dari tab pembanding.</div>
+      <div class="photo-drop sm" onclick="pickAttach()">
+        <div class="photo-drop-ico">📄</div>
+        <div class="photo-drop-txt"><strong>Klik untuk menambah file PDF</strong> — bisa lebih dari satu, maks 15 MB / file</div>
+      </div>
+      <input type="file" id="attach-input" accept="application/pdf,.pdf" multiple style="display:none" onchange="onAttachFiles(this.files)">
+      <div id="attach-list" style="margin-top:10px"></div>
     </div>
   </div>
 
@@ -1163,6 +1188,80 @@ function buildApprovalPhotos(){
   return out;
 }
 
+/* ── vendor PDF attachments — per test session ──────────────────────────
+   Uploaded straight to Drive on pick (PDFs are too big for localStorage),
+   only {name,url,size} kept in state + drafts. Restored on loadSession. ── */
+const ATTACH_KEY = 'motor_witness_attach_v1';
+const ATTACH_MAX_BYTES = 15 * 1024 * 1024;
+let ATTACH = [];   // {name, size, url, uploadedAt, __sig, __uploading?, __error?}
+const _attSig = f => f.name + '~' + f.size + '~' + (f.lastModified || 0);
+const _attFmt = n => n ? (n / 1048576).toFixed(2) + ' MB' : '';
+
+function pickAttach(){ const inp = document.getElementById('attach-input'); if(inp){ inp.value=''; inp.click(); } }
+
+async function onAttachFiles(fileList){
+  const files = [...(fileList || [])].filter(f => f && (/pdf$/i.test(f.type || '') || /\.pdf$/i.test(f.name || '')));
+  if(!files.length){ note('Hanya file PDF yang bisa dilampirkan.', 'err'); return; }
+  for(const f of files){
+    if(f.size > ATTACH_MAX_BYTES){ note('File "' + f.name + '" terlalu besar (' + _attFmt(f.size) + ', maks 15 MB).', 'err'); continue; }
+    const sig = _attSig(f);
+    if(ATTACH.some(a => a.__sig === sig)){ note('File "' + f.name + '" sudah dilampirkan.', 'info'); continue; }
+    const rec = { name: f.name, size: f.size, url: null, uploadedAt: null, __sig: sig, __uploading: true };
+    ATTACH.push(rec); renderAttach();
+    try{
+      const tag = gv('asset-tag') || (_activeMotor && _activeMotor.tag) || 'motor';
+      const path = 'motor-witness/attachments/' + mmSlug(tag) + '/' + Date.now().toString(36) + '-' + f.name.replace(/[^\w.\-]+/g, '_');
+      rec.url = await Storage.uploadBlob(path, f, 'application/pdf');
+      rec.uploadedAt = new Date().toISOString();
+      rec.__uploading = false;
+      note('✅ Lampiran "' + f.name + '" terunggah.', 'ok');
+    }catch(e){
+      console.error('upload lampiran gagal:', e);
+      rec.__uploading = false; rec.__error = true;
+      note('⚠️ Gagal mengunggah "' + f.name + '": ' + (e && e.message || e), 'err');
+    }
+    renderAttach(); persistAttach();
+    if(typeof autoSaveNow === 'function') autoSaveNow();
+  }
+}
+
+async function openAttachUrl(url){
+  if(!url) return;
+  try{
+    const burl = await Storage.toObjectUrl(url);
+    window.open(burl, '_blank');
+    setTimeout(() => { try{ URL.revokeObjectURL(burl); }catch(e){} }, 60000);
+  }catch(e){ note('Gagal membuka file: ' + (e && e.message || e), 'err'); }
+}
+function openAttach(i){ const a = ATTACH[i]; if(a) openAttachUrl(a.url); }
+
+function removeAttach(i){
+  const a = ATTACH[i]; if(!a) return;
+  if(!confirm('Hapus lampiran "' + (a.name || '') + '" dari sesi ini? (File di database tidak ikut terhapus.)')) return;
+  ATTACH.splice(i, 1); renderAttach(); persistAttach();
+  if(typeof autoSaveNow === 'function') autoSaveNow();
+}
+
+function renderAttach(){
+  const box = document.getElementById('attach-list'); if(!box) return;
+  if(!ATTACH.length){ box.innerHTML = '<div class="photo-empty">Belum ada lampiran.</div>'; return; }
+  box.innerHTML = ATTACH.map((a, i) => `
+    <div class="att-row">
+      <span class="att-ico">📄</span>
+      <span class="att-name">${_esc(a.name || 'file.pdf')} <span class="att-sz">${_attFmt(a.size)}</span></span>
+      ${a.__uploading ? '<span class="att-st">⏳ mengunggah…</span>'
+        : a.__error ? '<span class="att-st err">⚠️ gagal unggah</span>'
+        : a.url ? `<button class="btn bo bsm" type="button" onclick="openAttach(${i})">Buka</button>`
+        : '<span class="att-st err">tidak tersimpan</span>'}
+      <button class="btn br bsm" type="button" onclick="removeAttach(${i})">&#10005;</button>
+    </div>`).join('');
+}
+
+function attachForSave(){ return ATTACH.filter(a => a.url).map(a => ({ name: a.name, size: a.size, url: a.url, uploadedAt: a.uploadedAt, __sig: a.__sig })); }
+function persistAttach(){ try{ localStorage.setItem(ATTACH_KEY, JSON.stringify(attachForSave())); }catch(e){} }
+function loadAttachDraft(){ try{ const raw = localStorage.getItem(ATTACH_KEY); if(raw){ ATTACH = JSON.parse(raw) || []; renderAttach(); } }catch(e){} }
+function applyAttachList(list){ ATTACH = Array.isArray(list) ? list.slice() : []; renderAttach(); persistAttach(); }
+
 /* ── notice ── */
 function note(msg,t){ const n=document.getElementById('notice'); n.textContent=msg; n.className='notice '+(t||'info'); setTimeout(()=>{ if(n.textContent===msg) n.className='notice'; },4000); }
 function showNote(msg,t){ note(msg,t); }
@@ -1248,8 +1347,9 @@ function resetForm(){
   document.querySelectorAll('.rb').forEach(b=>b.classList.remove('a'));
   ['sig-insp','sig-vendor','sig-super'].forEach(clrSig);
   PHOTO_KEYS.forEach(k=>PHOTOS[k]=[]); renderAllPhotos();
+  ATTACH = []; renderAttach();
   try{ const _aid = CloudDraft.getActiveId && CloudDraft.getActiveId(); if(_aid) CloudDraft.deleteDraft(_aid); }catch(e){}
-  try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); }catch(e){}
+  try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); localStorage.removeItem(ATTACH_KEY); }catch(e){}
   document.querySelectorAll('.pi-out').forEach(el=>{ el.textContent='—'; el.classList.remove('bad'); });
   upStats(); note('🔄 Form direset.','info');
 }
@@ -1421,6 +1521,9 @@ async function submitToDb(){
     kv(7,'Reviewed By', iv('sig-super-name')||iv('reviewed-by')),
   ]);
 
+  // vendor PDF attachments (uploaded on pick) travel with the checksheet doc
+  base.attachments = attachForSave();
+
   // ── Phase 2: keep only the sheets that belong to this session's test type ──
   base.testType = _testType || null;
   if(_testType && TEST_SECTIONS[_testType]){
@@ -1495,7 +1598,7 @@ async function submitToDb(){
   // submission is safely in the DB — clear the autosave drafts (local + cloud) so
   // a later reload doesn't offer to restore data that's already been submitted.
   clearTimeout(_autoTimer);
-  try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); }catch(e){}
+  try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); localStorage.removeItem(ATTACH_KEY); }catch(e){}
   SubmitGuard.setProgress(100,'Selesai!');
   setTimeout(()=>SubmitGuard.hideProgress(), 500);
   const _sess = (window.AuthSession && window.AuthSession.get) ? window.AuthSession.get() : null;
@@ -2054,6 +2157,7 @@ function clearSessionForm(){
   document.querySelectorAll('.rb').forEach(b => b.classList.remove('a'));
   if (typeof PHOTOS === 'object') Object.keys(PHOTOS).forEach(k => { PHOTOS[k] = []; });
   if (typeof renderAllPhotos === 'function') renderAllPhotos();
+  if (typeof applyAttachList === 'function') applyAttachList([]);
   upStats(); if (typeof drawAllIRCharts === 'function') drawAllIRCharts();
 }
 
@@ -2077,6 +2181,8 @@ async function loadSession(s){
   if (s.photoUrls && typeof window.restorePhotosFromUrls === 'function') {
     try { await window.restorePhotosFromUrls(s.photoUrls, true); } catch (e) { console.warn('restore foto sesi:', e); }
   }
+  // vendor PDF attachments (submitted -> s.attachments; draft -> s.extra.attachments)
+  applyAttachList(s.attachments || (s.extra && s.extra.attachments) || []);
 
   if (s._isDraft) {
     _editingSession = { draftId: s.id, isDraft: true };
@@ -2186,9 +2292,13 @@ async function openCompare(){
 
   const colHd = full.map((s, i) => {
     const st = s._isDraft ? '<span class="cmp-badge cmp-na">DRAFT</span>' : (s._status === 'approved' ? '<span class="cmp-badge cmp-ok">APPROVED</span>' : '<span class="cmp-badge" style="background:var(--sl);color:#fff">SUBMIT</span>');
+    const atts = s.attachments || (s.extra && s.extra.attachments) || [];
+    const attHtml = atts.length
+      ? `<div class="cmp-att">${atts.filter(a => a && a.url).map(a => `<button type="button" class="cmp-att-btn" data-u="${_esc(a.url)}" onclick="openAttachUrl(this.dataset.u)">📄 ${_esc(String(a.name || 'PDF').slice(0, 26))}</button>`).join('')}</div>`
+      : '';
     return `<th>${_tabIco(s.testType)} ${_esc(_sd(s.executionDate || s.updatedAt))}
       <span class="cmp-col-hd">${_esc((TEST_LABEL[s.testType] || 'Test').replace(/^\S+\s/, ''))} · ${_esc(s.checkedBy || s.savedByName || '—')}</span>
-      ${st}
+      ${st}${attHtml}
       ${(!s._isDraft && s.sheets) ? `<br><button class="btn bo bsm cmp-full-btn" type="button" onclick="openFullView(${i})">👁 Lihat Lengkap</button>` : `<br><button class="btn bo bsm cmp-full-btn" type="button" onclick="cmpContinue(${i})">↪ Lanjutkan</button>`}</th>`;
   }).join('');
 
@@ -2227,7 +2337,11 @@ function openFullView(i){
   if (!s || !s.sheets) return;
   const body = document.getElementById('cmp-body');
   document.getElementById('cmp-title').textContent = 'SESI ' + _sd(s.executionDate || s.updatedAt) + ' — ' + ((TEST_LABEL[s.testType] || 'Test').replace(/^\S+\s/, '')) + ' (read-only)';
-  body.innerHTML = `<button class="btn bo bsm" type="button" style="margin-bottom:12px" onclick="openCompare()">← Kembali ke perbandingan</button>` + _sheetsHtml(s.sheets);
+  const atts = s.attachments || (s.extra && s.extra.attachments) || [];
+  const attHtml = atts.filter(a => a && a.url).length
+    ? `<div class="cmp-sheet"><div class="cmp-sheet-t">Lampiran — File PDF Vendor</div>${atts.filter(a => a && a.url).map(a => `<div class="att-row"><span class="att-ico">📄</span><span class="att-name">${_esc(a.name || 'PDF')} <span class="att-sz">${_attFmt(a.size)}</span></span><button class="btn bo bsm" type="button" data-u="${_esc(a.url)}" onclick="openAttachUrl(this.dataset.u)">Buka</button></div>`).join('')}</div>`
+    : '';
+  body.innerHTML = `<button class="btn bo bsm" type="button" style="margin-bottom:12px" onclick="openCompare()">← Kembali ke perbandingan</button>` + attHtml + _sheetsHtml(s.sheets);
 }
 // keep the motor chip in the top bar in sync
 function refreshMotorChip(){
@@ -2418,7 +2532,9 @@ async function initMotorFlow(){
 mountPhotoPanels();
 loadDraft();
 loadPhotoDraft();
+loadAttachDraft();
 renderAllPhotos();
+renderAttach();
 upStats();
 drawAllIRCharts();
 // Saving a session to the database is a deliberate action (💾 button -> CloudDraft),
@@ -2429,7 +2545,11 @@ LoadMergeModal.init({ assetTag: MW_TAG });
 LoadMergeModal.initRevisionBanner();
 SubmitGuard.init({ assetTag: MW_TAG });
 TechnicianAuth.init({ checkedByFieldId: 'checked-by' });
-CloudDraft.init({ formId:'mw', assetTag:()=>gv('asset-tag')||MW_TAG, assetName:MW_NAME, frequency:'WITNESS' });
+CloudDraft.init({
+  formId:'mw', assetTag:()=>gv('asset-tag')||MW_TAG, assetName:MW_NAME, frequency:'WITNESS',
+  collectExtra: () => ({ attachments: attachForSave() }),
+  applyExtra: (x) => applyAttachList(x && x.attachments),
+});
 document.getElementById('asset-tag').addEventListener('change', ()=>{ const t=gv('asset-tag')||MW_TAG; LoadMergeModal.init({ assetTag:t }); SubmitGuard.init({ assetTag:t }); });
 // Phase 1 — pilih / daftar motor sebelum mengisi check sheet
 initMotorFlow();
