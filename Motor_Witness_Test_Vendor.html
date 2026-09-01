@@ -174,6 +174,30 @@ table.ct tr:last-child td{border-bottom:none}
 .mtx td .ti{text-align:center}
 .mtx th{position:sticky;left:0}
 .hint{font-size:10.5px;color:var(--t3);font-style:italic;margin-top:4px;line-height:1.4}
+/* checkbox label */
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink);cursor:pointer}
+.chk input{width:15px;height:15px;accent-color:var(--sl);cursor:pointer}
+/* air-gap diagram */
+.ag-block{border:1px solid var(--pb);border-radius:10px;padding:12px;margin:10px 0;background:var(--field-bg)}
+.ag-block>.ag-t{font-family:var(--raj);font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#fff;background:var(--sl);padding:5px 10px;border-radius:5px;font-size:11.5px;margin:-4px -4px 10px}
+.ag-grid{display:grid;grid-template-columns:minmax(240px,1fr) minmax(240px,320px);gap:16px;align-items:center}
+@media(max-width:640px){.ag-grid{grid-template-columns:1fr}}
+.ag-diagram{position:relative;width:100%;max-width:300px;aspect-ratio:1;margin:0 auto}
+.ag-diagram svg{width:100%;height:100%;display:block}
+.ag-in{position:absolute;width:62px;padding:5px 4px;text-align:center;font-family:var(--mono);font-size:13px;font-weight:700;
+  border:1.5px solid #e0a72c;border-radius:5px;background:#fde9b8;color:#5a4300}
+.ag-in:focus{outline:none;border-color:var(--sl)}
+.ag-in.pA{top:-4px;left:-6px}.ag-in.pB{top:-4px;right:-6px}.ag-in.pC{bottom:-4px;right:-6px}.ag-in.pD{bottom:-4px;left:-6px}
+.ag-tbl td,.ag-tbl th{text-align:center}
+.ag-tbl .dev{font-size:10.5px;color:var(--t3)}
+.ag-tbl tr.avg td{font-weight:700;background:var(--sec-hdr-bg)}
+.bm-tbl{width:100%;border-collapse:separate;border-spacing:0;font-size:11px;margin:6px 0}
+.bm-tbl th,.bm-tbl td{border:1px solid var(--td-line);padding:4px 6px;text-align:center;vertical-align:middle}
+.bm-tbl th{background:var(--sl);color:#fff;font-family:var(--raj);letter-spacing:.5px;font-weight:700}
+.bm-tbl th.sub{background:var(--sec-hdr-bg);color:var(--sl)}
+.bm-tbl td.rowlbl{background:var(--sec-hdr-bg);color:var(--sl);font-weight:700;text-align:left;white-space:nowrap}
+.bm-tbl .ti{min-width:52px}
+.time-add{margin:8px 0 2px;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 
 /* Phase 1 — motor master gate + locked nameplate fields */
 .np-lock{background:var(--sec-hdr-bg)!important;color:var(--t2)!important;border-style:dashed!important;cursor:default}
@@ -386,8 +410,15 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div class="mf"><label>Raise Temp DE-Side (°C)</label><input type="text" id="ht-de" class="num"></div>
         <div class="mf"><label>Raise Temp NDE-Side (°C)</label><input type="text" id="ht-nde" class="num"></div>
       </div>
+      <div class="subttl">Motor Temperature Sensor</div>
       <div class="hint">RTD winding / phase temperature — nilai °C tiap titik (nilai Ω PT100 mentah di lampiran).</div>
       <div class="tbl-wrap"><table class="ct" id="rtd-heat"></table></div>
+      <div class="grid" style="margin-top:10px">
+        <div class="mf"><label>Bearing RTD DE (°C)</label><input type="text" id="brtd-de" class="num"></div>
+        <div class="mf"><label>Bearing RTD NDE (°C)</label><input type="text" id="brtd-nde" class="num"></div>
+        <div class="mf"><label>Bearing RTD DE — IR (MΩ)</label><input type="text" id="brtd-de-ir" class="num"></div>
+        <div class="mf"><label>Bearing RTD NDE — IR (MΩ)</label><input type="text" id="brtd-nde-ir" class="num"></div>
+      </div>
     </div>
   </div>
 
@@ -527,11 +558,44 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
       <div class="tbl-wrap"><table class="ct"><thead><tr>
         <th style="width:26px">No</th><th>Check Item</th><th>Criteria</th><th class="ctr" style="width:118px">Result</th><th style="min-width:150px">Value / Remark</th>
       </tr></thead><tbody id="tb-mech"></tbody></table></div>
-      <div class="subttl">Bearing Clearance &amp; Air Gap</div>
+
+      <div class="subttl">Air-gaps — Main Rotor &amp; Stator</div>
+      <div class="hint">Isi 4 titik (A/B/C/D). Deviasi &amp; rata-rata dihitung otomatis. Deviasi = |gap − rata2| / rata2.</div>
+      <div id="ag-de"></div>
+      <div id="ag-nde"></div>
+      <div style="margin-top:10px;display:flex;gap:22px;flex-wrap:wrap;align-items:center">
+        <span style="font-family:var(--raj);font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--sl);font-size:11.5px">Conclusion :</span>
+        <label class="chk"><input type="checkbox" id="agc-good" onchange="onChk(this)"> Good</label>
+        <label class="chk"><input type="checkbox" id="agc-correct" onchange="onChk(this)"> Need to be corrected position</label>
+      </div>
+
+      <div class="subttl">Mechanical Inspection Measurements — Sleeve Bearing</div>
       <div class="grid">
-        <div class="mf"><label>Bearing Clearance DE (mm)</label><input type="text" id="bc-de" class="num"></div>
-        <div class="mf"><label>Bearing Clearance NDE (mm)</label><input type="text" id="bc-nde" class="num"></div>
-        <div class="mf"><label>Air Gap — 4 titik (mm)</label><input type="text" id="airgap" placeholder="2 / 1.9 / 1.95 / 1.95"></div>
+        <div class="mf"><label>Inside micrometer ID</label><input type="text" id="bm-mic-id" class="num"></div>
+        <div class="mf"><label>Calibration date</label><input type="text" id="bm-cal-date" placeholder="Sep-25"></div>
+        <div class="mf"><label>Ambient temp. (°C)</label><input type="text" id="bm-amb" class="num"></div>
+        <div class="mf"><label>Shaft temp. (°C)</label><input type="text" id="bm-shaft-temp" class="num"></div>
+        <div class="mf"><label>Humidity (%)</label><input type="text" id="bm-hum" class="num"></div>
+      </div>
+      <div id="bm-received"></div>
+      <div class="subttl" style="font-size:11.5px">Drive End (DE)</div>
+      <div class="tbl-wrap" id="bm-de"></div>
+      <div style="margin:6px 0;display:flex;gap:20px;flex-wrap:wrap">
+        <span class="hint" style="margin:0">Inspection Comments (DE):</span>
+        <label class="chk"><input type="checkbox" id="bmc-de-intol" onchange="onChk(this)"> In-tolerance</label>
+        <label class="chk"><input type="checkbox" id="bmc-de-polish" onchange="onChk(this)"> Polishing</label>
+        <label class="chk"><input type="checkbox" id="bmc-de-rebab" onchange="onChk(this)"> Rebabbit</label>
+      </div>
+      <div class="subttl" style="font-size:11.5px">Non Drive End (NDE)</div>
+      <div class="tbl-wrap" id="bm-nde"></div>
+      <div style="margin:6px 0;display:flex;gap:20px;flex-wrap:wrap">
+        <span class="hint" style="margin:0">Inspection Comments (NDE):</span>
+        <label class="chk"><input type="checkbox" id="bmc-nde-intol" onchange="onChk(this)"> In-tolerance</label>
+        <label class="chk"><input type="checkbox" id="bmc-nde-polish" onchange="onChk(this)"> Polishing</label>
+        <label class="chk"><input type="checkbox" id="bmc-nde-rebab" onchange="onChk(this)"> Rebabbit</label>
+      </div>
+      <div class="grid" style="margin-top:8px">
+        <div class="mf full"><label>Notes</label><textarea id="bm-notes" placeholder="cth. DE: Visual bearing has black stain… / NDE: isolator housing peeling…"></textarea></div>
         <div class="mf"><label>Slave Bearing Contact Gap (mm)</label><input type="text" id="slave-gap" class="num"></div>
       </div>
       <div class="hint">Kriteria clearance: min 0.001 × Ø shaft · max 0.002 × Ø shaft.</div>
@@ -564,9 +628,15 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div class="mf"><label>OB – Vertical</label><input type="text" id="vib-obv" class="num"></div>
         <div class="mf"><label>OB – Axial</label><input type="text" id="vib-oba" class="num"></div>
       </div>
-      <div class="subttl">Winding Temperature (°C) — per interval</div>
+      <div class="subttl">Winding &amp; Bearing Temperature (°C) — per interval</div>
+      <div class="time-add">
+        <button class="btn bo bsm" type="button" onclick="addTimeInterval('ul')">➕ Tambah Waktu</button>
+        <button class="btn bo bsm" type="button" onclick="removeTimeInterval('ul')">➖ Hapus Waktu Terakhir</button>
+        <span class="hint" style="margin:0">Waktu default 0'–75'. Tambah kolom bila test lebih lama.</span>
+      </div>
+      <div class="subttl" style="font-size:11px">Winding Temperature</div>
       <div class="tbl-wrap"><table class="ct" id="ul-wtemp"></table></div>
-      <div class="subttl">Bearing Temperature (°C) — per interval</div>
+      <div class="subttl" style="font-size:11px">Bearing Temperature</div>
       <div class="tbl-wrap"><table class="ct" id="ul-btemp"></table></div>
       <div class="grid" style="margin-top:10px"><div class="mf full"><label>Remark Unload Test</label><textarea id="rmk-ul" placeholder="Catatan unload test…"></textarea></div></div>
     </div>
@@ -602,6 +672,11 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
       </div>
 
       <div class="subttl">Local Monitoring — Temperature &amp; Air Flow (per interval)</div>
+      <div class="time-add">
+        <button class="btn bo bsm" type="button" onclick="addTimeInterval('solo')">➕ Tambah Waktu</button>
+        <button class="btn bo bsm" type="button" onclick="removeTimeInterval('solo')">➖ Hapus Waktu Terakhir</button>
+        <span class="hint" style="margin:0">Waktu default Initial–60'. Tambah kolom bila solo run lebih lama.</span>
+      </div>
       <div class="tbl-wrap"><table class="ct" id="solo-local"></table></div>
 
       <div class="subttl">DCS / MPR Monitoring (per interval)</div>
@@ -1018,7 +1093,9 @@ function fillCoronaHp(){
 }
 fillCoronaSurge(); fillCoronaTd(); fillCoronaHp();
 
-const UL_INT = ["0'","15'","30'","45'","60'","75'"];
+const UL_INT_DEFAULT = ["0'","15'","30'","45'","60'","75'"];
+const SOLO_INT_DEFAULT = ['Initial',"10'","30'","45'","60'"];
+let UL_INT = UL_INT_DEFAULT.slice();
 function fillUlWinding(){
   const t=document.getElementById('ul-wtemp'); let h='<thead><tr><th>Interval</th>';
   for(let i=1;i<=10;i++) h+=`<th class="ctr">T${i}</th>`;
@@ -1033,7 +1110,7 @@ function fillUlBearing(){
 }
 fillUlWinding(); fillUlBearing();
 
-const SOLO_INT = ['Initial',"10'","30'","45'","60'"];
+let SOLO_INT = SOLO_INT_DEFAULT.slice();
 function fillSoloLocal(){
   const t=document.getElementById('solo-local');
   const rows=['Motor Body','NDE Bearing','DE Bearing','Motor Body (Thermal Image)','Outlet Duct','Air Flow'];
@@ -1053,6 +1130,154 @@ function fillSoloDcs(){
   t.innerHTML=h+'</tbody>';
 }
 fillSoloLocal(); fillSoloDcs();
+
+/* ── dynamic test-time intervals (G unload / H solo run) ── */
+function _preserveInputs(root, fn){
+  const snap = {};
+  root.querySelectorAll('input[id]').forEach(el => { snap[el.id] = el.value; });
+  fn();
+  root.querySelectorAll('input[id]').forEach(el => { if (snap[el.id] !== undefined && snap[el.id] !== '') el.value = snap[el.id]; });
+}
+function _rebuildUl(){ _preserveInputs(document.getElementById('p-g'), () => { fillUlWinding(); fillUlBearing(); }); }
+function _rebuildSolo(){ _preserveInputs(document.getElementById('p-h'), () => { fillSoloLocal(); fillSoloDcs(); }); }
+function addTimeInterval(which){
+  const arr = which === 'ul' ? UL_INT : SOLO_INT;
+  const last = arr[arr.length - 1] || '';
+  const m = String(last).match(/^(\d+)'?$/);
+  const suggest = m ? (parseInt(m[1], 10) + 15) + "'" : '';
+  const lbl = (prompt('Label kolom waktu baru:', suggest) || '').trim();
+  if (!lbl) return;
+  arr.push(lbl);
+  which === 'ul' ? _rebuildUl() : _rebuildSolo();
+  if (typeof autoSaveNow === 'function') autoSaveNow();
+}
+function removeTimeInterval(which){
+  const arr = which === 'ul' ? UL_INT : SOLO_INT;
+  const min = which === 'ul' ? UL_INT_DEFAULT.length : SOLO_INT_DEFAULT.length;
+  if (arr.length <= min) { note('Kolom waktu default tidak bisa dihapus.', 'info'); return; }
+  if (!confirm('Hapus kolom waktu "' + arr[arr.length - 1] + '" beserta isinya?')) return;
+  arr.pop();
+  which === 'ul' ? _rebuildUl() : _rebuildSolo();
+  if (typeof autoSaveNow === 'function') autoSaveNow();
+}
+// re-apply saved interval arrays (draft / loaded session) then rebuild the tables.
+// Idempotent: only rebuilds when the array actually differs, so a redundant second
+// call (loadSession -> applyDraftData, then CloudDraft.adopt -> applyExtra) doesn't
+// wipe the values the first call already restored into the rebuilt cells.
+function applyIntervals(ul, solo){
+  if (Array.isArray(ul) && ul.length && JSON.stringify(ul) !== JSON.stringify(UL_INT)) { UL_INT = ul.slice(); fillUlWinding(); fillUlBearing(); }
+  if (Array.isArray(solo) && solo.length && JSON.stringify(solo) !== JSON.stringify(SOLO_INT)) { SOLO_INT = solo.slice(); fillSoloLocal(); fillSoloDcs(); }
+}
+function resetIntervals(){
+  UL_INT = UL_INT_DEFAULT.slice(); SOLO_INT = SOLO_INT_DEFAULT.slice();
+  fillUlWinding(); fillUlBearing(); fillSoloLocal(); fillSoloDcs();
+}
+
+/* ── checkbox state (air-gap conclusion, bearing pedestal/flanged, DE/NDE comments) ── */
+const CHK = {};
+function onChk(el){ if (el && el.id) { CHK[el.id] = !!el.checked; if (typeof scheduleAutoSave === 'function') scheduleAutoSave(); } }
+function applyChecks(obj){
+  Object.keys(CHK).forEach(k => delete CHK[k]);
+  if (obj && typeof obj === 'object') Object.assign(CHK, obj);
+  document.querySelectorAll('input[type=checkbox][id]').forEach(el => { el.checked = !!CHK[el.id]; });
+}
+
+/* ── Section F: Air-gaps — main rotor & stator (D-end + N-end) ── */
+function agSvg(){
+  return `<svg viewBox="0 0 200 200" aria-hidden="true">
+    <circle cx="100" cy="100" r="86" fill="none" stroke="#3b4a63" stroke-width="1.6"/>
+    <circle cx="100" cy="100" r="64" fill="none" stroke="#3b4a63" stroke-width="1.2" stroke-dasharray="5 3"/>
+    <line x1="34" y1="34" x2="166" y2="166" stroke="#7cc47c" stroke-width="1.6"/>
+    <line x1="166" y1="34" x2="34" y2="166" stroke="#7cc47c" stroke-width="1.6"/>
+    <line x1="100" y1="8" x2="100" y2="192" stroke="#7cc47c" stroke-width="1"/>
+    <line x1="8" y1="100" x2="192" y2="100" stroke="#7cc47c" stroke-width="1"/>
+    <text x="100" y="21" text-anchor="middle" font-size="9" fill="#556">12 · Top</text>
+    <text x="180" y="103" text-anchor="middle" font-size="9" fill="#556">3</text>
+    <text x="100" y="185" text-anchor="middle" font-size="9" fill="#556">6 · Bottom</text>
+    <text x="18" y="103" text-anchor="middle" font-size="9" fill="#556">9</text>
+    <text x="52" y="50" text-anchor="middle" font-size="12" font-weight="700" fill="#1f3864">A</text>
+    <text x="148" y="50" text-anchor="middle" font-size="12" font-weight="700" fill="#1f3864">B</text>
+    <text x="148" y="156" text-anchor="middle" font-size="12" font-weight="700" fill="#1f3864">C</text>
+    <text x="52" y="156" text-anchor="middle" font-size="12" font-weight="700" fill="#1f3864">D</text>
+    <text x="118" y="94" font-size="8" fill="#889">Rotor</text>
+    <text x="150" y="128" font-size="8" fill="#889">Stator</text>
+  </svg>`;
+}
+function renderAirGap(end){
+  const host = document.getElementById('ag-' + end); if (!host) return;
+  host.innerHTML = `
+    <div class="ag-block">
+      <div class="ag-t">Air-gaps (${end === 'de' ? 'D-end / inboard' : 'N-end / outboard'}) — main rotor and stator</div>
+      <div class="ag-grid">
+        <div class="ag-diagram">
+          ${agSvg()}
+          ${['A','B','C','D'].map(pp => `<input type="text" inputmode="decimal" class="ag-in p${pp}" id="ag-${end}-${pp}" placeholder="${pp}" oninput="calcAirGap('${end}')">`).join('')}
+        </div>
+        <div>
+          <table class="ct ag-tbl"><thead><tr><th>Position</th><th>Gap</th><th>Deviation [%]</th></tr></thead>
+            <tbody id="ag-${end}-tbl"></tbody></table>
+          <div style="margin-top:8px;display:flex;flex-direction:column;gap:5px">
+            <label class="chk"><input type="checkbox" id="agc-${end}-ped" onchange="onChk(this)"> Bearing pedestal (3, 6, 9 and 12)</label>
+            <label class="chk"><input type="checkbox" id="agc-${end}-flg" onchange="onChk(this)"> Bearing flanged (A, B, C and D)</label>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  calcAirGap(end);
+}
+function calcAirGap(end){
+  const body = document.getElementById('ag-' + end + '-tbl'); if (!body) return;
+  const raw = ['A','B','C','D'].map(pp => ({ p: pp, v: parseFloat(String(gv('ag-' + end + '-' + pp) || '').replace(',', '.')) }));
+  const ok = raw.filter(x => !isNaN(x.v));
+  const avg = ok.length ? ok.reduce((s, x) => s + x.v, 0) / ok.length : null;
+  const devs = [];
+  let rows = raw.map(x => {
+    let dev = '';
+    if (avg && !isNaN(x.v) && avg !== 0) { const d = Math.abs(x.v - avg) / avg * 100; devs.push(d); dev = Math.round(d) + '%'; }
+    return `<tr><td>${x.p}</td><td>${isNaN(x.v) ? '—' : x.v.toFixed(2)}</td><td class="dev">${dev || '—'}</td></tr>`;
+  }).join('');
+  const avgDev = devs.length ? Math.round(devs.reduce((s, d) => s + d, 0) / devs.length) : null;
+  rows += `<tr class="avg"><td>Average</td><td>${avg == null ? '—' : avg.toFixed(2)}</td><td class="dev">${avgDev == null ? '—' : avgDev + '%'}</td></tr>`;
+  body.innerHTML = rows;
+}
+function airGapData(end){
+  const raw = ['A','B','C','D'].map(pp => ({ p: pp, v: parseFloat(String(gv('ag-' + end + '-' + pp) || '').replace(',', '.')) }));
+  const ok = raw.filter(x => !isNaN(x.v));
+  const avg = ok.length ? ok.reduce((s, x) => s + x.v, 0) / ok.length : null;
+  const devs = [];
+  const rows = raw.map(x => {
+    let dev = '—';
+    if (avg && !isNaN(x.v) && avg !== 0) { const d = Math.abs(x.v - avg) / avg * 100; devs.push(d); dev = Math.round(d) + '%'; }
+    return { pos: x.p, gap: isNaN(x.v) ? '—' : x.v.toFixed(2), dev };
+  });
+  const avgDev = devs.length ? Math.round(devs.reduce((s, d) => s + d, 0) / devs.length) : null;
+  rows.push({ pos: 'Average', gap: avg == null ? '—' : avg.toFixed(2), dev: avgDev == null ? '—' : avgDev + '%' });
+  return rows;
+}
+
+/* ── Section F: Sleeve-bearing mechanical inspection measurement tables ── */
+const BM_ROWS = ['U', 'V', 'W'];
+const BM_COLK = ['rb1','rb2','rc1','rc2','fb1','fb2','fc1','fc2'];
+function bmEndTable(end){
+  const th = `<thead>
+      <tr><th rowspan="3" style="width:30px"></th><th colspan="4">Received Value</th><th colspan="4">Finishing value</th></tr>
+      <tr><th class="sub" colspan="2">Bore diameter</th><th class="sub" colspan="2">Clearance</th><th class="sub" colspan="2">Bore diameter</th><th class="sub" colspan="2">Clearance</th></tr>
+      <tr>${['Side 1','Side 2','Side 1','Side 2','Side 1','Side 2','Side 1','Side 2'].map(s => `<th class="sub">${s}</th>`).join('')}</tr>
+    </thead>`;
+  const body = BM_ROWS.map(r => `<tr><td class="rowlbl">${r}</td>${BM_COLK.map(k => `<td><input type="text" class="ti" id="bm-${end}-${r}-${k}"></td>`).join('')}</tr>`).join('');
+  return `<table class="bm-tbl">${th}<tbody>${body}</tbody></table>`;
+}
+function renderBearingMeas(){
+  const rec = document.getElementById('bm-received');
+  if (rec) rec.innerHTML = `<div class="tbl-wrap"><table class="bm-tbl">
+      <thead><tr><th style="width:230px;text-align:left">Received Data</th><th>DE / Drive End</th><th>NDE / Non Drive End</th></tr></thead>
+      <tbody>${[['sbid','Sleeve Brg inside Diameter (mm)'],['sjd','Shaft Journal Diameter (mm)'],['rsc','Req. standard clearance (mm)'],['l1','L1 (Sleeve length) (mm)']]
+        .map(r => `<tr><td class="rowlbl">${r[1]}</td><td><input type="text" class="ti" id="bm-rd-${r[0]}-de"></td><td><input type="text" class="ti" id="bm-rd-${r[0]}-nde"></td></tr>`).join('')}</tbody>
+    </table></div>`;
+  const de = document.getElementById('bm-de'); if (de) de.innerHTML = bmEndTable('de');
+  const nde = document.getElementById('bm-nde'); if (nde) nde.innerHTML = bmEndTable('nde');
+}
+renderAirGap('de'); renderAirGap('nde'); renderBearingMeas();
 
 /* mount standalone toggles */
 [['tog-wr','wr_result'],['tog-ir','ir_result'],['tog-surge','surge_wave'],['tog-csurge','corona_surge'],
@@ -1269,13 +1494,16 @@ function showNote(msg,t){ note(msg,t); }
 /* ── local draft autosave (localStorage only). Saving to the database is a
    deliberate action via the 💾 button -> shared CloudDraft, unified with the
    "Muat / Lanjutkan dari Database" modal. No parallel auto-cloud-save. ── */
-const DRAFT_SEL = 'input:not(.photo-cap):not([type=file]),select,textarea';
+const DRAFT_SEL = 'input:not(.photo-cap):not([type=file]):not([type=checkbox]),select,textarea';
 let _autoTimer=null, _flashTimer=null;
 
 function collectDraftPayload(){
   const d={};
   document.querySelectorAll(DRAFT_SEL).forEach(el=>{ if(el.id) d['f_'+el.id]=el.value; });
   d._st = Object.assign({}, ST);
+  d._chk = Object.assign({}, CHK);
+  d._ul_int = UL_INT.slice();
+  d._solo_int = SOLO_INT.slice();
   return d;
 }
 function flashAutosave(state){
@@ -1313,6 +1541,7 @@ function draftHasContent(d){
 }
 function applyDraftData(d){
   if(!d) return;
+  if(d._ul_int || d._solo_int) applyIntervals(d._ul_int, d._solo_int);
   document.querySelectorAll(DRAFT_SEL).forEach(el=>{ if(el.id && d['f_'+el.id]!==undefined) el.value=d['f_'+el.id]; });
   if(d._st){
     Object.assign(ST, d._st);
@@ -1320,7 +1549,9 @@ function applyDraftData(d){
       document.querySelectorAll(`.rb[data-id="${id}"]`).forEach(b=>b.classList.toggle('a', b.dataset.v===v));
     });
   }
+  if(d._chk) applyChecks(d._chk);
   upStats(); calcUnbalance(); calcPI('stator'); calcPI('hipot');
+  if(typeof calcAirGap==='function'){ calcAirGap('de'); calcAirGap('nde'); }
 }
 function loadDraft(){
   try{
@@ -1348,6 +1579,8 @@ function resetForm(){
   ['sig-insp','sig-vendor','sig-super'].forEach(clrSig);
   PHOTO_KEYS.forEach(k=>PHOTOS[k]=[]); renderAllPhotos();
   ATTACH = []; renderAttach();
+  applyChecks({}); resetIntervals();
+  renderAirGap('de'); renderAirGap('nde'); renderBearingMeas();
   try{ const _aid = CloudDraft.getActiveId && CloudDraft.getActiveId(); if(_aid) CloudDraft.deleteDraft(_aid); }catch(e){}
   try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); localStorage.removeItem(ATTACH_KEY); }catch(e){}
   document.querySelectorAll('.pi-out').forEach(el=>{ el.textContent='—'; el.classList.remove('bad'); });
@@ -1358,6 +1591,46 @@ function resetForm(){
 function mkSheet(title, columns, rows){ return { title, columns, rows: rows.filter(Boolean) }; }
 function kv(no,desc,val){ return { no:String(no), desc, values:{ Value: val } }; }
 function tblRow(no,desc,crit,vals){ return { no:String(no), desc, crit:crit||'', values:vals }; }
+
+// Section F sheets — mech checklist + air-gaps (D/N end) + sleeve-bearing measurement.
+// Shared by submitToDb (base.sheets) and buildSheets (PDF snapshot).
+const _cb = id => CHK[id] ? '[x]' : '[ ]';
+function buildMechSheets(){
+  const out = {};
+  out.mech = { title:'F — Mechanical Inspection', columns:['Result','Value / Remark'], rows:
+    MECH.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result: tv('m_'+r.no), 'Value / Remark': gv('rmk-m_'+r.no)||'—' } }))
+      .concat([{ no:'', desc:'Slave Bearing Contact Gap (mm)', values:{ Result:'—', 'Value / Remark': iv('slave-gap') } }]) };
+  ['de','nde'].forEach(end=>{
+    const lbl = end==='de' ? 'D-end / inboard' : 'N-end / outboard';
+    out['airgap_'+end] = { title:'F — Air-gap '+lbl+' (rotor↔stator)', columns:['Position','Gap (mm)','Deviation [%]'], rows:
+      airGapData(end).map(r=>({ no:'', desc:r.pos, values:{ Position:r.pos, 'Gap (mm)':r.gap, 'Deviation [%]':r.dev } })) };
+  });
+  out.airgap_meta = { title:'F — Air-gap Bearing Type & Conclusion', columns:['Value'], rows:[
+    kv('','D-end · Bearing pedestal (3, 6, 9 and 12)', _cb('agc-de-ped')),
+    kv('','D-end · Bearing flanged (A, B, C and D)', _cb('agc-de-flg')),
+    kv('','N-end · Bearing pedestal (3, 6, 9 and 12)', _cb('agc-nde-ped')),
+    kv('','N-end · Bearing flanged (A, B, C and D)', _cb('agc-nde-flg')),
+    kv('','Conclusion — Good', _cb('agc-good')),
+    kv('','Conclusion — Need to be corrected position', _cb('agc-correct')),
+  ]};
+  const _cmt = end => _cb('bmc-'+end+'-intol')+' In-tolerance   '+_cb('bmc-'+end+'-polish')+' Polishing   '+_cb('bmc-'+end+'-rebab')+' Rebabbit';
+  out.bearing_hdr = { title:'F — Sleeve Bearing Measurement Header & Comments', columns:['Value'], rows:[
+    kv('','Inside micrometer ID', iv('bm-mic-id')), kv('','Calibration date', iv('bm-cal-date')),
+    kv('','Ambient temp. (°C)', iv('bm-amb')), kv('','Shaft temp. (°C)', iv('bm-shaft-temp')),
+    kv('','Humidity (%)', iv('bm-hum')),
+    kv('','Inspection Comments — DE', _cmt('de')), kv('','Inspection Comments — NDE', _cmt('nde')),
+    kv('','Notes', gv('bm-notes')||'—'),
+  ]};
+  out.bearing_recv = { title:'F — Sleeve Bearing Received Data', columns:['Parameter','DE / Drive End','NDE / Non Drive End'], rows:
+    [['sbid','Sleeve Brg inside Diameter (mm)'],['sjd','Shaft Journal Diameter (mm)'],['rsc','Req. standard clearance (mm)'],['l1','L1 (Sleeve length) (mm)']]
+      .map(r=>({ no:'', desc:r[1], values:{ Parameter:r[1], 'DE / Drive End': iv('bm-rd-'+r[0]+'-de'), 'NDE / Non Drive End': iv('bm-rd-'+r[0]+'-nde') } })) };
+  const bmCols = ['Rec.Bore S1','Rec.Bore S2','Rec.Clr S1','Rec.Clr S2','Fin.Bore S1','Fin.Bore S2','Fin.Clr S1','Fin.Clr S2'];
+  ['de','nde'].forEach(end=>{
+    out['bearing_'+end] = { title:'F — Sleeve Bearing '+(end==='de'?'Drive End (DE)':'Non Drive End (NDE)'), columns:['Point'].concat(bmCols), rows:
+      BM_ROWS.map(rr=>{ const o={ Point:rr }; BM_COLK.forEach((k,i)=>{ o[bmCols[i]] = iv('bm-'+end+'-'+rr+'-'+k); }); return { no:'', desc:rr, values:o }; }) };
+  });
+  return out;
+}
 function inspSheet(){
   const rows=[]; let sec='';
   INSP.forEach(r=>{
@@ -1426,7 +1699,10 @@ async function submitToDb(){
   base.sheets.heater = mkSheet('A — Heater Motor Measurement', ['Value'], [
     kv(1,'Type Heater', iv('ht-type')), kv(2,'Resistance Total (Ω)', iv('ht-r')), kv(3,'Current (A)', iv('ht-i')),
     kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE (°C)', iv('ht-de')), kv(6,'Raise Temp NDE (°C)', iv('ht-nde')),
-  ].concat(rtdRows('rtdh')));
+  ].concat(rtdRows('rtdh')).concat([
+    kv('BRTD-DE','Bearing RTD DE (°C)', iv('brtd-de')), kv('BRTD-NDE','Bearing RTD NDE (°C)', iv('brtd-nde')),
+    kv('BRTD-DE-IR','Bearing RTD DE — IR (MΩ)', iv('brtd-de-ir')), kv('BRTD-NDE-IR','Bearing RTD NDE — IR (MΩ)', iv('brtd-nde-ir')),
+  ]));
 
   base.sheets.stator = mkSheet('B — Stator Winding Resistance & Insulation', ['Value'], [
     kv('B.1','Winding R T1-T4 (mΩ)', iv('wr-14')), kv('B.2','Winding R T2-T5 (mΩ)', iv('wr-25')),
@@ -1475,11 +1751,7 @@ async function submitToDb(){
     [['T1 – T2T3G','1'],['T2 – T3T1G','2'],['T3 – T1T2G','3'],['T1T2T3 – G','4']].map(x=>({ no:'', desc:x[0], values:{
       'Leak Current (µA)': gv('chp_lc'+x[1])||'—', 'Corona Count': gv('chp_cc'+x[1])||'—', 'Result': tv('chp_'+x[1]) } })) };
 
-  base.sheets.mech = { title:'F — Mechanical Inspection', columns:['Result','Value / Remark'], rows:
-    MECH.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result: tv('m_'+r.no), 'Value / Remark': gv('rmk-m_'+r.no)||'—' } })).concat([
-      kv('','Bearing Clearance DE (mm)', iv('bc-de')), kv('','Bearing Clearance NDE (mm)', iv('bc-nde')),
-      kv('','Air Gap 4 titik (mm)', iv('airgap')), kv('','Slave Bearing Contact Gap (mm)', iv('slave-gap')),
-    ].map(r=>({ no:'', desc:r.desc, values:{ Result:'—', 'Value / Remark': r.values.Value } }))) };
+  Object.assign(base.sheets, buildMechSheets());
 
   base.sheets.unload = mkSheet('G — Unload Test', ['Value'], [
     kv(1,'Voltage (Vac)', iv('ul-v')), kv(2,'Current 3φ (A)', iv('ul-i')), kv(3,'RPM', iv('ul-rpm')),
@@ -1523,6 +1795,9 @@ async function submitToDb(){
 
   // vendor PDF attachments (uploaded on pick) travel with the checksheet doc
   base.attachments = attachForSave();
+  base.checkStates = Object.assign({}, CHK);
+  base.ulIntervals = UL_INT.slice();
+  base.soloIntervals = SOLO_INT.slice();
 
   // ── Phase 2: keep only the sheets that belong to this session's test type ──
   base.testType = _testType || null;
@@ -1829,6 +2104,20 @@ async function generatePDF(selSet, opts){
   if(selSet.has('f')){
     secBar('F. Mechanical Inspection');
     checkTable(S.mech);
+    subTitle('Air-gap D-end / inboard (rotor - stator)');
+    dataTable(S.airgap_de, null);
+    subTitle('Air-gap N-end / outboard (rotor - stator)');
+    dataTable(S.airgap_nde, null);
+    subTitle('Air-gap Bearing Type & Conclusion');
+    kvGrid(S.airgap_meta.rows);
+    subTitle('Sleeve Bearing - Measurement Header & Comments');
+    kvGrid(S.bearing_hdr.rows);
+    subTitle('Sleeve Bearing - Received Data');
+    dataTable(S.bearing_recv, null);
+    subTitle('Sleeve Bearing - Drive End (DE)');
+    dataTable(S.bearing_de, null);
+    subTitle('Sleeve Bearing - Non Drive End (NDE)');
+    dataTable(S.bearing_nde, null);
     sectionPhotos('f');
   }
   if(selSet.has('g')){
@@ -1901,7 +2190,10 @@ function _pdfSnapshot(){
   S.heater = mkSheet('A', ['Value'], [
     kv(1,'Type Heater', iv('ht-type')), kv(2,'Resistance Total (Ω)', iv('ht-r')), kv(3,'Current (A)', iv('ht-i')),
     kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE (°C)', iv('ht-de')), kv(6,'Raise Temp NDE (°C)', iv('ht-nde')),
-  ].concat(rtdRows('rtdh')));
+  ].concat(rtdRows('rtdh')).concat([
+    kv('BRTD-DE','Bearing RTD DE (°C)', iv('brtd-de')), kv('BRTD-NDE','Bearing RTD NDE (°C)', iv('brtd-nde')),
+    kv('BRTD-DE-IR','Bearing RTD DE — IR (MΩ)', iv('brtd-de-ir')), kv('BRTD-NDE-IR','Bearing RTD NDE — IR (MΩ)', iv('brtd-nde-ir')),
+  ]));
   S.stator = mkSheet('B', ['Value'], [
     kv('B.1','Winding R T1-T4 (mΩ)', iv('wr-14')), kv('B.2','Winding R T2-T5 (mΩ)', iv('wr-25')), kv('B.3','Winding R T3-T6 (mΩ)', iv('wr-36')),
     kv('B.4','Max Unbalance (%)', iv('wr-unb')), kv('B.5','Hasil Winding Resistance', tv('wr_result')),
@@ -1935,10 +2227,7 @@ function _pdfSnapshot(){
   S.hipot_mtx = { title:'E', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('hipot') };
   S.corona_hp = { title:'E', columns:['Leak Current (µA)','Corona Count','Result'], rows:
     [['T1 – T2T3G','1'],['T2 – T3T1G','2'],['T3 – T1T2G','3'],['T1T2T3 – G','4']].map(x=>({ no:'', desc:x[0], values:{ 'Leak Current (µA)':gv('chp_lc'+x[1])||'—','Corona Count':gv('chp_cc'+x[1])||'—','Result':tv('chp_'+x[1]) } })) };
-  S.mech = { title:'F', columns:['Result','Value / Remark'], rows:
-    MECH.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result:tv('m_'+r.no), 'Value / Remark':gv('rmk-m_'+r.no)||'—' } })).concat(
-    [['Bearing Clearance DE (mm)','bc-de'],['Bearing Clearance NDE (mm)','bc-nde'],['Air Gap 4 titik (mm)','airgap'],['Slave Bearing Contact Gap (mm)','slave-gap']]
-      .map(x=>({ no:'', desc:x[0], crit:'', values:{ Result:'—', 'Value / Remark':iv(x[1]) } }))) };
+  Object.assign(S, buildMechSheets());
   S.unload = mkSheet('G', ['Value'], [
     kv(1,'Voltage (Vac)', iv('ul-v')), kv(2,'Current 3φ (A)', iv('ul-i')), kv(3,'RPM', iv('ul-rpm')), kv(4,'Durasi (jam)', iv('ul-dur')),
     kv(5,'Air Gap DE (mm)', iv('ul-ag-de')), kv(6,'Air Gap NDE (mm)', iv('ul-ag-nde')), kv(7,'Rotasi', iv('ul-rot')),
@@ -2158,6 +2447,9 @@ function clearSessionForm(){
   if (typeof PHOTOS === 'object') Object.keys(PHOTOS).forEach(k => { PHOTOS[k] = []; });
   if (typeof renderAllPhotos === 'function') renderAllPhotos();
   if (typeof applyAttachList === 'function') applyAttachList([]);
+  if (typeof applyChecks === 'function') applyChecks({});
+  if (typeof resetIntervals === 'function') resetIntervals();
+  if (typeof renderAirGap === 'function') { renderAirGap('de'); renderAirGap('nde'); renderBearingMeas(); }
   upStats(); if (typeof drawAllIRCharts === 'function') drawAllIRCharts();
 }
 
@@ -2167,8 +2459,10 @@ async function loadSession(s){
   document.body.style.overflow = '';
   clearSessionForm();
 
-  // text fields + toggles
-  const d = { _st: s.toggleStates || {} };
+  // text fields + toggles + checkboxes + dynamic time intervals
+  const d = { _st: s.toggleStates || {}, _chk: s.checkStates || (s.extra && s.extra.checkStates) || null,
+              _ul_int: s.ulIntervals || (s.extra && s.extra.ulIntervals),
+              _solo_int: s.soloIntervals || (s.extra && s.extra.soloIntervals) };
   Object.entries(s.inputValues || {}).forEach(([k, v]) => { d['f_' + k] = v; });
   applyDraftData(d);
   // matrix cells (ids present in inputValues but not matched by DRAFT_SEL sometimes)
@@ -2547,8 +2841,17 @@ SubmitGuard.init({ assetTag: MW_TAG });
 TechnicianAuth.init({ checkedByFieldId: 'checked-by' });
 CloudDraft.init({
   formId:'mw', assetTag:()=>gv('asset-tag')||MW_TAG, assetName:MW_NAME, frequency:'WITNESS',
-  collectExtra: () => ({ attachments: attachForSave() }),
-  applyExtra: (x) => applyAttachList(x && x.attachments),
+  collectExtra: () => ({
+    attachments: attachForSave(),
+    checkStates: Object.assign({}, CHK),
+    ulIntervals: UL_INT.slice(),
+    soloIntervals: SOLO_INT.slice(),
+  }),
+  applyExtra: (x) => {
+    applyAttachList(x && x.attachments);
+    if (x && x.checkStates) applyChecks(x.checkStates);
+    if (x && (x.ulIntervals || x.soloIntervals)) applyIntervals(x.ulIntervals, x.soloIntervals);
+  },
 });
 document.getElementById('asset-tag').addEventListener('change', ()=>{ const t=gv('asset-tag')||MW_TAG; LoadMergeModal.init({ assetTag:t }); SubmitGuard.init({ assetTag:t }); });
 // Phase 1 — pilih / daftar motor sebelum mengisi check sheet
