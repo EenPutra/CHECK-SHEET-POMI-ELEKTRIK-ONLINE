@@ -208,6 +208,28 @@ table.ct tr:last-child td{border-bottom:none}
 #session-banner{background:var(--info-bg);border:1px solid var(--info-bd);color:var(--info-tx);border-radius:8px;padding:9px 14px;margin:0 2px 10px;font-size:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 #session-banner b{font-family:var(--raj);letter-spacing:.5px}
 #session-banner button{font-size:11px;padding:4px 10px}
+.session-tab.cmp{background:var(--info-bg);border-color:var(--info-bd);color:var(--info-tx)}
+#compare-overlay{display:none;position:fixed;inset:0;background:rgba(19,35,56,.6);z-index:9998;align-items:flex-start;justify-content:center;padding:22px 14px;overflow-y:auto;backdrop-filter:blur(3px)}
+#compare-overlay.show{display:flex}
+.cmp-box{background:var(--panel-solid);border:1.5px solid var(--pb);border-radius:13px;width:min(1100px,100%);max-height:92vh;overflow:hidden;display:flex;flex-direction:column;margin:auto}
+.cmp-hd{background:var(--topbar-g);padding:13px 18px;color:var(--topbar-tl);font-family:var(--raj);font-weight:700;letter-spacing:1.5px;font-size:13px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-shrink:0}
+.cmp-hd button{background:rgba(255,255,255,.16);border:0;color:#fff;font-size:15px;width:28px;height:28px;border-radius:6px;cursor:pointer}
+.cmp-bd{padding:14px 16px 18px;overflow:auto;flex:1}
+.cmp-tbl{border-collapse:collapse;width:100%;font-size:12px}
+.cmp-tbl th,.cmp-tbl td{border:1px solid var(--td-line);padding:6px 9px;text-align:left;vertical-align:top}
+.cmp-tbl thead th{background:var(--th-bg);color:var(--steel);font-family:var(--raj);font-weight:700;letter-spacing:.5px;white-space:nowrap;position:sticky;top:0}
+.cmp-tbl td:first-child,.cmp-tbl th:first-child{position:sticky;left:0;background:var(--field-bg);z-index:1;font-weight:600;color:var(--t2);min-width:230px}
+.cmp-tbl thead th:first-child{z-index:2}
+.cmp-sec-row td{background:var(--sec-hdr-bg);font-family:var(--raj);font-weight:700;letter-spacing:1px;color:var(--sl);font-size:10.5px}
+.cmp-badge{display:inline-block;padding:1px 8px;border-radius:5px;font-weight:800;font-size:10.5px}
+.cmp-ok{background:var(--ok-bg);color:var(--ok)} .cmp-ng{background:var(--ng-bg);color:var(--ng)} .cmp-na{background:var(--na-soft);color:var(--na)}
+.cmp-col-hd{font-size:10px;color:var(--t3);font-weight:400;display:block;margin-top:2px}
+.cmp-full-btn{margin-top:5px;font-size:10px;padding:3px 8px}
+.cmp-sheet{margin-bottom:16px}
+.cmp-sheet-t{font-family:var(--raj);font-weight:700;letter-spacing:1px;color:var(--steel);font-size:12.5px;margin-bottom:5px;border-left:3px solid var(--sl);padding-left:8px}
+.cmp-crit{color:var(--t3);font-size:10px}
+.cmp-remark{font-size:11px;color:var(--t3);font-style:italic;margin-top:4px}
+.cmp-empty{color:var(--t3);font-size:12px;text-align:center;padding:26px 10px}
 .pi-out{font-family:var(--mono);font-weight:700;color:var(--steel)}
 .pi-out.bad{color:var(--ng)}
 /* photos */
@@ -628,6 +650,14 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
   <div id="notice" class="notice"></div>
 </div>
 <div class="autosave-ind" id="autosave-indicator"></div>
+
+<!-- Session comparison (Phase 4) -->
+<div id="compare-overlay">
+  <div class="cmp-box">
+    <div class="cmp-hd"><span id="cmp-title">PERBANDINGAN SESI TEST</span><button type="button" onclick="closeCompare()">&#10005;</button></div>
+    <div class="cmp-bd" id="cmp-body"></div>
+  </div>
+</div>
 
 <!-- Motor master gate (Phase 1) -->
 <div id="motor-gate">
@@ -2127,7 +2157,117 @@ function renderSessionTabs(){
     return `<button class="session-tab${s.id === cur ? ' active' : ''}" type="button" onclick="mgLoadSession(${i})">${_tabIco(s.testType)} ${_esc(_sd(s.executionDate || s.updatedAt))}<span class="st-badge ${bcls}">${blbl}</span></button>`;
   }).join('');
   const newTab = `<button class="session-tab${!cur ? ' active' : ''}" type="button" onclick="mgNewSession()">➕ Sesi Baru</button>`;
-  bar.innerHTML = tabs + newTab;
+  const cmpTab = _sessions.length >= 1 ? `<button class="session-tab cmp" type="button" onclick="openCompare()">📊 Bandingkan (${_sessions.length})</button>` : '';
+  bar.innerHTML = tabs + newTab + cmpTab;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   PHASE 4 — perbandingan sesi test (tabel ringkas + "Lihat Lengkap")
+   ════════════════════════════════════════════════════════════════════ */
+const _cnum = v => { const n = parseFloat(String(v == null ? '' : v).replace(',', '.')); return isNaN(n) ? null : n; };
+const _ivx = (s, id) => (s.inputValues && s.inputValues[id] != null && s.inputValues[id] !== '') ? String(s.inputValues[id]) : '—';
+const _tgx = (s, id) => (s.toggleStates && s.toggleStates[id]) || '—';
+const _ratio = (a, b) => { const x = _cnum(a), y = _cnum(b); return (x != null && y != null && y !== 0) ? (x / y).toFixed(2) : '—'; };
+function _maxIv(s, ids){ let m = null; ids.forEach(id => { const n = _cnum((s.inputValues || {})[id]); if (n != null && (m == null || n > m)) m = n; }); return m == null ? '—' : String(m); }
+const _ULW = (() => { const a = []; for (let r = 0; r < 10; r++) for (let i = 1; i <= 10; i++) a.push('ulw_' + r + '_' + i); return a; })();
+const _ULB = (() => { const a = []; for (let r = 0; r < 10; r++) ['de1', 'de2', 'nde1', 'nde2'].forEach(x => a.push('ulb_' + r + '_' + x)); return a; })();
+
+const CMP_ROWS = [
+  { sec: 'B — Stator Winding R & IR', label: 'Winding R T1–T4 / T2–T5 / T3–T6 (mΩ)', get: s => [_ivx(s, 'wr-14'), _ivx(s, 'wr-25'), _ivx(s, 'wr-36')].join(' / ') },
+  { sec: 'B — Stator Winding R & IR', label: 'Max Unbalance Winding R (%)', get: s => _ivx(s, 'wr-unb') },
+  { sec: 'B — Stator Winding R & IR', label: 'Hasil Winding Resistance', get: s => _tgx(s, 'wr_result'), badge: 1 },
+  { sec: 'B — Stator Winding R & IR', label: 'IR @10 min · T1T2T3–G (GΩ)', get: s => _ivx(s, 'stator_d_10min') },
+  { sec: 'B — Stator Winding R & IR', label: 'PI (R10min / R1min)', get: s => _ratio(_ivx(s, 'stator_d_10min'), _ivx(s, 'stator_d_1min')) },
+  { sec: 'B — Stator Winding R & IR', label: 'DAR (R1min / R30s)', get: s => _ratio(_ivx(s, 'stator_d_1min'), _ivx(s, 'stator_d_30s')) },
+  { sec: 'B — Stator Winding R & IR', label: 'Hasil IR / PI', get: s => _tgx(s, 'ir_result'), badge: 1 },
+  { sec: 'C — Surge & Corona', label: 'Surge Waveform', get: s => _tgx(s, 'surge_wave'), badge: 1 },
+  { sec: 'C — Surge & Corona', label: 'Applied Voltage Surge (kV-Ac)', get: s => _ivx(s, 'sc-v') },
+  { sec: 'C — Surge & Corona', label: 'Hasil Corona (surge)', get: s => _tgx(s, 'corona_surge'), badge: 1 },
+  { sec: 'D — Tan Delta & PD', label: 'PD Qmax (nC)', get: s => _ivx(s, 'pd-max') },
+  { sec: 'D — Tan Delta & PD', label: 'Hasil PD', get: s => _tgx(s, 'pd_result'), badge: 1 },
+  { sec: 'D — Tan Delta & PD', label: 'Tan Delta @0.2Un / Δ (×10⁻³)', get: s => [_ivx(s, 'td-02'), _ivx(s, 'td-delta')].join(' / ') },
+  { sec: 'D — Tan Delta & PD', label: 'Hasil Tan Delta', get: s => _tgx(s, 'td_result'), badge: 1 },
+  { sec: 'E — Hi-Pot', label: 'IR After Hi-Pot · T1T2T3–G (GΩ)', get: s => _ivx(s, 'hp-ir4') },
+  { sec: 'E — Hi-Pot', label: 'Hasil Hi-Pot', get: s => _tgx(s, 'hp_result'), badge: 1 },
+  { sec: 'G — Unload Test', label: 'Max Winding Temp Unload (°C)', get: s => _maxIv(s, _ULW) },
+  { sec: 'G — Unload Test', label: 'Max Bearing Temp Unload (°C)', get: s => _maxIv(s, _ULB) },
+  { sec: 'H — Solo Run', label: 'IR @1" / @10" / PI (Solo Run)', get: s => [_ivx(s, 'sr-ir1'), _ivx(s, 'sr-ir10'), _ivx(s, 'sr-pi')].join(' / ') },
+  { sec: 'H — Solo Run', label: 'Voltage Unbalance (%)', get: s => _ivx(s, 'dcs-vunb') },
+  { sec: 'H — Solo Run', label: 'Power (kW) / PF', get: s => [_ivx(s, 'dcs-kw'), _ivx(s, 'dcs-pf')].join(' / ') },
+  { sec: 'H — Solo Run', label: 'Vibration Solo Run (mm/s)', get: s => _ivx(s, 'dcs-vib') },
+  { sec: 'H — Solo Run', label: 'Hasil Solo Run', get: s => _tgx(s, 'solo_result'), badge: 1 },
+  { sec: 'I — Kesimpulan', label: 'Overall Condition', get: s => _ivx(s, 'overall') },
+  { sec: 'I — Kesimpulan', label: 'Jumlah NG', get: s => String(s.countNg != null ? s.countNg : Object.values(s.toggleStates || {}).filter(v => v === 'NG').length) },
+];
+
+function _badge(v){
+  const t = String(v || '').toUpperCase();
+  if (t === 'OK' || t === 'ACCEPT' || t === 'PASS') return `<span class="cmp-badge cmp-ok">${_esc(v)}</span>`;
+  if (t === 'NG' || t === 'FAIL' || t === 'REJECT') return `<span class="cmp-badge cmp-ng">${_esc(v)}</span>`;
+  if (t === 'N/A' || t === 'NA') return `<span class="cmp-badge cmp-na">${_esc(v)}</span>`;
+  return _esc(v);
+}
+
+async function openCompare(){
+  document.getElementById('compare-overlay').classList.add('show');
+  document.body.style.overflow = 'hidden';
+  const body = document.getElementById('cmp-body');
+  body.innerHTML = '<div class="cmp-empty">Memuat data sesi…</div>';
+  document.getElementById('cmp-title').textContent = 'PERBANDINGAN SESI TEST — ' + ((_activeMotor && _activeMotor.tag) || '');
+
+  // pull full docs (drafts already have inputValues/toggleStates; submitted need the full doc)
+  const full = [];
+  for (const s of _sessions) {
+    if (s._isDraft || s.inputValues) { full.push(s); continue; }
+    try { const d = await DB.getById(s.id); full.push(Object.assign({}, s, d || {})); }
+    catch (e) { full.push(s); }
+  }
+  if (!full.length) { body.innerHTML = '<div class="cmp-empty">Belum ada sesi test untuk dibandingkan.</div>'; return; }
+
+  const colHd = full.map((s, i) => {
+    const st = s._isDraft ? '<span class="cmp-badge cmp-na">DRAFT</span>' : (s._status === 'approved' ? '<span class="cmp-badge cmp-ok">APPROVED</span>' : '<span class="cmp-badge" style="background:var(--sl);color:#fff">SUBMIT</span>');
+    return `<th>${_tabIco(s.testType)} ${_esc(_sd(s.executionDate || s.updatedAt))}
+      <span class="cmp-col-hd">${_esc((TEST_LABEL[s.testType] || 'Test').replace(/^\S+\s/, ''))} · ${_esc(s.checkedBy || s.savedByName || '—')}</span>
+      ${st}
+      ${(!s._isDraft && s.sheets) ? `<br><button class="btn bo bsm cmp-full-btn" type="button" onclick="openFullView(${i})">👁 Lihat Lengkap</button>` : `<br><button class="btn bo bsm cmp-full-btn" type="button" onclick="cmpContinue(${i})">↪ Lanjutkan</button>`}</th>`;
+  }).join('');
+
+  let rows = '', lastSec = '';
+  CMP_ROWS.forEach(r => {
+    const vals = full.map(r.get ? s => r.get(s) : () => '—');
+    if (vals.every(v => v === '—' || v === '— / — / —' || v === '— / —')) return;   // skip rows nothing tested
+    if (r.sec !== lastSec) { rows += `<tr class="cmp-sec-row"><td colspan="${full.length + 1}">${_esc(r.sec)}</td></tr>`; lastSec = r.sec; }
+    rows += `<tr><td>${_esc(r.label)}</td>${vals.map(v => `<td>${r.badge ? _badge(v) : _esc(v)}</td>`).join('')}</tr>`;
+  });
+
+  body.innerHTML = `
+    <div style="font-size:11.5px;color:var(--t3);margin-bottom:8px">${full.length} sesi · parameter yang belum pernah diisi di semua sesi disembunyikan.</div>
+    <div style="overflow:auto"><table class="cmp-tbl"><thead><tr><th>Parameter</th>${colHd}</tr></thead><tbody>${rows || '<tr><td colspan="' + (full.length + 1) + '" class="cmp-empty">Belum ada nilai terisi.</td></tr>'}</tbody></table></div>`;
+  window.__cmpFull = full;
+}
+function closeCompare(){ document.getElementById('compare-overlay').classList.remove('show'); document.body.style.overflow = ''; }
+function cmpContinue(i){ const s = (window.__cmpFull || [])[i]; closeCompare(); if (s) loadSession(s); }
+
+function _sheetsHtml(sheets){
+  return Object.keys(sheets).map(k => {
+    const sh = sheets[k] || {};
+    const cols = sh.columns || ['Value'];
+    const head = '<th style="width:40px">#</th><th>Item</th>' + cols.map(c => `<th>${_esc(c)}</th>`).join('');
+    const body = (sh.rows || []).map(r => {
+      const cells = cols.map(c => `<td>${_esc(((r.values || {})[c] != null) ? (r.values || {})[c] : '—')}</td>`).join('');
+      return `<tr><td>${_esc(r.no || '')}</td><td>${_esc(r.desc || '')}${r.crit ? `<br><span class="cmp-crit">${_esc(r.crit)}</span>` : ''}</td>${cells}</tr>`;
+    }).join('');
+    return `<div class="cmp-sheet"><div class="cmp-sheet-t">${_esc(sh.title || k)}</div>
+      <table class="cmp-tbl"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
+      ${sh.remark ? `<div class="cmp-remark">${_esc(sh.remark)}</div>` : ''}</div>`;
+  }).join('');
+}
+function openFullView(i){
+  const s = (window.__cmpFull || [])[i];
+  if (!s || !s.sheets) return;
+  const body = document.getElementById('cmp-body');
+  document.getElementById('cmp-title').textContent = 'SESI ' + _sd(s.executionDate || s.updatedAt) + ' — ' + ((TEST_LABEL[s.testType] || 'Test').replace(/^\S+\s/, '')) + ' (read-only)';
+  body.innerHTML = `<button class="btn bo bsm" type="button" style="margin-bottom:12px" onclick="openCompare()">← Kembali ke perbandingan</button>` + _sheetsHtml(s.sheets);
 }
 // keep the motor chip in the top bar in sync
 function refreshMotorChip(){
