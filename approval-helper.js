@@ -247,17 +247,36 @@ const Approvals = {
       const groups = Object.keys(photos || {});
       const totalPhotos = groups.reduce((n, k) => n + (photos[k] || []).length, 0);
       let uploadedPhotos = 0;
+      // When this report was built up via "Simpan ke Database" (cloud-draft.js),
+      // its photos are ALREADY on Drive — reuse those URLs group-for-group
+      // (count match) instead of uploading everything again. This is the whole
+      // point of the unified draft/submit flow: Drive isn't hit twice.
+      let reuse = null;
+      try {
+        if (opts.reusePhotoUrls) reuse = opts.reusePhotoUrls;
+        else if (typeof window !== 'undefined' && window.CloudDraft && CloudDraft.getReusePhotoUrls) reuse = CloudDraft.getReusePhotoUrls();
+      } catch (e) {}
       if (totalPhotos) report(0, 'Mengunggah foto...');
       for (const key of groups) {
         const list = photos[key] || [];
         if (!list.length) continue;
+        if (reuse && Array.isArray(reuse[key]) && reuse[key].length === list.length) {
+          photoUrls[key] = reuse[key].map(u => ({ url: u.url, caption: u.caption || '',
+            ...(u.w != null ? { w: u.w } : {}), ...(u.h != null ? { h: u.h } : {}),
+            ...(u.widthCm != null ? { widthCm: u.widthCm } : {}), ...(u.heightCm != null ? { heightCm: u.heightCm } : {}) }));
+          uploadedPhotos += list.length;
+          if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Foto ${key} sudah tersimpan (${list.length})...`);
+          continue;
+        }
         const urls = [];
         for (let i = 0; i < list.length; i++) {
           const p = list[i];
           if (!p || !p.src) continue;
-          const url = await Storage.uploadDataUrl(
-            `checksheets/${checksheetId}/photos/${key}-${i}.jpg`, p.src, 'image/jpeg'
-          );
+          const url = (p.__cdUrl && p.__cdSig === (String(p.src).length + '~' + String(p.src).slice(0, 24) + String(p.src).slice(-24)))
+            ? p.__cdUrl
+            : await Storage.uploadDataUrl(
+                `checksheets/${checksheetId}/photos/${key}-${i}.jpg`, p.src, 'image/jpeg'
+              );
           // w/h/widthCm/heightCm ride along so a later restore (revision
           // banner / Load & Merge — see load-merge-modal.js's
           // restorePhotosFromUrls hook) can recreate the exact same PhotoKit

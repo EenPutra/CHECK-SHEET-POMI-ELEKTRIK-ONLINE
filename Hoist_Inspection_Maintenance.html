@@ -314,7 +314,6 @@ input[type=range].esl::-webkit-slider-thumb{-webkit-appearance:none;width:14px;h
     
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-draft btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">⬇️ Download PDF</button>
     <button class="btn btn-submit btn-sm" onclick="submitToDb()">🗄️ Submit</button>
   </div>
@@ -348,7 +347,7 @@ input[type=range].esl::-webkit-slider-thumb{-webkit-appearance:none;width:14px;h
   </div>
   <div class="sec-body">
     <div style="padding:14px 16px 0">
-      <button class="btn-load-merge" id="btn-load-merge" onclick="openLoadMergeModal()">&#128229; Pilih &amp; Gabung Data dari Database</button>
+      <button class="btn-load-merge" id="btn-load-merge" onclick="openLoadMergeModal()">&#128229; Muat / Lanjutkan dari Database</button>
     </div>
     <div class="wo-grid">
       <div class="mf"><label>Tag Number</label><input type="text" id="tag-no" placeholder="e.g. 7CRN-001"></div>
@@ -743,7 +742,6 @@ input[type=range].esl::-webkit-slider-thumb{-webkit-appearance:none;width:14px;h
     </div>
     <div class="actions">
       <button class="btn btn-draft" onclick="CloudDraft.save()">💾 Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
       <button class="btn btn-pdf" onclick="generatePDF()">⬇️ Download PDF</button>
       <button class="btn btn-submit" onclick="submitToDb()">🗄️ Submit to Database</button>
     </div>

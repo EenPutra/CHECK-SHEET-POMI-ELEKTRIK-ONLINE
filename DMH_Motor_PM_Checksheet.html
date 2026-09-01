@@ -227,7 +227,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <a class="btn-back" href="index.html" title="Back to Portal">&#8592; Portal</a>
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-draft btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📥 Download PDF</button>
     <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
@@ -299,7 +298,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       </div>
     </div>
     <div style="padding:0 16px 14px">
-      <button class="btn btn-sm" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Pilih &amp; Gabung Data dari Database</button>
+      <button class="btn btn-sm" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Muat / Lanjutkan dari Database</button>
       <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya (untuk unit yang sedang dipilih) untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
@@ -571,7 +570,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
   <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
   <button class="btn btn-draft" style="background:var(--navy);color:#fff" onclick="CloudDraft.save()">💾 Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
   <button class="btn btn-pdf" onclick="generatePDF()">📥 Download PDF</button>
   <button class="btn" style="background:#16a34a;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">&#128202; Submit to Database</button>
 </div>

@@ -235,7 +235,6 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
     <span class="clock" id="clock">--:--:--</span><div class="tsep"></div>
     <button class="theme-btn" id="theme-btn" title="Ganti tema (light / dark)" onclick="cycleTheme()">🌙</button>
     <button class="btn bo bsm" onclick="CloudDraft.save()">💾 Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn br bsm" onclick="openPdfModal()">📥 PDF</button>
     <button class="btn bg bsm" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
@@ -254,7 +253,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
   </div>
 
   <div style="padding:0 2px 12px">
-    <button class="btn bo bsm" onclick="openLoadMerge()">📥 Pilih &amp; Gabung Data dari Database</button>
+    <button class="btn bo bsm" onclick="openLoadMerge()">📥 Muat / Lanjutkan dari Database</button>
     <span style="font-size:11px;color:var(--t3);margin-left:6px">Ambil / gabung witness test sebelumnya untuk motor yang sama.</span>
   </div>
 
@@ -578,7 +577,6 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
 
   <div class="action-row" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-top:12px">
     <button class="btn bo" onclick="CloudDraft.save()">💾 Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn bg" style="font-size:15px;padding:10px 22px" onclick="submitToDb()">&#128202; Submit to Database</button>
     <button class="btn bp" onclick="resetForm()">🔄 Reset</button>
     <button class="btn br" onclick="openPdfModal()">📥 Download PDF</button>

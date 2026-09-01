@@ -11,6 +11,7 @@
 <script src="storage-helper.js?v=20260901a"></script>
 <script src="approval-helper.js?v=20260901a"></script>
 <script src="submit-guard.js?v=20260901a"></script>
+<script src="load-merge-modal.js?v=20260901a"></script>
 <script src="cloud-draft.js?v=20260901a"></script>
 <script>window.__pdfPreviewOwn=true;</script>
 <script src="pdf-preview.js?v=20260901a"></script>
@@ -429,7 +430,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <span class="tb-time" id="clock">--:--:--</span>
     <span class="autosave-ind" id="autosave-indicator"></span>
     <button class="btn btn-draft btn-sm" onclick="CloudDraft.save()">&#128190; Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="openPdfModal()">&#128229; Download PDF</button>
     <button class="btn btn-submit btn-sm" onclick="submitToDb()">&#128451;&#65039; Submit</button>
   </div>
@@ -466,7 +466,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       </div>
     </div>
     <div style="padding:0 16px 14px">
-      <button class="btn btn-outline btn-sm" id="btn-load-last" onclick="openLoadModal()">&#128229; Pilih &amp; Gabung Data dari Database</button>
+      <button class="btn btn-outline btn-sm" id="btn-load-last" onclick="openLoadModal()">&#128229; Pilih &amp; Gabung Data (per Inverter)</button>
+      <button class="btn btn-outline btn-sm" onclick="LoadMergeModal.open()">&#128229; Muat / Lanjutkan Draft dari Database</button>
       <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini &mdash; berguna saat beberapa teknisi mengisi inverter berbeda secara terpisah.</span>
     </div>
     <span id="doc-id-display" style="font-family:var(--mono);font-size:10px;color:var(--txt4);padding:0 16px 10px;display:block"></span>
@@ -6431,7 +6432,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="actions">
   <button class="btn" style="background:var(--navy);color:#fff" onclick="resetForm()">&#128260; Reset</button>
   <button class="btn btn-draft" onclick="CloudDraft.save()">&#128190; Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
   <button class="btn btn-pdf" onclick="openPdfModal()">&#128229; Download PDF</button>
   <button class="btn btn-submit" style="font-size:14px;padding:8px 24px" onclick="submitToDb()">&#128451;&#65039; Submit to Database</button>
 </div>
@@ -7642,6 +7642,7 @@ function pdfPreviewDownload(){
 loadDraft();
 initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "checked-by" });
+LoadMergeModal.init({ assetTag: 'PLTS-ASHDISPOSAL' });
 CloudDraft.init({ formId:'plts-ash', assetTag:'PLTS-ASHDISPOSAL', assetName:'PV Ash Disposal 689 kWp PM', frequency:'YEARLY' });
 SubmitGuard.init({ assetTag: 'PLTS-ASHDISPOSAL' });
 </script>

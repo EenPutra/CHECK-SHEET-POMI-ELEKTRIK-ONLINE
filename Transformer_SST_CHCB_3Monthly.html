@@ -240,7 +240,6 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;wi
 
     <div class="ldot"></div><span class="tclock" id="clock">--:--:--</span><div class="tsep"></div>
     <button class="btn bo bsm" onclick="CloudDraft.save()">💾 Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn br bsm" onclick="openPdfModal()">📥 Download PDF</button>
     <button class="btn bsm" style="background:#27ae60;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
@@ -269,7 +268,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;wi
       <div class="mf"><label>Shift</label><select id="shift"><option>Shift 1 (07:00–15:00)</option><option>Shift 2 (15:00–23:00)</option><option>Shift 3 (23:00–07:00)</option><option>Normal Hours</option></select></div>
     </div>
     <div style="padding-top:12px">
-      <button class="btn bo bsm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Pilih &amp; Gabung Data dari Database</button>
+      <button class="btn bo bsm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Muat / Lanjutkan dari Database</button>
       <span style="font-size:11px;color:var(--t3);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
@@ -330,7 +329,6 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#f4f8f5;wi
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-top:14px">
     <button class="btn bo" onclick="CloudDraft.save()">💾 Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn" style="background:#27ae60;color:#fff;font-size:15px;padding:10px 24px;border:none;border-radius:6px;cursor:pointer" onclick="submitToDb()">&#128202; Submit to Database</button>
     <button class="btn bp" onclick="resetForm()">🔄 Reset</button>
     <button class="btn br" onclick="openPdfModal()">📥 Download PDF</button>

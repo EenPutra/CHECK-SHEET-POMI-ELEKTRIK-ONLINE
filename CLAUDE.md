@@ -1891,44 +1891,50 @@ file deleted; there is no standalone status page.
   the role's sections). `showApp()` calls `switchTab(_activeTab)` once so the default tab's
   panel visibility is synced on load.
 
-## `cloud-draft.js` — "Simpan ke Database (Lanjut Nanti)" on every check sheet
+## `cloud-draft.js` — "Simpan ke Database (Lanjut Nanti)", unified with Load & Merge
 
-A check sheet's draft button now ALSO writes the whole form state to the **isolated
-`checksheet_drafts` Firestore collection** — never `checksheets` — so a half-finished report can
-be picked back up on any device, and only "Submit to Database" ever creates a real submission +
-review record. Rolled out to **all 25 portal-linked check sheets** (self-injecting module like
-`submit-guard.js`). Firestore Rules must allow the collection:
-`match /checksheet_drafts/{doc} { allow read, write: if true; }` — the module degrades gracefully
-(localStorage-only + a clear toast) on `permission-denied`.
+"Save a not-yet-finished report to the database and continue it later, from any device" — built
+as ONE system with Load & Merge, NOT a separate feature (explicit user requirement: *"jadikan
+satu system.. jangan buat terpisah agar tidak membebani drive"*). Rolled out to **all 25 portal
+check sheets** (self-injecting like `submit-guard.js`). Firestore Rules must allow:
+`match /checksheet_drafts/{doc} { allow read, write: if true; }` — degrades to localStorage-only
++ a clear toast on `permission-denied`. Drafts live ONLY in `checksheet_drafts` (never
+`checksheets`), so dashboard / trend / dedup / review need no change.
 
-- **`CloudDraft.save()`** (the "💾 Simpan ke Database" button): runs the host's own
-  `saveDraft()`/`persistDraft()` first (local), then `DB.collectCheckSheetData(formId, tag, name,
-  freq)` for `inputValues` + `toggleStates` (works even on sheets whose `submitToDb()` builds the
-  doc manually), uploads every evidence photo to Drive (`Storage.uploadDataUrl` → progress
-  overlay), and `db.collection('checksheet_drafts').doc(<id>).set({..., status:'draft', savedBy,
-  photoUrls, extra})`. The draft id is kept in `localStorage['cd_<formId>_<tag>']` so re-saving
-  updates the same doc. Photos are auto-detected from `window.PHOTOS` / `window.FILES` when the
-  host doesn't pass an explicit `photos` getter.
-- **`CloudDraft.openResume()`** (the "📥 Lanjutkan Draft" button): lists every `checksheet_drafts`
-  doc for this `formId` (asset tag / WO / date / who saved / when), and on "Lanjutkan" restores
-  via `LoadMergeModal.applyMergedBundleToForm(bundle, true)` (text + toggles) +
-  `window.restorePhotosFromUrls(photoUrls, true)` (photos) + `cfg.applyExtra()` + `cfg.afterRestore()`,
-  then adopts that draft id so continued saves update it.
-- **`CloudDraft.markSubmitted()`** — call it in `submitToDb()` on success (wired into every
-  sheet right after `SubmitGuard.markSubmitted(...)`): deletes the draft doc + clears the
-  localStorage id, so a completed report doesn't linger as a resumable draft.
+- **`CloudDraft.save()`** ("💾 Simpan ke Database"): local `saveDraft()` first, then
+  `DB.collectCheckSheetData(formId, tag, name, freq)` for `inputValues` + `toggleStates` (works
+  even on sheets whose `submitToDb()` builds the doc manually), uploads photos to Drive, and
+  `db.collection('checksheet_drafts').doc(<id>).set({..., status:'draft', photoUrls, extra})`.
+  The id lives in `localStorage['cd_<formId>_<tag>']` so re-saving UPDATES the same doc.
+  **A photo already on Drive from an earlier save is NOT re-uploaded** — each entry gets a
+  `__cdSig` (`length~head~tail` of its data URL) + `__cdUrl` stamp; a re-save with an unchanged
+  signature reuses the URL. Photos auto-detected from `window.PHOTOS`/`window.FILES` when the
+  host passes no `photos` getter.
+- **Continuing a draft uses the SAME "📥 Muat / Lanjutkan dari Database" button as Load & Merge**
+  (the old "Pilih & Gabung Data" button, relabelled everywhere). `load-merge-modal.js`'s
+  `open()` now also calls `CloudDraft.listDrafts()` and lists drafts above the submitted history,
+  badged **DRAFT**. Picking a single draft row = full overwrite restore; `_confirm()` calls
+  `CloudDraft.adopt(id, doc)` **before** `buildMergedBundle` / `restorePhotosFromUrls` (so
+  `cfg.applyExtra` — e.g. MCA's `narrativeBlocks` into `_cloudNB` — is staged first) and this
+  session then keeps working on that draft doc.
+- **Submit is only for a finished report.** `submitToDb()` creates the real `checksheets` doc +
+  approval as usual, but `Approvals.submitWithFiles()` **reuses the draft's already-uploaded
+  photo URLs** (`opts.reusePhotoUrls` / `CloudDraft.getReusePhotoUrls()`, group-for-group on a
+  count match) so Drive is never hit twice for the same photos; only the archival PDF uploads.
+  `CloudDraft.markSubmitted()` (wired right after `SubmitGuard.markSubmitted(...)` in every sheet)
+  then deletes the draft doc.
 - **`CloudDraft.init({ formId, assetTag, assetName, frequency, photos?, collectExtra?, applyExtra?,
-  afterRestore? })`** — one call per file, inserted right after `TechnicianAuth.init(...)` (the
-  single reliable top-level init anchor). `assetTag` is a **getter** for multi-asset sheets
-  (`4000_Hours_Mill_PM`, `DMH`, `Hoist`, `HV_Motor_6Monthly`, `HV_Motor_SWGR`, `LV_Motor_MCC`) —
-  and those getters read the **DOM tag field** (`#tag-search` / `#tag-no` / `#sel-unit`), wrapped
-  in try/catch, NOT a bare JS variable (an early rollout used `()=>tag` and threw a `ReferenceError`
-  at save time because `tag` was only a function parameter). MCA additionally passes `photos`
-  (flatten NB image blocks + `PHOTOS.attachments`), `collectExtra`/`applyExtra` (the
-  `narrativeBlocks` structure — staged into `_cloudNB`, which `_fetchSourceNarrativeBlocks()`
-  checks first), and `afterRestore` (re-render blocks + conclusion + RCA panels).
-- The 3 legacy dups (`esp_checksheet.html`, `4000 Hours Mill/*.html`) are NOT wired, same as
-  submit-guard.
+  afterRestore? })`** — one call per file, right after `TechnicianAuth.init(...)` (the single
+  reliable top-level anchor). `assetTag` is a **getter reading the DOM tag field** (`#tag-search`
+  / `#tag-no` / `#sel-unit`, try/catch-wrapped) for the multi-asset sheets — NOT a bare JS var
+  (`()=>tag` threw `ReferenceError` at save time because `tag` was only a function parameter).
+  MCA also passes `photos` (flatten NB image blocks + `PHOTOS.attachments`),
+  `collectExtra`/`applyExtra` (`narrativeBlocks` structure → `_cloudNB`, checked first by
+  `_fetchSourceNarrativeBlocks()`), `afterRestore`.
+- `PLTS_AshDisposal_PM.html` keeps its bespoke per-inverter merge button AND gets a second
+  "Muat / Lanjutkan Draft" button wired to the shared `LoadMergeModal` (+ its own
+  `LoadMergeModal.init`). The 3 legacy dups (`esp_checksheet.html`, `4000 Hours Mill/*.html`)
+  are not wired, same as submit-guard.
 
 ## Cache-busting shared JS includes (`?v=` suffix)
 

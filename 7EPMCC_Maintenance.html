@@ -217,7 +217,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-ol btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">🖨️ Print / PDF</button>
     <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
@@ -263,7 +262,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Location</label><input type="text" id="location" placeholder="MCC location"></div>
     </div>
     <div style="padding:0 14px 14px">
-      <button class="btn btn-ol btn-sm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Pilih & Gabung Data dari Database</button>
+      <button class="btn btn-ol btn-sm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Muat / Lanjutkan dari Database</button>
       <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini &mdash; berguna saat beberapa teknisi mengisi bagian berbeda secara terpisah.</span>
     </div>
   </div>
@@ -375,7 +374,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="action-row">
   <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
   <button class="btn btn-ol" style="background:var(--navy)" onclick="CloudDraft.save()">💾 Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
   <button class="btn btn-pdf" onclick="generatePDF()">🖨️ Print / Save PDF</button>
   <button class="btn" style="background:#16a34a;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">&#128202; Submit to Database</button>
 </div>

@@ -300,7 +300,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <a class="btn-back" href="index.html" title="Back to Portal">&#8592; Portal</a>
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-draft btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="openPdfModal()">📥 Download PDF</button>
     <button class="btn btn-submit btn-sm" onclick="submitToDb()">🗄️ Submit</button>
   </div>
@@ -337,7 +336,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
           <option value="E">4000 Hours Mill E</option>
           <option value="F">4000 Hours Mill F</option>
       </select>
-      <button type="button" class="btn btn-outline btn-sm" id="btn-load-db" onclick="openLoadMergeModal()" disabled title="Pilih Mill terlebih dahulu">📥 Pilih &amp; Gabung Data dari Database</button>
+      <button type="button" class="btn btn-outline btn-sm" id="btn-load-db" onclick="openLoadMergeModal()" disabled title="Pilih Mill terlebih dahulu">📥 Muat / Lanjutkan dari Database</button>
     </div>
     <div class="tag-summary" id="tag-summary">
       <div class="ss-empty">Pilih Mill di atas untuk melihat 5 asset tag yang akan digunakan.</div>
@@ -681,7 +680,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="actions">
   <button class="btn" style="background:var(--navy);color:#fff" onclick="resetForm()">🔄 Reset</button>
   <button class="btn btn-draft" onclick="CloudDraft.save()">💾 Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
   <button class="btn btn-pdf" onclick="openPdfModal()">📥 Download PDF</button>
   <button class="btn btn-submit" style="font-size:14px;padding:8px 24px" onclick="submitToDb()">🗄️ Submit to Database</button>
   <span class="autosave-ind" id="autosave-indicator"></span>

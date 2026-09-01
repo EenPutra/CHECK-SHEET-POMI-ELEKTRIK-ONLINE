@@ -311,7 +311,6 @@ body::before{content:none}
 
     <span class="tb-clock" id="clock">--:--:--</span>
     <button class="btn btn-ghost btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-db btn-sm" onclick="saveToDatabase()">☁️ Save DB</button>
     <button class="btn btn-amber btn-sm" onclick="generatePDF()">📥 Download PDF</button>
   </div>
@@ -389,7 +388,7 @@ body::before{content:none}
       </div>
     </div>
     <div style="padding:0 16px 14px">
-      <button class="btn btn-ghost btn-sm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Pilih &amp; Gabung Data dari Database</button>
+      <button class="btn btn-ghost btn-sm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Muat / Lanjutkan dari Database</button>
       <span style="font-size:11px;color:var(--txt3);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
@@ -571,7 +570,6 @@ body::before{content:none}
 <div class="action-row">
   <button class="btn" style="background:#f1f5f9;color:var(--ink2);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
   <button class="btn btn-ghost" style="background:var(--ink2);color:#fff" onclick="CloudDraft.save()">💾 Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
   <button class="btn btn-db" onclick="saveToDatabase()">☁️ Save to Database</button>
   <button class="btn btn-amber" onclick="generatePDF()">📥 Download PDF</button>
 </div>

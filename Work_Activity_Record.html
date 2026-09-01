@@ -396,7 +396,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-ghost btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-blue btn-sm" onclick="generatePDF()">⬇️ Download PDF</button>
     <button class="btn btn-green btn-sm" onclick="submitToDb()">🗄️ Submit</button>
   </div>
@@ -461,7 +460,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   <div class="sec-body">
     <div style="padding:10px 14px 0">
       <button class="btn btn-ghost btn-sm" style="background:#eef4ff;color:var(--navy);border:1px solid var(--bdr)"
-        onclick="LoadMergeModal.init({assetTag:'WORK-ACTIVITY-RECORD'});LoadMergeModal.open()">📥 Pilih &amp; Gabung Data dari Database</button>
+        onclick="LoadMergeModal.init({assetTag:'WORK-ACTIVITY-RECORD'});LoadMergeModal.open()">📥 Muat / Lanjutkan dari Database</button>
     </div>
     <div class="form-grid">
       <div class="mf"><label>Asset Tag No.</label>
@@ -553,7 +552,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div class="action-row">
   <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetAll()">🔄 Reset</button>
   <button class="btn btn-ghost" style="background:var(--navy2);color:#fff" onclick="CloudDraft.save()">💾 Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
   <button class="btn btn-blue" onclick="generatePDF()">⬇️ Download PDF</button>
   <button class="btn btn-green" onclick="submitToDb()">🗄️ Submit to Database</button>
 </div>

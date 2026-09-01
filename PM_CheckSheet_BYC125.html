@@ -153,7 +153,6 @@ canvas.sig-canvas{border:1.5px solid var(--panel-border);border-radius:8px;backg
     <span class="topbar-time" id="clock">--:--:--</span>
     <div class="topbar-sep"></div>
     <button class="btn btn-outline btn-sm" onclick="CloudDraft.save()">Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">🖨️ Print / PDF</button>
     <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="submitToDb()">Submit to DB</button>
   </div>
@@ -198,7 +197,7 @@ canvas.sig-canvas{border:1.5px solid var(--panel-border);border-radius:8px;backg
       <div class="meta-field"><label>Unit / Plant Location</label><input type="text" id="location" placeholder="e.g. Unit 8 - DC System Room"></div>
     </div>
     <div style="margin-top:12px">
-      <button class="btn btn-outline btn-sm" id="btn-load-merge" onclick="LoadMergeModal.open()">&#128229; Pilih &amp; Gabung Data dari Database</button>
+      <button class="btn btn-outline btn-sm" id="btn-load-merge" onclick="LoadMergeModal.open()">&#128229; Muat / Lanjutkan dari Database</button>
       <span style="font-size:11px;color:var(--text3);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk digabung (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
@@ -326,7 +325,6 @@ canvas.sig-canvas{border:1.5px solid var(--panel-border);border-radius:8px;backg
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-bottom:16px">
     <button class="btn btn-outline" onclick="CloudDraft.save()">Save Draft</button>
-    <button type="button" class="btn" onclick="CloudDraft.openResume()">📥 Lanjutkan Draft</button>
     <button class="btn btn-primary" onclick="resetForm()">Reset Form</button>
     <button class="btn btn-pdf" onclick="generatePDF()">🖨️ Print / Save PDF</button>
     <button class="btn" style="background:#27ae60;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">&#128202; Submit to Database</button>

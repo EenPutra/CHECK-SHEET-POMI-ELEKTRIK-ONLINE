@@ -190,9 +190,14 @@ const LoadMergeModal = (function () {
     try {
       const docs = await DB.getAll({ assetTag: _config.assetTag });
       docs.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-      _docs = docs;
-      _sel = new Set(docs.length ? [docs[0].id] : []);
-      document.getElementById('lmm-sub').textContent = docs.length + ' submission ditemukan · pilih satu atau lebih untuk digabung ke form ini';
+      // "Simpan ke Database" drafts (checksheet_drafts) are listed here too —
+      // one unified place to pull data back, badged so a draft is obvious.
+      let drafts = [];
+      try { if (window.CloudDraft && CloudDraft.listDrafts) drafts = await CloudDraft.listDrafts(); } catch (e) {}
+      _docs = drafts.concat(docs);
+      _sel = new Set(_docs.length ? [_docs[0].id] : []);
+      const dPart = drafts.length ? drafts.length + ' draft + ' : '';
+      document.getElementById('lmm-sub').textContent = dPart + docs.length + ' submission ditemukan · pilih untuk memuat / melanjutkan';
     } catch (e) {
       _docs = []; _sel = new Set();
       document.getElementById('lmm-sub').textContent = 'Gagal memuat: ' + e.message;
@@ -217,14 +222,20 @@ const LoadMergeModal = (function () {
       wrap.innerHTML = '<div class="lmm-empty">Belum ada submission sebelumnya untuk asset ini.</div>';
     } else {
       wrap.innerHTML = _docs.map(d => {
-        const created = fmtDate(d.createdAt);
-        const label = 'WO ' + esc(d.woNumber || '—') + ' · ' + esc(d.executionDate || 'tgl —') + ' · ' + esc(d.checkedBy || '—');
+        const when = fmtDate(d.updatedAt || d.createdAt);
+        const badge = d._isDraft
+          ? '<span style="background:#f59e0b;color:#fff;font-size:9px;font-weight:800;letter-spacing:.5px;padding:1px 6px;border-radius:4px;margin-right:6px;vertical-align:1px">DRAFT</span>'
+          : '';
+        const label = badge + 'WO ' + esc(d.woNumber || '—') + ' · ' + esc(d.executionDate || 'tgl —') + ' · ' + esc(d.checkedBy || '—');
+        const meta = d._isDraft
+          ? 'Draft — terakhir disimpan ' + when + (d.savedByName ? ' oleh ' + esc(d.savedByName) : '') + ' · ' + (d.photoCount || 0) + ' foto'
+          : 'Disimpan ' + when + ' · Status: ' + esc(d.overallStatus || '—');
         return `
         <label class="lmm-item${_sel.has(d.id) ? ' on' : ''}">
           <input type="checkbox" ${_sel.has(d.id) ? 'checked' : ''} onchange="LoadMergeModal._toggle('${d.id}')">
           <div class="lmm-info">
             <div class="lmm-name">${label}</div>
-            <div class="lmm-meta">Disimpan ${created} · Status: ${esc(d.overallStatus || '—')}</div>
+            <div class="lmm-meta">${meta}</div>
           </div>
         </label>`;
       }).join('');
@@ -413,13 +424,20 @@ const LoadMergeModal = (function () {
   async function _confirm() {
     if (_lmmBusy) return;
     if (_sel.size === 0) return;
-    const overwrite = document.getElementById('lmm-overwrite-toggle').checked;
     const chosen = _docs.filter(d => _sel.has(d.id));
-    if (overwrite && !confirm('Mode Timpa akan mengganti field yang SUDAH diisi di form ini dengan data dari ' + chosen.length + ' submission terpilih. Lanjutkan?')) return;
+    // Continuing a single DRAFT = full restore (overwrite), and this session
+    // then keeps working on that draft doc.
+    const soleDraft = chosen.length === 1 && chosen[0]._isDraft ? chosen[0] : null;
+    const overwrite = soleDraft ? true : document.getElementById('lmm-overwrite-toggle').checked;
+    if (overwrite && !soleDraft && !confirm('Mode Timpa akan mengganti field yang SUDAH diisi di form ini dengan data dari ' + chosen.length + ' submission terpilih. Lanjutkan?')) return;
 
     _lmmBusy = true;
     _pShow('Menyiapkan data...');
     try {
+      // Adopt the draft FIRST — so cfg.applyExtra() (e.g. MCA's narrativeBlocks
+      // structure into _cloudNB) is in place before restorePhotosFromUrls()
+      // runs, letting it slice photos into the right blocks.
+      if (soleDraft && window.CloudDraft && CloudDraft.adopt) CloudDraft.adopt(soleDraft.id, soleDraft);
       const bundle = buildMergedBundle(chosen, _config.headerMap);
       _pSet(10, 'Mengisi field form...');
       const filled = applyMergedBundleToForm(bundle, overwrite);
@@ -437,7 +455,8 @@ const LoadMergeModal = (function () {
       if (typeof Storage !== 'undefined' && Storage.clearDataUrlCache) Storage.clearDataUrlCache();
       if (typeof showNote === 'function') {
         const photoPart = photosRestored ? ', ' + photosRestored + ' foto dipulihkan' : '';
-        showNote('✅ ' + chosen.length + ' submission digabungkan' + (overwrite ? ' (mode timpa)' : '') + ' — ' + filled + ' field terisi' + photoPart + '.', 'ok');
+        if (soleDraft) showNote('☁️ Draft dimuat — lanjutkan pengisian, lalu "Submit" saat sudah lengkap. ' + filled + ' field' + photoPart + '.', 'ok');
+        else showNote('✅ ' + chosen.length + ' submission digabungkan' + (overwrite ? ' (mode timpa)' : '') + ' — ' + filled + ' field terisi' + photoPart + '.', 'ok');
       }
       if (typeof autoSaveNow === 'function') autoSaveNow();
     } catch (e) {
