@@ -2045,6 +2045,62 @@ async function generatePDF(selSet, opts){
     y=pdf.lastAutoTable.finalY+4;
   }
 
+  // Air-gap circular diagram (rotor/stator) — vector-drawn for the PDF, with the
+  // measured gap values in the four corner boxes, mirroring the on-screen widget.
+  function airGapDiagram(sheet, cx, cy, r){
+    const g = {}; (sheet.rows||[]).forEach(x=>{ g[x.values.Position] = x.values['Gap (mm)']; });
+    const S71 = 0.7071;
+    pdf.setDrawColor(59,74,99); pdf.setLineWidth(0.5); pdf.circle(cx, cy, r, 'S');
+    try{ pdf.setLineDashPattern([1,0.8], 0); }catch(e){}
+    pdf.setLineWidth(0.35); pdf.circle(cx, cy, r*0.74, 'S');
+    try{ pdf.setLineDashPattern([], 0); }catch(e){}
+    pdf.setDrawColor(124,196,124); pdf.setLineWidth(0.4);
+    const d = r*1.04;
+    pdf.line(cx-d*S71, cy-d*S71, cx+d*S71, cy+d*S71);
+    pdf.line(cx+d*S71, cy-d*S71, cx-d*S71, cy+d*S71);
+    pdf.line(cx, cy-d, cx, cy+d);
+    pdf.line(cx-d, cy, cx+d, cy);
+    pdf.setTextColor(90,100,110); pdf.setFont('times','normal'); pdf.setFontSize(5.4);
+    pdf.text('12 Top', cx, cy-r-1.2, {align:'center'});
+    pdf.text('6 Bottom', cx, cy+r+2.6, {align:'center'});
+    pdf.text('3', cx+r+1.4, cy+0.8, {align:'center'}); pdf.text('9', cx-r-1.4, cy+0.8, {align:'center'});
+    pdf.text('Rotor', cx, cy-r*0.34, {align:'center'});
+    pdf.setTextColor(31,56,100); pdf.setFont('times','bold'); pdf.setFontSize(7.5);
+    const pr = r*0.82;
+    pdf.text('A', cx-pr*S71, cy-pr*S71+1, {align:'center'});
+    pdf.text('B', cx+pr*S71, cy-pr*S71+1, {align:'center'});
+    pdf.text('C', cx+pr*S71, cy+pr*S71+1, {align:'center'});
+    pdf.text('D', cx-pr*S71, cy+pr*S71+1, {align:'center'});
+    const bw=13, bh=5.4, off=r+4;
+    const box=(px,py,lbl)=>{
+      const val = g[lbl];
+      pdf.setFillColor(253,233,184); pdf.setDrawColor(224,167,44); pdf.setLineWidth(0.3);
+      pdf.roundedRect(px-bw/2, py-bh/2, bw, bh, 1, 1, 'FD');
+      pdf.setTextColor(90,67,0); pdf.setFont('times','bold'); pdf.setFontSize(7.2);
+      pdf.text(sanitize((val && val!=='-') ? (lbl+': '+val) : lbl), px, py+1.9, {align:'center'});
+    };
+    box(cx-off*S71, cy-off*S71, 'A');
+    box(cx+off*S71, cy-off*S71, 'B');
+    box(cx+off*S71, cy+off*S71, 'C');
+    box(cx-off*S71, cy+off*S71, 'D');
+  }
+  function airGapBlock(sheet, title){
+    subTitle(title);
+    const R = 22, dh = (R+8)*2;
+    checkY(dh + 2);
+    const cx = M + R + 9, cy = y + R + 8;
+    airGapDiagram(sheet, cx, cy, R);
+    // data table to the right of the diagram
+    const tx = cx + R + 12;
+    const head = [sheet.columns.slice()];
+    const bodyR = sheet.rows.map(r=>sheet.columns.map(c=>sanitize(r.values[c]!==undefined?r.values[c]:'-')));
+    pdf.autoTable({ ...theme, startY:cy - R, head, body:bodyR, margin:{left:tx, right:M},
+      styles:{...theme.styles, fontSize:7.6, halign:'center'},
+      headStyles:{...theme.headStyles, fillColor:LBL_BG, textColor:LBL_TX, halign:'center', fontSize:7},
+      willDrawPage:()=>ensureBg() });
+    y = Math.max(cy + R + 6, pdf.lastAutoTable.finalY) + 4;
+  }
+
   function clrBand(title, sub){
     checkY(9);
     pdf.setFillColor(191,191,191); pdf.rect(M,y,W-M*2,7,'F');
@@ -2211,10 +2267,8 @@ async function generatePDF(selSet, opts){
   if(selSet.has('f')){
     secBar('F. Mechanical Inspection');
     checkTable(S.mech);
-    subTitle('Air-gap D-end / inboard (rotor - stator)');
-    dataTable(S.airgap_de, null);
-    subTitle('Air-gap N-end / outboard (rotor - stator)');
-    dataTable(S.airgap_nde, null);
+    airGapBlock(S.airgap_de, 'Air-gaps (D-end / inboard) - Main Rotor and Stator');
+    airGapBlock(S.airgap_nde, 'Air-gaps (N-end / outboard) - Main Rotor and Stator');
     subTitle('Air-gap Bearing Type & Conclusion');
     kvGrid(S.airgap_meta.rows);
     subTitle('Inspection Measurements - Bearing Clearance');
