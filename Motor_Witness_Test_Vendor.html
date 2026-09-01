@@ -607,23 +607,47 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
     </div>
   </div>
 
-  <!-- G. UNLOAD TEST -->
+  <!-- G. UNLOAD / SOLO RUN TEST (combined) -->
   <div class="panel" id="p-g">
-    <div class="sec-hdr" onclick="toggleSec('p-g')"><span class="sec-ico">🌀</span><span class="sec-t">G. Unload Test</span><span class="sec-arrow">▼</span></div>
+    <div class="sec-hdr" onclick="toggleSec('p-g')"><span class="sec-ico">▶️</span><span class="sec-t">G. Unload / Solo Run Test</span><span class="sec-arrow">▼</span></div>
     <div class="sec-body">
+      <div class="hint" style="margin-top:0">Di workshop, unload &amp; solo run dijalankan bersamaan — semua data (RTD, vibrasi, arus, dll) diisi satu kali di sini.</div>
+
+      <div class="subttl">Final Visual &amp; Physical Check</div>
+      <div class="tbl-wrap"><table class="ct"><thead><tr>
+        <th style="width:26px">No</th><th>Check Item</th><th>Criteria</th><th class="ctr" style="width:118px">Result</th><th style="min-width:150px">Remark</th>
+      </tr></thead><tbody id="tb-solo-visual"></tbody></table></div>
+
       <div class="subttl">Recording</div>
       <div class="grid">
-        <div class="mf"><label>Voltage (Vac)</label><input type="text" id="ul-v" class="num"></div>
+        <div class="mf"><label>Voltage L-L (Vac)</label><input type="text" id="ul-v" class="num"></div>
+        <div class="mf"><label>Voltage VAB / VBC / VAC (V)</label><input type="text" id="dcs-vab" placeholder="VAB / VBC / VAC"></div>
+        <div class="mf"><label>Voltage Unbalance (%)</label><input type="text" id="dcs-vunb" class="num"></div>
         <div class="mf"><label>Current 3φ (A)</label><input type="text" id="ul-i" placeholder="10.2 / 10.2 / 10.1"></div>
+        <div class="mf"><label>Power (kW)</label><input type="text" id="dcs-kw" class="num"></div>
+        <div class="mf"><label>Power Factor</label><input type="text" id="dcs-pf" class="num"></div>
         <div class="mf"><label>RPM</label><input type="text" id="ul-rpm" class="num"></div>
         <div class="mf"><label>Durasi Test (jam)</label><input type="text" id="ul-dur" class="num"></div>
+        <div class="mf"><label>Rotasi</label><select id="ul-rot"><option value="">—</option><option>CW</option><option>CCW</option></select></div>
         <div class="mf"><label>Air Gap DE (mm)</label><input type="text" id="ul-ag-de" class="num"></div>
         <div class="mf"><label>Air Gap NDE (mm)</label><input type="text" id="ul-ag-nde" class="num"></div>
-        <div class="mf"><label>Rotasi</label><select id="ul-rot"><option value="">—</option><option>CW</option><option>CCW</option></select></div>
         <div class="mf"><label>Air Flow Suction</label><input type="text" id="ul-af-s" placeholder="0.5 – 1.3"></div>
         <div class="mf"><label>Air Flow Discharge</label><input type="text" id="ul-af-d" placeholder="1.6 – 2.3"></div>
         <div class="mf full"><label>Hasil Air Flow</label><div id="tog-airflow" class="rc" style="justify-content:flex-start"></div></div>
       </div>
+
+      <div class="subttl">Electrical Test Recap</div>
+      <div class="grid">
+        <div class="mf"><label>Stator R T1-T2 (Ω)</label><input type="text" id="sr-t12" class="num"></div>
+        <div class="mf"><label>Stator R T2-T3 (Ω)</label><input type="text" id="sr-t23" class="num"></div>
+        <div class="mf"><label>Stator R T3-T1 (Ω)</label><input type="text" id="sr-t31" class="num"></div>
+        <div class="mf"><label>IR T1T2T3-G @ 1&quot; (MΩ)</label><input type="text" id="sr-ir1" class="num"></div>
+        <div class="mf"><label>IR T1T2T3-G @ 10&quot; (MΩ)</label><input type="text" id="sr-ir10" class="num"></div>
+        <div class="mf"><label>PI</label><input type="text" id="sr-pi" class="num"></div>
+        <div class="mf"><label>RTD type</label><input type="text" id="sr-rtdtype" placeholder="PT100"></div>
+        <div class="mf"><label>Heater Resistance (Ω)</label><input type="text" id="sr-htr" class="num"></div>
+      </div>
+
       <div class="subttl">Vibration (mm/s)</div>
       <div class="grid">
         <div class="mf"><label>IB – Horizontal</label><input type="text" id="vib-ibh" class="num"></div>
@@ -632,72 +656,28 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div class="mf"><label>OB – Horizontal</label><input type="text" id="vib-obh" class="num"></div>
         <div class="mf"><label>OB – Vertical</label><input type="text" id="vib-obv" class="num"></div>
         <div class="mf"><label>OB – Axial</label><input type="text" id="vib-oba" class="num"></div>
+        <div class="mf"><label>Overall / Max (mm/s)</label><input type="text" id="dcs-vib" class="num"></div>
       </div>
-      <div class="subttl">Winding &amp; Bearing Temperature (°C) — per interval</div>
+
+      <div class="subttl">Temperature &amp; Monitoring — per interval</div>
       <div class="time-add">
-        <button class="btn bo bsm" type="button" onclick="addTimeInterval('ul')">➕ Tambah Waktu</button>
-        <button class="btn bo bsm" type="button" onclick="removeTimeInterval('ul')">➖ Hapus Waktu Terakhir</button>
+        <button class="btn bo bsm" type="button" onclick="addTimeInterval()">➕ Tambah Waktu</button>
+        <button class="btn bo bsm" type="button" onclick="removeTimeInterval()">➖ Hapus Waktu Terakhir</button>
         <span class="hint" style="margin:0">Waktu default 0'–75'. Tambah kolom bila test lebih lama.</span>
       </div>
-      <div class="subttl" style="font-size:11px">Winding Temperature</div>
+      <div class="subttl" style="font-size:11px">RTD Winding — °C per interval
+        <button class="btn bo bsm" type="button" style="margin-left:8px" onclick="addRtdCol()">➕ RTD</button>
+        <button class="btn bo bsm" type="button" onclick="removeRtdCol()">➖ RTD</button>
+      </div>
       <div class="tbl-wrap"><table class="ct" id="ul-wtemp"></table></div>
-      <div class="subttl" style="font-size:11px">Bearing Temperature</div>
+      <div class="subttl" style="font-size:11px">Bearing Temperature — °C per interval</div>
       <div class="tbl-wrap"><table class="ct" id="ul-btemp"></table></div>
-      <div class="grid" style="margin-top:10px"><div class="mf full"><label>Remark Unload Test</label><textarea id="rmk-ul" placeholder="Catatan unload test…"></textarea></div></div>
-    </div>
-  </div>
-
-  <!-- H. SOLO RUN -->
-  <div class="panel" id="p-h">
-    <div class="sec-hdr" onclick="toggleSec('p-h')"><span class="sec-ico">▶️</span><span class="sec-t">H. Solo Run</span><span class="sec-arrow">▼</span></div>
-    <div class="sec-body">
-      <div class="subttl">Final Visual &amp; Physical Check</div>
-      <div class="tbl-wrap"><table class="ct"><thead><tr>
-        <th style="width:26px">No</th><th>Check Item</th><th>Criteria</th><th class="ctr" style="width:118px">Result</th><th style="min-width:150px">Remark</th>
-      </tr></thead><tbody id="tb-solo-visual"></tbody></table></div>
-
-      <div class="subttl">Electrical Test Recap</div>
-      <div class="grid">
-        <div class="mf"><label>Stator R T1-T2 (Ω)</label><input type="text" id="sr-t12" class="num"></div>
-        <div class="mf"><label>Stator R T2-T3 (Ω)</label><input type="text" id="sr-t23" class="num"></div>
-        <div class="mf"><label>Stator R T3-T1 (Ω)</label><input type="text" id="sr-t31" class="num"></div>
-        <div class="mf"><label>IR T1T2T3-G @ 1" (MΩ)</label><input type="text" id="sr-ir1" class="num"></div>
-        <div class="mf"><label>IR T1T2T3-G @ 10" (MΩ)</label><input type="text" id="sr-ir10" class="num"></div>
-        <div class="mf"><label>PI</label><input type="text" id="sr-pi" class="num"></div>
-        <div class="mf"><label>RTD type</label><input type="text" id="sr-rtdtype" placeholder="PT100"></div>
-        <div class="mf"><label>Heater Resistance (Ω)</label><input type="text" id="sr-htr" class="num"></div>
-      </div>
-      <div class="hint">RTD 1-5 (Ω): RTD 1,2,3 winding · RTD 4 NDE bearing · RTD 5 DE bearing.</div>
-      <div class="grid">
-        <div class="mf"><label>RTD 1 (Ω)</label><input type="text" id="sr-rtd1" class="num"></div>
-        <div class="mf"><label>RTD 2 (Ω)</label><input type="text" id="sr-rtd2" class="num"></div>
-        <div class="mf"><label>RTD 3 (Ω)</label><input type="text" id="sr-rtd3" class="num"></div>
-        <div class="mf"><label>RTD 4 (Ω)</label><input type="text" id="sr-rtd4" class="num"></div>
-        <div class="mf"><label>RTD 5 (Ω)</label><input type="text" id="sr-rtd5" class="num"></div>
-      </div>
-
-      <div class="subttl">Local Monitoring — Temperature &amp; Air Flow (per interval)</div>
-      <div class="time-add">
-        <button class="btn bo bsm" type="button" onclick="addTimeInterval('solo')">➕ Tambah Waktu</button>
-        <button class="btn bo bsm" type="button" onclick="removeTimeInterval('solo')">➖ Hapus Waktu Terakhir</button>
-        <span class="hint" style="margin:0">Waktu default Initial–60'. Tambah kolom bila solo run lebih lama.</span>
-      </div>
+      <div class="subttl" style="font-size:11px">Local Monitoring &amp; Current — per interval</div>
       <div class="tbl-wrap"><table class="ct" id="solo-local"></table></div>
 
-      <div class="subttl">DCS / MPR Monitoring (per interval)</div>
-      <div class="grid">
-        <div class="mf"><label>Voltage VAB (V)</label><input type="text" id="dcs-vab" class="num"></div>
-        <div class="mf"><label>Voltage VBC (V)</label><input type="text" id="dcs-vbc" class="num"></div>
-        <div class="mf"><label>Voltage VAC (V)</label><input type="text" id="dcs-vac" class="num"></div>
-        <div class="mf"><label>Voltage Unbalance (%)</label><input type="text" id="dcs-vunb" class="num"></div>
-        <div class="mf"><label>Power (kW)</label><input type="text" id="dcs-kw" class="num"></div>
-        <div class="mf"><label>Power Factor</label><input type="text" id="dcs-pf" class="num"></div>
-        <div class="mf"><label>Vibration Solo Run</label><input type="text" id="dcs-vib" placeholder="max mm/s"></div>
-      </div>
-      <div class="tbl-wrap"><table class="ct" id="solo-dcs"></table></div>
-      <div class="grid" style="margin-top:10px">
-        <div class="mf full"><label>Hasil Solo Run</label><div id="tog-solo" class="rc" style="justify-content:flex-start"></div></div>
-        <div class="mf full"><label>Remark Solo Run</label><textarea id="rmk-solo" placeholder="Catatan solo run…"></textarea></div>
+      <div class="grid" style="margin-top:12px">
+        <div class="mf full"><label>Hasil Unload / Solo Run</label><div id="tog-solo" class="rc" style="justify-content:flex-start"></div></div>
+        <div class="mf full"><label>Remark</label><textarea id="rmk-ul" placeholder="Catatan unload / solo run…"></textarea></div>
       </div>
     </div>
   </div>
@@ -800,7 +780,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
           <button class="mg-tt-btn" type="button" onclick="mgChooseTestType('electrical')">
             <span class="ic">⚡</span><b>Electrical Test</b><span class="sub">Section A · B · C · D · E</span></button>
           <button class="mg-tt-btn" type="button" onclick="mgChooseTestType('solorun')">
-            <span class="ic">▶️</span><b>Solo Run Test</b><span class="sub">Section A · B · F · G · H</span></button>
+            <span class="ic">▶️</span><b>Unload / Solo Run Test</b><span class="sub">Section A · B · F · G</span></button>
         </div>
         <div class="hint" style="margin-top:10px">Section I (Kesimpulan &amp; Tanda Tangan) selalu ada, apa pun jenis test-nya.</div>
         <div style="display:flex;gap:8px;margin-top:12px">
@@ -1099,42 +1079,36 @@ function fillCoronaHp(){
 fillCoronaSurge(); fillCoronaTd(); fillCoronaHp();
 
 const UL_INT_DEFAULT = ["0'","15'","30'","45'","60'","75'"];
-const SOLO_INT_DEFAULT = ['Initial',"10'","30'","45'","60'"];
 let UL_INT = UL_INT_DEFAULT.slice();
+const RTD_N_DEFAULT = 10, RTD_N_MIN = 3, RTD_N_MAX = 40;
+let RTD_N = RTD_N_DEFAULT;
 function fillUlWinding(){
-  const t=document.getElementById('ul-wtemp'); let h='<thead><tr><th>Interval</th>';
-  for(let i=1;i<=10;i++) h+=`<th class="ctr">T${i}</th>`;
+  const t=document.getElementById('ul-wtemp'); if(!t) return;
+  let h='<thead><tr><th>Interval</th>';
+  for(let i=1;i<=RTD_N;i++) h+=`<th class="ctr">RTD${i}</th>`;
   h+='</tr></thead><tbody>';
-  UL_INT.forEach((iv,r)=>{ h+=`<tr><td class="tno">${iv}</td>`; for(let i=1;i<=10;i++) h+=`<td><input class="ti" style="text-align:center" id="ulw_${r}_${i}"></td>`; h+='</tr>'; });
+  UL_INT.forEach((iv,r)=>{ h+=`<tr><td class="tno">${iv}</td>`; for(let i=1;i<=RTD_N;i++) h+=`<td><input class="ti" style="text-align:center" id="ulw_${r}_${i}"></td>`; h+='</tr>'; });
   t.innerHTML=h+'</tbody>';
 }
 function fillUlBearing(){
-  const t=document.getElementById('ul-btemp'); let h='<thead><tr><th>Interval</th><th class="ctr">DE-1</th><th class="ctr">DE-2</th><th class="ctr">NDE-1</th><th class="ctr">NDE-2</th></tr></thead><tbody>';
+  const t=document.getElementById('ul-btemp'); if(!t) return;
+  let h='<thead><tr><th>Interval</th><th class="ctr">DE-1</th><th class="ctr">DE-2</th><th class="ctr">NDE-1</th><th class="ctr">NDE-2</th></tr></thead><tbody>';
   UL_INT.forEach((iv,r)=>{ h+=`<tr><td class="tno">${iv}</td>`; ['de1','de2','nde1','nde2'].forEach(k=>h+=`<td><input class="ti" style="text-align:center" id="ulb_${r}_${k}"></td>`); h+='</tr>'; });
   t.innerHTML=h+'</tbody>';
 }
-fillUlWinding(); fillUlBearing();
-
-let SOLO_INT = SOLO_INT_DEFAULT.slice();
+const SOLO_LOCAL_ROWS = [
+  ['Motor Body','0'],['NDE Bearing','1'],['DE Bearing','2'],['Motor Body (Thermal Image)','3'],['Outlet Duct','4'],['Air Flow','5'],
+  ['Current Phase A (A)','ia'],['Current Phase B (A)','ib'],['Current Phase C (A)','ic'],['Unbalance Current (%)','unb'],
+];
 function fillSoloLocal(){
-  const t=document.getElementById('solo-local');
-  const rows=['Motor Body','NDE Bearing','DE Bearing','Motor Body (Thermal Image)','Outlet Duct','Air Flow'];
+  const t=document.getElementById('solo-local'); if(!t) return;
   let h='<thead><tr><th>Parameter</th>';
-  SOLO_INT.forEach(i=>h+=`<th class="ctr">${i}</th>`);
+  UL_INT.forEach(i=>h+=`<th class="ctr">${i}</th>`);
   h+='</tr></thead><tbody>';
-  rows.forEach((r,ri)=>{ h+=`<tr><td class="tdesc">${r}</td>`; SOLO_INT.forEach((_,ci)=>h+=`<td><input class="ti" style="text-align:center" id="slcl_${ri}_${ci}"></td>`); h+='</tr>'; });
+  SOLO_LOCAL_ROWS.forEach(r=>{ h+=`<tr><td class="tdesc">${r[0]}</td>`; UL_INT.forEach((_,ci)=>h+=`<td><input class="ti" style="text-align:center" id="slcl_${r[1]}_${ci}"></td>`); h+='</tr>'; });
   t.innerHTML=h+'</tbody>';
 }
-function fillSoloDcs(){
-  const t=document.getElementById('solo-dcs');
-  const rows=[['Current Phase A (A)','ia'],['Current Phase B (A)','ib'],['Current Phase C (A)','ic'],['Unbalance Current (%)','unb'],['RTD 1 (°C)','r1'],['RTD 2 (°C)','r2'],['RTD 3 (°C)','r3'],['RTD 4 (°C)','r4'],['RTD 5 (°C)','r5']];
-  let h='<thead><tr><th>Parameter</th>';
-  SOLO_INT.forEach(i=>h+=`<th class="ctr">${i}</th>`);
-  h+='</tr></thead><tbody>';
-  rows.forEach(r=>{ h+=`<tr><td class="tdesc">${r[0]}</td>`; SOLO_INT.forEach((_,ci)=>h+=`<td><input class="ti" style="text-align:center" id="sldcs_${r[1]}_${ci}"></td>`); h+='</tr>'; });
-  t.innerHTML=h+'</tbody>';
-}
-fillSoloLocal(); fillSoloDcs();
+fillUlWinding(); fillUlBearing(); fillSoloLocal();
 
 /* ── dynamic test-time intervals (G unload / H solo run) ── */
 function _preserveInputs(root, fn){
@@ -1143,39 +1117,50 @@ function _preserveInputs(root, fn){
   fn();
   root.querySelectorAll('input[id]').forEach(el => { if (snap[el.id] !== undefined && snap[el.id] !== '') el.value = snap[el.id]; });
 }
-function _rebuildUl(){ _preserveInputs(document.getElementById('p-g'), () => { fillUlWinding(); fillUlBearing(); }); }
-function _rebuildSolo(){ _preserveInputs(document.getElementById('p-h'), () => { fillSoloLocal(); fillSoloDcs(); }); }
-function addTimeInterval(which){
-  const arr = which === 'ul' ? UL_INT : SOLO_INT;
+function _rebuildG(){ _preserveInputs(document.getElementById('p-g'), () => { fillUlWinding(); fillUlBearing(); fillSoloLocal(); }); }
+function addTimeInterval(){
+  const arr = UL_INT;
   const last = arr[arr.length - 1] || '';
   const m = String(last).match(/^(\d+)'?$/);
   const suggest = m ? (parseInt(m[1], 10) + 15) + "'" : '';
   const lbl = (prompt('Label kolom waktu baru:', suggest) || '').trim();
   if (!lbl) return;
   arr.push(lbl);
-  which === 'ul' ? _rebuildUl() : _rebuildSolo();
+  _rebuildG();
   if (typeof autoSaveNow === 'function') autoSaveNow();
 }
-function removeTimeInterval(which){
-  const arr = which === 'ul' ? UL_INT : SOLO_INT;
-  const min = which === 'ul' ? UL_INT_DEFAULT.length : SOLO_INT_DEFAULT.length;
-  if (arr.length <= min) { note('Kolom waktu default tidak bisa dihapus.', 'info'); return; }
-  if (!confirm('Hapus kolom waktu "' + arr[arr.length - 1] + '" beserta isinya?')) return;
-  arr.pop();
-  which === 'ul' ? _rebuildUl() : _rebuildSolo();
+function removeTimeInterval(){
+  if (UL_INT.length <= UL_INT_DEFAULT.length) { note('Kolom waktu default tidak bisa dihapus.', 'info'); return; }
+  if (!confirm('Hapus kolom waktu "' + UL_INT[UL_INT.length - 1] + '" beserta isinya?')) return;
+  UL_INT.pop();
+  _rebuildG();
   if (typeof autoSaveNow === 'function') autoSaveNow();
 }
-// re-apply saved interval arrays (draft / loaded session) then rebuild the tables.
-// Idempotent: only rebuilds when the array actually differs, so a redundant second
-// call (loadSession -> applyDraftData, then CloudDraft.adopt -> applyExtra) doesn't
-// wipe the values the first call already restored into the rebuilt cells.
-function applyIntervals(ul, solo){
-  if (Array.isArray(ul) && ul.length && JSON.stringify(ul) !== JSON.stringify(UL_INT)) { UL_INT = ul.slice(); fillUlWinding(); fillUlBearing(); }
-  if (Array.isArray(solo) && solo.length && JSON.stringify(solo) !== JSON.stringify(SOLO_INT)) { SOLO_INT = solo.slice(); fillSoloLocal(); fillSoloDcs(); }
+function addRtdCol(){
+  if (RTD_N >= RTD_N_MAX) { note('Maksimum ' + RTD_N_MAX + ' RTD.', 'info'); return; }
+  RTD_N++;
+  _preserveInputs(document.getElementById('p-g'), () => fillUlWinding());
+  if (typeof autoSaveNow === 'function') autoSaveNow();
+}
+function removeRtdCol(){
+  if (RTD_N <= RTD_N_MIN) { note('Minimum ' + RTD_N_MIN + ' RTD.', 'info'); return; }
+  if (!confirm('Hapus kolom RTD' + RTD_N + ' beserta isinya?')) return;
+  RTD_N--;
+  _preserveInputs(document.getElementById('p-g'), () => fillUlWinding());
+  if (typeof autoSaveNow === 'function') autoSaveNow();
+}
+// re-apply saved interval array + RTD count (draft / loaded session) then rebuild.
+// Idempotent so a redundant second call doesn't wipe restored values.
+function applyIntervals(ul, rtdN){
+  let changed = false;
+  if (Array.isArray(ul) && ul.length && JSON.stringify(ul) !== JSON.stringify(UL_INT)) { UL_INT = ul.slice(); changed = true; }
+  const n = parseInt(rtdN, 10);
+  if (!isNaN(n) && n >= RTD_N_MIN && n <= RTD_N_MAX && n !== RTD_N) { RTD_N = n; changed = true; }
+  if (changed) { fillUlWinding(); fillUlBearing(); fillSoloLocal(); }
 }
 function resetIntervals(){
-  UL_INT = UL_INT_DEFAULT.slice(); SOLO_INT = SOLO_INT_DEFAULT.slice();
-  fillUlWinding(); fillUlBearing(); fillSoloLocal(); fillSoloDcs();
+  UL_INT = UL_INT_DEFAULT.slice(); RTD_N = RTD_N_DEFAULT;
+  fillUlWinding(); fillUlBearing(); fillSoloLocal();
 }
 
 /* ── checkbox state (air-gap conclusion, bearing pedestal/flanged, DE/NDE comments) ── */
@@ -1352,8 +1337,7 @@ const PHOTO_SECTIONS = [
   {key:'d', panel:'p-d', label:'D. Tan Delta & Partial Discharge'},
   {key:'e', panel:'p-e', label:'E. Stator High Potential Test'},
   {key:'f', panel:'p-f', label:'F. Mechanical Inspection'},
-  {key:'g', panel:'p-g', label:'G. Unload Test'},
-  {key:'h', panel:'p-h', label:'H. Solo Run'},
+  {key:'g', panel:'p-g', label:'G. Unload / Solo Run Test'},
   {key:'i', panel:'p-i', label:'I. Kesimpulan & Tanda Tangan'},
 ];
 const PHOTO_KEYS = PHOTO_SECTIONS.map(s=>s.key);
@@ -1436,7 +1420,7 @@ async function restorePhotosFromUrls(photoUrls, overwrite){
   let restored=0;
   for(const key of Object.keys(photoUrls)){
     const list=photoUrls[key]; if(!Array.isArray(list)||!list.length) continue;
-    const target = PHOTO_KEYS.indexOf(key)!==-1 ? key : 'a';   // unknown groups fall into section A
+    const target = key==='h' ? 'g' : (PHOTO_KEYS.indexOf(key)!==-1 ? key : 'a');   // unknown/legacy-h groups
     if(!overwrite && (PHOTOS[target]||[]).length) continue;
     const acc=[];
     for(const entry of list){
@@ -1558,7 +1542,7 @@ function collectDraftPayload(){
   d._st = Object.assign({}, ST);
   d._chk = Object.assign({}, CHK);
   d._ul_int = UL_INT.slice();
-  d._solo_int = SOLO_INT.slice();
+  d._rtd_n = RTD_N;
   return d;
 }
 function flashAutosave(state){
@@ -1596,7 +1580,7 @@ function draftHasContent(d){
 }
 function applyDraftData(d){
   if(!d) return;
-  if(d._ul_int || d._solo_int) applyIntervals(d._ul_int, d._solo_int);
+  if(d._ul_int || d._rtd_n) applyIntervals(d._ul_int, d._rtd_n);
   document.querySelectorAll(DRAFT_SEL).forEach(el=>{ if(el.id && d['f_'+el.id]!==undefined) el.value=d['f_'+el.id]; });
   if(d._st){
     Object.assign(ST, d._st);
@@ -1696,6 +1680,36 @@ function buildMechSheets(){
   out.bearing_pedestal = { title:'F — Clearance Check: Outer Bearing to Pedestal (Plastic Gauge)', columns:jCols, rows:pRows };
   return out;
 }
+
+// Section G — combined Unload / Solo Run. Shared by submitToDb + PDF snapshot.
+function buildUnloadSoloSheets(){
+  const out = {};
+  out.solo = { title:'G — Unload / Solo Run Visual', columns:['Result','Remark'], rows:
+    SOLO_VIS.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result: tv('sv_'+r.no), Remark: gv('rmk-sv_'+r.no)||'—' } })) };
+  out.unload = mkSheet('G — Unload / Solo Run Recording', ['Value'], [
+    kv(1,'Voltage L-L (Vac)', iv('ul-v')), kv(2,'Voltage VAB/VBC/VAC (V)', iv('dcs-vab')), kv(3,'Voltage Unbalance (%)', iv('dcs-vunb')),
+    kv(4,'Current 3φ (A)', iv('ul-i')), kv(5,'Power (kW)', iv('dcs-kw')), kv(6,'Power Factor', iv('dcs-pf')),
+    kv(7,'RPM', iv('ul-rpm')), kv(8,'Durasi (jam)', iv('ul-dur')), kv(9,'Rotasi', iv('ul-rot')),
+    kv(10,'Air Gap DE (mm)', iv('ul-ag-de')), kv(11,'Air Gap NDE (mm)', iv('ul-ag-nde')),
+    kv(12,'Air Flow Suction', iv('ul-af-s')), kv(13,'Air Flow Discharge', iv('ul-af-d')), kv(14,'Hasil Air Flow', tv('airflow_result')),
+    kv(15,'Stator R T1-T2 (Ω)', iv('sr-t12')), kv(16,'Stator R T2-T3 (Ω)', iv('sr-t23')), kv(17,'Stator R T3-T1 (Ω)', iv('sr-t31')),
+    kv(18,'IR @1" (MΩ)', iv('sr-ir1')), kv(19,'IR @10" (MΩ)', iv('sr-ir10')), kv(20,'PI', iv('sr-pi')),
+    kv(21,'RTD type', iv('sr-rtdtype')), kv(22,'Heater Resistance (Ω)', iv('sr-htr')),
+    kv(23,'Vibration IB-H (mm/s)', iv('vib-ibh')), kv(24,'Vibration IB-V', iv('vib-ibv')), kv(25,'Vibration IB-A', iv('vib-iba')),
+    kv(26,'Vibration OB-H', iv('vib-obh')), kv(27,'Vibration OB-V', iv('vib-obv')), kv(28,'Vibration OB-A', iv('vib-oba')),
+    kv(29,'Vibration Overall / Max (mm/s)', iv('dcs-vib')),
+    kv(30,'Hasil Unload / Solo Run', tv('solo_result')), kv(31,'Remark', gv('rmk-ul')||'—'),
+  ]);
+  const rtdCols = []; for(let i=1;i<=RTD_N;i++) rtdCols.push('RTD'+i);
+  out.unload_wtemp = { title:'G — RTD Winding Temp (°C) per Interval', columns:['Interval'].concat(rtdCols), rows:
+    UL_INT.map((it,r)=>{ const o={Interval:it}; for(let i=1;i<=RTD_N;i++) o['RTD'+i]=gv(`ulw_${r}_${i}`)||'—'; return { no:'', desc:it, values:o }; }) };
+  out.unload_btemp = { title:'G — Bearing Temp (°C) per Interval', columns:['Interval','DE-1','DE-2','NDE-1','NDE-2'], rows:
+    UL_INT.map((it,r)=>({ no:'', desc:it, values:{ Interval:it, 'DE-1':gv(`ulb_${r}_de1`)||'—', 'DE-2':gv(`ulb_${r}_de2`)||'—', 'NDE-1':gv(`ulb_${r}_nde1`)||'—', 'NDE-2':gv(`ulb_${r}_nde2`)||'—' } })) };
+  out.unload_local = { title:'G — Local Monitoring & Current per Interval', columns:['Parameter'].concat(UL_INT), rows:
+    SOLO_LOCAL_ROWS.map(rr=>{ const o={Parameter:rr[0]}; UL_INT.forEach((it,ci)=>o[it]=gv(`slcl_${rr[1]}_${ci}`)||'—'); return { no:'', desc:rr[0], values:o }; }) };
+  return out;
+}
+
 function inspSheet(){
   const rows=[]; let sec='';
   INSP.forEach(r=>{
@@ -1818,38 +1832,7 @@ async function submitToDb(){
 
   Object.assign(base.sheets, buildMechSheets());
 
-  base.sheets.unload = mkSheet('G — Unload Test', ['Value'], [
-    kv(1,'Voltage (Vac)', iv('ul-v')), kv(2,'Current 3φ (A)', iv('ul-i')), kv(3,'RPM', iv('ul-rpm')),
-    kv(4,'Durasi (jam)', iv('ul-dur')), kv(5,'Air Gap DE (mm)', iv('ul-ag-de')), kv(6,'Air Gap NDE (mm)', iv('ul-ag-nde')),
-    kv(7,'Rotasi', iv('ul-rot')), kv(8,'Air Flow Suction', iv('ul-af-s')), kv(9,'Air Flow Discharge', iv('ul-af-d')),
-    kv(10,'Hasil Air Flow', tv('airflow_result')),
-    kv(11,'Vibration IB-H (mm/s)', iv('vib-ibh')), kv(12,'Vibration IB-V', iv('vib-ibv')), kv(13,'Vibration IB-A', iv('vib-iba')),
-    kv(14,'Vibration OB-H', iv('vib-obh')), kv(15,'Vibration OB-V', iv('vib-obv')), kv(16,'Vibration OB-A', iv('vib-oba')),
-    kv(17,'Remark Unload', gv('rmk-ul')||'—'),
-  ]);
-  base.sheets.unload_wtemp = { title:'G — Unload Winding Temp (°C)', columns:['Interval','T1','T2','T3','T4','T5','T6','T7','T8','T9','T10'], rows:
-    UL_INT.map((iv,r)=>{ const o={Interval:iv}; for(let i=1;i<=10;i++) o['T'+i]=gv(`ulw_${r}_${i}`)||'—'; return { no:'', desc:iv, values:o }; }) };
-  base.sheets.unload_btemp = { title:'G — Unload Bearing Temp (°C)', columns:['Interval','DE-1','DE-2','NDE-1','NDE-2'], rows:
-    UL_INT.map((iv,r)=>({ no:'', desc:iv, values:{ Interval:iv, 'DE-1':gv(`ulb_${r}_de1`)||'—', 'DE-2':gv(`ulb_${r}_de2`)||'—', 'NDE-1':gv(`ulb_${r}_nde1`)||'—', 'NDE-2':gv(`ulb_${r}_nde2`)||'—' } })) };
-
-  base.sheets.solo = { title:'H — Solo Run Visual', columns:['Result','Remark'], rows:
-    SOLO_VIS.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result: tv('sv_'+r.no), Remark: gv('rmk-sv_'+r.no)||'—' } })) };
-  base.sheets.solo_elec = mkSheet('H — Solo Run Electrical Recap', ['Value'], [
-    kv(1,'Stator R T1-T2 (Ω)', iv('sr-t12')), kv(2,'Stator R T2-T3 (Ω)', iv('sr-t23')), kv(3,'Stator R T3-T1 (Ω)', iv('sr-t31')),
-    kv(4,'IR @1" (MΩ)', iv('sr-ir1')), kv(5,'IR @10" (MΩ)', iv('sr-ir10')), kv(6,'PI', iv('sr-pi')),
-    kv(7,'RTD type', iv('sr-rtdtype')), kv(8,'Heater Resistance (Ω)', iv('sr-htr')),
-    kv(9,'RTD 1 (Ω)', iv('sr-rtd1')), kv(10,'RTD 2 (Ω)', iv('sr-rtd2')), kv(11,'RTD 3 (Ω)', iv('sr-rtd3')),
-    kv(12,'RTD 4 (Ω)', iv('sr-rtd4')), kv(13,'RTD 5 (Ω)', iv('sr-rtd5')),
-    kv(14,'DCS VAB (V)', iv('dcs-vab')), kv(15,'DCS VBC (V)', iv('dcs-vbc')), kv(16,'DCS VAC (V)', iv('dcs-vac')),
-    kv(17,'Voltage Unbalance (%)', iv('dcs-vunb')), kv(18,'Power (kW)', iv('dcs-kw')), kv(19,'Power Factor', iv('dcs-pf')),
-    kv(20,'Vibration Solo Run', iv('dcs-vib')), kv(21,'Hasil Solo Run', tv('solo_result')), kv(22,'Remark Solo Run', gv('rmk-solo')||'—'),
-  ]);
-  base.sheets.solo_local = { title:'H — Solo Run Local Monitoring', columns:['Parameter'].concat(SOLO_INT), rows:
-    ['Motor Body','NDE Bearing','DE Bearing','Motor Body (Thermal)','Outlet Duct','Air Flow'].map((r,ri)=>{
-      const o={Parameter:r}; SOLO_INT.forEach((it,ci)=>o[it]=gv(`slcl_${ri}_${ci}`)||'—'); return { no:'', desc:r, values:o }; }) };
-  base.sheets.solo_dcs = { title:'H — Solo Run DCS Monitoring', columns:['Parameter'].concat(SOLO_INT), rows:
-    [['Current A (A)','ia'],['Current B (A)','ib'],['Current C (A)','ic'],['Unbalance I (%)','unb'],['RTD 1 (°C)','r1'],['RTD 2 (°C)','r2'],['RTD 3 (°C)','r3'],['RTD 4 (°C)','r4'],['RTD 5 (°C)','r5']]
-      .map(r=>{ const o={Parameter:r[0]}; SOLO_INT.forEach((it,ci)=>o[it]=gv(`sldcs_${r[1]}_${ci}`)||'—'); return { no:'', desc:r[0], values:o }; }) };
+  Object.assign(base.sheets, buildUnloadSoloSheets());
 
   base.sheets.conclusion = mkSheet('I — Kesimpulan', ['Value'], [
     kv(1,'Overall Condition', iv('overall')), kv(2,'Findings', gv('findings')||'—'),
@@ -1862,7 +1845,7 @@ async function submitToDb(){
   base.attachments = attachForSave();
   base.checkStates = Object.assign({}, CHK);
   base.ulIntervals = UL_INT.slice();
-  base.soloIntervals = SOLO_INT.slice();
+  base.rtdN = RTD_N;
 
   // ── Phase 2: keep only the sheets that belong to this session's test type ──
   base.testType = _testType || null;
@@ -1956,8 +1939,7 @@ const PDF_SHEETS = [
   {key:'d', ic:'📉', label:'D. Tan Delta & Partial Discharge'},
   {key:'e', ic:'⚠️', label:'E. Stator High Potential Test'},
   {key:'f', ic:'🔧', label:'F. Mechanical Inspection'},
-  {key:'g', ic:'🌀', label:'G. Unload Test'},
-  {key:'h', ic:'▶️', label:'H. Solo Run'},
+  {key:'g', ic:'▶️', label:'G. Unload / Solo Run Test'},
   {key:'i', ic:'✍️', label:'I. Kesimpulan & Tanda Tangan'},
 ];
 let _pdfSel = new Set(PDF_SHEETS.map(s=>s.key));
@@ -2313,26 +2295,18 @@ async function generatePDF(selSet, opts){
     sectionPhotos('f');
   }
   if(selSet.has('g')){
-    secBar('G. Unload Test');
-    subTitle('Recording & Vibration');
+    secBar('G. Unload / Solo Run Test');
+    subTitle('Final Visual & Physical Check');
+    checkTable(S.solo);
+    subTitle('Recording, Electrical Recap & Vibration');
     kvGrid(S.unload.rows);
-    subTitle('Winding Temperature (deg C) per Interval');
+    subTitle('RTD Winding Temperature (deg C) per Interval');
     dataTable(S.unload_wtemp, null);
     subTitle('Bearing Temperature (deg C) per Interval');
     dataTable(S.unload_btemp, null);
+    subTitle('Local Monitoring & Current per Interval');
+    dataTable(S.unload_local, null);
     sectionPhotos('g');
-  }
-  if(selSet.has('h')){
-    secBar('H. Solo Run');
-    subTitle('Final Visual & Physical Check');
-    checkTable(S.solo);
-    subTitle('Electrical Test Recap');
-    kvGrid(S.solo_elec.rows);
-    subTitle('Local Monitoring per Interval');
-    dataTable(S.solo_local, null);
-    subTitle('DCS / MPR Monitoring per Interval');
-    dataTable(S.solo_dcs, null);
-    sectionPhotos('h');
   }
   if(selSet.has('i')){
     secBar('I. Kesimpulan & Tanda Tangan');
@@ -2420,33 +2394,7 @@ function _pdfSnapshot(){
   S.corona_hp = { title:'E', columns:['Leak Current (µA)','Corona Count','Result'], rows:
     [['T1 – T2T3G','1'],['T2 – T3T1G','2'],['T3 – T1T2G','3'],['T1T2T3 – G','4']].map(x=>({ no:'', desc:x[0], values:{ 'Leak Current (µA)':gv('chp_lc'+x[1])||'—','Corona Count':gv('chp_cc'+x[1])||'—','Result':tv('chp_'+x[1]) } })) };
   Object.assign(S, buildMechSheets());
-  S.unload = mkSheet('G', ['Value'], [
-    kv(1,'Voltage (Vac)', iv('ul-v')), kv(2,'Current 3φ (A)', iv('ul-i')), kv(3,'RPM', iv('ul-rpm')), kv(4,'Durasi (jam)', iv('ul-dur')),
-    kv(5,'Air Gap DE (mm)', iv('ul-ag-de')), kv(6,'Air Gap NDE (mm)', iv('ul-ag-nde')), kv(7,'Rotasi', iv('ul-rot')),
-    kv(8,'Air Flow Suction', iv('ul-af-s')), kv(9,'Air Flow Discharge', iv('ul-af-d')), kv(10,'Hasil Air Flow', tv('airflow_result')),
-    kv(11,'Vib IB-H', iv('vib-ibh')), kv(12,'Vib IB-V', iv('vib-ibv')), kv(13,'Vib IB-A', iv('vib-iba')),
-    kv(14,'Vib OB-H', iv('vib-obh')), kv(15,'Vib OB-V', iv('vib-obv')), kv(16,'Vib OB-A', iv('vib-oba')), kv(17,'Remark', gv('rmk-ul')||'—'),
-  ]);
-  S.unload_wtemp = { title:'G', columns:['Interval','T1','T2','T3','T4','T5','T6','T7','T8','T9','T10'], rows:
-    UL_INT.map((it,r)=>{ const o={Interval:it}; for(let i=1;i<=10;i++) o['T'+i]=gv(`ulw_${r}_${i}`)||'—'; return { no:'', desc:it, values:o }; }) };
-  S.unload_btemp = { title:'G', columns:['Interval','DE-1','DE-2','NDE-1','NDE-2'], rows:
-    UL_INT.map((it,r)=>({ no:'', desc:it, values:{ Interval:it, 'DE-1':gv(`ulb_${r}_de1`)||'—','DE-2':gv(`ulb_${r}_de2`)||'—','NDE-1':gv(`ulb_${r}_nde1`)||'—','NDE-2':gv(`ulb_${r}_nde2`)||'—' } })) };
-  S.solo = { title:'H', columns:['Result','Remark'], rows:
-    SOLO_VIS.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result:tv('sv_'+r.no), Remark:gv('rmk-sv_'+r.no)||'—' } })) };
-  S.solo_elec = mkSheet('H', ['Value'], [
-    kv(1,'Stator R T1-T2 (Ω)', iv('sr-t12')), kv(2,'Stator R T2-T3 (Ω)', iv('sr-t23')), kv(3,'Stator R T3-T1 (Ω)', iv('sr-t31')),
-    kv(4,'IR @1" (MΩ)', iv('sr-ir1')), kv(5,'IR @10" (MΩ)', iv('sr-ir10')), kv(6,'PI', iv('sr-pi')),
-    kv(7,'RTD type', iv('sr-rtdtype')), kv(8,'Heater R (Ω)', iv('sr-htr')),
-    kv(9,'RTD1 (Ω)', iv('sr-rtd1')), kv(10,'RTD2 (Ω)', iv('sr-rtd2')), kv(11,'RTD3 (Ω)', iv('sr-rtd3')), kv(12,'RTD4 (Ω)', iv('sr-rtd4')), kv(13,'RTD5 (Ω)', iv('sr-rtd5')),
-    kv(14,'DCS VAB (V)', iv('dcs-vab')), kv(15,'DCS VBC (V)', iv('dcs-vbc')), kv(16,'DCS VAC (V)', iv('dcs-vac')),
-    kv(17,'Voltage Unbalance (%)', iv('dcs-vunb')), kv(18,'Power (kW)', iv('dcs-kw')), kv(19,'PF', iv('dcs-pf')),
-    kv(20,'Vibration', iv('dcs-vib')), kv(21,'Hasil Solo Run', tv('solo_result')), kv(22,'Remark', gv('rmk-solo')||'—'),
-  ]);
-  S.solo_local = { title:'H', columns:['Parameter'].concat(SOLO_INT), rows:
-    ['Motor Body','NDE Bearing','DE Bearing','Motor Body (Thermal)','Outlet Duct','Air Flow'].map((r,ri)=>{ const o={Parameter:r}; SOLO_INT.forEach((it,ci)=>o[it]=gv(`slcl_${ri}_${ci}`)||'—'); return { no:'', desc:r, values:o }; }) };
-  S.solo_dcs = { title:'H', columns:['Parameter'].concat(SOLO_INT), rows:
-    [['Current A (A)','ia'],['Current B (A)','ib'],['Current C (A)','ic'],['Unbalance I (%)','unb'],['RTD 1 (°C)','r1'],['RTD 2 (°C)','r2'],['RTD 3 (°C)','r3'],['RTD 4 (°C)','r4'],['RTD 5 (°C)','r5']]
-      .map(r=>{ const o={Parameter:r[0]}; SOLO_INT.forEach((it,ci)=>o[it]=gv(`sldcs_${r[1]}_${ci}`)||'—'); return { no:'', desc:r[0], values:o }; }) };
+  Object.assign(S, buildUnloadSoloSheets());
   S.conclusion = mkSheet('I', ['Value'], [
     kv(1,'Overall Condition', iv('overall')), kv(2,'Findings', gv('findings')||'—'),
     kv(3,'Recommendations', gv('recommendations')||'—'), kv(4,'Next Test', iv('next-test')),
@@ -2488,12 +2436,12 @@ let _mgList = [];
 let _testType = null;
 
 // Section keys (match PDF_SHEETS keys + panel id suffix p-<k>) per test type.
-const ALL_SEC = ['a','b','c','d','e','f','g','h','i'];
+const ALL_SEC = ['a','b','c','d','e','f','g','i'];
 const TEST_SECTIONS = {
   electrical: ['a', 'b', 'c', 'd', 'e', 'i'],
-  solorun:    ['a', 'b', 'f', 'g', 'h', 'i'],
+  solorun:    ['a', 'b', 'f', 'g', 'i'],
 };
-const TEST_LABEL = { electrical: '⚡ Electrical Test', solorun: '▶️ Solo Run Test' };
+const TEST_LABEL = { electrical: '⚡ Electrical Test', solorun: '▶️ Unload / Solo Run Test' };
 function currentTestSections(){ return (TEST_SECTIONS[_testType] || ALL_SEC).slice(); }
 
 function applyTestType(t){
@@ -2654,7 +2602,7 @@ async function loadSession(s){
   // text fields + toggles + checkboxes + dynamic time intervals
   const d = { _st: s.toggleStates || {}, _chk: s.checkStates || (s.extra && s.extra.checkStates) || null,
               _ul_int: s.ulIntervals || (s.extra && s.extra.ulIntervals),
-              _solo_int: s.soloIntervals || (s.extra && s.extra.soloIntervals) };
+              _rtd_n: s.rtdN || (s.extra && s.extra.rtdN) };
   Object.entries(s.inputValues || {}).forEach(([k, v]) => { d['f_' + k] = v; });
   applyDraftData(d);
   // matrix cells (ids present in inputValues but not matched by DRAFT_SEL sometimes)
@@ -2721,8 +2669,8 @@ const _ivx = (s, id) => (s.inputValues && s.inputValues[id] != null && s.inputVa
 const _tgx = (s, id) => (s.toggleStates && s.toggleStates[id]) || '—';
 const _ratio = (a, b) => { const x = _cnum(a), y = _cnum(b); return (x != null && y != null && y !== 0) ? (x / y).toFixed(2) : '—'; };
 function _maxIv(s, ids){ let m = null; ids.forEach(id => { const n = _cnum((s.inputValues || {})[id]); if (n != null && (m == null || n > m)) m = n; }); return m == null ? '—' : String(m); }
-const _ULW = (() => { const a = []; for (let r = 0; r < 10; r++) for (let i = 1; i <= 10; i++) a.push('ulw_' + r + '_' + i); return a; })();
-const _ULB = (() => { const a = []; for (let r = 0; r < 10; r++) ['de1', 'de2', 'nde1', 'nde2'].forEach(x => a.push('ulb_' + r + '_' + x)); return a; })();
+const _ULW = (() => { const a = []; for (let r = 0; r < 24; r++) for (let i = 1; i <= 40; i++) a.push('ulw_' + r + '_' + i); return a; })();
+const _ULB = (() => { const a = []; for (let r = 0; r < 24; r++) ['de1', 'de2', 'nde1', 'nde2'].forEach(x => a.push('ulb_' + r + '_' + x)); return a; })();
 
 const CMP_ROWS = [
   { sec: 'B — Stator Winding R & IR', label: 'Winding R T1–T4 / T2–T5 / T3–T6 (mΩ)', get: s => [_ivx(s, 'wr-14'), _ivx(s, 'wr-25'), _ivx(s, 'wr-36')].join(' / ') },
@@ -2741,13 +2689,13 @@ const CMP_ROWS = [
   { sec: 'D — Tan Delta & PD', label: 'Hasil Tan Delta', get: s => _tgx(s, 'td_result'), badge: 1 },
   { sec: 'E — Hi-Pot', label: 'IR After Hi-Pot · T1T2T3–G (GΩ)', get: s => _ivx(s, 'hp-ir4') },
   { sec: 'E — Hi-Pot', label: 'Hasil Hi-Pot', get: s => _tgx(s, 'hp_result'), badge: 1 },
-  { sec: 'G — Unload Test', label: 'Max Winding Temp Unload (°C)', get: s => _maxIv(s, _ULW) },
-  { sec: 'G — Unload Test', label: 'Max Bearing Temp Unload (°C)', get: s => _maxIv(s, _ULB) },
-  { sec: 'H — Solo Run', label: 'IR @1" / @10" / PI (Solo Run)', get: s => [_ivx(s, 'sr-ir1'), _ivx(s, 'sr-ir10'), _ivx(s, 'sr-pi')].join(' / ') },
-  { sec: 'H — Solo Run', label: 'Voltage Unbalance (%)', get: s => _ivx(s, 'dcs-vunb') },
-  { sec: 'H — Solo Run', label: 'Power (kW) / PF', get: s => [_ivx(s, 'dcs-kw'), _ivx(s, 'dcs-pf')].join(' / ') },
-  { sec: 'H — Solo Run', label: 'Vibration Solo Run (mm/s)', get: s => _ivx(s, 'dcs-vib') },
-  { sec: 'H — Solo Run', label: 'Hasil Solo Run', get: s => _tgx(s, 'solo_result'), badge: 1 },
+  { sec: 'G — Unload / Solo Run', label: 'Max RTD Winding Temp (°C)', get: s => _maxIv(s, _ULW) },
+  { sec: 'G — Unload / Solo Run', label: 'Max Bearing Temp (°C)', get: s => _maxIv(s, _ULB) },
+  { sec: 'G — Unload / Solo Run', label: 'IR @1" / @10" / PI (Solo Run)', get: s => [_ivx(s, 'sr-ir1'), _ivx(s, 'sr-ir10'), _ivx(s, 'sr-pi')].join(' / ') },
+  { sec: 'G — Unload / Solo Run', label: 'Voltage Unbalance (%)', get: s => _ivx(s, 'dcs-vunb') },
+  { sec: 'G — Unload / Solo Run', label: 'Power (kW) / PF', get: s => [_ivx(s, 'dcs-kw'), _ivx(s, 'dcs-pf')].join(' / ') },
+  { sec: 'G — Unload / Solo Run', label: 'Vibration Overall (mm/s)', get: s => _ivx(s, 'dcs-vib') },
+  { sec: 'G — Unload / Solo Run', label: 'Hasil Unload / Solo Run', get: s => _tgx(s, 'solo_result'), badge: 1 },
   { sec: 'I — Kesimpulan', label: 'Overall Condition', get: s => _ivx(s, 'overall') },
   { sec: 'I — Kesimpulan', label: 'Jumlah NG', get: s => String(s.countNg != null ? s.countNg : Object.values(s.toggleStates || {}).filter(v => v === 'NG').length) },
 ];
@@ -3037,12 +2985,12 @@ CloudDraft.init({
     attachments: attachForSave(),
     checkStates: Object.assign({}, CHK),
     ulIntervals: UL_INT.slice(),
-    soloIntervals: SOLO_INT.slice(),
+    rtdN: RTD_N,
   }),
   applyExtra: (x) => {
     applyAttachList(x && x.attachments);
     if (x && x.checkStates) applyChecks(x.checkStates);
-    if (x && (x.ulIntervals || x.soloIntervals)) applyIntervals(x.ulIntervals, x.soloIntervals);
+    if (x && (x.ulIntervals || x.rtdN)) applyIntervals(x.ulIntervals, x.rtdN);
   },
 });
 document.getElementById('asset-tag').addEventListener('change', ()=>{ const t=gv('asset-tag')||MW_TAG; LoadMergeModal.init({ assetTag:t }); SubmitGuard.init({ assetTag:t }); });
