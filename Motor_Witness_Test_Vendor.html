@@ -1675,15 +1675,16 @@ function buildUnloadSoloSheets(){
   const out = {};
   out.solo = { title:'G — Unload / Solo Run Visual', columns:['Result','Remark'], rows:
     SOLO_VIS.map(r=>({ no:r.no, desc:r.it, crit:r.crit, values:{ Result: tv('sv_'+r.no), Remark: gv('rmk-sv_'+r.no)||'—' } })) };
-  out.unload = mkSheet('G — Unload / Solo Run Recording', ['Value'], [
+  out.unload_rec = mkSheet('G — Recording', ['Value'], [
     kv(1,'Voltage L-L (Vac)', iv('ul-v')), kv(2,'Voltage VAB/VBC/VAC (V)', iv('dcs-vab')), kv(3,'Voltage Unbalance (%)', iv('dcs-vunb')),
     kv(4,'Current 3φ (A)', iv('ul-i')), kv(5,'Power (kW)', iv('dcs-kw')), kv(6,'Power Factor', iv('dcs-pf')),
     kv(7,'RPM', iv('ul-rpm')), kv(8,'Durasi (jam)', iv('ul-dur')), kv(9,'Rotasi', iv('ul-rot')),
     kv(10,'Air Flow Suction', iv('ul-af-s')), kv(11,'Air Flow Discharge', iv('ul-af-d')), kv(12,'Hasil Air Flow', tv('airflow_result')),
-    kv(13,'Vibration IB-H (mm/s)', iv('vib-ibh')), kv(14,'Vibration IB-V', iv('vib-ibv')), kv(15,'Vibration IB-A', iv('vib-iba')),
-    kv(16,'Vibration OB-H', iv('vib-obh')), kv(17,'Vibration OB-V', iv('vib-obv')), kv(18,'Vibration OB-A', iv('vib-oba')),
-    kv(19,'Vibration Overall / Max (mm/s)', iv('dcs-vib')),
-    kv(20,'Remark', gv('rmk-ul')||'—'),
+  ]);
+  out.unload_vib = mkSheet('G — Vibration (mm/s)', ['Value'], [
+    kv(1,'IB - Horizontal', iv('vib-ibh')), kv(2,'IB - Vertical', iv('vib-ibv')), kv(3,'IB - Axial', iv('vib-iba')),
+    kv(4,'OB - Horizontal', iv('vib-obh')), kv(5,'OB - Vertical', iv('vib-obv')), kv(6,'OB - Axial', iv('vib-oba')),
+    kv(7,'Overall / Max (mm/s)', iv('dcs-vib')), kv(8,'Remark Unload / Solo Run', gv('rmk-ul')||'—'),
   ]);
   const rtdCols = []; for(let i=1;i<=RTD_N;i++) rtdCols.push('RTD'+i);
   out.unload_wtemp = { title:'G — RTD Winding Temp (°C) per Interval', columns:['Interval'].concat(rtdCols), rows:
@@ -1693,6 +1694,50 @@ function buildUnloadSoloSheets(){
   out.unload_local = { title:'G — Local Monitoring & Current per Interval', columns:['Parameter'].concat(UL_INT), rows:
     SOLO_LOCAL_ROWS.map(rr=>{ const o={Parameter:rr[0]}; UL_INT.forEach((it,ci)=>o[it]=gv(`slcl_${rr[1]}_${ci}`)||'—'); return { no:'', desc:rr[0], values:o }; }) };
   return out;
+}
+
+// Section B/D/E — each on-screen sub-block gets its own titled sheet so the PDF
+// (and dashboard) render them as separate, easy-to-read blocks.
+function buildStatorSheets(){
+  return {
+    stator_wr: mkSheet('B — Winding Resistance', ['Value'], [
+      kv('1','Winding R T1-T4 (mΩ)', iv('wr-14')), kv('2','Winding R T2-T5 (mΩ)', iv('wr-25')),
+      kv('3','Winding R T3-T6 (mΩ)', iv('wr-36')), kv('4','Max Unbalance (%)', iv('wr-unb')),
+      kv('5','Hasil Winding Resistance', tv('wr_result')),
+    ]),
+    stator_ir: mkSheet('B — Insulation Resistance / Polarization Index', ['Value'], [
+      kv('1','IR Test Voltage (V-dc)', iv('ir-v')), kv('2','Ambient / Winding Temp (°C)', iv('ir-temp')),
+      kv('3','Hasil IR / PI', tv('ir_result')), kv('4','Remark IR / PI', gv('rmk-ir')||'—'),
+    ]),
+  };
+}
+function buildTdpdSheets(){
+  return {
+    pd: mkSheet('D — Partial Discharge', ['Value'], [
+      kv('1','PD Qmax (nC)', iv('pd-max')), kv('2','+QM', iv('pd-qp')), kv('3','−QM', iv('pd-qn')), kv('4','Hasil PD', tv('pd_result')),
+    ]),
+    td: mkSheet('D — Tan Delta', ['Value'], [
+      kv('1','Tan Delta @0.2Un (×10⁻³)', iv('td-02')), kv('2','Δ Tan Delta (×10⁻³)', iv('td-delta')),
+      kv('3','Avg Increment (×10⁻³)', iv('td-avg')), kv('4','Hasil Tan Delta', tv('td_result')), kv('5','Remark TD / PD', gv('rmk-tdpd')||'—'),
+    ]),
+  };
+}
+function buildHipotSheets(){
+  return {
+    hipot_param: mkSheet('E — Hi-Pot Parameters', ['Value'], [
+      kv('1','Ambient Temp (°C)', iv('hp-amb')), kv('2','Humidity (%)', iv('hp-hum')), kv('3','Winding Temp (°C)', iv('hp-wtemp')),
+      kv('4','Rated Voltage HI-POT (kV-dc)', iv('hp-rated')), kv('5','Test Level (%)', iv('hp-level')), kv('6','Applied Voltage (kV-dc)', iv('hp-applied')),
+    ]),
+    hipot_wr: mkSheet('E — Resistance Winding Motor (after Hi-Pot)', ['Value'], [
+      kv('1','Winding R T1-T4 (mΩ)', iv('hp-wr14')), kv('2','Winding R T2-T5 (mΩ)', iv('hp-wr25')), kv('3','Winding R T3-T6 (mΩ)', iv('hp-wr36')),
+    ]),
+    hipot_ir: mkSheet('E — Insulation Resistance After Hi-Pot', ['Value'], [
+      kv('1','IR After Hi-Pot T1-T2T3G (GΩ)', iv('hp-ir1')), kv('2','IR After Hi-Pot T2-T3T1G (GΩ)', iv('hp-ir2')),
+      kv('3','IR After Hi-Pot T3-T1T2G (GΩ)', iv('hp-ir3')), kv('4','IR After Hi-Pot T1T2T3-G (GΩ)', iv('hp-ir4')),
+      kv('5','Hasil Hi-Pot', tv('hp_result')), kv('6','Remark Hi-Pot', gv('rmk-hp')||'—'),
+    ]),
+    hipot_rtd: rtdWindingSheet('rtdp', 'E — RTD Winding After Hi-Pot'),
+  };
 }
 
 function inspSheet(){
@@ -1774,13 +1819,7 @@ async function submitToDb(){
     kv(1,'DE-1', iv('brtd-de1')), kv(2,'DE-2', iv('brtd-de2')), kv(3,'NDE-1', iv('brtd-nde1')), kv(4,'NDE-2', iv('brtd-nde2')),
   ]);
 
-  base.sheets.stator = mkSheet('B — Stator Winding Resistance & Insulation', ['Value'], [
-    kv('B.1','Winding R T1-T4 (mΩ)', iv('wr-14')), kv('B.2','Winding R T2-T5 (mΩ)', iv('wr-25')),
-    kv('B.3','Winding R T3-T6 (mΩ)', iv('wr-36')), kv('B.4','Max Unbalance (%)', iv('wr-unb')),
-    kv('B.5','Hasil Winding Resistance', tv('wr_result')),
-    kv('B.6','IR Test Voltage (V-dc)', iv('ir-v')), kv('B.7','Ambient/Winding Temp (°C)', iv('ir-temp')),
-    kv('B.8','Hasil IR / PI', tv('ir_result')), kv('B.9','Remark IR/PI', gv('rmk-ir')||'—'),
-  ]);
+  Object.assign(base.sheets, buildStatorSheets());
   base.sheets.stator_mtx = { title:'B — IR/PI Matrix (Stator)', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('stator') };
 
   base.sheets.surge = mkSheet('C — Surge Comparison & Corona', ['Value'], [
@@ -1794,13 +1833,7 @@ async function submitToDb(){
       'T1-T3 DE': gv('csv_t13de'+r)||'—', 'T1-T3 NDE': gv('csv_t13nde'+r)||'—' } }))
       .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
 
-  base.sheets.tdpd = mkSheet('D — Tan Delta & Partial Discharge', ['Value'], [
-    kv('D.1','PD Qmax (nC)', iv('pd-max')), kv('D.2','+QM', iv('pd-qp')), kv('D.3','−QM', iv('pd-qn')),
-    kv('D.4','Hasil PD', tv('pd_result')),
-    kv('D.5','Tan Delta @0.2Un (×10⁻³)', iv('td-02')), kv('D.6','Δ Tan Delta (×10⁻³)', iv('td-delta')),
-    kv('D.7','Avg Increment (×10⁻³)', iv('td-avg')), kv('D.8','Hasil Tan Delta', tv('td_result')),
-    kv('D.9','Remark TD/PD', gv('rmk-tdpd')||'—'),
-  ]);
+  Object.assign(base.sheets, buildTdpdSheets());
   base.sheets.corona_td = { title:'D — Corona Count During TD/PD Test', columns:['Voltage','Ph-U DE','Ph-U NDE','Ph-V DE','Ph-V NDE','Ph-W DE','Ph-W NDE','Ph-UVW DE','Ph-UVW NDE'], rows:
     [0,1,2,3,4].map(r=>({ no:'', desc:'', values:{
       Voltage: gv('ctd_v'+r)||'—', 'Ph-U DE': gv('ctd_ude'+r)||'—', 'Ph-U NDE': gv('ctd_unde'+r)||'—',
@@ -1808,14 +1841,7 @@ async function submitToDb(){
       'Ph-UVW DE': gv('ctd_uvwde'+r)||'—', 'Ph-UVW NDE': gv('ctd_uvwnde'+r)||'—' } }))
       .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
 
-  base.sheets.hipot = mkSheet('E — Stator High Potential Test', ['Value'], [
-    kv('E.1','Ambient Temp (°C)', iv('hp-amb')), kv('E.2','Humidity (%)', iv('hp-hum')), kv('E.3','Winding Temp (°C)', iv('hp-wtemp')),
-    kv('E.4','Rated Voltage HI-POT (kV-dc)', iv('hp-rated')), kv('E.5','Test Level (%)', iv('hp-level')), kv('E.6','Applied Voltage (kV-dc)', iv('hp-applied')),
-    kv('E.7','Winding R T1-T4 (mΩ)', iv('hp-wr14')), kv('E.8','Winding R T2-T5 (mΩ)', iv('hp-wr25')), kv('E.9','Winding R T3-T6 (mΩ)', iv('hp-wr36')),
-    kv('E.10','IR After Hipot T1-T2T3G (GΩ)', iv('hp-ir1')), kv('E.11','IR After Hipot T2-T3T1G (GΩ)', iv('hp-ir2')),
-    kv('E.12','IR After Hipot T3-T1T2G (GΩ)', iv('hp-ir3')), kv('E.13','IR After Hipot T1T2T3-G (GΩ)', iv('hp-ir4')),
-    kv('E.14','Hasil Hi-Pot', tv('hp_result')), kv('E.15','Remark Hi-Pot', gv('rmk-hp')||'—'),
-  ].concat(rtdRows('rtdp').map((r,i)=>({...r, desc:'RTD After Hipot '+r.desc}))));
+  Object.assign(base.sheets, buildHipotSheets());
   base.sheets.hipot_mtx = { title:'E — IR/PI Matrix (Hi-Pot)', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('hipot') };
   base.sheets.corona_hp = { title:'E — Corona Count Hi-Pot dc', columns:['Leak Current (µA)','Corona Count','Result'], rows:
     [['T1 – T2T3G','1'],['T2 – T3T1G','2'],['T3 – T1T2G','3'],['T1T2T3 – G','4']].map(x=>({ no:'', desc:x[0], values:{
@@ -2274,8 +2300,10 @@ async function generatePDF(selSet, opts){
   }
   if(selSet.has('b')){
     secBar('B. Stator Winding Resistance & Insulation Test');
-    subTitle('Winding Resistance & Insulation Resistance / PI');
-    kvGrid(S.stator.rows);
+    subTitle('Winding Resistance');
+    kvGrid(S.stator_wr.rows);
+    subTitle('Insulation Resistance / Polarization Index');
+    kvGrid(S.stator_ir.rows);
     subTitle('IR / PI Matrix (Stator)');
     dataTable(S.stator_mtx, 'Waktu');
     irChartImage('stator');
@@ -2291,16 +2319,24 @@ async function generatePDF(selSet, opts){
   }
   if(selSet.has('d')){
     secBar('D. Tan Delta & Partial Discharge');
-    subTitle('Partial Discharge & Tan Delta');
-    kvGrid(S.tdpd.rows);
+    subTitle('Partial Discharge');
+    kvGrid(S.pd.rows);
+    subTitle('Tan Delta');
+    kvGrid(S.td.rows);
     if(S.corona_td.rows.length){ subTitle('Corona Count During TD / PD Test'); dataTable(S.corona_td, null); }
     sectionAttach('d');
     sectionPhotos('d');
   }
   if(selSet.has('e')){
     secBar('E. Stator High Potential Test');
-    subTitle('Hi-Pot Parameters, Winding R & IR After Hi-Pot');
-    kvGrid(S.hipot.rows.filter(r=>r.values && r.values.Value!==undefined));
+    subTitle('Hi-Pot Parameters');
+    kvGrid(S.hipot_param.rows);
+    subTitle('Resistance Winding Motor (after Hi-Pot)');
+    kvGrid(S.hipot_wr.rows);
+    subTitle('Insulation Resistance After Hi-Pot');
+    kvGrid(S.hipot_ir.rows);
+    subTitle('RTD Winding After Hi-Pot (deg C)');
+    rtdWindingGrid(S.hipot_rtd);
     subTitle('IR / PI Matrix (Hi-Pot)');
     dataTable(S.hipot_mtx, 'Waktu');
     irChartImage('hipot');
@@ -2331,8 +2367,10 @@ async function generatePDF(selSet, opts){
     secBar('G. Unload / Solo Run Test');
     subTitle('Final Visual & Physical Check');
     checkTable(S.solo);
-    subTitle('Recording & Vibration');
-    kvGrid(S.unload.rows);
+    subTitle('Recording');
+    kvGrid(S.unload_rec.rows);
+    subTitle('Vibration (mm/s)');
+    kvGrid(S.unload_vib.rows);
     subTitle('RTD Winding Temperature (deg C) per Interval');
     dataTable(S.unload_wtemp, null);
     subTitle('Bearing Temperature (deg C) per Interval');
@@ -2394,12 +2432,7 @@ function _pdfSnapshot(){
   S.rtd_bearing = mkSheet('A', ['Value'], [
     kv(1,'DE-1', iv('brtd-de1')), kv(2,'DE-2', iv('brtd-de2')), kv(3,'NDE-1', iv('brtd-nde1')), kv(4,'NDE-2', iv('brtd-nde2')),
   ]);
-  S.stator = mkSheet('B', ['Value'], [
-    kv('B.1','Winding R T1-T4 (mΩ)', iv('wr-14')), kv('B.2','Winding R T2-T5 (mΩ)', iv('wr-25')), kv('B.3','Winding R T3-T6 (mΩ)', iv('wr-36')),
-    kv('B.4','Max Unbalance (%)', iv('wr-unb')), kv('B.5','Hasil Winding Resistance', tv('wr_result')),
-    kv('B.6','IR Test Voltage (V-dc)', iv('ir-v')), kv('B.7','Temp (°C)', iv('ir-temp')),
-    kv('B.8','Hasil IR / PI', tv('ir_result')), kv('B.9','Remark', gv('rmk-ir')||'—'),
-  ]);
+  Object.assign(S, buildStatorSheets());
   S.stator_mtx = { title:'B', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('stator') };
   S.surge = mkSheet('C', ['Value'], [
     kv('C.1','Surge Waveform', tv('surge_wave')), kv('C.2','Applied Voltage (kV-Ac)', iv('sc-v')),
@@ -2408,22 +2441,11 @@ function _pdfSnapshot(){
   S.corona_surge = { title:'C', columns:['Voltage','T1-T2 DE','T1-T2 NDE','T2-T3 DE','T2-T3 NDE','T1-T3 DE','T1-T3 NDE'], rows:
     [0,1,2].map(r=>({ no:'', desc:'', values:{ Voltage: gv('csv_v'+r)||'—', 'T1-T2 DE':gv('csv_t12de'+r)||'—','T1-T2 NDE':gv('csv_t12nde'+r)||'—','T2-T3 DE':gv('csv_t23de'+r)||'—','T2-T3 NDE':gv('csv_t23nde'+r)||'—','T1-T3 DE':gv('csv_t13de'+r)||'—','T1-T3 NDE':gv('csv_t13nde'+r)||'—' } }))
       .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
-  S.tdpd = mkSheet('D', ['Value'], [
-    kv('D.1','PD Qmax (nC)', iv('pd-max')), kv('D.2','+QM', iv('pd-qp')), kv('D.3','−QM', iv('pd-qn')), kv('D.4','Hasil PD', tv('pd_result')),
-    kv('D.5','Tan Delta @0.2Un (×10⁻³)', iv('td-02')), kv('D.6','Δ Tan Delta (×10⁻³)', iv('td-delta')),
-    kv('D.7','Avg Increment (×10⁻³)', iv('td-avg')), kv('D.8','Hasil Tan Delta', tv('td_result')), kv('D.9','Remark', gv('rmk-tdpd')||'—'),
-  ]);
+  Object.assign(S, buildTdpdSheets());
   S.corona_td = { title:'D', columns:['Voltage','Ph-U DE','Ph-U NDE','Ph-V DE','Ph-V NDE','Ph-W DE','Ph-W NDE','Ph-UVW DE','Ph-UVW NDE'], rows:
     [0,1,2,3,4].map(r=>({ no:'', desc:'', values:{ Voltage:gv('ctd_v'+r)||'—','Ph-U DE':gv('ctd_ude'+r)||'—','Ph-U NDE':gv('ctd_unde'+r)||'—','Ph-V DE':gv('ctd_vde'+r)||'—','Ph-V NDE':gv('ctd_vnde'+r)||'—','Ph-W DE':gv('ctd_wde'+r)||'—','Ph-W NDE':gv('ctd_wnde'+r)||'—','Ph-UVW DE':gv('ctd_uvwde'+r)||'—','Ph-UVW NDE':gv('ctd_uvwnde'+r)||'—' } }))
       .filter(row=>Object.values(row.values).some(v=>v!=='—')) };
-  S.hipot = mkSheet('E', ['Value'], [
-    kv('E.1','Ambient Temp (°C)', iv('hp-amb')), kv('E.2','Humidity (%)', iv('hp-hum')), kv('E.3','Winding Temp (°C)', iv('hp-wtemp')),
-    kv('E.4','Rated V HI-POT (kV-dc)', iv('hp-rated')), kv('E.5','Test Level (%)', iv('hp-level')), kv('E.6','Applied V (kV-dc)', iv('hp-applied')),
-    kv('E.7','Winding R T1-T4 (mΩ)', iv('hp-wr14')), kv('E.8','Winding R T2-T5 (mΩ)', iv('hp-wr25')), kv('E.9','Winding R T3-T6 (mΩ)', iv('hp-wr36')),
-    kv('E.10','IR After T1-T2T3G (GΩ)', iv('hp-ir1')), kv('E.11','IR After T2-T3T1G (GΩ)', iv('hp-ir2')),
-    kv('E.12','IR After T3-T1T2G (GΩ)', iv('hp-ir3')), kv('E.13','IR After T1T2T3-G (GΩ)', iv('hp-ir4')),
-    kv('E.14','Hasil Hi-Pot', tv('hp_result')), kv('E.15','Remark', gv('rmk-hp')||'—'),
-  ]);
+  Object.assign(S, buildHipotSheets());
   S.hipot_mtx = { title:'E', columns:MTX_COLS.map(c=>c[1]), rows:mtxRows('hipot') };
   S.corona_hp = { title:'E', columns:['Leak Current (µA)','Corona Count','Result'], rows:
     [['T1 – T2T3G','1'],['T2 – T3T1G','2'],['T3 – T1T2G','3'],['T1T2T3 – G','4']].map(x=>({ no:'', desc:x[0], values:{ 'Leak Current (µA)':gv('chp_lc'+x[1])||'—','Corona Count':gv('chp_cc'+x[1])||'—','Result':tv('chp_'+x[1]) } })) };
