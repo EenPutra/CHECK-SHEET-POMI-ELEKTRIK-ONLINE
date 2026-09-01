@@ -480,6 +480,9 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <th>Voltage (kV-Ac)</th><th class="ctr">T1–T2 DE</th><th class="ctr">T1–T2 NDE</th><th class="ctr">T2–T3 DE</th><th class="ctr">T2–T3 NDE</th><th class="ctr">T1–T3 DE</th><th class="ctr">T1–T3 NDE</th>
       </tr></thead><tbody id="tb-corona-surge"></tbody></table></div>
       <div class="grid" style="margin-top:8px"><div class="mf full"><label>Hasil Corona (surge)</label><div id="tog-csurge" class="rc" style="justify-content:flex-start"></div></div></div>
+      <div class="subttl" style="font-size:11px">Report PDF — Surge / Corona Test</div>
+      <div class="photo-drop sm" onclick="pickAttach('c')"><div class="photo-drop-ico">📄</div><div class="photo-drop-txt"><strong>Upload PDF report hasil surge test</strong> — bisa lebih dari satu, maks 15 MB/file</div></div>
+      <div id="attach-list-c" style="margin-top:8px"></div>
     </div>
   </div>
 
@@ -506,6 +509,9 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <th>Voltage (kV)</th><th class="ctr">Ph-U DE</th><th class="ctr">Ph-U NDE</th><th class="ctr">Ph-V DE</th><th class="ctr">Ph-V NDE</th><th class="ctr">Ph-W DE</th><th class="ctr">Ph-W NDE</th><th class="ctr">Ph-UVW DE</th><th class="ctr">Ph-UVW NDE</th>
       </tr></thead><tbody id="tb-corona-td"></tbody></table></div>
       <div class="grid" style="margin-top:8px"><div class="mf full"><label>Remark TD / PD</label><textarea id="rmk-tdpd" placeholder="Catatan / trending vs data sebelumnya…"></textarea></div></div>
+      <div class="subttl" style="font-size:11px">Report PDF — Tan Delta / PD Test</div>
+      <div class="photo-drop sm" onclick="pickAttach('d')"><div class="photo-drop-ico">📄</div><div class="photo-drop-txt"><strong>Upload PDF report hasil TD / PD test</strong> — bisa lebih dari satu, maks 15 MB/file</div></div>
+      <div id="attach-list-d" style="margin-top:8px"></div>
       <details class="pd-help"><summary style="cursor:pointer;font-weight:700;color:#5b3d78">📖 Panduan Interpretasi Partial Discharge</summary>
         <p style="margin-top:8px"><b>QM</b> = nilai peak magnitude; makin besar QM makin besar void di isolasi (udara terjebak / contaminant).</p>
         <p><b>Symptom umum:</b></p>
@@ -1457,24 +1463,27 @@ function buildApprovalPhotos(){
    only {name,url,size} kept in state + drafts. Restored on loadSession. ── */
 const ATTACH_KEY = 'motor_witness_attach_v1';
 const ATTACH_MAX_BYTES = 15 * 1024 * 1024;
-let ATTACH = [];   // {name, size, url, uploadedAt, __sig, __uploading?, __error?}
+let ATTACH = [];   // {name, size, url, uploadedAt, sec, __sig, __uploading?, __error?}
+let _attachPendingSec = '';
 const _attSig = f => f.name + '~' + f.size + '~' + (f.lastModified || 0);
 const _attFmt = n => n ? (n / 1048576).toFixed(2) + ' MB' : '';
+const ATT_SEC_LABEL = { '': 'Lampiran', c: 'Surge / Corona', d: 'Tan Delta / PD' };
 
-function pickAttach(){ const inp = document.getElementById('attach-input'); if(inp){ inp.value=''; inp.click(); } }
+function pickAttach(sec){ _attachPendingSec = sec || ''; const inp = document.getElementById('attach-input'); if(inp){ inp.value=''; inp.click(); } }
 
 async function onAttachFiles(fileList){
+  const sec = _attachPendingSec; _attachPendingSec = '';
   const files = [...(fileList || [])].filter(f => f && (/pdf$/i.test(f.type || '') || /\.pdf$/i.test(f.name || '')));
   if(!files.length){ note('Hanya file PDF yang bisa dilampirkan.', 'err'); return; }
   for(const f of files){
     if(f.size > ATTACH_MAX_BYTES){ note('File "' + f.name + '" terlalu besar (' + _attFmt(f.size) + ', maks 15 MB).', 'err'); continue; }
     const sig = _attSig(f);
-    if(ATTACH.some(a => a.__sig === sig)){ note('File "' + f.name + '" sudah dilampirkan.', 'info'); continue; }
-    const rec = { name: f.name, size: f.size, url: null, uploadedAt: null, __sig: sig, __uploading: true };
+    if(ATTACH.some(a => a.__sig === sig && (a.sec || '') === sec)){ note('File "' + f.name + '" sudah dilampirkan.', 'info'); continue; }
+    const rec = { name: f.name, size: f.size, url: null, uploadedAt: null, sec: sec, __sig: sig, __uploading: true };
     ATTACH.push(rec); renderAttach();
     try{
       const tag = gv('asset-tag') || (_activeMotor && _activeMotor.tag) || 'motor';
-      const path = 'motor-witness/attachments/' + mmSlug(tag) + '/' + Date.now().toString(36) + '-' + f.name.replace(/[^\w.\-]+/g, '_');
+      const path = 'motor-witness/attachments/' + mmSlug(tag) + '/' + (sec ? sec + '/' : '') + Date.now().toString(36) + '-' + f.name.replace(/[^\w.\-]+/g, '_');
       rec.url = await Storage.uploadBlob(path, f, 'application/pdf');
       rec.uploadedAt = new Date().toISOString();
       rec.__uploading = false;
@@ -1506,11 +1515,8 @@ function removeAttach(i){
   if(typeof autoSaveNow === 'function') autoSaveNow();
 }
 
-function renderAttach(){
-  const box = document.getElementById('attach-list'); if(!box) return;
-  if(!ATTACH.length){ box.innerHTML = '<div class="photo-empty">Belum ada lampiran.</div>'; return; }
-  box.innerHTML = ATTACH.map((a, i) => `
-    <div class="att-row">
+function _attRowHtml(a, i){
+  return `<div class="att-row">
       <span class="att-ico">📄</span>
       <span class="att-name">${_esc(a.name || 'file.pdf')} <span class="att-sz">${_attFmt(a.size)}</span></span>
       ${a.__uploading ? '<span class="att-st">⏳ mengunggah…</span>'
@@ -1518,10 +1524,20 @@ function renderAttach(){
         : a.url ? `<button class="btn bo bsm" type="button" onclick="openAttach(${i})">Buka</button>`
         : '<span class="att-st err">tidak tersimpan</span>'}
       <button class="btn br bsm" type="button" onclick="removeAttach(${i})">&#10005;</button>
-    </div>`).join('');
+    </div>`;
+}
+function _renderAttachInto(boxId, sec){
+  const box = document.getElementById(boxId); if(!box) return;
+  const items = ATTACH.map((a, i) => ({ a, i })).filter(x => (x.a.sec || '') === sec);
+  box.innerHTML = items.length ? items.map(x => _attRowHtml(x.a, x.i)).join('') : '<div class="photo-empty">Belum ada lampiran.</div>';
+}
+function renderAttach(){
+  _renderAttachInto('attach-list', '');
+  _renderAttachInto('attach-list-c', 'c');
+  _renderAttachInto('attach-list-d', 'd');
 }
 
-function attachForSave(){ return ATTACH.filter(a => a.url).map(a => ({ name: a.name, size: a.size, url: a.url, uploadedAt: a.uploadedAt, __sig: a.__sig })); }
+function attachForSave(){ return ATTACH.filter(a => a.url).map(a => ({ name: a.name, size: a.size, url: a.url, uploadedAt: a.uploadedAt, sec: a.sec || '', __sig: a.__sig })); }
 function persistAttach(){ try{ localStorage.setItem(ATTACH_KEY, JSON.stringify(attachForSave())); }catch(e){} }
 function loadAttachDraft(){ try{ const raw = localStorage.getItem(ATTACH_KEY); if(raw){ ATTACH = JSON.parse(raw) || []; renderAttach(); } }catch(e){} }
 function applyAttachList(list){ ATTACH = Array.isArray(list) ? list.slice() : []; renderAttach(); persistAttach(); }
@@ -2170,6 +2186,16 @@ async function generatePDF(selSet, opts){
     try{ pdf.addImage(canvas.toDataURL('image/png'),'PNG',M,y,iw,ih); }catch(e){}
     y+=ih+5;
   }
+  function sectionAttach(sec){
+    let list=[];
+    try{ list=(typeof attachForSave==='function'?attachForSave():[]).filter(a=>(a.sec||'')===sec && a.url); }catch(e){}
+    if(!list.length) return;
+    subTitle('Report PDF Terlampir');
+    pdf.setFont('times','normal'); pdf.setFontSize(8); pdf.setTextColor(40,40,40);
+    list.forEach(a=>{ checkY(6); pdf.text(sanitize('- '+(a.name||'file.pdf')+'   ('+(a.size?(a.size/1048576).toFixed(2)+' MB':'-')+')'), M+2, y+3); y+=5; });
+    pdf.setFontSize(6.8); pdf.setTextColor(120,120,120);
+    pdf.text('File dapat dibuka dari check sheet / dashboard Review & Approval.', M+2, y+2.5); y+=6;
+  }
   function sectionPhotos(key){
     const list=(PHOTOS[key]||[]).filter(p=>p&&p.src);
     if(!list.length) return;
@@ -2245,6 +2271,7 @@ async function generatePDF(selSet, opts){
     subTitle('Surge Comparison');
     kvGrid(S.surge.rows);
     if(S.corona_surge.rows.length){ subTitle('Corona Count During Surge Test'); dataTable(S.corona_surge, null); }
+    sectionAttach('c');
     sectionPhotos('c');
   }
   if(selSet.has('d')){
@@ -2252,6 +2279,7 @@ async function generatePDF(selSet, opts){
     subTitle('Partial Discharge & Tan Delta');
     kvGrid(S.tdpd.rows);
     if(S.corona_td.rows.length){ subTitle('Corona Count During TD / PD Test'); dataTable(S.corona_td, null); }
+    sectionAttach('d');
     sectionPhotos('d');
   }
   if(selSet.has('e')){
