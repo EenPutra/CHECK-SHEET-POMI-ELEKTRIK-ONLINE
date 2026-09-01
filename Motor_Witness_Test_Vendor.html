@@ -11,18 +11,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20260901a"></script>
-<script src="db-helper.js?v=20260901a"></script>
-<script src="storage-helper.js?v=20260901a"></script>
-<script src="approval-helper.js?v=20260901a"></script>
-<script src="submit-guard.js?v=20260901a"></script>
-<script src="pdf-preview.js?v=20260901a"></script>
-<script src="load-merge-modal.js?v=20260901a"></script>
-<script src="cloud-draft.js?v=20260901a"></script>
-<script src="auth-session.js?v=20260901a"></script>
-<script src="technician-auth.js?v=20260901a"></script>
-<script src="img-helper.js?v=20260901a"></script>
-<script src="photo-kit.js?v=20260901a"></script>
+<script src="firebase-config.js?v=20260901b"></script>
+<script src="db-helper.js?v=20260901b"></script>
+<script src="storage-helper.js?v=20260901b"></script>
+<script src="approval-helper.js?v=20260901b"></script>
+<script src="submit-guard.js?v=20260901b"></script>
+<script src="pdf-preview.js?v=20260901b"></script>
+<script src="load-merge-modal.js?v=20260901b"></script>
+<script src="cloud-draft.js?v=20260901b"></script>
+<script src="auth-session.js?v=20260901b"></script>
+<script src="technician-auth.js?v=20260901b"></script>
+<script src="img-helper.js?v=20260901b"></script>
+<script src="photo-kit.js?v=20260901b"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 /* ===== BLUE THEME — light (default) ===== */
@@ -315,8 +315,9 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
   </div>
   <div id="session-tabs" class="session-tabs" style="display:none"></div>
   <div id="session-banner" style="display:none"></div>
-  <input type="hidden" id="test-type">
-  <input type="hidden" id="session-id">
+  <!-- type=text (visually hidden) so DB.collectCheckSheetData()'s input sweep persists them into a cloud draft -->
+  <input type="text" id="test-type" style="display:none" autocomplete="off" tabindex="-1" aria-hidden="true">
+  <input type="text" id="session-id" style="display:none" autocomplete="off" tabindex="-1" aria-hidden="true">
 
   <!-- A. WO & MOTOR DATA + INSPEKSI AWAL -->
   <div class="panel open" id="p-a">
@@ -1163,22 +1164,12 @@ function buildApprovalPhotos(){
 function note(msg,t){ const n=document.getElementById('notice'); n.textContent=msg; n.className='notice '+(t||'info'); setTimeout(()=>{ if(n.textContent===msg) n.className='notice'; },4000); }
 function showNote(msg,t){ note(msg,t); }
 
-/* ── draft (autosave: localStorage + Firestore) ── */
+/* ── local draft autosave (localStorage only). Saving to the database is a
+   deliberate action via the 💾 button -> shared CloudDraft, unified with the
+   "Muat / Lanjutkan dari Database" modal. No parallel auto-cloud-save. ── */
 const DRAFT_SEL = 'input:not(.photo-cap):not([type=file]),select,textarea';
-const CLOUD_DRAFT_COLL = 'checksheet_drafts';
-const CLOUD_DRAFT_ID_KEY = 'motor_witness_cloud_draft_id';
 let _autoTimer=null, _flashTimer=null;
-let _cloudTimer=null, _cloudBusy=false, _cloudEnabled=true, _cloudLastOk=0, _cloudWarned=false;
 
-function newDraftId(){
-  try{ if(window.crypto && crypto.randomUUID) return 'mw_'+crypto.randomUUID(); }catch(e){}
-  return 'mw_'+new Date().toISOString().replace(/[^0-9]/g,'')+'_'+String(performance.now()|0);
-}
-function cloudDraftId(){
-  let id=null; try{ id=localStorage.getItem(CLOUD_DRAFT_ID_KEY); }catch(e){}
-  if(!id){ id=newDraftId(); try{ localStorage.setItem(CLOUD_DRAFT_ID_KEY,id); }catch(e){} }
-  return id;
-}
 function collectDraftPayload(){
   const d={};
   document.querySelectorAll(DRAFT_SEL).forEach(el=>{ if(el.id) d['f_'+el.id]=el.value; });
@@ -1186,12 +1177,9 @@ function collectDraftPayload(){
   return d;
 }
 function flashAutosave(state){
-  // state: 'local' | 'cloud' | 'localonly' | 'err'
   const el=document.getElementById('autosave-indicator');
   const t=new Date().toLocaleTimeString('id-ID');
   if(state==='err'){ el.textContent='⚠️ Auto-save gagal'; el.className='autosave-ind show warn'; }
-  else if(state==='cloud'){ el.textContent='☁️ Tersimpan (lokal + database) '+t; el.className='autosave-ind show'; }
-  else if(state==='localonly'){ el.textContent='💾 Tersimpan lokal '+t+' · database nonaktif'; el.className='autosave-ind show warn'; }
   else { el.textContent='💾 Tersimpan lokal '+t; el.className='autosave-ind show'; }
   clearTimeout(_flashTimer); _flashTimer=setTimeout(()=>el.classList.remove('show'),2600);
 }
@@ -1200,13 +1188,11 @@ function persistDraft(silent){
   try{ localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); }
   catch(e){ if(!silent) note('❌ Gagal simpan draft lokal: '+e.message,'err'); return; }
   savePhotoDraft();
-  if(silent) flashAutosave(_cloudEnabled ? 'local' : 'localonly'); else note('💾 Draft tersimpan.','ok');
-  if(_cloudEnabled) scheduleCloudSave();
+  if(silent) flashAutosave('local'); else note('💾 Draft lokal tersimpan.','ok');
 }
-function saveDraft(){ persistDraft(false); cloudDraftSave(true); }
+function saveDraft(){ persistDraft(false); }
 function autoSaveNow(){ persistDraft(true); }
 function scheduleAutoSave(){ clearTimeout(_autoTimer); _autoTimer=setTimeout(autoSaveNow,800); }
-function scheduleCloudSave(){ clearTimeout(_cloudTimer); _cloudTimer=setTimeout(()=>cloudDraftSave(true),4000); }
 
 const _TEXTISH = {text:1,number:1,date:1,time:1,tel:1,email:1,search:1,url:1,'':1};
 function draftHasContent(d){
@@ -1223,53 +1209,6 @@ function draftHasContent(d){
     return el.tagName==='INPUT' && _TEXTISH[el.type||''];
   });
 }
-async function cloudDraftSave(silent){
-  if(!_cloudEnabled || _cloudBusy) return;
-  if(typeof db==='undefined' || !db) return;
-  const dataNow=collectDraftPayload();
-  if(!draftHasContent(dataNow)) return;   // don't create an empty cloud draft doc
-  _cloudBusy=true;
-  const payload={
-    kind:'motor-witness-test',
-    draftId: cloudDraftId(),
-    assetTag: (gv('asset-tag')||'').trim(),
-    woNumber: (gv('wo-no')||'').trim(),
-    checkedBy: (gv('checked-by')||'').trim(),
-    executionDate: (gv('wo-date')||'').trim(),
-    data: dataNow,
-    photoCount: photoTotal(),
-    updatedAt: new Date().toISOString(),
-    ua: navigator.userAgent.slice(0,120),
-  };
-  try{
-    await db.collection(CLOUD_DRAFT_COLL).doc(cloudDraftId()).set(payload);
-    _cloudLastOk=Date.now();
-    if(silent) flashAutosave('cloud');
-  }catch(e){
-    console.warn('cloud draft autosave gagal:', e && e.code, e && e.message);
-    // permission-denied / unavailable collection -> disable cloud drafts, keep localStorage
-    if(e && (e.code==='permission-denied' || e.code==='unauthenticated')){
-      _cloudEnabled=false;
-      if(!_cloudWarned){ _cloudWarned=true; note('ℹ️ Auto-save ke database nonaktif (koleksi checksheet_drafts belum diizinkan). Draft tetap tersimpan di perangkat ini.','info'); }
-      flashAutosave('localonly');
-    } else {
-      if(silent) flashAutosave('err');
-    }
-  }finally{ _cloudBusy=false; }
-}
-async function cloudDraftDelete(){
-  if(typeof db==='undefined' || !db) return;
-  try{ await db.collection(CLOUD_DRAFT_COLL).doc(cloudDraftId()).delete(); }catch(e){}
-  try{ localStorage.removeItem(CLOUD_DRAFT_ID_KEY); }catch(e){}
-}
-async function fetchCloudDraft(){
-  if(typeof db==='undefined' || !db) return null;
-  let id=null; try{ id=localStorage.getItem(CLOUD_DRAFT_ID_KEY); }catch(e){}
-  if(!id) return null;
-  try{ const doc=await db.collection(CLOUD_DRAFT_COLL).doc(id).get(); return doc.exists ? doc.data() : null; }
-  catch(e){ if(e && e.code==='permission-denied') _cloudEnabled=false; return null; }
-}
-
 function applyDraftData(d){
   if(!d) return;
   document.querySelectorAll(DRAFT_SEL).forEach(el=>{ if(el.id && d['f_'+el.id]!==undefined) el.value=d['f_'+el.id]; });
@@ -1288,25 +1227,6 @@ function loadDraft(){
     note('📂 Draft lokal dimuat.','info');
   }catch(e){}
 }
-// If the cloud draft is newer than what we just restored from localStorage
-// (e.g. last edited on another device, or localStorage was cleared), offer it.
-async function loadCloudDraftIfNewer(){
-  const cd=await fetchCloudDraft();
-  if(!cd || !cd.data) return;
-  let localTs=0;
-  try{ const lr=localStorage.getItem(DRAFT_KEY); if(lr){ const ld=JSON.parse(lr); localTs = ld.__ts||0; } }catch(e){}
-  const cloudTs = cd.updatedAt ? Date.parse(cd.updatedAt) : 0;
-  const hasLocal = !!(()=>{ try{ return localStorage.getItem(DRAFT_KEY); }catch(e){ return null; } })();
-  if(!hasLocal || cloudTs > localTs + 60000){
-    const when = cd.updatedAt ? new Date(cd.updatedAt).toLocaleString('id-ID') : '(waktu tidak diketahui)';
-    if(confirm('Ditemukan draft tersimpan di database (terakhir '+when+').\n\nMuat draft dari database? (Data teks/hasil dipulihkan; foto tetap dari perangkat ini.)')){
-      applyDraftData(cd.data);
-      persistDraft(true);
-      note('☁️ Draft dari database dimuat.','ok');
-    }
-  }
-}
-
 document.addEventListener('input', e=>{
   if(!e.target.matches('input,select,textarea')) return;
   scheduleAutoSave();
@@ -1315,10 +1235,8 @@ document.addEventListener('input', e=>{
 });
 document.addEventListener('change', e=>{ if(e.target.matches('input,select,textarea')) scheduleAutoSave(); });
 // best-effort flush when leaving / backgrounding the tab
-window.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden'){ autoSaveNow(); cloudDraftSave(true); } });
+window.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') autoSaveNow(); });
 window.addEventListener('beforeunload', ()=>{ try{ const d=collectDraftPayload(); d.__ts=Date.now(); localStorage.setItem(DRAFT_KEY, JSON.stringify(d)); savePhotoDraft(); }catch(e){} });
-// periodic cloud safety net even if the debounce keeps getting reset while typing
-setInterval(()=>{ if(_cloudEnabled && Date.now()-_cloudLastOk>25000) cloudDraftSave(true); }, 25000);
 
 function resetForm(){
   if(!confirm('Reset semua data? Draft lokal & database untuk sesi ini juga dihapus.')) return;
@@ -1327,7 +1245,7 @@ function resetForm(){
   document.querySelectorAll('.rb').forEach(b=>b.classList.remove('a'));
   ['sig-insp','sig-vendor','sig-super'].forEach(clrSig);
   PHOTO_KEYS.forEach(k=>PHOTOS[k]=[]); renderAllPhotos();
-  cloudDraftDelete();
+  try{ const _aid = CloudDraft.getActiveId && CloudDraft.getActiveId(); if(_aid) CloudDraft.deleteDraft(_aid); }catch(e){}
   try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); }catch(e){}
   document.querySelectorAll('.pi-out').forEach(el=>{ el.textContent='—'; el.classList.remove('bad'); });
   upStats(); note('🔄 Form direset.','info');
@@ -1573,8 +1491,7 @@ async function submitToDb(){
   renderSessionBanner();
   // submission is safely in the DB — clear the autosave drafts (local + cloud) so
   // a later reload doesn't offer to restore data that's already been submitted.
-  clearTimeout(_cloudTimer); clearTimeout(_autoTimer);
-  await cloudDraftDelete();
+  clearTimeout(_autoTimer);
   try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(DRAFT_PHOTOS_KEY); }catch(e){}
   SubmitGuard.setProgress(100,'Selesai!');
   setTimeout(()=>SubmitGuard.hideProgress(), 500);
@@ -2049,7 +1966,12 @@ async function mmSessions(tag){
   try {
     let drafts = [];
     if (window.CloudDraft && CloudDraft.listDrafts) drafts = await CloudDraft.listDrafts();
-    (drafts || []).forEach(d => { if (!out.some(o => o.id === d.id)) out.push(Object.assign({ _isDraft: true }, d)); });
+    (drafts || []).forEach(d => {
+      if (out.some(o => o.id === d.id)) return;
+      // shared CloudDraft stores test type inside inputValues['test-type'], not top-level
+      if (!d.testType && d.inputValues && d.inputValues['test-type']) d.testType = d.inputValues['test-type'];
+      out.push(Object.assign({ _isDraft: true }, d));
+    });
   } catch (e) {}
   out.sort((a, b) => String(b.updatedAt || b.executionDate || b.createdAt || '').localeCompare(String(a.updatedAt || a.executionDate || a.createdAt || '')));
   return out;
@@ -2080,6 +2002,9 @@ async function mgLoadSession(i){ if (_sessions[i]) await loadSession(_sessions[i
 function mgNewSession(){
   clearSessionForm();
   _editingSession = null;
+  // detach from any draft we were editing so this new session gets its OWN
+  // draft doc — the previous one stays as a separate (comparison) session
+  try{ if(window.CloudDraft && CloudDraft.forgetActive) CloudDraft.forgetActive(); }catch(e){}
   const sid = document.getElementById('session-id'); if (sid) sid.value = '';
   mgShowTestType();
 }
@@ -2110,7 +2035,7 @@ async function loadSession(s){
   // matrix cells (ids present in inputValues but not matched by DRAFT_SEL sometimes)
   Object.entries(s.inputValues || {}).forEach(([k, v]) => { const el = document.getElementById(k); if (el && !el.value) el.value = v; });
 
-  applyTestType(s.testType || gv('test-type') || 'electrical');
+  applyTestType(s.testType || (s.inputValues && s.inputValues['test-type']) || gv('test-type') || 'electrical');
   document.getElementById('session-id').value = s.id;
 
   // photos
@@ -2462,9 +2387,10 @@ loadPhotoDraft();
 renderAllPhotos();
 upStats();
 drawAllIRCharts();
-// (cloud-draft "resume" is now offered inside the motor gate + the unified
-//  "Muat / Lanjutkan dari Database" modal, so the old auto-prompt is dropped)
-setTimeout(()=>{ if(_cloudEnabled) cloudDraftSave(true); }, 6000);
+// Saving a session to the database is a deliberate action (💾 button -> CloudDraft),
+// unified with the "Muat / Lanjutkan dari Database" modal + the motor gate's session
+// list. Local autosave (localStorage) still runs on every edit; there is no parallel
+// auto-cloud-save.
 LoadMergeModal.init({ assetTag: MW_TAG });
 LoadMergeModal.initRevisionBanner();
 SubmitGuard.init({ assetTag: MW_TAG });

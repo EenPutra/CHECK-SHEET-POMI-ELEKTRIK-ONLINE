@@ -212,6 +212,10 @@
     if (typeof cfg.applyExtra === 'function' && doc) { try { cfg.applyExtra(doc.extra || null); } catch (e) {} }
   }
   function getActiveId() { return currentDraftId(false); }
+  // Detach from the current draft WITHOUT deleting it (its Firestore doc stays as
+  // a separate session). The next save() mints a fresh id. Used when a multi-session
+  // sheet starts a brand-new session while an earlier draft should be kept.
+  function forgetActive() { forgetDraftId(); }
   // photo URLs the active draft already uploaded — Approvals.submitWithFiles()
   // reuses these so a finished report never re-uploads its photos.
   function getReusePhotoUrls() {
@@ -247,7 +251,7 @@
   function init(opts) { cfg = Object.assign({ formId: 'checksheet', assetName: '', frequency: 'DRAFT' }, opts || {}); }
 
   window.CloudDraft = {
-    init, save, adopt, markSubmitted,
+    init, save, adopt, markSubmitted, forgetActive,
     getActiveId, getReusePhotoUrls, listDrafts, deleteDraft,
     // kept for any old inline onclick still pointing here — route to the unified modal
     openResume() { if (window.LoadMergeModal && LoadMergeModal.open) LoadMergeModal.open(); },
