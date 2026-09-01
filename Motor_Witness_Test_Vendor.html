@@ -190,6 +190,13 @@ table.ct tr:last-child td{border-bottom:none}
 #motor-gate .mg-row b{font-size:13.5px;color:var(--ink);font-family:var(--raj);letter-spacing:.5px}
 #motor-gate .mg-row .mg-meta{font-size:11px;color:var(--t3);display:block;margin-top:2px}
 .motor-chip{display:inline-flex;align-items:center;gap:6px;background:var(--chip-bg);border:1px solid var(--chip-bd);border-radius:20px;padding:3px 12px;font-family:var(--raj);font-weight:700;font-size:11px;letter-spacing:1px;color:var(--steel)}
+.motor-chip a{color:var(--sl);cursor:pointer;text-decoration:underline;font-size:10px;letter-spacing:0}
+#motor-gate .mg-tt-row{display:flex;gap:12px;margin-top:10px;flex-wrap:wrap}
+#motor-gate .mg-tt-btn{flex:1;min-width:190px;border:1.5px solid var(--pb);border-radius:11px;background:var(--field-bg);padding:16px 14px;cursor:pointer;text-align:center;font-family:var(--sans);color:var(--ink);line-height:1.5}
+#motor-gate .mg-tt-btn:hover{border-color:var(--sl);background:var(--field-focus-bg)}
+#motor-gate .mg-tt-btn .ic{font-size:26px}
+#motor-gate .mg-tt-btn b{display:block;font-family:var(--raj);letter-spacing:1px;font-size:14px;margin:4px 0 2px}
+#motor-gate .mg-tt-btn .sub{font-size:11px;color:var(--t3)}
 .pi-out{font-family:var(--mono);font-weight:700;color:var(--steel)}
 .pi-out.bad{color:var(--ng)}
 /* photos */
@@ -268,10 +275,12 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
     </div>
   </div>
 
-  <div style="padding:0 2px 12px">
+  <div style="padding:0 2px 12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
     <button class="btn bo bsm" onclick="openLoadMerge()">📥 Muat / Lanjutkan dari Database</button>
-    <span style="font-size:11px;color:var(--t3);margin-left:6px">Ambil / gabung witness test sebelumnya untuk motor yang sama.</span>
+    <span id="testtype-chip" class="motor-chip" style="display:none"></span>
+    <span style="font-size:11px;color:var(--t3)">Ambil / gabung witness test sebelumnya untuk motor yang sama.</span>
   </div>
+  <input type="hidden" id="test-type">
 
   <!-- A. WO & MOTOR DATA + INSPEKSI AWAL -->
   <div class="panel open" id="p-a">
@@ -624,6 +633,17 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
           <button class="btn bo bsm" type="button" onclick="mgShowPick()">← Kembali</button>
           <button class="btn bg bsm" type="button" style="min-width:160px" onclick="mgSaveMotor()">💾 Simpan &amp; Lanjut</button>
         </div>
+      </div>
+      <div id="mg-testtype" style="display:none">
+        <div class="subttl" style="margin-top:0">Jenis Test — <span id="mg-tt-motor" style="color:var(--ink)"></span></div>
+        <div class="hint" style="margin:0">Pilih pengetesan yang akan dilakukan pada sesi ini.</div>
+        <div class="mg-tt-row">
+          <button class="mg-tt-btn" type="button" onclick="mgChooseTestType('electrical')">
+            <span class="ic">⚡</span><b>Electrical Test</b><span class="sub">Section A · B · C · D · E</span></button>
+          <button class="mg-tt-btn" type="button" onclick="mgChooseTestType('solorun')">
+            <span class="ic">▶️</span><b>Solo Run Test</b><span class="sub">Section A · B · F · G · H</span></button>
+        </div>
+        <div class="hint" style="margin-top:10px">Section I (Kesimpulan &amp; Tanda Tangan) selalu ada, apa pun jenis test-nya.</div>
       </div>
     </div>
   </div>
@@ -1427,6 +1447,16 @@ async function submitToDb(){
     kv(7,'Reviewed By', iv('sig-super-name')||iv('reviewed-by')),
   ]);
 
+  // ── Phase 2: keep only the sheets that belong to this session's test type ──
+  base.testType = _testType || null;
+  if(_testType && TEST_SECTIONS[_testType]){
+    const keep = new Set(TEST_SECTIONS[_testType].map(x=>x.toUpperCase()));
+    Object.keys(base.sheets).forEach(k=>{
+      const L = String(base.sheets[k].title||'').trim().charAt(0).toUpperCase();
+      if(/[A-I]/.test(L) && !keep.has(L)) delete base.sheets[k];
+    });
+  }
+
   base.toggleStates = Object.assign({}, ST);
   const _iv={};
   document.querySelectorAll('input[type=text],input[type=number],input[type=date],input[type=time],select,textarea').forEach(el=>{ if(el.id && el.value) _iv[el.id]=el.value; });
@@ -1436,7 +1466,7 @@ async function submitToDb(){
   document.querySelectorAll('.mtx .ti, .ct .ti').forEach(el=>{ if(el.id && el.value) base.inputValues[el.id]=el.value; });
 
   SubmitGuard.init({ assetTag: base.assetTag });
-  const target = await SubmitGuard.resolveSubmitTarget(base.woNumber, () => generatePDF(new Set(PDF_SHEETS.map(s=>s.key)), { silent:true }));
+  const target = await SubmitGuard.resolveSubmitTarget(base.woNumber, () => generatePDF(new Set(currentTestSections()), { silent:true }));
   if(target.mode==='cancel') return;
 
   let id;
@@ -1452,7 +1482,7 @@ async function submitToDb(){
   try{
     const filesOk = await Approvals.submitWithFiles(id, {
       photos: buildApprovalPhotos(),
-      pdfBuilder: () => generatePDF(new Set(PDF_SHEETS.map(s=>s.key)), { silent:true }),
+      pdfBuilder: () => generatePDF(new Set(currentTestSections()), { silent:true }),
       assetTag: base.assetTag,
       assetName: base.assetName,
       checksheetFile: 'Motor_Witness_Test_Vendor.html',
@@ -1494,10 +1524,11 @@ const PDF_SHEETS = [
   {key:'i', ic:'✍️', label:'I. Kesimpulan & Tanda Tangan'},
 ];
 let _pdfSel = new Set(PDF_SHEETS.map(s=>s.key));
-function openPdfModal(){ _pdfSel=new Set(PDF_SHEETS.map(s=>s.key)); renderPdfModal(); document.getElementById('pdf-modal-overlay').style.display='flex'; }
+function openPdfModal(){ _pdfSel=new Set(currentTestSections()); renderPdfModal(); document.getElementById('pdf-modal-overlay').style.display='flex'; }
 function closePdfModal(){ document.getElementById('pdf-modal-overlay').style.display='none'; }
 function renderPdfModal(){
-  document.getElementById('pdf-sheet-list').innerHTML = PDF_SHEETS.map(s=>`
+  const relevant = new Set(currentTestSections());
+  document.getElementById('pdf-sheet-list').innerHTML = PDF_SHEETS.filter(s=>relevant.has(s.key)).map(s=>`
     <label style="display:flex;align-items:center;gap:9px;padding:7px 10px;border:1.5px solid var(--pb);border-radius:7px;background:var(--field-bg);cursor:pointer;font-size:13px">
       <input type="checkbox" ${_pdfSel.has(s.key)?'checked':''} onchange="toggleSheet('${s.key}')" style="width:16px;height:16px">
       <span>${s.ic}</span><span>${s.label}</span></label>`).join('');
@@ -1876,6 +1907,54 @@ const mmSlug = t => String(t || '').trim().replace(/[^A-Za-z0-9_-]+/g, '_').repl
 function _esc(s){ return String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
 let _activeMotor = null;
 let _mgList = [];
+let _testType = null;
+
+// Section keys (match PDF_SHEETS keys + panel id suffix p-<k>) per test type.
+const ALL_SEC = ['a','b','c','d','e','f','g','h','i'];
+const TEST_SECTIONS = {
+  electrical: ['a', 'b', 'c', 'd', 'e', 'i'],
+  solorun:    ['a', 'b', 'f', 'g', 'h', 'i'],
+};
+const TEST_LABEL = { electrical: '⚡ Electrical Test', solorun: '▶️ Solo Run Test' };
+function currentTestSections(){ return (TEST_SECTIONS[_testType] || ALL_SEC).slice(); }
+
+function applyTestType(t){
+  if (!TEST_SECTIONS[t]) return;
+  _testType = t;
+  const tt = document.getElementById('test-type'); if (tt) tt.value = t;
+  const show = new Set(TEST_SECTIONS[t]);
+  ALL_SEC.forEach(k => {
+    const el = document.getElementById('p-' + k);
+    if (el) el.style.display = show.has(k) ? '' : 'none';
+  });
+  const chip = document.getElementById('testtype-chip');
+  if (chip) {
+    chip.style.display = '';
+    chip.innerHTML = TEST_LABEL[t] + ' <a onclick="changeTestType()">ganti</a>';
+  }
+  _pdfSel = new Set(currentTestSections());
+  if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
+}
+function changeTestType(){
+  if (!confirm('Ganti jenis test? Isian pada section yang jadi tersembunyi tetap tersimpan tapi tidak ditampilkan/diekspor selama jenis test ini.')) return;
+  document.getElementById('motor-gate').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  mgShowTestType();
+}
+function mgShowTestType(){
+  document.getElementById('mg-pick').style.display = 'none';
+  document.getElementById('mg-register').style.display = 'none';
+  document.getElementById('mg-testtype').style.display = '';
+  const m = document.getElementById('mg-tt-motor');
+  if (m) m.textContent = (_activeMotor && _activeMotor.tag) || gv('asset-tag') || '—';
+}
+function mgChooseTestType(t){
+  applyTestType(t);
+  document.getElementById('motor-gate').style.display = 'none';
+  document.body.style.overflow = '';
+  document.getElementById('mg-testtype').style.display = 'none';
+  note('✅ Jenis test: ' + TEST_LABEL[t].replace(/^\S+\s/, ''), 'ok');
+}
 
 async function mmList(){
   if (typeof db === 'undefined' || !db) return null;
@@ -1920,11 +1999,13 @@ function applyMotor(m, opts){
   try { LoadMergeModal.init({ assetTag: t }); } catch (e) {}
   try { SubmitGuard.init({ assetTag: t }); } catch (e) {}
   try { localStorage.setItem('mw_active_motor', mmSlug(t)); } catch (e) {}
-  const gate = document.getElementById('motor-gate');
-  if (gate) gate.style.display = 'none';
-  document.body.style.overflow = '';
+  if (!opts.keepGate) {
+    const gate = document.getElementById('motor-gate');
+    if (gate) gate.style.display = 'none';
+    document.body.style.overflow = '';
+  }
   if (!opts.silent) note('✅ Motor aktif: ' + (m.tag || '—'), 'ok');
-  scheduleAutoSave && scheduleAutoSave();
+  if (typeof scheduleAutoSave === 'function') scheduleAutoSave();
 }
 
 // ── gate popup ──
@@ -1936,6 +2017,7 @@ function openMotorGate(){
 async function mgShowPick(){
   document.getElementById('mg-pick').style.display = '';
   document.getElementById('mg-register').style.display = 'none';
+  document.getElementById('mg-testtype').style.display = 'none';
   const box = document.getElementById('mg-list');
   box.innerHTML = '<div class="hint">Memuat daftar motor…</div>';
   const list = await mmList();
@@ -1960,17 +2042,31 @@ async function mgShowPick(){
   }
   box.innerHTML = rows;
 }
-function mgPick(i){ if (_mgList[i]) applyMotor(_mgList[i]); }
+// picking an existing motor from the list = start a NEW session for it
+function mgPick(i){
+  if (!_mgList[i]) return;
+  applyMotor(_mgList[i], { keepGate: true, silent: true });
+  mgShowTestType();
+}
 function mgResumeLocalDraft(){
-  // loadDraft() already restored the local draft. Try to lock the nameplate
-  // from a matching motor_master; otherwise just leave it editable + close.
+  // loadDraft() already restored the local draft (fields + #test-type). Lock the
+  // nameplate from a matching motor_master; keep the draft's testType if any.
   const tag = gv('asset-tag');
-  document.getElementById('motor-gate').style.display = 'none';
-  document.body.style.overflow = '';
-  if (!tag) return;
+  const savedTT = gv('test-type');
+  const finish = () => {
+    if (savedTT && TEST_SECTIONS[savedTT]) {
+      applyTestType(savedTT);
+      document.getElementById('motor-gate').style.display = 'none';
+      document.body.style.overflow = '';
+    } else {
+      mgShowTestType();
+    }
+  };
+  if (!tag) { document.getElementById('motor-gate').style.display = 'none'; document.body.style.overflow = ''; return; }
   mmGet(tag).then(m => {
-    if (m) applyMotor(m, { silent: true, keepFilled: true });
-    else note('ℹ️ Motor "' + tag + '" belum terdaftar. Klik "Edit Data Motor" untuk mendaftarkan.', 'info');
+    if (m) applyMotor(m, { silent: true, keepFilled: true, keepGate: true });
+    else note('ℹ️ Motor "' + tag + '" belum terdaftar — data nameplate tetap bisa diedit.', 'info');
+    finish();
   });
 }
 
@@ -1985,6 +2081,7 @@ function mgFieldsHtml(preset){
 }
 function mgShowRegister(preset){
   document.getElementById('mg-pick').style.display = 'none';
+  document.getElementById('mg-testtype').style.display = 'none';
   document.getElementById('mg-register').style.display = '';
   document.getElementById('mg-reg-title').textContent = (preset && preset.tag) ? ('Edit Data Motor — ' + preset.tag) : 'Data Motor Baru (Nameplate)';
   document.getElementById('mg-fields').innerHTML = mgFieldsHtml(preset);
@@ -1998,8 +2095,16 @@ async function mgSaveMotor(){
   err.textContent = 'Menyimpan…';
   try {
     const m = await mmUpsert(obj);
-    // refresh the picker list so it's there next time
-    applyMotor(m);
+    const wasEdit = /^Edit Data Motor/.test(document.getElementById('mg-reg-title').textContent);
+    applyMotor(m, { keepGate: !wasEdit, silent: true, keepFilled: wasEdit });
+    if (wasEdit) {
+      // just an edit of the active motor — close, keep current session/testType
+      document.getElementById('motor-gate').style.display = 'none';
+      document.body.style.overflow = '';
+      note('✅ Data motor diperbarui.', 'ok');
+    } else {
+      mgShowTestType();   // new motor -> pick the test type next
+    }
   } catch (e) {
     err.textContent = 'Gagal menyimpan: ' + (e && e.message || e) + (e && e.code === 'permission-denied' ? ' — koleksi motor_master belum diizinkan di Firestore Rules.' : '');
   }
@@ -2016,10 +2121,19 @@ function editMotorData(){
 
 // Decide gate vs auto-apply at startup.
 async function initMotorFlow(){
-  const tag = gv('asset-tag');   // set by loadDraft() if there was a local draft
+  const tag = gv('asset-tag');       // set by loadDraft() if there was a local draft
+  const savedTT = gv('test-type');   // ditto
   if (tag) {
     const m = await mmGet(tag);
-    if (m) { applyMotor(m, { silent: true, keepFilled: true }); return; }
+    if (m) {
+      applyMotor(m, { silent: true, keepFilled: true });
+      if (savedTT && TEST_SECTIONS[savedTT]) { applyTestType(savedTT); return; }
+      // motor known but no test type recorded -> ask
+      document.getElementById('motor-gate').style.display = 'flex';
+      document.body.style.overflow = 'hidden';
+      mgShowTestType();
+      return;
+    }
   }
   openMotorGate();
 }
