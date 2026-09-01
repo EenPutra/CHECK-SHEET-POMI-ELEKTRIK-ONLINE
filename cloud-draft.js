@@ -93,7 +93,7 @@
   }
   function progHide() { const e = document.getElementById('cd-prog'); if (e) e.classList.remove('show'); }
   function lockSubmit(lock) {
-    document.querySelectorAll('[onclick*="submitToDb"],[onclick*="saveToDatabase"],[onclick*="CloudDraft.save"]').forEach(b => { b.disabled = !!lock; });
+    document.querySelectorAll('[onclick*="submitToDb"],[onclick*="saveToDatabase"],[onclick*="CloudDraft.save"],[onclick*="saveSessionDraft"]').forEach(b => { b.disabled = !!lock; });
   }
 
   function autoPhotos() {
