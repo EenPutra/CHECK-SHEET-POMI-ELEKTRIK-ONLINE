@@ -1863,8 +1863,16 @@ file deleted; there is no standalone status page.
   into `#mystatus-area`:
   - `technician`: one section, "Laporan yang saya submit" — every approval where
     `_msMatches(a.submittedBy)` or the cached checksheet's `checkedBy`/`uploadedBy`/
-    `uploadedByUsername` matches. Same name-match heuristic (`loggedInName` OR
-    `loggedInUser`, lower-cased) as `dashboard.html`'s technician scoping — imperfect.
+    `uploadedByUsername` matches. `_msMatches()` is **token-overlap**, not exact
+    (user request): it tokenizes the logged-in account's name + username and the report's
+    name field (`_nameTokens()` — lowercase, ≥3 letters, minus the `_MS_STOP` set of
+    honorifics/particles like `muhammad`/`abdul`/`bin`/`pak`) and matches if any token is
+    shared. So account "Fauzan Agung Hamidi" also picks up a report whose Checked By is just
+    "Fauzan", "Fauzan Hamidi", or a multi-name "Fauzan, Adnan" (which then appears for BOTH
+    Fauzan and Adnan). Deliberately loose — it's a read-only status view, not a permission
+    gate; a shared middle/last name causes harmless over-inclusion. `_msMyTokens()` is
+    memoised per `loggedInName|loggedInUser`. `dashboard.html`'s technician scoping still
+    uses its own stricter exact-name filter (unchanged).
   - `techop2`: "Masuk untuk saya review" (`status==='submitted' && inMyReviewScope(a)` —
     the exact same scope filter the "Menunggu Saya" inbox uses), "Sudah saya review"
     (`a.review.reviewedBy` matches me, incl. auto-reviews), "Laporan yang saya submit"

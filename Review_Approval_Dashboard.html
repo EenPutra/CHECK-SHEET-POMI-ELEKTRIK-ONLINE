@@ -1663,8 +1663,37 @@ function updateTabCounts(){
 }
 
 /* ── STATUS LAPORAN (read-only per-person view) ── */
-const _msKeys = () => [ (loggedInName||'').trim().toLowerCase(), (loggedInUser||'').trim().toLowerCase() ].filter(Boolean);
-function _msMatches(name){ const n=(name||'').trim().toLowerCase(); return !!n && _msKeys().includes(n); }
+// Common name particles / honorifics that aren't distinctive enough to route on.
+const _MS_STOP = new Set(['muhammad','muhamad','mohammad','mohamad','muh','mhd','abdul','abd','bin','binti',
+  'dan','the','van','den','der','pak','bpk','bapak','bu','ibu','mas','mba','mbak','sdr','sdri','mr','mrs','ms']);
+function _nameTokens(s){
+  return String(s||'').toLowerCase().replace(/[^a-z\s]+/g,' ').split(/\s+/)
+    .filter(t => t.length >= 3 && !_MS_STOP.has(t));
+}
+// Tokens of the logged-in account's own name (+ username), computed once per render.
+let _msTokenCache = null, _msTokenCacheKey = '';
+function _msMyTokens(){
+  const key = (loggedInName||'')+'|'+(loggedInUser||'');
+  if(_msTokenCache && _msTokenCacheKey === key) return _msTokenCache;
+  const set = new Set();
+  _nameTokens(loggedInName).forEach(t => set.add(t));
+  _nameTokens(loggedInUser).forEach(t => set.add(t));
+  _msTokenCache = set; _msTokenCacheKey = key;
+  return set;
+}
+// A person-name field is "me" when my account's full name shares at least one
+// meaningful token (>=3 letters, not a common particle) with it — so
+// "Fauzan Agung Hamidi" also picks up a report whose Checked By is just
+// "Fauzan", "Fauzan Hamidi", or "Fauzan, Adnan" (multi-name). Loose by design:
+// this is a read-only status view, not a permission gate.
+function _msMatches(name){
+  const n = String(name||'').trim().toLowerCase();
+  if(!n) return false;
+  const mine = _msMyTokens();
+  if(!mine.size) return false;
+  if(mine.has(n)) return true;                        // exact-ish fast path
+  return _nameTokens(name).some(t => mine.has(t));
+}
 function _msISubmitted(a){
   if(_msMatches(a.submittedBy)) return true;
   const cs = _checksheetCache[a.checksheetId];
@@ -1679,7 +1708,7 @@ function _msInMyArea(a){
 function myStatusSections(){
   const r = loggedInRole;
   if(r==='technician'){
-    return [{ h:'📤 Laporan yang saya submit', sub:'Semua laporan yang Anda kirim, beserta status review & approval-nya.',
+    return [{ h:'📤 Laporan yang saya submit', sub:'Laporan yang Anda kirim ATAU yang mencantumkan nama Anda (mis. "'+((loggedInName||'').split(/\s+/)[0]||'nama depan')+'") di kolom pelaksana — beserta status review & approval-nya.',
       items:_allApprovals.filter(_msISubmitted) }];
   }
   if(r==='techop2'){
