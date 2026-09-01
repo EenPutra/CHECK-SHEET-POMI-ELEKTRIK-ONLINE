@@ -423,14 +423,15 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div class="mf"><label>Raise Temp DE-Side (°C)</label><input type="text" id="ht-de" class="num"></div>
         <div class="mf"><label>Raise Temp NDE-Side (°C)</label><input type="text" id="ht-nde" class="num"></div>
       </div>
-      <div class="subttl">Motor Temperature Sensor</div>
-      <div class="hint">RTD winding / phase temperature — nilai °C tiap titik (nilai Ω PT100 mentah di lampiran).</div>
+      <div class="subttl">Motor Temperature Sensor — Winding RTD / TC</div>
+      <div class="hint">RTD / TC winding / phase temperature — nilai °C tiap titik (nilai Ω PT100 mentah di lampiran).</div>
       <div class="tbl-wrap"><table class="ct" id="rtd-heat"></table></div>
-      <div class="grid" style="margin-top:10px">
-        <div class="mf"><label>Bearing RTD DE (°C)</label><input type="text" id="brtd-de" class="num"></div>
-        <div class="mf"><label>Bearing RTD NDE (°C)</label><input type="text" id="brtd-nde" class="num"></div>
-        <div class="mf"><label>Bearing RTD DE — IR (MΩ)</label><input type="text" id="brtd-de-ir" class="num"></div>
-        <div class="mf"><label>Bearing RTD NDE — IR (MΩ)</label><input type="text" id="brtd-nde-ir" class="num"></div>
+      <div class="subttl" style="font-size:11px">Bearing RTD / TC Sensor (°C)</div>
+      <div class="grid" style="margin-top:6px">
+        <div class="mf"><label>DE-1</label><input type="text" id="brtd-de1" class="num"></div>
+        <div class="mf"><label>DE-2</label><input type="text" id="brtd-de2" class="num"></div>
+        <div class="mf"><label>NDE-1</label><input type="text" id="brtd-nde1" class="num"></div>
+        <div class="mf"><label>NDE-2</label><input type="text" id="brtd-nde2" class="num"></div>
       </div>
     </div>
   </div>
@@ -1748,8 +1749,8 @@ async function submitToDb(){
     kv(1,'Type Heater', iv('ht-type')), kv(2,'Resistance Total (Ω)', iv('ht-r')), kv(3,'Current (A)', iv('ht-i')),
     kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE (°C)', iv('ht-de')), kv(6,'Raise Temp NDE (°C)', iv('ht-nde')),
   ].concat(rtdRows('rtdh')).concat([
-    kv('BRTD-DE','Bearing RTD DE (°C)', iv('brtd-de')), kv('BRTD-NDE','Bearing RTD NDE (°C)', iv('brtd-nde')),
-    kv('BRTD-DE-IR','Bearing RTD DE — IR (MΩ)', iv('brtd-de-ir')), kv('BRTD-NDE-IR','Bearing RTD NDE — IR (MΩ)', iv('brtd-nde-ir')),
+    kv('BRTD-DE1','Bearing RTD/TC DE-1 (°C)', iv('brtd-de1')), kv('BRTD-DE2','Bearing RTD/TC DE-2 (°C)', iv('brtd-de2')),
+    kv('BRTD-NDE1','Bearing RTD/TC NDE-1 (°C)', iv('brtd-nde1')), kv('BRTD-NDE2','Bearing RTD/TC NDE-2 (°C)', iv('brtd-nde2')),
   ]));
 
   base.sheets.stator = mkSheet('B — Stator Winding Resistance & Insulation', ['Value'], [
@@ -2354,8 +2355,8 @@ function _pdfSnapshot(){
     kv(1,'Type Heater', iv('ht-type')), kv(2,'Resistance Total (Ω)', iv('ht-r')), kv(3,'Current (A)', iv('ht-i')),
     kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE (°C)', iv('ht-de')), kv(6,'Raise Temp NDE (°C)', iv('ht-nde')),
   ].concat(rtdRows('rtdh')).concat([
-    kv('BRTD-DE','Bearing RTD DE (°C)', iv('brtd-de')), kv('BRTD-NDE','Bearing RTD NDE (°C)', iv('brtd-nde')),
-    kv('BRTD-DE-IR','Bearing RTD DE — IR (MΩ)', iv('brtd-de-ir')), kv('BRTD-NDE-IR','Bearing RTD NDE — IR (MΩ)', iv('brtd-nde-ir')),
+    kv('BRTD-DE1','Bearing RTD/TC DE-1 (°C)', iv('brtd-de1')), kv('BRTD-DE2','Bearing RTD/TC DE-2 (°C)', iv('brtd-de2')),
+    kv('BRTD-NDE1','Bearing RTD/TC NDE-1 (°C)', iv('brtd-nde1')), kv('BRTD-NDE2','Bearing RTD/TC NDE-2 (°C)', iv('brtd-nde2')),
   ]));
   S.stator = mkSheet('B', ['Value'], [
     kv('B.1','Winding R T1-T4 (mΩ)', iv('wr-14')), kv('B.2','Winding R T2-T5 (mΩ)', iv('wr-25')), kv('B.3','Winding R T3-T6 (mΩ)', iv('wr-36')),
