@@ -420,8 +420,8 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div class="mf"><label>Resistance Total (Ω)</label><input type="text" id="ht-r" class="num"></div>
         <div class="mf"><label>Current (A)</label><input type="text" id="ht-i" class="num"></div>
         <div class="mf"><label>IR Heater (GΩ)</label><input type="text" id="ht-ir" class="num"></div>
-        <div class="mf"><label>Raise Temp DE-Side (°C)</label><input type="text" id="ht-de" class="num"></div>
-        <div class="mf"><label>Raise Temp NDE-Side (°C)</label><input type="text" id="ht-nde" class="num"></div>
+        <div class="mf"><label>Raise Temp Heater 1 (°C)</label><input type="text" id="ht-de" class="num"></div>
+        <div class="mf"><label>Raise Temp Heater 2 (°C)</label><input type="text" id="ht-nde" class="num"></div>
       </div>
       <div class="subttl">Motor Temperature Sensor — Winding RTD / TC</div>
       <div class="hint">RTD / TC winding / phase temperature — nilai °C tiap titik (nilai Ω PT100 mentah di lampiran).</div>
@@ -634,18 +634,6 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div class="mf full"><label>Hasil Air Flow</label><div id="tog-airflow" class="rc" style="justify-content:flex-start"></div></div>
       </div>
 
-      <div class="subttl">Electrical Test Recap</div>
-      <div class="grid">
-        <div class="mf"><label>Stator R T1-T2 (Ω)</label><input type="text" id="sr-t12" class="num"></div>
-        <div class="mf"><label>Stator R T2-T3 (Ω)</label><input type="text" id="sr-t23" class="num"></div>
-        <div class="mf"><label>Stator R T3-T1 (Ω)</label><input type="text" id="sr-t31" class="num"></div>
-        <div class="mf"><label>IR T1T2T3-G @ 1&quot; (MΩ)</label><input type="text" id="sr-ir1" class="num"></div>
-        <div class="mf"><label>IR T1T2T3-G @ 10&quot; (MΩ)</label><input type="text" id="sr-ir10" class="num"></div>
-        <div class="mf"><label>PI</label><input type="text" id="sr-pi" class="num"></div>
-        <div class="mf"><label>RTD type</label><input type="text" id="sr-rtdtype" placeholder="PT100"></div>
-        <div class="mf"><label>Heater Resistance (Ω)</label><input type="text" id="sr-htr" class="num"></div>
-      </div>
-
       <div class="subttl">Vibration (mm/s)</div>
       <div class="grid">
         <div class="mf"><label>IB – Horizontal</label><input type="text" id="vib-ibh" class="num"></div>
@@ -674,8 +662,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
       <div class="tbl-wrap"><table class="ct" id="solo-local"></table></div>
 
       <div class="grid" style="margin-top:12px">
-        <div class="mf full"><label>Hasil Unload / Solo Run</label><div id="tog-solo" class="rc" style="justify-content:flex-start"></div></div>
-        <div class="mf full"><label>Remark</label><textarea id="rmk-ul" placeholder="Catatan unload / solo run…"></textarea></div>
+        <div class="mf full"><label>Remark Unload / Solo Run</label><textarea id="rmk-ul" placeholder="Catatan unload / solo run…"></textarea></div>
       </div>
     </div>
   </div>
@@ -1316,8 +1303,8 @@ renderAirGap('de'); renderAirGap('nde'); renderBearingMeas();
 
 /* mount standalone toggles */
 [['tog-wr','wr_result'],['tog-ir','ir_result'],['tog-surge','surge_wave'],['tog-csurge','corona_surge'],
- ['tog-pd','pd_result'],['tog-td','td_result'],['tog-hp','hp_result'],['tog-airflow','airflow_result'],
- ['tog-solo','solo_result']].forEach(p=>mountTog(p[0],p[1]));
+ ['tog-pd','pd_result'],['tog-td','td_result'],['tog-hp','hp_result'],['tog-airflow','airflow_result']
+].forEach(p=>mountTog(p[0],p[1]));
 
 /* ── signature pads ── */
 function initSig(id){
@@ -1696,13 +1683,10 @@ function buildUnloadSoloSheets(){
     kv(4,'Current 3φ (A)', iv('ul-i')), kv(5,'Power (kW)', iv('dcs-kw')), kv(6,'Power Factor', iv('dcs-pf')),
     kv(7,'RPM', iv('ul-rpm')), kv(8,'Durasi (jam)', iv('ul-dur')), kv(9,'Rotasi', iv('ul-rot')),
     kv(10,'Air Flow Suction', iv('ul-af-s')), kv(11,'Air Flow Discharge', iv('ul-af-d')), kv(12,'Hasil Air Flow', tv('airflow_result')),
-    kv(13,'Stator R T1-T2 (Ω)', iv('sr-t12')), kv(14,'Stator R T2-T3 (Ω)', iv('sr-t23')), kv(15,'Stator R T3-T1 (Ω)', iv('sr-t31')),
-    kv(16,'IR @1" (MΩ)', iv('sr-ir1')), kv(17,'IR @10" (MΩ)', iv('sr-ir10')), kv(18,'PI', iv('sr-pi')),
-    kv(19,'RTD type', iv('sr-rtdtype')), kv(20,'Heater Resistance (Ω)', iv('sr-htr')),
-    kv(21,'Vibration IB-H (mm/s)', iv('vib-ibh')), kv(22,'Vibration IB-V', iv('vib-ibv')), kv(23,'Vibration IB-A', iv('vib-iba')),
-    kv(24,'Vibration OB-H', iv('vib-obh')), kv(25,'Vibration OB-V', iv('vib-obv')), kv(26,'Vibration OB-A', iv('vib-oba')),
-    kv(27,'Vibration Overall / Max (mm/s)', iv('dcs-vib')),
-    kv(28,'Hasil Unload / Solo Run', tv('solo_result')), kv(29,'Remark', gv('rmk-ul')||'—'),
+    kv(13,'Vibration IB-H (mm/s)', iv('vib-ibh')), kv(14,'Vibration IB-V', iv('vib-ibv')), kv(15,'Vibration IB-A', iv('vib-iba')),
+    kv(16,'Vibration OB-H', iv('vib-obh')), kv(17,'Vibration OB-V', iv('vib-obv')), kv(18,'Vibration OB-A', iv('vib-oba')),
+    kv(19,'Vibration Overall / Max (mm/s)', iv('dcs-vib')),
+    kv(20,'Remark', gv('rmk-ul')||'—'),
   ]);
   const rtdCols = []; for(let i=1;i<=RTD_N;i++) rtdCols.push('RTD'+i);
   out.unload_wtemp = { title:'G — RTD Winding Temp (°C) per Interval', columns:['Interval'].concat(rtdCols), rows:
@@ -1786,7 +1770,7 @@ async function submitToDb(){
   base.sheets.inspeksi = inspSheet();
   base.sheets.heater = mkSheet('A — Heater Motor Measurement', ['Value'], [
     kv(1,'Type Heater', iv('ht-type')), kv(2,'Resistance Total (Ω)', iv('ht-r')), kv(3,'Current (A)', iv('ht-i')),
-    kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE-Side (°C)', iv('ht-de')), kv(6,'Raise Temp NDE-Side (°C)', iv('ht-nde')),
+    kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp Heater 1 (°C)', iv('ht-de')), kv(6,'Raise Temp Heater 2 (°C)', iv('ht-nde')),
   ]);
   base.sheets.rtd_winding = rtdWindingSheet('rtdh', 'A — Motor Temperature Sensor (Winding RTD / TC)');
   base.sheets.rtd_bearing = mkSheet('A — Bearing RTD / TC Sensor (°C)', ['Value'], [
@@ -2350,7 +2334,7 @@ async function generatePDF(selSet, opts){
     secBar('G. Unload / Solo Run Test');
     subTitle('Final Visual & Physical Check');
     checkTable(S.solo);
-    subTitle('Recording, Electrical Recap & Vibration');
+    subTitle('Recording & Vibration');
     kvGrid(S.unload.rows);
     subTitle('RTD Winding Temperature (deg C) per Interval');
     dataTable(S.unload_wtemp, null);
@@ -2407,7 +2391,7 @@ function _pdfSnapshot(){
   S.inspeksi = inspSheet();
   S.heater = mkSheet('A', ['Value'], [
     kv(1,'Type Heater', iv('ht-type')), kv(2,'Resistance Total (Ω)', iv('ht-r')), kv(3,'Current (A)', iv('ht-i')),
-    kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp DE-Side (°C)', iv('ht-de')), kv(6,'Raise Temp NDE-Side (°C)', iv('ht-nde')),
+    kv(4,'IR Heater (GΩ)', iv('ht-ir')), kv(5,'Raise Temp Heater 1 (°C)', iv('ht-de')), kv(6,'Raise Temp Heater 2 (°C)', iv('ht-nde')),
   ]);
   S.rtd_winding = rtdWindingSheet('rtdh', 'A');
   S.rtd_bearing = mkSheet('A', ['Value'], [
@@ -2744,11 +2728,9 @@ const CMP_ROWS = [
   { sec: 'E — Hi-Pot', label: 'Hasil Hi-Pot', get: s => _tgx(s, 'hp_result'), badge: 1 },
   { sec: 'G — Unload / Solo Run', label: 'Max RTD Winding Temp (°C)', get: s => _maxIv(s, _ULW) },
   { sec: 'G — Unload / Solo Run', label: 'Max Bearing Temp (°C)', get: s => _maxIv(s, _ULB) },
-  { sec: 'G — Unload / Solo Run', label: 'IR @1" / @10" / PI (Solo Run)', get: s => [_ivx(s, 'sr-ir1'), _ivx(s, 'sr-ir10'), _ivx(s, 'sr-pi')].join(' / ') },
   { sec: 'G — Unload / Solo Run', label: 'Voltage Unbalance (%)', get: s => _ivx(s, 'dcs-vunb') },
   { sec: 'G — Unload / Solo Run', label: 'Power (kW) / PF', get: s => [_ivx(s, 'dcs-kw'), _ivx(s, 'dcs-pf')].join(' / ') },
   { sec: 'G — Unload / Solo Run', label: 'Vibration Overall (mm/s)', get: s => _ivx(s, 'dcs-vib') },
-  { sec: 'G — Unload / Solo Run', label: 'Hasil Unload / Solo Run', get: s => _tgx(s, 'solo_result'), badge: 1 },
   { sec: 'I — Kesimpulan', label: 'Overall Condition', get: s => _ivx(s, 'overall') },
   { sec: 'I — Kesimpulan', label: 'Jumlah NG', get: s => String(s.countNg != null ? s.countNg : Object.values(s.toggleStates || {}).filter(v => v === 'NG').length) },
 ];
