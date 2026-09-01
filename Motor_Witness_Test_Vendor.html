@@ -629,8 +629,6 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <div class="mf"><label>RPM</label><input type="text" id="ul-rpm" class="num"></div>
         <div class="mf"><label>Durasi Test (jam)</label><input type="text" id="ul-dur" class="num"></div>
         <div class="mf"><label>Rotasi</label><select id="ul-rot"><option value="">—</option><option>CW</option><option>CCW</option></select></div>
-        <div class="mf"><label>Air Gap DE (mm)</label><input type="text" id="ul-ag-de" class="num"></div>
-        <div class="mf"><label>Air Gap NDE (mm)</label><input type="text" id="ul-ag-nde" class="num"></div>
         <div class="mf"><label>Air Flow Suction</label><input type="text" id="ul-af-s" placeholder="0.5 – 1.3"></div>
         <div class="mf"><label>Air Flow Discharge</label><input type="text" id="ul-af-d" placeholder="1.6 – 2.3"></div>
         <div class="mf full"><label>Hasil Air Flow</label><div id="tog-airflow" class="rc" style="justify-content:flex-start"></div></div>
@@ -1690,15 +1688,14 @@ function buildUnloadSoloSheets(){
     kv(1,'Voltage L-L (Vac)', iv('ul-v')), kv(2,'Voltage VAB/VBC/VAC (V)', iv('dcs-vab')), kv(3,'Voltage Unbalance (%)', iv('dcs-vunb')),
     kv(4,'Current 3φ (A)', iv('ul-i')), kv(5,'Power (kW)', iv('dcs-kw')), kv(6,'Power Factor', iv('dcs-pf')),
     kv(7,'RPM', iv('ul-rpm')), kv(8,'Durasi (jam)', iv('ul-dur')), kv(9,'Rotasi', iv('ul-rot')),
-    kv(10,'Air Gap DE (mm)', iv('ul-ag-de')), kv(11,'Air Gap NDE (mm)', iv('ul-ag-nde')),
-    kv(12,'Air Flow Suction', iv('ul-af-s')), kv(13,'Air Flow Discharge', iv('ul-af-d')), kv(14,'Hasil Air Flow', tv('airflow_result')),
-    kv(15,'Stator R T1-T2 (Ω)', iv('sr-t12')), kv(16,'Stator R T2-T3 (Ω)', iv('sr-t23')), kv(17,'Stator R T3-T1 (Ω)', iv('sr-t31')),
-    kv(18,'IR @1" (MΩ)', iv('sr-ir1')), kv(19,'IR @10" (MΩ)', iv('sr-ir10')), kv(20,'PI', iv('sr-pi')),
-    kv(21,'RTD type', iv('sr-rtdtype')), kv(22,'Heater Resistance (Ω)', iv('sr-htr')),
-    kv(23,'Vibration IB-H (mm/s)', iv('vib-ibh')), kv(24,'Vibration IB-V', iv('vib-ibv')), kv(25,'Vibration IB-A', iv('vib-iba')),
-    kv(26,'Vibration OB-H', iv('vib-obh')), kv(27,'Vibration OB-V', iv('vib-obv')), kv(28,'Vibration OB-A', iv('vib-oba')),
-    kv(29,'Vibration Overall / Max (mm/s)', iv('dcs-vib')),
-    kv(30,'Hasil Unload / Solo Run', tv('solo_result')), kv(31,'Remark', gv('rmk-ul')||'—'),
+    kv(10,'Air Flow Suction', iv('ul-af-s')), kv(11,'Air Flow Discharge', iv('ul-af-d')), kv(12,'Hasil Air Flow', tv('airflow_result')),
+    kv(13,'Stator R T1-T2 (Ω)', iv('sr-t12')), kv(14,'Stator R T2-T3 (Ω)', iv('sr-t23')), kv(15,'Stator R T3-T1 (Ω)', iv('sr-t31')),
+    kv(16,'IR @1" (MΩ)', iv('sr-ir1')), kv(17,'IR @10" (MΩ)', iv('sr-ir10')), kv(18,'PI', iv('sr-pi')),
+    kv(19,'RTD type', iv('sr-rtdtype')), kv(20,'Heater Resistance (Ω)', iv('sr-htr')),
+    kv(21,'Vibration IB-H (mm/s)', iv('vib-ibh')), kv(22,'Vibration IB-V', iv('vib-ibv')), kv(23,'Vibration IB-A', iv('vib-iba')),
+    kv(24,'Vibration OB-H', iv('vib-obh')), kv(25,'Vibration OB-V', iv('vib-obv')), kv(26,'Vibration OB-A', iv('vib-oba')),
+    kv(27,'Vibration Overall / Max (mm/s)', iv('dcs-vib')),
+    kv(28,'Hasil Unload / Solo Run', tv('solo_result')), kv(29,'Remark', gv('rmk-ul')||'—'),
   ]);
   const rtdCols = []; for(let i=1;i<=RTD_N;i++) rtdCols.push('RTD'+i);
   out.unload_wtemp = { title:'G — RTD Winding Temp (°C) per Interval', columns:['Interval'].concat(rtdCols), rows:
