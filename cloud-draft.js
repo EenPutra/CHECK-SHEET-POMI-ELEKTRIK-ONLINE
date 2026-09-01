@@ -229,7 +229,9 @@
       try { snap = await db.collection(COLL).where('assetTag', '==', tagNow()).get(); }
       catch (e) { snap = await db.collection(COLL).where('formId', '==', cfg.formId).get(); }
       let arr = snap.docs.map(d => Object.assign({ id: d.id, _isDraft: true }, d.data()));
-      if (cfg && cfg.formId) arr = arr.filter(d => !d.formId || d.formId === cfg.formId);
+      // only drafts written by THIS module (they always carry formId + inputValues) —
+      // excludes any pre-rollout / foreign-shape doc that happens to share the collection
+      if (cfg && cfg.formId) arr = arr.filter(d => d.formId === cfg.formId && d.inputValues);
       arr.sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
       return arr;
     } catch (e) { console.warn('CloudDraft.listDrafts gagal:', e); return []; }
