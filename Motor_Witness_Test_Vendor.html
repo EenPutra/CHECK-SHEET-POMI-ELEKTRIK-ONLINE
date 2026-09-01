@@ -246,6 +246,16 @@ table.ct tr:last-child td{border-bottom:none}
 #session-banner b{font-family:var(--raj);letter-spacing:.5px}
 #session-banner button{font-size:11px;padding:4px 10px}
 .session-tab.cmp{background:var(--info-bg);border-color:var(--info-bd);color:var(--info-tx)}
+/* ── admin delete mode (only when logged in as role:admin) ── */
+#admin-chip{display:none;align-items:center;gap:6px;background:#fee2e2;border:1.5px solid #f87171;color:#991b1b;border-radius:20px;padding:4px 12px;font-family:var(--raj,sans-serif);font-weight:700;font-size:11px;letter-spacing:.5px;cursor:pointer}
+#admin-chip:hover{background:#fecaca}
+body.admin-mode #admin-chip{display:inline-flex}
+.mg-rowwrap{display:flex;gap:6px;align-items:stretch}
+.mg-rowwrap .mg-row{flex:1}
+.mg-del{flex:0 0 auto;border:1.5px solid #c0392b;background:#c0392b;color:#fff;border-radius:9px;padding:0 13px;cursor:pointer;font-size:14px;font-family:var(--sans,sans-serif);line-height:1}
+.mg-del:hover{background:#a93226}
+.session-tab .tab-x{margin-left:7px;color:#c0392b;font-weight:900;cursor:pointer;padding:0 4px;border-radius:4px;font-size:12px}
+.session-tab .tab-x:hover{background:#c0392b;color:#fff}
 #compare-overlay{display:none;position:fixed;inset:0;background:rgba(19,35,56,.6);z-index:9998;align-items:flex-start;justify-content:center;padding:22px 14px;overflow-y:auto;backdrop-filter:blur(3px)}
 #compare-overlay.show{display:flex}
 .cmp-box{background:var(--panel-solid);border:1.5px solid var(--pb);border-radius:13px;width:min(1100px,100%);max-height:92vh;overflow:hidden;display:flex;flex-direction:column;margin:auto}
@@ -360,6 +370,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
     <button class="btn bo bsm" onclick="openMotorGate()">⚙️ Ganti Motor / Sesi</button>
     <span id="motor-chip-top" class="motor-chip" style="display:none"></span>
     <span id="testtype-chip" class="motor-chip" style="display:none"></span>
+    <span id="admin-chip" title="Login admin aktif — tombol hapus sesi / motor / tab muncul. Klik untuk keluar." onclick="adminLogout()">🔧 MODE ADMIN · hapus aktif</span>
   </div>
   <div id="session-tabs" class="session-tabs" style="display:none"></div>
   <div id="session-banner" style="display:none"></div>
@@ -2589,12 +2600,23 @@ async function mgOpenMotorSessions(m){
   box.innerHTML = '<div class="hint">Memuat sesi test…</div>';
   _sessions = await mmSessions(m.tag);
   if (!_sessions.length) { mgShowTestType(); return; }   // no history -> new session
+  renderMgSessionList();
+}
+// (re)render the motor gate's session list — split out so admin delete + the
+// post-delete refresh can redraw it without re-running the whole open flow.
+function renderMgSessionList(){
+  const box = document.getElementById('mg-ss-list');
+  if (!box) return;
+  const adm = isAdmin();
   box.innerHTML = _sessions.map((s, i) => {
     const st = s._isDraft ? 'Draft' : (s._status ? (Approvals.STATUS_LABELS[s._status] || s._status) : 'Tersimpan');
-    return `<button class="mg-row" type="button" onclick="mgLoadSession(${i})">
+    const row = `<button class="mg-row" type="button" onclick="mgLoadSession(${i})">
       <span>${_tabIco(s.testType)}</span>
       <span><b>${_esc((TEST_LABEL[s.testType] || 'Test').replace(/^\S+\s/, ''))} — ${_esc(_sd(s.executionDate || s.updatedAt))}</b>
       <span class="mg-meta">${_esc(s.checkedBy || s.savedByName || '—')} · ${_esc(st)}${s._isDraft ? '' : ' · WO ' + _esc(s.woNumber || '—')}</span></span></button>`;
+    return adm
+      ? `<div class="mg-rowwrap">${row}<button class="mg-del" type="button" title="Hapus sesi ini" onclick="adminDeleteSession(${i})">🗑</button></div>`
+      : row;
   }).join('');
 }
 async function mgLoadSession(i){ if (_sessions[i]) await loadSession(_sessions[i]); }
@@ -2704,14 +2726,119 @@ function renderSessionTabs(){
   if (!_activeMotor || !_sessions.length) { bar.style.display = 'none'; return; }
   const cur = gv('session-id');
   bar.style.display = 'flex';
+  const adm = isAdmin();
   const tabs = _sessions.map((s, i) => {
     const bcls = s._isDraft ? 'st-draft' : (s._status === 'approved' ? 'st-appr' : 'st-sub');
     const blbl = s._isDraft ? 'DRAFT' : (s._status === 'approved' ? 'APPROVED' : 'SUBMIT');
-    return `<button class="session-tab${s.id === cur ? ' active' : ''}" type="button" onclick="mgLoadSession(${i})">${_tabIco(s.testType)} ${_esc(_sd(s.executionDate || s.updatedAt))}<span class="st-badge ${bcls}">${blbl}</span></button>`;
+    const x = adm ? `<span class="tab-x" title="Hapus tab / sesi ini" onclick="event.stopPropagation();adminDeleteSession(${i})">✕</span>` : '';
+    return `<button class="session-tab${s.id === cur ? ' active' : ''}" type="button" onclick="mgLoadSession(${i})">${_tabIco(s.testType)} ${_esc(_sd(s.executionDate || s.updatedAt))}<span class="st-badge ${bcls}">${blbl}</span>${x}</button>`;
   }).join('');
   const newTab = `<button class="session-tab${!cur ? ' active' : ''}" type="button" onclick="mgNewSession()">➕ Sesi Baru</button>`;
   const cmpTab = _sessions.length >= 1 ? `<button class="session-tab cmp" type="button" onclick="openCompare()">📊 Bandingkan (${_sessions.length})</button>` : '';
   bar.innerHTML = tabs + newTab + cmpTab;
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   ADMIN — login role:admin can delete sessions, motors, and session tabs
+   Login is the existing TechnicianAuth widget (near "Inspection By"); an
+   account whose dashboard_users.role === 'admin' unlocks the 🗑 / ✕ buttons.
+   ════════════════════════════════════════════════════════════════════ */
+function isAdmin(){
+  try {
+    const s = (window.AuthSession && AuthSession.get && AuthSession.get()) || {};
+    return String(s.role || '').toLowerCase() === 'admin';
+  } catch (e) { return false; }
+}
+function adminLogout(){
+  if (window.TechnicianAuth && TechnicianAuth.logout) TechnicianAuth.logout();
+  refreshAdminUI();
+}
+let _admState = null;
+function refreshAdminUI(force){
+  const on = isAdmin();
+  if (!force && on === _admState) return;   // no change — skip the redraw
+  const prev = _admState;
+  _admState = on;
+  document.body.classList.toggle('admin-mode', on);
+  try { renderSessionTabs(); } catch (e) {}
+  try {
+    const gate = document.getElementById('motor-gate');
+    if (gate && gate.style.display !== 'none') {
+      if (document.getElementById('mg-pick').style.display !== 'none') mgShowPick();
+      else if (document.getElementById('mg-sessions').style.display !== 'none' && _sessions.length) renderMgSessionList();
+    }
+  } catch (e) {}
+  if (prev !== null && prev !== on) note(on ? '🔧 Mode admin aktif — tombol hapus muncul.' : 'Mode admin nonaktif.', on ? 'info' : 'ok');
+}
+// TechnicianAuth login/logout happens in-page (no storage event in the same tab),
+// so poll the session for a role change and react only when it flips.
+setInterval(() => { try { refreshAdminUI(); } catch (e) {} }, 1500);
+
+async function adminDeleteSession(i){
+  if (!isAdmin()) return;
+  const s = _sessions[i];
+  if (!s) return;
+  const label = (TEST_LABEL[s.testType] || 'Test').replace(/^\S+\s/, '') + ' — ' + _sd(s.executionDate || s.updatedAt);
+  const kind = s._isDraft ? 'DRAFT' : 'sesi tersimpan' + (s.woNumber ? ' (WO ' + s.woNumber + ')' : '');
+  if (!confirm('HAPUS ' + kind + ':\n' + label + '\n\nData check sheet sesi ini akan dihapus permanen dari database' + (s._isDraft ? '' : ', termasuk record review/approval-nya') + '. Lanjutkan?')) return;
+  try {
+    if (s._isDraft) {
+      if (window.CloudDraft && CloudDraft.deleteDraft) await CloudDraft.deleteDraft(s.id);
+      else await db.collection('checksheet_drafts').doc(s.id).delete();
+    } else {
+      let ap = null;
+      try { ap = await Approvals.getByChecksheetId(s.id); } catch (e) {}
+      if (ap && ap.id) { try { await Approvals.deleteById(ap.id); } catch (e) { console.warn('hapus approval:', e); } }
+      await DB.deleteById(s.id);
+    }
+  } catch (e) {
+    note('Gagal menghapus sesi: ' + (e && e.message || e), 'err');
+    return;
+  }
+  // if the deleted session is the one loaded on the form, detach to a fresh session
+  if (gv('session-id') === s.id) {
+    try { clearSessionForm(); } catch (e) {}
+    _editingSession = null;
+    document.getElementById('session-id').value = '';
+    renderSessionBanner();
+  }
+  if (_activeMotor) {
+    try { _sessions = await mmSessions(_activeMotor.tag); } catch (e) { _sessions = []; }
+  } else { _sessions.splice(i, 1); }
+  renderSessionTabs();
+  if (document.getElementById('mg-sessions').style.display !== 'none') {
+    if (_sessions.length) renderMgSessionList();
+    else document.getElementById('mg-ss-list').innerHTML = '<div class="hint">Tidak ada sesi tersimpan.</div>';
+  }
+  note('🗑 Sesi dihapus.', 'ok');
+}
+
+async function adminDeleteMotor(i){
+  if (!isAdmin()) return;
+  const m = _mgList[i];
+  if (!m) return;
+  let n = 0;
+  try { n = (await mmSessions(m.tag) || []).length; } catch (e) {}
+  const warn = 'HAPUS MOTOR dari master:\n' + (m.tag || '(tanpa tag)') +
+    '\n\nEntri motor ini akan dihapus permanen.' +
+    (n ? '\n\nCATATAN: ' + n + ' sesi test yang sudah tersimpan untuk motor ini TIDAK ikut terhapus — hapus lewat daftar sesi bila perlu.' : '') +
+    '\n\nLanjutkan?';
+  if (!confirm(warn)) return;
+  try {
+    await db.collection(MM_COLL).doc(m._id || mmSlug(m.tag)).delete();
+  } catch (e) {
+    note('Gagal menghapus motor: ' + (e && e.message || e) + (e && e.code === 'permission-denied' ? ' — koleksi motor_master belum diizinkan di Firestore Rules.' : ''), 'err');
+    return;
+  }
+  if (_activeMotor && (_activeMotor._id === m._id || _activeMotor.tag === m.tag)) {
+    _activeMotor = null;
+    try { localStorage.removeItem('mw_active_motor'); } catch (e) {}
+    const c1 = document.getElementById('active-motor-chip'); if (c1) c1.style.display = 'none';
+    const c2 = document.getElementById('motor-chip-top'); if (c2) c2.style.display = 'none';
+    _sessions = []; renderSessionTabs();
+  }
+  note('🗑 Motor "' + (m.tag || '') + '" dihapus.', 'ok');
+  mgShowPick();
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -2917,7 +3044,13 @@ async function mgShowPick(){
   } else if (!list.length) {
     rows += '<div class="hint">Belum ada motor terdaftar. Klik "Daftar Motor Baru".</div>';
   } else {
-    rows += list.map((m, i) => `<button class="mg-row" type="button" onclick="mgPick(${i})"><span>⚙️</span><span><b>${_esc(m.tag || 'Tanpa tag')}</b><span class="mg-meta">${_esc([m.manufacture, m.ratedPower, m.rpm ? m.rpm + ' rpm' : ''].filter(Boolean).join(' · '))}</span></span></button>`).join('');
+    const adm = isAdmin();
+    rows += list.map((m, i) => {
+      const row = `<button class="mg-row" type="button" onclick="mgPick(${i})"><span>⚙️</span><span><b>${_esc(m.tag || 'Tanpa tag')}</b><span class="mg-meta">${_esc([m.manufacture, m.ratedPower, m.rpm ? m.rpm + ' rpm' : ''].filter(Boolean).join(' · '))}</span></span></button>`;
+      return adm
+        ? `<div class="mg-rowwrap">${row}<button class="mg-del" type="button" title="Hapus motor ini dari master" onclick="adminDeleteMotor(${i})">🗑</button></div>`
+        : row;
+    }).join('');
   }
   box.innerHTML = rows;
 }
@@ -3030,6 +3163,7 @@ LoadMergeModal.init({ assetTag: MW_TAG });
 LoadMergeModal.initRevisionBanner();
 SubmitGuard.init({ assetTag: MW_TAG });
 TechnicianAuth.init({ checkedByFieldId: 'checked-by' });
+refreshAdminUI(true);
 CloudDraft.init({
   formId:'mw', assetTag:()=>gv('asset-tag')||MW_TAG, assetName:MW_NAME, frequency:'WITNESS',
   collectExtra: () => ({
