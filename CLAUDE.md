@@ -2375,6 +2375,48 @@ buildings/locations, not variants of the same asset, so there's no shared tag to
   Socket Outlets — Lightning Arrester and Grounding have no Finding table in the source, don't add
   one for "consistency").
 
+## `Cathodic Protection/` — 8 ICCP check sheets, template + generator
+
+Ported from the 8 `.xls` files in `google-apps-script/Checksheet mentah/` (all "Catodic_*" —
+impressed-current cathodic protection: TRU setting, per-anode current at junction boxes,
+pipe-to-soil ON/OFF potential, and — for one — 6-monthly ON-OFF pile potential). Placed in a
+subfolder like `UNIT 8/`, so every shared-lib include and the portal back-link use a `../`
+prefix; portal `href`s are `Cathodic%20Protection/<file>.html` (URL-encoded space). New portal
+category **`cp` — "Cathodic Protection"** (added to `index.html`'s category array after `gnd`),
+8 cards `cat:'cp'`.
+
+**These 8 `.html` files are GENERATED — do not hand-edit them.** `Cathodic Protection/_generate.py`
+substitutes `__TITLE__` + `__CONFIG__` into `Cathodic Protection/_cp_template.tpl` (the shared
+engine — HTML shell + `<style>` + one big `<script>` identical in every file) and writes all 8.
+To change one sheet's data: edit its `CONFIGS[...]` entry in `_generate.py`; to change behaviour
+for all 8: edit `_cp_template.tpl`; then re-run `python3 "Cathodic Protection/_generate.py"` from
+the repo root. `.tpl` (not `.html`) so GitHub Pages never serves the token-bearing template as a
+broken page. Verify a regen the usual headless-Chrome way (`?method=PUT` on `/json/new` with
+Node 26's built-in `WebSocket` — no `ws` package here).
+
+**The engine is `CP_CONFIG`-driven.** `window.CP_CONFIG.systems[]` — each system optionally has
+`truFields` (DC output / TAP / native-potential header grid, default on), `anodeGroups[]`
+(`{g,anodes}` where an anode is a string or `{tag,struct}`; `anodeStruct:true` adds a "Structure
+Protected" column), `potentials[]` (strings; `potentialMode:'single'` → one "Potential (-mV)"
+column instead of ON/OFF), and `truUnits[]` (`{tag,struct,cap,remark}` — `remark` prefills the
+row's Remark input). `MULTI = systems.length>1` prefixes section letters and forces a
+`pdf.addPage()` per system. Global optional sections: `tpLocation:true` (drawing-photo slot +
+add-row test-point table) and `pilePotential:{title,groups:[{label,points[]}]}` (TOP/MID/BOTTOM
+ON+OFF grid — Jetty only). `ICCP_TP_Location_Boiler.html` has `systems:[]` (the source is a
+drawing with no cell data) — the engine renders nothing but the TP-location section, and that's
+intentional.
+
+Full standard feature stack (technician-auth on `checked-by`, autosave draft with dynamic-row
+keys namespaced `s<i>-`, PhotoKit `PHOTOS={evidence,tploc}`, Load & Merge + CloudDraft,
+submit-guard, `Approvals.submitWithFiles`, jsPDF portrait A4 like ESP/Battery — navy cover +
+`willDrawPage` mini-header + autoTable, `noEmoji()` strips non-Latin1 glyphs from the Times
+font). `base.sheets` = one keyed sheet per (system, table): single-system `tru`/`anode`/
+`potential`/`tru_units`, multi-system `s<a>_tru` etc, plus `pile_potential`/`tp_location`.
+Dynamic-row keys are deterministic monotonic (`ax<n>`/`pt<n>`/`tl<n>`/`pl<n>`, `bumpSeqs()`
+after a draft restore) so `loadDraft()` re-creates added rows with their saved ids and the
+generic value sweep lines up — an earlier timestamp-key version silently dropped added rows'
+values on reload.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that

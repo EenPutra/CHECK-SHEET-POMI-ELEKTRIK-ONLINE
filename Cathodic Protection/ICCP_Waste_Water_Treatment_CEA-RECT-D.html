@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ICCP Waste Water Treatment — CEA-RECT-D</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="../firebase-config.js?v=20260901d"></script>
+<script src="../db-helper.js?v=20260901d"></script>
+<script src="../storage-helper.js?v=20260901d"></script>
+<script src="../approval-helper.js?v=20260901d"></script>
+<script src="../submit-guard.js?v=20260901d"></script>
+<script src="../pdf-preview.js?v=20260901d"></script>
+<script src="../load-merge-modal.js?v=20260901d"></script>
+<script src="../cloud-draft.js?v=20260901d"></script>
+<script src="../auth-session.js?v=20260901d"></script>
+<script src="../technician-auth.js?v=20260901d"></script>
+<script src="../img-helper.js?v=20260901d"></script>
+<script src="../photo-kit.js?v=20260901d"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1e3a5f;--navy2:#0f2744;--blue:#2563eb;--sky:#7dd3fc;--sky2:#bfdbfe;
+  --bg:#f8fbff;--bg2:#f0f7ff;--surf:#ffffff;--bdr:#bfdbfe;--bdr2:#dbeafe;
+  --ok:#16a34a;--ng:#dc2626;--idle:#e5e7eb;--idle-txt:#9ca3af;
+  --txt:#0f172a;--txt4:#64748b;
+  --mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:100vh}
+.topbar{position:sticky;top:0;z-index:100;background:var(--navy2);height:52px;display:flex;align-items:center;padding:0 20px;gap:12px;border-bottom:2px solid var(--blue)}
+.tb-logo{font-family:var(--raj);font-size:20px;font-weight:700;letter-spacing:3px;color:#fff}
+.tb-logo em{color:var(--sky);font-style:normal}
+.tb-sep{width:1px;height:26px;background:rgba(255,255,255,0.15);flex-shrink:0}
+.tb-sub{font-size:11px;color:var(--sky);font-family:var(--mono);letter-spacing:1px;white-space:nowrap}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--sky);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.tb-time{font-family:var(--mono);font-size:12px;color:var(--sky);white-space:nowrap}
+.btn{padding:6px 14px;border-radius:5px;border:none;cursor:pointer;font-family:var(--raj);font-size:13px;font-weight:600;letter-spacing:1px;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.btn-draft{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)}
+.btn-draft:hover{background:rgba(255,255,255,0.2)}
+.btn-pdf{background:var(--blue);color:#fff}
+.btn-pdf:hover{background:#1d4ed8;transform:translateY(-1px)}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-back{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:1px;text-decoration:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);transition:background .15s;white-space:nowrap;cursor:pointer;flex-shrink:0}
+.btn-back:hover{background:rgba(255,255,255,0.2);color:#fff}
+.hero{background:var(--navy);padding:24px 20px 20px;color:#fff}
+.hero-eyebrow{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--sky)}
+.hero-title{font-family:var(--raj);font-size:clamp(28px,6vw,52px);font-weight:700;line-height:1;color:#fff;letter-spacing:1px}
+.hero-title em{color:var(--sky);font-style:normal}
+.hero-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-top:8px;font-weight:300}
+.hero-stats{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.hstat{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px 16px;text-align:center;min-width:82px}
+.hstat-n{font-family:var(--raj);font-size:24px;font-weight:700;color:#fff;line-height:1;display:block}
+.hstat-n.ok{color:#4ade80}
+.hstat-n.pend{color:var(--sky)}
+.hstat-l{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;display:block}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 90px}
+.panel{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 6px rgba(30,58,95,0.06)}
+.wo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf label{font-size:10px;color:var(--txt4);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.mf input,.mf select,.mf textarea{border:1.5px solid var(--bdr);border-radius:5px;padding:7px 10px;font-family:var(--sans);font-size:13px;background:var(--bg2);color:var(--txt);transition:border-color .18s;width:100%}
+.mf input:focus,.mf select:focus,.mf textarea:focus{outline:none;border-color:var(--blue);background:#fff}
+.mf input[type=date],.mf input[type=time]{font-family:var(--mono)}
+.mf textarea{resize:vertical;min-height:80px}
+.sec-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--navy);cursor:pointer;user-select:none}
+.sec-hdr-icon{width:28px;height:28px;border-radius:6px;background:rgba(37,99,235,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.sec-hdr-title{font-family:var(--raj);font-size:15px;font-weight:700;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.sec-hdr-sub{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:1px;margin-left:4px}
+.sec-hdr-cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.4);padding:2px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:10px}
+.sec-hdr-arrow{color:rgba(255,255,255,0.4);font-size:14px;transition:transform .2s;margin-left:6px}
+.sec-hdr:not(.open) .sec-hdr-arrow{transform:rotate(-90deg)}
+.sec-body{padding:14px 16px}
+.sys-panel{border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 6px rgba(30,58,95,0.06);background:var(--surf)}
+.sys-hdr{background:linear-gradient(90deg,var(--navy),var(--navy2));padding:12px 16px;color:#fff;font-family:var(--raj);font-size:16px;font-weight:700;letter-spacing:2px;text-transform:uppercase}
+.sys-hdr small{display:block;font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:1px;margin-top:2px;text-transform:none}
+.sub-sec{padding:14px 16px;border-top:1px solid var(--bdr2)}
+.sub-sec:first-child{border-top:none}
+.sub-sec h4{font-family:var(--raj);font-size:13px;font-weight:700;color:var(--navy);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.sub-sec h4 .cnt{font-family:var(--mono);font-size:10px;color:var(--txt4);font-weight:400;border:1px solid var(--bdr);border-radius:8px;padding:1px 7px}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl-wrap::-webkit-scrollbar{height:5px}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--sky2);border-radius:2px}
+.ct{width:100%;border-collapse:collapse;font-size:12px;min-width:520px}
+.ct th{background:var(--navy);color:var(--sky2);padding:7px 8px;text-align:center;font-family:var(--mono);font-size:9.5px;letter-spacing:1px;text-transform:uppercase;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.08)}
+.ct th.tl{text-align:left}
+.ct td{padding:6px 8px;border-bottom:1px solid var(--bdr2);background:var(--surf);vertical-align:middle;text-align:center;border-right:1px solid var(--bdr2)}
+.ct td:last-child,.ct th:last-child{border-right:none}
+.ct tr:last-child td{border-bottom:none}
+.ct td.lbl{text-align:left;color:var(--txt);font-size:11.5px;min-width:140px}
+.ct td.lbl small{display:block;font-size:10px;color:var(--txt4);font-style:italic;margin-top:1px}
+.ct td.no{font-family:var(--mono);font-size:11px;color:var(--txt4);min-width:26px}
+.grp-row td{background:rgba(37,99,235,0.08)!important;font-family:var(--raj);font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--navy);font-size:11px;text-align:left}
+.mi{width:70px;font-size:11px;padding:4px 5px;border-radius:3px;font-family:var(--mono);text-align:center;border:1.5px solid var(--bdr);background:var(--bg2);color:var(--txt);transition:border-color .15s}
+.mi:focus{outline:none;border-color:var(--blue);background:#fff}
+.mi.wide{width:100%;min-width:100px;text-align:left;font-family:var(--sans)}
+.rowdel{border:1px solid #fecaca;background:#fee2e2;color:#b91c1c;border-radius:4px;padding:2px 7px;font-size:11px;cursor:pointer;font-weight:700}
+.addrow{margin-top:8px;border:1px dashed var(--bdr);background:var(--bg2);color:var(--navy);border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+.addrow:hover{border-color:var(--blue);background:#eaf3ff}
+.hdr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.notice{padding:10px 16px;border-radius:6px;font-size:13px;display:none;margin:12px 0 0}
+.notice.ok{background:#dcfce7;border:1px solid #86efac;color:#15803d;display:block}
+.notice.err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;display:block}
+.notice.info{background:#dbeafe;border:1px solid #93c5fd;color:#1e40af;display:block}
+.footer{background:var(--navy2);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:20px}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px}
+.photo-drop{border:2px dashed var(--bdr);border-radius:10px;padding:18px 16px;text-align:center;cursor:pointer;background:var(--bg2);transition:all .2s;margin-bottom:12px}
+.photo-drop:hover{border-color:var(--blue);background:#eaf3ff}
+.photo-drop-ico{font-size:24px;margin-bottom:4px;pointer-events:none}
+.photo-drop-txt{color:var(--txt4);font-size:13px;pointer-events:none}
+.photo-drop-txt strong{color:var(--blue)}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.photo-item{border:1px solid var(--bdr);border-radius:10px;background:var(--surf);overflow:hidden}
+.photo-img-wrap{background:#eef4fb;display:flex;align-items:center;justify-content:center;height:150px}
+.photo-img-wrap img{max-width:100%;max-height:150px;width:auto;height:auto;object-fit:contain;display:block}
+.photo-ctrl{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px 7px;border-top:1px solid var(--bdr2)}
+.p-btn{border:1px solid var(--bdr);background:var(--bg2);color:var(--navy);border-radius:5px;padding:3px 7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
+.p-btn:hover{background:var(--sky2)}
+.p-btn.del{border-color:#fecaca;background:#fee2e2;color:#b91c1c}
+.p-sz{font-size:10px;color:var(--txt4);font-family:var(--mono);margin-left:auto}
+.photo-cap{width:100%;border:none;border-top:1px solid var(--bdr2);padding:6px 8px;font-size:12px;font-family:inherit;color:var(--txt);background:transparent}
+.photo-cap:focus{outline:none;background:var(--bg2)}
+.photo-empty{color:var(--txt4);font-size:12px;text-align:center;padding:10px}
+@media(max-width:640px){.tb-sub,.tb-sep{display:none}.btn-draft{display:none}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="live-dot"></div>
+  <span class="tb-logo">ICCP <em>CP</em></span>
+  <div class="tb-sep"></div>
+  <span class="tb-sub" id="tb-sub">CATHODIC PROTECTION</span>
+  <div class="tb-right">
+    <a class="btn-back" href="../index.html" title="Back to Portal">&#8592; Portal</a>
+    <span class="tb-time" id="clock">--:--:--</span>
+    <button class="btn btn-draft btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
+    <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 PDF</button>
+    <button class="btn btn-sm" style="background:#16a34a;color:#fff;border:none" onclick="submitToDb()">🗄️ Submit DB</button>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="hero-eyebrow" id="hero-eyebrow">Cathodic Protection Inspection</div>
+  <div class="hero-title" id="hero-title">ICCP <em>SYSTEM</em></div>
+  <div class="hero-sub" id="hero-sub">Cathodic Protection Inspection Report</div>
+  <div class="hero-stats">
+    <div class="hstat"><span class="hstat-n" id="h-anode">0</span><span class="hstat-l">Anodes</span></div>
+    <div class="hstat"><span class="hstat-n" id="h-pot">0</span><span class="hstat-l">Test Points</span></div>
+    <div class="hstat"><span class="hstat-n ok" id="h-filled">0</span><span class="hstat-l">Filled</span></div>
+    <div class="hstat"><span class="hstat-n pend" id="h-pend">0</span><span class="hstat-l">Pending</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📋</div>
+    <div><div class="sec-hdr-title">Work Order Information</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid">
+      <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
+      <div class="mf"><label>Survey Date</label><input type="date" id="wo-date"></div>
+      <div class="mf"><label>Time Start</label><input type="time" id="time-start"></div>
+      <div class="mf"><label>Time End</label><input type="time" id="time-end"></div>
+      <div class="mf"><label>Inspected By</label><input type="text" id="checked-by" placeholder="Full name"></div>
+      <div class="mf"><label>NIK</label><input type="text" id="nik" placeholder="NIK"></div>
+      <div class="mf"><label>Reviewed By</label><input type="text" id="reviewed-by" placeholder="Supervisor name"></div>
+      <div class="mf"><label>Shift</label>
+        <select id="shift"><option>Normal Hours</option><option>Shift 1 (07:00–15:00)</option><option>Shift 2 (15:00–23:00)</option><option>Shift 3 (23:00–07:00)</option></select>
+      </div>
+      <div class="mf"><label>Frequency</label>
+        <select id="frequency"><option>6 MONTHLY</option><option>MONTHLY</option><option>YEARLY</option><option>2 YEARLY</option></select>
+      </div>
+      <div class="mf"><label>Form No.</label><input type="text" id="form-no" readonly></div>
+    </div>
+    <div style="margin-top:14px">
+      <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="LoadMergeModal.open()">&#128229; Muat / Lanjutkan dari Database</button>
+      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu / lebih submission sebelumnya untuk digabung (union) ke form ini.</span>
+    </div>
+  </div>
+</div>
+
+<div id="systems"></div>
+
+<!-- PILE POTENTIAL (optional) -->
+<div class="panel" id="pile-panel" style="display:none">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📊</div>
+    <div><div class="sec-hdr-title" id="pile-title">6-Monthly ON-OFF Pile Potential</div>
+      <span class="sec-hdr-sub">TOP / MID / BOTTOM on & instant-off potential</span></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="tbl-wrap">
+      <table class="ct" id="tbl-pile" style="min-width:760px">
+        <thead>
+          <tr>
+            <th class="tl" style="width:26px" rowspan="2">No</th>
+            <th class="tl" style="min-width:160px" rowspan="2">Location</th>
+            <th colspan="3">ON Potential (mV)</th>
+            <th colspan="3">OFF Potential (mV)</th>
+            <th style="width:36px" rowspan="2"></th>
+          </tr>
+          <tr><th>Top</th><th>Mid</th><th>Bottom</th><th>Top</th><th>Mid</th><th>Bottom</th></tr>
+        </thead>
+        <tbody id="tbody-pile"></tbody>
+      </table>
+    </div>
+    <button class="addrow" onclick="addPile('')">+ Tambah Test Point</button>
+  </div>
+</div>
+
+<!-- TP LOCATION (optional) -->
+<div class="panel" id="tploc-panel" style="display:none">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🗺️</div>
+    <div><div class="sec-hdr-title">Test Point Location Reference</div>
+      <span class="sec-hdr-sub">Layout drawing + optional test-point readings</span></div>
+    <span class="sec-hdr-cnt" id="tploc-cnt">0 foto</span>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="photo-drop" onclick="pickPhotos('tploc',this)">
+      <div class="photo-drop-ico">🗺️</div>
+      <div class="photo-drop-txt"><strong>Klik untuk menambah gambar denah / TP location</strong><br>
+        <small style="font-size:11px">Scan / foto layout survey sebagai lampiran referensi</small></div>
+    </div>
+    <div class="photo-grid" id="grid-tploc"></div>
+    <div style="margin-top:12px" class="tbl-wrap">
+      <table class="ct" id="tbl-tploc">
+        <thead><tr>
+          <th class="tl" style="width:26px">No</th>
+          <th class="tl" style="min-width:150px">Test Point / Location</th>
+          <th style="width:100px">ON (mV)</th>
+          <th style="width:100px">OFF (mV)</th>
+          <th class="tl" style="min-width:120px">Remark</th>
+          <th style="width:40px"></th>
+        </tr></thead>
+        <tbody id="tbody-tploc"></tbody>
+      </table>
+    </div>
+    <button class="addrow" onclick="addTpLoc('')">+ Tambah Test Point</button>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📷</div>
+    <div><div class="sec-hdr-title">Evidence Photos</div></div>
+    <span class="sec-hdr-cnt" id="evidence-cnt">0 foto</span>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="photo-drop" onclick="pickPhotos('evidence',this)">
+      <div class="photo-drop-ico">📷</div>
+      <div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong><br>
+        <small style="font-size:11px">Kamera atau galeri · bisa banyak sekaligus · crop &amp; ukuran cetak diatur setelah foto dipilih</small></div>
+    </div>
+    <div class="photo-grid" id="grid-evidence"></div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📝</div>
+    <div><div class="sec-hdr-title">Findings &amp; Conclusion</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid" style="padding-bottom:4px">
+      <div class="mf"><label>Overall CP Condition</label>
+        <select id="overall">
+          <option>✅ PROTECTED — Criteria met</option>
+          <option>⚠️ MARGINAL — Requires monitoring</option>
+          <option>🔧 UNDER-PROTECTED — Adjust / repair required</option>
+          <option>🛑 NOT PROTECTED — Immediate action</option>
+        </select>
+      </div>
+      <div class="mf"><label>Next Survey Due</label><input type="date" id="next-pm"></div>
+    </div>
+    <div class="wo-grid" style="grid-template-columns:1fr 1fr">
+      <div class="mf"><label>Findings / Observations</label>
+        <textarea id="findings" placeholder="Catat semua temuan, anoda 0 A, potensial di luar kriteria, kerusakan, dll."></textarea>
+      </div>
+      <div class="mf"><label>Corrective Actions / Recommendations</label>
+        <textarea id="recommendations" placeholder="Tindakan yang diambil dan rekomendasi tindak lanjut…"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
+  <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
+  <button class="btn btn-draft" style="background:var(--navy);color:#fff" onclick="CloudDraft.save()">💾 Save Draft</button>
+  <button class="btn btn-pdf" onclick="generatePDF()">📄 Download PDF</button>
+  <button class="btn" style="background:#16a34a;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">📊 Submit to Database</button>
+</div>
+<div id="notice" class="notice"></div>
+
+</div><!-- /wrap -->
+
+<footer class="footer">
+  <div class="footer-l" id="foot-l">CATHODIC PROTECTION</div>
+  <div class="footer-r" id="fdate">—</div>
+</footer>
+
+<!-- ═══════════ PER-SHEET CONFIG ═══════════ -->
+<script id="cp-config">
+window.CP_CONFIG = {
+  "formId": "cp_wwt",
+  "assetTag": "CEA-RECT-D",
+  "assetName": "ICCP Waste Water Treatment",
+  "checksheetFile": "Cathodic Protection/ICCP_Waste_Water_Treatment_CEA-RECT-D.html",
+  "draftKey": "cp_wwt",
+  "formNo": "",
+  "pageTitle": "ICCP Waste Water Treatment — CEA-RECT-D",
+  "heroTitle": "ICCP <em>WASTE WATER</em>",
+  "eyebrow": "Impressed Current Cathodic Protection · Waste Water Treatment",
+  "heroSub": "CEA-RECT-D · ICCP Waste Water Treatment · Yard Piping — Anode Current & Pipe-to-Soil Potential",
+  "frequency": "6 MONTHLY",
+  "potentialRef": "Cu/CuSO4",
+  "tpLocation": true,
+  "pilePotential": null,
+  "systems": [
+    {
+      "label": "System G · CEA-RECT-D",
+      "sublabel": "Waste Water Treatment",
+      "potentialRef": "Cu/CuSO4",
+      "anodeGroups": [
+        {
+          "g": "Yard Piping Anodes",
+          "anodes": [
+            "P1 + G1 (combined)",
+            "P1",
+            "G1"
+          ]
+        }
+      ],
+      "potentials": [
+        "BT2-2 · 1.5\" CSW 845",
+        "BT2-2 · 1\" CSA 558",
+        "BT2-2 · CSS",
+        "TT2-2 · 1.5\" CSW 845",
+        "TT2-2 · 1\" CSA 558",
+        "TT2-2 · CSS",
+        "BT2-1 · 3\" CSW 820",
+        "BT2-1 · 6\" CPD 570",
+        "BT2-1 · 3\" CSW 820",
+        "BT2-1 · 4\" CPW 550",
+        "BT2-1 · 1\" CSA 540",
+        "BT2-1 · 16\" CPD 509",
+        "BT2-1 · 3\" CSW 820",
+        "TT2-1 · CPD 540",
+        "TT2-1 · CPD 570",
+        "TT2-1 · CPD 508",
+        "BT2-3 · 8\" CPD 570",
+        "BT2-3 · 18\" CPD 508",
+        "BT2-3 · 8\" CPD 540",
+        "BT2-4 · CSA 540",
+        "BT2-4 · CPW 560"
+      ]
+    }
+  ]
+};
+</script>
+
+<!-- ═══════════ SHARED ENGINE (identical in every CP check sheet) ═══════════ -->
+<script>
+const CFG=window.CP_CONFIG;
+const SYSTEMS=CFG.systems||[];
+const MULTI=SYSTEMS.length>1;
+
+const sid=s=>String(s==null?'':s).replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'');
+const v=id=>{const e=document.getElementById(id);return e?String(e.value).trim():'';};
+const iv=id=>{const e=document.getElementById(id);return e&&String(e.value).trim()?String(e.value).trim():'—';};
+const tr2=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'');
+const esc=s=>String(s==null?'':s).replace(/"/g,'&quot;');
+const noEmoji=s=>String(s||'').replace(/[^\x20-\xFF‐-―‘-”]/g,'').trim();
+
+function tick(){
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('id-ID');
+  document.getElementById('fdate').textContent=n.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(tick,1000);tick();
+
+function toggleSec(hdr){
+  hdr.classList.toggle('open');
+  const body=hdr.nextElementSibling;
+  body.style.display=hdr.classList.contains('open')?'':'none';
+}
+
+// ── DYNAMIC ROW STATE (per system) ──
+// SYS[si] = {anodeRows:[{key,tag,struct,group}], potRows:[{key,pipe}], anodeSeq, potSeq}
+let SYS=[];
+let TPLOC_ROWS=[],TPLOC_SEQ=0;
+let PILE_ROWS=[],PILE_SEQ=0;
+
+function letter(i){return String.fromCharCode(65+i);}
+
+// ── RENDER SYSTEMS ──
+function renderSystems(){
+  const host=document.getElementById('systems');host.innerHTML='';
+  SYS=SYSTEMS.map(()=>({anodeRows:[],potRows:[],anodeSeq:0,potSeq:0}));
+  SYSTEMS.forEach((s,si)=>{
+    const p=document.createElement('div');p.className='sys-panel';
+    let html=`<div class="sys-hdr">${MULTI?letter(si)+' — ':''}${esc(s.label||('System '+letter(si)))}${s.sublabel?`<small>${esc(s.sublabel)}</small>`:''}</div>`;
+    if(s.truFields!==false) html+=truFieldsHtml(si,s);
+    if(s.anodeGroups&&s.anodeGroups.length) html+=`<div class="sub-sec"><h4>⚡ Anode Current Output <span class="cnt" id="cnt-anode-${si}">0</span></h4>
+      <div class="tbl-wrap"><table class="ct" id="tbl-anode-${si}"><thead><tr>
+        <th class="tl" style="width:26px">No</th><th class="tl" style="min-width:130px">Anode Tag</th>
+        ${s.anodeStruct?'<th class="tl" style="min-width:110px">Structure Protected</th>':''}
+        <th style="width:104px">Current (A)</th><th class="tl" style="min-width:110px">Remark</th><th style="width:36px"></th>
+      </tr></thead><tbody id="tbody-anode-${si}"></tbody></table></div>
+      <div style="font-size:11px;color:var(--txt4);margin-top:6px">Catatan: arus 0 A biasanya karena kabel tidak terhubung atau anoda hilang.</div></div>`;
+    if(s.potentials&&s.potentials.length){
+      const single=s.potentialMode==='single';
+      html+=`<div class="sub-sec"><h4>📈 ${single?'Reference Electrode Potential':'Pipe-to-Soil Potential'} <span class="cnt" id="cnt-pot-${si}">0</span></h4>
+      <div style="font-size:11px;color:var(--txt4);margin-bottom:8px">Potential measurement using ${esc(s.potentialRef||CFG.potentialRef||'Cu/CuSO4')}</div>
+      <div class="tbl-wrap"><table class="ct" id="tbl-pot-${si}"><thead><tr>
+        <th class="tl" style="width:26px">No</th><th class="tl" style="min-width:140px">${single?'Reference Electrode / Location':'Pipe / Test Point'}</th>
+        ${single?'<th style="width:120px">Potential (-mV)</th>':'<th style="width:96px">ON (mV)</th><th style="width:96px">OFF (mV)</th>'}
+        <th class="tl" style="min-width:110px">Remark</th><th style="width:36px"></th>
+      </tr></thead><tbody id="tbody-pot-${si}"></tbody></table></div>
+      <button class="addrow" onclick="addPot(${si},'')">+ Tambah baris</button></div>`;
+    }
+    if(s.truUnits&&s.truUnits.length) html+=`<div class="sub-sec"><h4>🧰 TRU Unit Details <span class="cnt">${s.truUnits.length}</span></h4>
+      <div class="tbl-wrap"><table class="ct" id="tbl-tru-${si}" style="min-width:820px"><thead><tr>
+        <th class="tl" style="width:26px">No</th><th class="tl" style="min-width:160px">TRU Tag / Protected Structure</th>
+        <th style="width:66px">V Out</th><th style="width:66px">I Out (A)</th><th style="width:84px">TAP (C,F)</th>
+        <th style="width:84px">Pot. ON</th><th style="width:84px">Pot. OFF</th><th style="width:74px">Knob</th>
+        <th class="tl" style="min-width:100px">Remark</th>
+      </tr></thead><tbody id="tbody-tru-${si}"></tbody></table></div></div>`;
+    p.innerHTML=html;host.appendChild(p);
+  });
+  SYSTEMS.forEach((s,si)=>{
+    if(s.anodeGroups&&s.anodeGroups.length) buildAnode(si);
+    if(s.potentials&&s.potentials.length) buildPot(si);
+    if(s.truUnits&&s.truUnits.length) buildTru(si);
+  });
+}
+
+function truFieldsHtml(si,s){
+  return `<div class="sub-sec"><h4>🔧 Transformer Rectifier / Power Supply</h4>
+    <div class="hdr-grid">
+      <div class="mf"><label>DC Output Voltage (V)</label><input type="number" step="any" id="s${si}-dc-v" placeholder="—"></div>
+      <div class="mf"><label>DC Output Current (A)</label><input type="number" step="any" id="s${si}-dc-a" placeholder="—"></div>
+      <div class="mf"><label>TAP — Coarse (C)</label><input type="text" id="s${si}-tap-c" placeholder="C…"></div>
+      <div class="mf"><label>TAP — Fine (F)</label><input type="text" id="s${si}-tap-f" placeholder="F…"></div>
+      <div class="mf"><label>AC Input Voltage (V)</label><input type="number" step="any" id="s${si}-ac-v" placeholder="—"></div>
+      <div class="mf"><label>Native Potential (mV)</label><input type="number" step="any" id="s${si}-native-pot" placeholder="—"></div>
+      <div class="mf"><label>Reference Electrode</label>
+        <select id="s${si}-ref-elec"><option>${esc(s.potentialRef||CFG.potentialRef||'Cu/CuSO4')}</option><option>Cu/CuSO4</option><option>Ag/AgCl</option></select></div>
+      <div class="mf"><label>Rectifier Mode</label>
+        <select id="s${si}-tru-mode"><option>Auto Potential</option><option>Manual / Constant Current</option><option>Constant Voltage</option></select></div>
+      <div class="mf"><label>Auto Potential Set Point (mV)</label><input type="number" step="any" id="s${si}-auto-set" placeholder="—"></div>
+    </div>
+    <div class="mf" style="margin-top:8px"><label>TRU Condition / Notes</label>
+      <textarea id="s${si}-tru-notes" placeholder="Kondisi rectifier, indikator, terminasi, ventilasi, dll."></textarea></div>
+  </div>`;
+}
+
+// ── ANODE ──
+function buildAnode(si){
+  const s=SYSTEMS[si],st=SYS[si];
+  st.anodeRows=[];st.anodeSeq=0;
+  const tb=document.getElementById('tbody-anode-'+si);tb.innerHTML='';
+  s.anodeGroups.forEach((grp,gi)=>{
+    const gr=document.createElement('tr');gr.className='grp-row';
+    gr.innerHTML=`<td></td><td colspan="${s.anodeStruct?4:3}">${esc(grp.g||('Group '+(gi+1)))}</td>`;
+    tb.appendChild(gr);
+    (grp.anodes||[]).forEach(a=>{
+      const tag=typeof a==='string'?a:a.tag;
+      const struct=typeof a==='string'?(grp.struct||''):(a.struct||grp.struct||'');
+      const key=sid(tag)||('a'+(st.anodeSeq++));
+      st.anodeRows.push({key,tag,struct,group:grp.g||''});
+      tb.appendChild(anodeRow(si,key,tag,struct));
+    });
+    const ar=document.createElement('tr');
+    ar.innerHTML=`<td></td><td colspan="${s.anodeStruct?4:3}" style="text-align:left"><button class="addrow" style="margin-top:4px" onclick="addAnode(${si},${gi})">+ Tambah anoda</button></td>`;
+    tb.appendChild(ar);
+  });
+  renumberAnode(si);updateStats();
+}
+function anodeRow(si,key,tag,struct){
+  const s=SYSTEMS[si];
+  const tr=document.createElement('tr');tr.dataset.key=key;
+  tr.innerHTML=`<td class="no"></td>
+    <td class="lbl"><input class="mi wide" type="text" id="ant-s${si}-${key}" value="${esc(tag)}"></td>
+    ${s.anodeStruct?`<td class="lbl"><input class="mi wide" type="text" id="ans-s${si}-${key}" value="${esc(struct)}"></td>`:''}
+    <td><input class="mi" type="number" step="any" id="an-s${si}-${key}" placeholder="—" oninput="updateStats()"></td>
+    <td class="lbl"><input class="mi wide" type="text" id="anr-s${si}-${key}" placeholder="—"></td>
+    <td><button class="rowdel" onclick="delAnode(${si},'${key}')">✕</button></td>`;
+  return tr;
+}
+function addAnode(si,gi,key){
+  const st=SYS[si];key=key||('ax'+(st.anodeSeq++));
+  st.anodeRows.push({key,tag:'',struct:'',group:SYSTEMS[si].anodeGroups[gi]?SYSTEMS[si].anodeGroups[gi].g:''});
+  const tb=document.getElementById('tbody-anode-'+si);
+  const btnRow=[...tb.querySelectorAll('tr')].filter(r=>r.querySelector(`.addrow[onclick="addAnode(${si},${gi})"]`))[0];
+  const row=anodeRow(si,key,'','');
+  if(btnRow)tb.insertBefore(row,btnRow);else tb.appendChild(row);
+  renumberAnode(si);updateStats();
+}
+function delAnode(si,key){
+  const st=SYS[si];const i=st.anodeRows.findIndex(r=>r.key===key);if(i>=0)st.anodeRows.splice(i,1);
+  const tr=document.querySelector(`#tbody-anode-${si} tr[data-key="${key}"]`);if(tr)tr.remove();
+  renumberAnode(si);updateStats();
+}
+function renumberAnode(si){
+  let n=0;document.querySelectorAll(`#tbody-anode-${si} tr[data-key]`).forEach(tr=>{n++;tr.querySelector('.no').textContent=n;});
+  const c=document.getElementById('cnt-anode-'+si);if(c)c.textContent=n;
+}
+
+// ── POTENTIAL ──
+function buildPot(si){
+  const s=SYSTEMS[si],st=SYS[si];
+  st.potRows=[];st.potSeq=0;
+  document.getElementById('tbody-pot-'+si).innerHTML='';
+  s.potentials.forEach(p=>addPot(si,typeof p==='string'?p:p.pipe));
+}
+function potRow(si,key,pipe){
+  const single=SYSTEMS[si].potentialMode==='single';
+  const tr=document.createElement('tr');tr.dataset.key=key;
+  tr.innerHTML=`<td class="no"></td>
+    <td class="lbl"><input class="mi wide" type="text" id="ptp-s${si}-${key}" value="${esc(pipe)}" placeholder="—"></td>
+    ${single
+      ?`<td><input class="mi" type="number" step="any" id="psng-s${si}-${key}" placeholder="—" oninput="updateStats()"></td>`
+      :`<td><input class="mi" type="number" step="any" id="pon-s${si}-${key}" placeholder="—" oninput="updateStats()"></td>
+        <td><input class="mi" type="number" step="any" id="poff-s${si}-${key}" placeholder="—" oninput="updateStats()"></td>`}
+    <td class="lbl"><input class="mi wide" type="text" id="prm-s${si}-${key}" placeholder="—"></td>
+    <td><button class="rowdel" onclick="delPot(${si},'${key}')">✕</button></td>`;
+  return tr;
+}
+function addPot(si,pipe,key){
+  const st=SYS[si];key=key||('pt'+(st.potSeq++));
+  st.potRows.push({key,pipe:pipe||''});
+  document.getElementById('tbody-pot-'+si).appendChild(potRow(si,key,pipe||''));
+  renumberPot(si);updateStats();
+}
+function delPot(si,key){
+  const st=SYS[si];const i=st.potRows.findIndex(r=>r.key===key);if(i>=0)st.potRows.splice(i,1);
+  const tr=document.querySelector(`#tbody-pot-${si} tr[data-key="${key}"]`);if(tr)tr.remove();
+  renumberPot(si);updateStats();
+}
+function renumberPot(si){
+  let n=0;document.querySelectorAll(`#tbody-pot-${si} tr`).forEach(tr=>{n++;const c=tr.querySelector('.no');if(c)c.textContent=n;});
+  const c=document.getElementById('cnt-pot-'+si);if(c)c.textContent=n;
+}
+
+// ── TRU UNITS ──
+function buildTru(si){
+  const tb=document.getElementById('tbody-tru-'+si);tb.innerHTML='';
+  SYSTEMS[si].truUnits.forEach((u,i)=>{
+    const k=sid(u.tag)||('u'+i);
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="no">${i+1}</td>
+      <td class="lbl"><strong>${esc(u.tag)}</strong><small>${esc([u.struct,u.cap].filter(Boolean).join(' · '))}</small></td>
+      <td><input class="mi" type="number" step="any" id="tru-s${si}-${k}-vout" placeholder="—" oninput="updateStats()"></td>
+      <td><input class="mi" type="number" step="any" id="tru-s${si}-${k}-iout" placeholder="—" oninput="updateStats()"></td>
+      <td><input class="mi" type="text" id="tru-s${si}-${k}-tap" placeholder="C,F"></td>
+      <td><input class="mi" type="number" step="any" id="tru-s${si}-${k}-pon" placeholder="—"></td>
+      <td><input class="mi" type="number" step="any" id="tru-s${si}-${k}-poff" placeholder="—"></td>
+      <td><input class="mi" type="text" id="tru-s${si}-${k}-knob" placeholder="—"></td>
+      <td class="lbl"><input class="mi wide" type="text" id="tru-s${si}-${k}-rmk" value="${esc(u.remark||'')}" placeholder="—"></td>`;
+    tb.appendChild(tr);
+  });
+}
+
+// ── TP LOCATION ──
+function addTpLoc(loc,key){
+  key=key||('tl'+(TPLOC_SEQ++));TPLOC_ROWS.push({key});
+  const tr=document.createElement('tr');tr.dataset.key=key;
+  tr.innerHTML=`<td class="no"></td>
+    <td class="lbl"><input class="mi wide" type="text" id="tlp-${key}" value="${esc(loc)}" placeholder="Test point / location"></td>
+    <td><input class="mi" type="number" step="any" id="tlon-${key}" placeholder="—"></td>
+    <td><input class="mi" type="number" step="any" id="tloff-${key}" placeholder="—"></td>
+    <td class="lbl"><input class="mi wide" type="text" id="tlrm-${key}" placeholder="—"></td>
+    <td><button class="rowdel" onclick="delDyn('tploc','${key}')">✕</button></td>`;
+  document.getElementById('tbody-tploc').appendChild(tr);renumberDyn('tploc');
+}
+// ── PILE POTENTIAL ──
+function addPile(loc,key,group){
+  key=key||('pl'+(PILE_SEQ++));PILE_ROWS.push({key});
+  const tb=document.getElementById('tbody-pile');
+  if(group){const g=document.createElement('tr');g.className='grp-row';g.innerHTML=`<td></td><td colspan="8">${esc(group)}</td>`;tb.appendChild(g);}
+  const tr=document.createElement('tr');tr.dataset.key=key;
+  tr.innerHTML=`<td class="no"></td>
+    <td class="lbl"><input class="mi wide" type="text" id="pll-${key}" value="${esc(loc)}" placeholder="Location"></td>
+    ${['ont','onm','onb','offt','offm','offb'].map(p=>`<td><input class="mi" type="number" step="any" id="pl${p}-${key}" placeholder="—"></td>`).join('')}
+    <td><button class="rowdel" onclick="delDyn('pile','${key}')">✕</button></td>`;
+  tb.appendChild(tr);renumberDyn('pile');
+}
+function delDyn(kind,key){
+  const arr=kind==='tploc'?TPLOC_ROWS:PILE_ROWS;
+  const i=arr.findIndex(r=>r.key===key);if(i>=0)arr.splice(i,1);
+  const tr=document.querySelector(`#tbody-${kind} tr[data-key="${key}"]`);if(tr)tr.remove();
+  renumberDyn(kind);
+}
+function renumberDyn(kind){
+  let n=0;document.querySelectorAll(`#tbody-${kind} tr[data-key]`).forEach(tr=>{n++;const c=tr.querySelector('.no');if(c)c.textContent=n;});
+}
+
+// ── STATS ──
+function updateStats(){
+  let anodeCount=0,potCount=0,filled=0,fields=0;
+  SYS.forEach((st,si)=>{
+    const s=SYSTEMS[si];
+    (st.anodeRows||[]).forEach(r=>{anodeCount++;fields++;if(v('an-s'+si+'-'+r.key)!=='')filled++;});
+    (st.potRows||[]).forEach(r=>{potCount++;
+      if(s.potentialMode==='single'){fields++;if(v('psng-s'+si+'-'+r.key)!=='')filled++;}
+      else{fields+=2;if(v('pon-s'+si+'-'+r.key)!=='')filled++;if(v('poff-s'+si+'-'+r.key)!=='')filled++;}
+    });
+    (s.truUnits||[]).forEach((u,i)=>{const k=sid(u.tag)||('u'+i);['vout','iout'].forEach(f=>{fields++;if(v('tru-s'+si+'-'+k+'-'+f)!=='')filled++;});});
+  });
+  document.getElementById('h-anode').textContent=anodeCount;
+  document.getElementById('h-pot').textContent=potCount;
+  document.getElementById('h-filled').textContent=filled;
+  document.getElementById('h-pend').textContent=Math.max(0,fields-filled);
+}
+
+// ── PHOTOS ──
+const PHOTOS={evidence:[],tploc:[]};
+function pickPhotos(key,el){
+  PhotoKit.upload(el,{multiple:true},entry=>{if(!entry)return;entry.caption='';PHOTOS[key].push(entry);renderPhotos(key);autoSaveNow();});
+}
+function recropPhotoAt(key,i){
+  const cur=PHOTOS[key][i];if(!cur)return;
+  PhotoKit.recrop(cur,e=>{if(!e)return;e.caption=cur.caption||'';PHOTOS[key][i]=e;renderPhotos(key);autoSaveNow();});
+}
+function rotatePhotoAt(key,i,deg){
+  const img=new Image();
+  img.onload=()=>{
+    const Wp=img.naturalWidth,Hp=img.naturalHeight;
+    const swap=((deg%360)+360)%360===90||((deg%360)+360)%360===270;
+    const cv=document.createElement('canvas');cv.width=swap?Hp:Wp;cv.height=swap?Wp:Hp;
+    const ctx=cv.getContext('2d');ctx.translate(cv.width/2,cv.height/2);ctx.rotate(deg*Math.PI/180);ctx.drawImage(img,-Wp/2,-Hp/2);
+    const p=PHOTOS[key][i];p.src=cv.toDataURL('image/jpeg',0.92);p.dataUrl=p.src;p.w=cv.width;p.h=cv.height;
+    if(swap&&p.widthCm&&p.heightCm){const t=p.widthCm;p.widthCm=p.heightCm;p.heightCm=t;}
+    renderPhotos(key);autoSaveNow();
+  };
+  img.src=PHOTOS[key][i].src;
+}
+function removePhotoAt(key,i){if(!confirm('Hapus foto ini?'))return;PHOTOS[key].splice(i,1);renderPhotos(key);autoSaveNow();}
+function renderPhotos(key){
+  const grid=document.getElementById('grid-'+key);if(!grid)return;
+  const cnt=document.getElementById(key+'-cnt');if(cnt)cnt.textContent=PHOTOS[key].length+' foto';
+  if(!PHOTOS[key].length){grid.innerHTML='<div class="photo-empty">Belum ada foto.</div>';return;}
+  grid.innerHTML=PHOTOS[key].map((p,i)=>`
+    <div class="photo-item">
+      <div class="photo-img-wrap"><img src="${p.src}" alt="Foto ${i+1}"></div>
+      <div class="photo-ctrl">
+        <button class="p-btn" onclick="recropPhotoAt('${key}',${i})">✂ Crop</button>
+        <button class="p-btn" onclick="rotatePhotoAt('${key}',${i},-90)">↺</button>
+        <button class="p-btn" onclick="rotatePhotoAt('${key}',${i},90)">↻</button>
+        <button class="p-btn del" onclick="removePhotoAt('${key}',${i})">✕</button>
+        <span class="p-sz">${p.widthCm?p.widthCm.toFixed(1)+'×'+p.heightCm.toFixed(1)+'cm':''}</span>
+      </div>
+      <input class="photo-cap" type="text" placeholder="Caption foto ${i+1}…" value="${esc(p.caption||'')}"
+        oninput="PHOTOS['${key}'][${i}].caption=this.value">
+    </div>`).join('');
+}
+
+// ── DRAFT ──
+function collectDraft(){
+  const d={};
+  document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.id&&el.type!=='file')d[el.id]=el.value;});
+  d._dyn={
+    anode:SYS.map(st=>st.anodeRows.map(r=>({key:r.key,group:r.group}))),
+    pot:SYS.map(st=>st.potRows.map(r=>({key:r.key}))),
+    tploc:TPLOC_ROWS.map(r=>({key:r.key})),
+    pile:PILE_ROWS.map(r=>({key:r.key})),
+  };
+  return d;
+}
+function persistDraft(silent){
+  try{
+    localStorage.setItem(CFG.draftKey+'_draft',JSON.stringify(collectDraft()));
+    try{localStorage.setItem(CFG.draftKey+'_photos',JSON.stringify(PHOTOS));}
+    catch(e){if(!silent)showNote('⚠️ Draft tersimpan, tapi foto terlalu besar untuk localStorage.','err');}
+    if(!silent)showNote('💾 Draft tersimpan.','ok');
+  }catch(e){if(!silent)showNote('❌ Gagal menyimpan draft: '+e.message,'err');}
+}
+let _saveT=null;
+function scheduleAutoSave(){clearTimeout(_saveT);_saveT=setTimeout(()=>persistDraft(true),800);}
+function autoSaveNow(){clearTimeout(_saveT);persistDraft(true);}
+document.addEventListener('input',e=>{if(e.target.matches('input,select,textarea'))scheduleAutoSave();});
+document.addEventListener('change',e=>{if(e.target.matches('input,select,textarea'))scheduleAutoSave();});
+
+function loadDraft(){
+  try{
+    const rawP=localStorage.getItem(CFG.draftKey+'_photos');
+    if(rawP){const pp=JSON.parse(rawP)||{};['evidence','tploc'].forEach(k=>{PHOTOS[k]=pp[k]||[];renderPhotos(k);});}
+    const raw=localStorage.getItem(CFG.draftKey+'_draft');
+    if(!raw)return;
+    const d=JSON.parse(raw);const dyn=d._dyn||{};
+    (dyn.anode||[]).forEach((rows,si)=>{if(!SYS[si])return;
+      rows.forEach(r=>{if(!SYS[si].anodeRows.find(x=>x.key===r.key)){
+        const gi=(SYSTEMS[si].anodeGroups||[]).findIndex(g=>g.g===r.group);addAnode(si,gi<0?0:gi,r.key);
+      }});
+    });
+    (dyn.pot||[]).forEach((rows,si)=>{if(!SYS[si])return;
+      rows.forEach(r=>{if(!SYS[si].potRows.find(x=>x.key===r.key))addPot(si,'',r.key);});
+    });
+    (dyn.tploc||[]).forEach(r=>{if(!TPLOC_ROWS.find(x=>x.key===r.key))addTpLoc('',r.key);});
+    (dyn.pile||[]).forEach(r=>{if(!PILE_ROWS.find(x=>x.key===r.key))addPile('',r.key);});
+    bumpSeqs();
+    Object.entries(d).forEach(([id,val])=>{if(id.startsWith('_'))return;const el=document.getElementById(id);if(el&&el.type!=='file')el.value=val;});
+    updateStats();
+  }catch(e){console.warn('loadDraft',e);}
+}
+function bumpSeqs(){
+  const mx=(arr,pfx)=>arr.reduce((m,r)=>{const n=parseInt(String(r.key).replace(pfx,''),10);return isNaN(n)?m:Math.max(m,n+1);},0);
+  SYS.forEach(st=>{st.anodeSeq=Math.max(st.anodeSeq,mx(st.anodeRows,'ax'));st.potSeq=Math.max(st.potSeq,mx(st.potRows,'pt'));});
+  TPLOC_SEQ=Math.max(TPLOC_SEQ,mx(TPLOC_ROWS,'tl'));
+  PILE_SEQ=Math.max(PILE_SEQ,mx(PILE_ROWS,'pl'));
+}
+function resetForm(){
+  if(!confirm('Reset semua data? Tindakan ini tidak dapat dibatalkan.'))return;
+  localStorage.removeItem(CFG.draftKey+'_draft');localStorage.removeItem(CFG.draftKey+'_photos');
+  document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file'&&!el.readOnly)el.value='';});
+  PHOTOS.evidence=[];PHOTOS.tploc=[];renderPhotos('evidence');renderPhotos('tploc');
+  renderSystems();
+  document.getElementById('tbody-tploc').innerHTML='';TPLOC_ROWS=[];TPLOC_SEQ=0;
+  document.getElementById('tbody-pile').innerHTML='';PILE_ROWS=[];PILE_SEQ=0;
+  initOptionalSections();
+  document.getElementById('form-no').value=CFG.formNo||'';
+  updateStats();
+}
+function showNote(msg,t){
+  const n=document.getElementById('notice');n.textContent=msg;n.className='notice '+t;
+  clearTimeout(showNote._t);showNote._t=setTimeout(()=>n.className='notice',5000);
+}
+
+// ── PDF ──
+async function generatePDF(opts={}){
+  if(!opts.silent){showNote('⏳ Membuat PDF, harap tunggu…','info');await new Promise(r=>setTimeout(r,150));}
+  const{jsPDF}=window.jspdf||{};
+  if(!jsPDF){showNote('❌ jsPDF gagal dimuat. Pastikan koneksi internet aktif.','err');return;}
+  await PhotoKit.prepare([...PHOTOS.evidence,...PHOTOS.tploc]);
+  const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  const W=210,H=297,M=12;let y=M;
+  const NAVY=[30,58,95],BLUE=[37,99,235],SKY=[125,211,252],LT=[240,247,255],GRAY=[100,116,139];
+  function miniHdr(){
+    pdf.setFillColor(...NAVY);pdf.rect(0,0,W,9,'F');
+    pdf.setTextColor(...SKY);pdf.setFont('times','bold');pdf.setFontSize(7);
+    pdf.text((CFG.assetName||'').toUpperCase()+' — '+(CFG.assetTag||''),M,6);
+    pdf.setFont('times','normal');pdf.setFontSize(6.5);
+    pdf.text('Date: '+(v('wo-date')||'—')+'   By: '+(v('checked-by')||'—'),W-M,6,{align:'right'});
+    y=14;
+  }
+  function nPage(){pdf.addPage();y=M;miniHdr();}
+  function ckY(n){if(y+n>H-14)nPage();}
+  function secBar(t){
+    ckY(12);pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,7,'F');
+    pdf.setTextColor(255,255,255);pdf.setFont('times','bold');pdf.setFontSize(8.5);
+    pdf.text('> '+t,M+3,y+5);y+=10;
+  }
+  const kvTheme={theme:'grid',styles:{font:'times',fontSize:8,cellPadding:2,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.18},
+    headStyles:{fillColor:NAVY,textColor:[125,211,252],fontStyle:'bold',fontSize:7,halign:'center'},
+    margin:{left:M,right:M,top:14,bottom:14},
+    willDrawPage:()=>{if(pdf.internal.getCurrentPageInfo().pageNumber>1)miniHdr();}};
+
+  pdf.setFillColor(...NAVY);pdf.rect(0,0,W,40,'F');
+  pdf.setFillColor(...BLUE);pdf.rect(0,38,W,2,'F');
+  pdf.setTextColor(255,255,255);pdf.setFont('times','bold');pdf.setFontSize(16);
+  pdf.text('CATHODIC PROTECTION INSPECTION',M,15);
+  pdf.setFontSize(11);pdf.setTextColor(...SKY);
+  pdf.text((CFG.assetName||'')+' — '+(CFG.assetTag||''),M,24);
+  pdf.setFontSize(8);pdf.setFont('times','normal');
+  pdf.text((CFG.formNo?'Form '+CFG.formNo+'  ·  ':'')+'Generated: '+new Date().toLocaleString('en-GB'),M,32);
+  pdf.text('POMI — Unit 7/8 Electrical Maintenance',W-M,32,{align:'right'});
+  y=48;
+
+  pdf.setFillColor(...LT);pdf.setDrawColor(125,211,252);pdf.setLineWidth(0.25);
+  pdf.roundedRect(M,y,W-M*2,24,2,2,'FD');
+  function ib(l,val,x,yy){
+    pdf.setFont('times','bold');pdf.setFontSize(6);pdf.setTextColor(...GRAY);pdf.text(l.toUpperCase(),x,yy);
+    pdf.setFont('times','normal');pdf.setFontSize(8.5);pdf.setTextColor(...NAVY);pdf.text(tr2(val||'—',34),x,yy+4.5);
+  }
+  const cx=[M+4,M+66,M+128];
+  ib('Survey Date',v('wo-date'),cx[0],y+7);ib('WO No.',v('wo-no'),cx[1],y+7);ib('Frequency',v('frequency'),cx[2],y+7);
+  ib('Inspected By',v('checked-by'),cx[0],y+16);ib('Reviewed By',v('reviewed-by'),cx[1],y+16);ib('Condition',noEmoji(v('overall')),cx[2],y+16);
+  y+=30;
+
+  SYSTEMS.forEach((s,si)=>{
+    if(si>0)nPage();
+    secBar((MULTI?letter(si)+' — ':'')+(s.label||('System '+letter(si))));
+    if(s.truFields!==false){
+      pdf.autoTable({...kvTheme,startY:y,body:[
+        ['DC Output Voltage (V)',iv('s'+si+'-dc-v')],['DC Output Current (A)',iv('s'+si+'-dc-a')],
+        ['TAP (Coarse , Fine)','C'+(v('s'+si+'-tap-c')||'—')+' , F'+(v('s'+si+'-tap-f')||'—')],
+        ['AC Input Voltage (V)',iv('s'+si+'-ac-v')],['Native Potential (mV)',iv('s'+si+'-native-pot')],
+        ['Reference Electrode',v('s'+si+'-ref-elec')||'—'],['Rectifier Mode',v('s'+si+'-tru-mode')||'—'],
+        ['Auto Potential Set Point (mV)',iv('s'+si+'-auto-set')],['TRU Condition / Notes',v('s'+si+'-tru-notes')||'—'],
+      ],columnStyles:{0:{cellWidth:60,fontStyle:'bold',fillColor:LT,textColor:NAVY}}});
+      y=pdf.lastAutoTable.finalY+5;
+    }
+    if(s.anodeGroups&&s.anodeGroups.length){
+      secBar('Anode Current Output');
+      const body=[];let cg=null;
+      (SYS[si].anodeRows||[]).forEach(r=>{
+        if(r.group&&r.group!==cg){cg=r.group;body.push([{content:cg,colSpan:s.anodeStruct?4:3,styles:{fontStyle:'bold',fillColor:[219,234,254],textColor:NAVY}}]);}
+        const row=[v('ant-s'+si+'-'+r.key)||r.tag||'—'];
+        if(s.anodeStruct)row.push(v('ans-s'+si+'-'+r.key)||r.struct||'—');
+        row.push(iv('an-s'+si+'-'+r.key),v('anr-s'+si+'-'+r.key)||'—');
+        body.push(row);
+      });
+      const head=s.anodeStruct?['Anode Tag','Structure','Current (A)','Remark']:['Anode Tag','Current (A)','Remark'];
+      pdf.autoTable({...kvTheme,startY:y,head:[head],body,columnStyles:{[s.anodeStruct?2:1]:{cellWidth:24,halign:'center'}}});
+      y=pdf.lastAutoTable.finalY+5;
+    }
+    if(s.potentials&&s.potentials.length){
+      const single=s.potentialMode==='single';
+      secBar((single?'Reference Electrode Potential':'Pipe-to-Soil Potential')+' ('+(v('s'+si+'-ref-elec')||s.potentialRef||CFG.potentialRef||'Cu/CuSO4')+')');
+      const body=(SYS[si].potRows||[]).map(r=>single
+        ?[v('ptp-s'+si+'-'+r.key)||'—',iv('psng-s'+si+'-'+r.key),v('prm-s'+si+'-'+r.key)||'—']
+        :[v('ptp-s'+si+'-'+r.key)||'—',iv('pon-s'+si+'-'+r.key),iv('poff-s'+si+'-'+r.key),v('prm-s'+si+'-'+r.key)||'—']);
+      pdf.autoTable({...kvTheme,startY:y,
+        head:[single?['Reference Electrode / Location','Potential (-mV)','Remark']:['Pipe / Test Point','ON (mV)','OFF (mV)','Remark']],
+        body:body.length?body:[single?['—','—','—']:['—','—','—','—']],
+        columnStyles:single?{1:{cellWidth:28,halign:'center'}}:{1:{cellWidth:24,halign:'center'},2:{cellWidth:24,halign:'center'}}});
+      y=pdf.lastAutoTable.finalY+5;
+    }
+    if(s.truUnits&&s.truUnits.length){
+      secBar('TRU Unit Details');
+      const body=s.truUnits.map((u,i)=>{
+        const k=sid(u.tag)||('u'+i);
+        return [(u.tag||'')+(u.struct?'\n'+u.struct:''),iv('tru-s'+si+'-'+k+'-vout'),iv('tru-s'+si+'-'+k+'-iout'),
+          v('tru-s'+si+'-'+k+'-tap')||'—',iv('tru-s'+si+'-'+k+'-pon'),iv('tru-s'+si+'-'+k+'-poff'),
+          v('tru-s'+si+'-'+k+'-knob')||'—',v('tru-s'+si+'-'+k+'-rmk')||'—'];
+      });
+      pdf.autoTable({...kvTheme,startY:y,head:[['TRU / Structure','V Out','I Out','TAP','Pot ON','Pot OFF','Knob','Remark']],body,
+        styles:{...kvTheme.styles,fontSize:7,cellPadding:1.6}});
+      y=pdf.lastAutoTable.finalY+5;
+    }
+  });
+
+  if(CFG.pilePotential&&PILE_ROWS.length){
+    nPage();secBar(document.getElementById('pile-title').textContent);
+    pdf.autoTable({...kvTheme,startY:y,
+      head:[[{content:'Location',rowSpan:2},{content:'ON Potential (mV)',colSpan:3},{content:'OFF Potential (mV)',colSpan:3}],
+            ['Top','Mid','Bottom','Top','Mid','Bottom']],
+      body:PILE_ROWS.map(r=>[v('pll-'+r.key)||'—',iv('plont-'+r.key),iv('plonm-'+r.key),iv('plonb-'+r.key),iv('plofft-'+r.key),iv('ploffm-'+r.key),iv('ploffb-'+r.key)]),
+      styles:{...kvTheme.styles,fontSize:7,cellPadding:1.4}});
+    y=pdf.lastAutoTable.finalY+5;
+  }
+
+  if(CFG.tpLocation&&TPLOC_ROWS.length){
+    secBar('Test Point Location Readings');
+    pdf.autoTable({...kvTheme,startY:y,head:[['Test Point / Location','ON (mV)','OFF (mV)','Remark']],
+      body:TPLOC_ROWS.map(r=>[v('tlp-'+r.key)||'—',iv('tlon-'+r.key),iv('tloff-'+r.key),v('tlrm-'+r.key)||'—']),
+      columnStyles:{1:{cellWidth:24,halign:'center'},2:{cellWidth:24,halign:'center'}}});
+    y=pdf.lastAutoTable.finalY+5;
+  }
+
+  function drawPhotoBlock(title,list){
+    if(!list.length)return;
+    secBar(title);
+    const PCOLS=2,PGAP=5,PW=(W-M*2-PGAP*(PCOLS-1))/PCOLS,PHM=95;
+    for(let i=0;i<list.length;i+=PCOLS){
+      const rowp=list.slice(i,i+PCOLS);
+      const dims=rowp.map(p=>PhotoKit.fit(p,PW,PHM));
+      const rowH=Math.max(...dims.map(d=>d.h));
+      const hasCap=rowp.some(p=>p.caption);
+      ckY(rowH+(hasCap?12:6));
+      rowp.forEach((p,ci)=>{
+        const px=M+ci*(PW+PGAP);
+        PhotoKit.draw(pdf,p,px,y,PW,rowH,{align:'center'});
+        if(p.caption){pdf.setFont('times','italic');pdf.setFontSize(7);pdf.setTextColor(...GRAY);
+          pdf.text(p.caption,px+PW/2,y+rowH+4,{align:'center',maxWidth:PW-2});}
+      });
+      y+=rowH+(hasCap?11:6);
+    }
+  }
+  drawPhotoBlock('Test Point Location Drawing',PHOTOS.tploc);
+  drawPhotoBlock('Evidence Photos',PHOTOS.evidence);
+
+  ckY(30);secBar('Findings & Conclusion');
+  pdf.autoTable({...kvTheme,startY:y,body:[
+    ['Overall CP Condition',noEmoji(v('overall'))],['Next Survey Due',v('next-pm')||'—'],
+    ['Findings / Observations',v('findings')||'—'],['Corrective Actions / Recommendations',v('recommendations')||'—'],
+  ],columnStyles:{0:{cellWidth:56,fontStyle:'bold',fillColor:LT,textColor:NAVY}}});
+
+  const pages=pdf.internal.getNumberOfPages();
+  for(let pg=1;pg<=pages;pg++){
+    pdf.setPage(pg);pdf.setFont('times','normal');pdf.setFontSize(6.5);pdf.setTextColor(150);
+    pdf.text('Page '+pg+'/'+pages,W-M,H-6,{align:'right'});
+    pdf.text('POMI — '+(CFG.assetName||'')+' — '+(CFG.assetTag||''),M,H-6);
+  }
+  const fn='CP_'+sid(CFG.assetTag)+'_'+(v('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')+'.pdf';
+  if(!opts.silent){pdf.save(fn);showNote('✅ PDF tersimpan: '+fn,'ok');}
+  return pdf;
+}
+
+// ── base.sheets ──
+function buildSheets(){
+  const sheets={};
+  SYSTEMS.forEach((s,si)=>{
+    const pfx=MULTI?('s'+letter(si).toLowerCase()+'_'):'';
+    const ref=v('s'+si+'-ref-elec')||s.potentialRef||CFG.potentialRef||'Cu/CuSO4';
+    const tag=MULTI?(letter(si)+' — '):'';
+    if(s.truFields!==false){
+      sheets[pfx+'tru']={title:tag+(s.label||'System '+letter(si))+' — TRU / Power Supply',columns:['Value'],rows:[
+        {no:'1',desc:'DC Output Voltage (V)',crit:'',values:{Value:iv('s'+si+'-dc-v')}},
+        {no:'2',desc:'DC Output Current (A)',crit:'',values:{Value:iv('s'+si+'-dc-a')}},
+        {no:'3',desc:'TAP (Coarse , Fine)',crit:'',values:{Value:'C'+(v('s'+si+'-tap-c')||'—')+' , F'+(v('s'+si+'-tap-f')||'—')}},
+        {no:'4',desc:'AC Input Voltage (V)',crit:'',values:{Value:iv('s'+si+'-ac-v')}},
+        {no:'5',desc:'Native Potential (mV)',crit:'',values:{Value:iv('s'+si+'-native-pot')}},
+        {no:'6',desc:'Reference Electrode',crit:'',values:{Value:ref}},
+        {no:'7',desc:'Rectifier Mode',crit:'',values:{Value:v('s'+si+'-tru-mode')||'—'}},
+        {no:'8',desc:'Auto Potential Set Point (mV)',crit:'',values:{Value:iv('s'+si+'-auto-set')}},
+        {no:'9',desc:'TRU Condition / Notes',crit:'',values:{Value:v('s'+si+'-tru-notes')||'—'}},
+      ]};
+    }
+    if(s.anodeGroups&&s.anodeGroups.length){
+      sheets[pfx+'anode']={title:tag+'Anode Current Output',
+        columns:s.anodeStruct?['Structure','Current (A)','Remark']:['Current (A)','Remark'],
+        rows:(SYS[si].anodeRows||[]).map((r,i)=>{
+          const vals=s.anodeStruct?{'Structure':v('ans-s'+si+'-'+r.key)||r.struct||'—'}:{};
+          vals['Current (A)']=iv('an-s'+si+'-'+r.key);vals['Remark']=v('anr-s'+si+'-'+r.key)||'—';
+          return {no:String(i+1),desc:v('ant-s'+si+'-'+r.key)||r.tag||'—',section:r.group||'',crit:'',values:vals};
+        })};
+    }
+    if(s.potentials&&s.potentials.length){
+      const single=s.potentialMode==='single';
+      sheets[pfx+'potential']={title:tag+(single?'Reference Electrode Potential':'Pipe-to-Soil Potential')+' ('+ref+')',
+        columns:single?['Potential (-mV)','Remark']:['ON (mV)','OFF (mV)','Remark'],
+        rows:(SYS[si].potRows||[]).map((r,i)=>({no:String(i+1),desc:v('ptp-s'+si+'-'+r.key)||'—',
+          crit:single?'':'OFF ≥ 850 mV (Cu/CuSO4)',
+          values:single?{'Potential (-mV)':iv('psng-s'+si+'-'+r.key),'Remark':v('prm-s'+si+'-'+r.key)||'—'}
+            :{'ON (mV)':iv('pon-s'+si+'-'+r.key),'OFF (mV)':iv('poff-s'+si+'-'+r.key),'Remark':v('prm-s'+si+'-'+r.key)||'—'}}))};
+    }
+    if(s.truUnits&&s.truUnits.length){
+      sheets[pfx+'tru_units']={title:tag+'TRU Unit Details',
+        columns:['V Out','I Out (A)','TAP','Pot ON (mV)','Pot OFF (mV)','Knob','Remark'],
+        rows:s.truUnits.map((u,i)=>{const k=sid(u.tag)||('u'+i);
+          return {no:String(i+1),desc:[u.tag,u.struct,u.cap].filter(Boolean).join(' — '),crit:'',values:{
+            'V Out':iv('tru-s'+si+'-'+k+'-vout'),'I Out (A)':iv('tru-s'+si+'-'+k+'-iout'),'TAP':v('tru-s'+si+'-'+k+'-tap')||'—',
+            'Pot ON (mV)':iv('tru-s'+si+'-'+k+'-pon'),'Pot OFF (mV)':iv('tru-s'+si+'-'+k+'-poff'),
+            'Knob':v('tru-s'+si+'-'+k+'-knob')||'—','Remark':v('tru-s'+si+'-'+k+'-rmk')||'—'}};
+        })};
+    }
+  });
+  if(CFG.pilePotential&&PILE_ROWS.length){
+    sheets.pile_potential={title:document.getElementById('pile-title').textContent,
+      columns:['ON Top','ON Mid','ON Bot','OFF Top','OFF Mid','OFF Bot'],
+      rows:PILE_ROWS.map((r,i)=>({no:String(i+1),desc:v('pll-'+r.key)||'—',crit:'',values:{
+        'ON Top':iv('plont-'+r.key),'ON Mid':iv('plonm-'+r.key),'ON Bot':iv('plonb-'+r.key),
+        'OFF Top':iv('plofft-'+r.key),'OFF Mid':iv('ploffm-'+r.key),'OFF Bot':iv('ploffb-'+r.key)}}))};
+  }
+  if(CFG.tpLocation&&TPLOC_ROWS.length){
+    sheets.tp_location={title:'Test Point Location Readings',columns:['ON (mV)','OFF (mV)','Remark'],
+      rows:TPLOC_ROWS.map((r,i)=>({no:String(i+1),desc:v('tlp-'+r.key)||'—',crit:'',values:{
+        'ON (mV)':iv('tlon-'+r.key),'OFF (mV)':iv('tloff-'+r.key),'Remark':v('tlrm-'+r.key)||'—'}}))};
+  }
+  return sheets;
+}
+
+// ── photo restore hook ──
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls)return 0;
+  let restored=0;
+  for(const [grp,arr] of Object.entries(photoUrls)){
+    const key=/tploc|tp|location|drawing/i.test(grp)?'tploc':'evidence';
+    if(!Array.isArray(arr)||!arr.length)continue;
+    if(!overwrite&&PHOTOS[key].length)continue;
+    if(overwrite)PHOTOS[key]=[];
+    for(const entry of arr){
+      if(!entry||!entry.url)continue;
+      try{
+        const dataUrl=await Storage.toDataUrl(entry.url);
+        if(!dataUrl)continue;
+        PHOTOS[key].push({src:dataUrl,dataUrl,caption:entry.caption||'',w:entry.w,h:entry.h,widthCm:entry.widthCm,heightCm:entry.heightCm});
+        restored++;
+      }catch(e){console.error('restorePhotosFromUrls: satu foto gagal',e);}
+    }
+    renderPhotos(key);
+  }
+  try{autoSaveNow();}catch(e){}
+  return restored;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
+// ── SUBMIT ──
+async function submitToDb(){
+  const base=DB.collectCheckSheetData(CFG.formId,CFG.assetTag,CFG.assetName,v('frequency')||CFG.frequency||'6 MONTHLY');
+  if(!base.executionDate){DB.showSubmitResult(false,'Isi tanggal survey terlebih dahulu.');return;}
+  if(!base.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+  base.sheets=buildSheets();
+  base.formNo=CFG.formNo||'';
+
+  const target=await SubmitGuard.resolveSubmitTarget(base.woNumber,()=>generatePDF({silent:true}));
+  if(target.mode==='cancel')return;
+  let id;
+  try{
+    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
+    id=target.mode==='overwrite'?await DB.update(target.targetId,base):await DB.save(base);
+    DB.showSubmitResult(true,'Data berhasil disimpan ke database! ID: '+id);
+  }catch(e){
+    SubmitGuard.hideProgress();DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);return;
+  }
+  try{
+    const filesOk=await Approvals.submitWithFiles(id,{
+      photos:{evidence:PHOTOS.evidence,tploc:PHOTOS.tploc},
+      pdfBuilder:()=>generatePDF({silent:true}),
+      assetTag:CFG.assetTag,assetName:CFG.assetName,checksheetFile:CFG.checksheetFile,
+      submittedBy:base.checkedBy,revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId:target.mode==='overwrite'?target.approvalId:null,
+      onProgress:(pct,label)=>SubmitGuard.setProgress(10+Math.round(pct*0.85),label),
+    });
+    if(!filesOk)showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review/approval.','err');
+  }catch(e){
+    console.error('Approvals.submitWithFiles gagal:',e);
+    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review/approval.','err');
+  }
+  SubmitGuard.markSubmitted(id,{woNumber:base.woNumber,executionDate:base.executionDate,checkedBy:base.checkedBy});
+  try{CloudDraft.markSubmitted();}catch(e){}
+  SubmitGuard.setProgress(100,'Selesai!');
+  setTimeout(()=>SubmitGuard.hideProgress(),500);
+}
+
+// ── OPTIONAL SECTIONS ──
+function initOptionalSections(){
+  if(CFG.tpLocation)document.getElementById('tploc-panel').style.display='';
+  if(CFG.pilePotential){
+    document.getElementById('pile-panel').style.display='';
+    if(CFG.pilePotential.title)document.getElementById('pile-title').textContent=CFG.pilePotential.title;
+    (CFG.pilePotential.groups||[]).forEach(g=>{(g.points||[]).forEach((pt,idx)=>addPile(pt,null,idx===0?g.label:null));});
+    if(!CFG.pilePotential.groups)( CFG.pilePotential.points||[]).forEach(pt=>addPile(pt));
+  }
+}
+
+// ── INIT ──
+PhotoKit.configure({maxWcm:8.6,maxHcm:11,defaultWcm:8.6,defaultHcm:6.4});
+document.title=CFG.pageTitle||((CFG.assetName||'CP')+' — Cathodic Protection');
+document.getElementById('tb-sub').textContent=(CFG.assetTag||'')+' · CATHODIC PROTECTION';
+document.getElementById('hero-eyebrow').textContent=CFG.eyebrow||'Cathodic Protection Inspection';
+document.getElementById('hero-title').innerHTML=CFG.heroTitle||('ICCP <em>'+(CFG.subtitle||'SYSTEM')+'</em>');
+document.getElementById('hero-sub').textContent=CFG.heroSub||((CFG.assetName||'')+' · '+(CFG.assetTag||''));
+document.getElementById('foot-l').textContent=(CFG.assetTag||'')+' · '+(CFG.assetName||'').toUpperCase()+' · CATHODIC PROTECTION';
+document.getElementById('form-no').value=CFG.formNo||'';
+if(!CFG.formNo){const w=document.getElementById('form-no').closest('.mf');if(w)w.style.display='none';}
+if(CFG.frequency){const f=document.getElementById('frequency');[...f.options].forEach(o=>{if(o.value===CFG.frequency)f.value=CFG.frequency;});}
+
+renderSystems();
+initOptionalSections();
+renderPhotos('evidence');renderPhotos('tploc');
+loadDraft();
+updateStats();
+
+LoadMergeModal.init({assetTag:CFG.assetTag});
+SubmitGuard.init({assetTag:CFG.assetTag});
+LoadMergeModal.initRevisionBanner();
+TechnicianAuth.init({checkedByFieldId:'checked-by'});
+CloudDraft.init({formId:CFG.formId,assetTag:CFG.assetTag,assetName:CFG.assetName,frequency:CFG.frequency||'6 MONTHLY',
+  photos:()=>[...PHOTOS.evidence,...PHOTOS.tploc]});
+
+setTimeout(async()=>{
+  try{const d=await DB.loadLastSubmission(CFG.assetTag);if(d)showNote('📂 Data terakhir tersedia di menu "Muat / Lanjutkan dari Database".','info');}catch(e){}
+},900);
+</script>
+</body>
+</html>
