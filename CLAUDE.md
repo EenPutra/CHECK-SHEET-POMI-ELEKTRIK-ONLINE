@@ -2406,6 +2406,15 @@ ON+OFF grid — Jetty only). `ICCP_TP_Location_Boiler.html` has `systems:[]` (th
 drawing with no cell data) — the engine renders nothing but the TP-location section, and that's
 intentional.
 
+**Report scope (multi-system only).** When `systems.length>1` a "Cakupan Laporan & Submit" panel
+appears: a checkbox per system (all on by default) plus quick buttons for each distinct
+`system.unit` value (`ICCP_Yard_Piping` sets `unit:'Unit 7'`/`'Unit 8'` so you can PDF/submit
+"only Unit 7"). `SYS_SEL` (a Set of indices, persisted in the draft as `_sysSel`) filters both
+`generatePDF()` (excluded systems skipped, page-break tracked by a `firstShown` flag, a red
+"Cakupan laporan: …" line on the cover) and `buildSheets()` (excluded systems produce no sheet
+keys). A partial-scope submit appends the unit/label to `base.assetName`, sets `base.reportScope`,
+and `confirm()`s first. Excluded system panels get `.sys-excluded` (dimmed + "TIDAK DISERTAKAN").
+
 Full standard feature stack (technician-auth on `checked-by`, autosave draft with dynamic-row
 keys namespaced `s<i>-`, PhotoKit `PHOTOS={evidence,tploc}`, Load & Merge + CloudDraft,
 submit-guard, `Approvals.submitWithFiles`, jsPDF portrait A4 like ESP/Battery — navy cover +

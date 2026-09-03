@@ -83,6 +83,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .sys-hdr small{display:block;font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:1px;margin-top:2px;text-transform:none}
 .sub-sec{padding:14px 16px;border-top:1px solid var(--bdr2)}
 .sub-sec:first-child{border-top:none}
+.sys-panel.sys-excluded{opacity:.5}
+.sys-panel.sys-excluded .sys-hdr::after{content:' · TIDAK DISERTAKAN';color:#fca5a5;font-size:11px;letter-spacing:1px}
+.scope-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border:1px solid var(--bdr);border-radius:8px;background:var(--bg2);cursor:pointer;font-size:13px}
+.scope-row input{width:16px;height:16px;accent-color:var(--blue);cursor:pointer}
+.scope-row .u{margin-left:auto;font-family:var(--mono);font-size:11px;color:var(--txt4)}
+.scope-qbtn{border:1px solid var(--bdr);background:#fff;color:var(--navy);border-radius:6px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--sans)}
+.scope-qbtn:hover{background:var(--sky2)}
 .sub-sec h4{font-family:var(--raj);font-size:13px;font-weight:700;color:var(--navy);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .sub-sec h4 .cnt{font-family:var(--mono);font-size:10px;color:var(--txt4);font-weight:400;border:1px solid var(--bdr);border-radius:8px;padding:1px 7px}
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
@@ -188,6 +195,22 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="LoadMergeModal.open()">&#128229; Muat / Lanjutkan dari Database</button>
       <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu / lebih submission sebelumnya untuk digabung (union) ke form ini.</span>
     </div>
+  </div>
+</div>
+
+<!-- REPORT SCOPE (multi-system only) -->
+<div class="panel" id="scope-panel" style="display:none">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🎯</div>
+    <div><div class="sec-hdr-title">Cakupan Laporan &amp; Submit</div>
+      <span class="sec-hdr-sub">Pilih sistem yang disertakan di PDF &amp; database</span></div>
+    <span class="sec-hdr-cnt" id="scope-cnt"></span>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div id="scope-quick" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px"></div>
+    <div id="scope-list" style="display:flex;flex-direction:column;gap:8px"></div>
+    <div style="font-size:11px;color:var(--txt4);margin-top:10px">Hanya sistem tercentang yang masuk ke PDF dan disimpan ke database. Data sistem lain tetap tersimpan di draft.</div>
   </div>
 </div>
 
@@ -396,6 +419,41 @@ window.CP_CONFIG = {
 const CFG=window.CP_CONFIG;
 const SYSTEMS=CFG.systems||[];
 const MULTI=SYSTEMS.length>1;
+
+// ── REPORT SCOPE ── which systems go into PDF + submission (multi-system only)
+let SYS_SEL=new Set(SYSTEMS.map((_,i)=>i));   // all included by default
+function sysIncluded(si){return SYS_SEL.has(si);}
+function toggleSys(si,on){
+  if(on)SYS_SEL.add(si);else SYS_SEL.delete(si);
+  syncScopeUI();scheduleAutoSave();
+}
+function scopeSetUnit(unit){
+  SYS_SEL=new Set();
+  SYSTEMS.forEach((s,i)=>{if(unit==='ALL'||(s.unit||'')===unit)SYS_SEL.add(i);});
+  if(!SYS_SEL.size)SYSTEMS.forEach((_,i)=>SYS_SEL.add(i));
+  renderScopePanel();scheduleAutoSave();
+}
+function renderScopePanel(){
+  if(!MULTI)return;
+  const panel=document.getElementById('scope-panel');panel.style.display='';
+  const units=[...new Set(SYSTEMS.map(s=>s.unit).filter(Boolean))];
+  const q=document.getElementById('scope-quick');
+  q.innerHTML=(units.length?[`<button class="scope-qbtn" onclick="scopeSetUnit('ALL')">Semua</button>`]
+    .concat(units.map(u=>`<button class="scope-qbtn" onclick="scopeSetUnit('${esc(u)}')">${esc(u)}</button>`)).join(''):'');
+  document.getElementById('scope-list').innerHTML=SYSTEMS.map((s,i)=>`
+    <label class="scope-row">
+      <input type="checkbox" ${SYS_SEL.has(i)?'checked':''} onchange="toggleSys(${i},this.checked)">
+      <span>${MULTI?String.fromCharCode(65+i)+' — ':''}${esc(s.label||('System '+String.fromCharCode(65+i)))}</span>
+      ${s.unit?`<span class="u">${esc(s.unit)}</span>`:''}
+    </label>`).join('');
+  syncScopeUI();
+}
+function syncScopeUI(){
+  document.querySelectorAll('#scope-list input[type=checkbox]').forEach((c,i)=>{c.checked=SYS_SEL.has(i);});
+  const cnt=document.getElementById('scope-cnt');
+  if(cnt)cnt.textContent=SYS_SEL.size+' / '+SYSTEMS.length+' sistem';
+  document.querySelectorAll('#systems .sys-panel').forEach((p,i)=>p.classList.toggle('sys-excluded',!SYS_SEL.has(i)));
+}
 
 const sid=s=>String(s==null?'':s).replace(/[^a-zA-Z0-9]+/g,'-').replace(/^-|-$/g,'');
 const v=id=>{const e=document.getElementById(id);return e?String(e.value).trim():'';};
@@ -698,6 +756,7 @@ function collectDraft(){
     tploc:TPLOC_ROWS.map(r=>({key:r.key})),
     pile:PILE_ROWS.map(r=>({key:r.key})),
   };
+  d._sysSel=[...SYS_SEL];
   return d;
 }
 function persistDraft(silent){
@@ -732,7 +791,9 @@ function loadDraft(){
     (dyn.tploc||[]).forEach(r=>{if(!TPLOC_ROWS.find(x=>x.key===r.key))addTpLoc('',r.key);});
     (dyn.pile||[]).forEach(r=>{if(!PILE_ROWS.find(x=>x.key===r.key))addPile('',r.key);});
     bumpSeqs();
+    if(Array.isArray(d._sysSel)&&d._sysSel.length){SYS_SEL=new Set(d._sysSel.filter(i=>i<SYSTEMS.length));if(!SYS_SEL.size)SYSTEMS.forEach((_,i)=>SYS_SEL.add(i));}
     Object.entries(d).forEach(([id,val])=>{if(id.startsWith('_'))return;const el=document.getElementById(id);if(el&&el.type!=='file')el.value=val;});
+    renderScopePanel();
     updateStats();
   }catch(e){console.warn('loadDraft',e);}
 }
@@ -748,6 +809,7 @@ function resetForm(){
   document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file'&&!el.readOnly)el.value='';});
   PHOTOS.evidence=[];PHOTOS.tploc=[];renderPhotos('evidence');renderPhotos('tploc');
   renderSystems();
+  SYS_SEL=new Set(SYSTEMS.map((_,i)=>i));renderScopePanel();
   document.getElementById('tbody-tploc').innerHTML='';TPLOC_ROWS=[];TPLOC_SEQ=0;
   document.getElementById('tbody-pile').innerHTML='';PILE_ROWS=[];PILE_SEQ=0;
   initOptionalSections();
@@ -764,6 +826,7 @@ async function generatePDF(opts={}){
   if(!opts.silent){showNote('⏳ Membuat PDF, harap tunggu…','info');await new Promise(r=>setTimeout(r,150));}
   const{jsPDF}=window.jspdf||{};
   if(!jsPDF){showNote('❌ jsPDF gagal dimuat. Pastikan koneksi internet aktif.','err');return;}
+  if(MULTI&&!SYS_SEL.size){if(!opts.silent)showNote('Pilih minimal satu sistem di "Cakupan Laporan & Submit".','err');return;}
   await PhotoKit.prepare([...PHOTOS.evidence,...PHOTOS.tploc]);
   const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const W=210,H=297,M=12;let y=M;
@@ -810,8 +873,16 @@ async function generatePDF(opts={}){
   ib('Inspected By',v('checked-by'),cx[0],y+16);ib('Reviewed By',v('reviewed-by'),cx[1],y+16);ib('Condition',noEmoji(v('overall')),cx[2],y+16);
   y+=30;
 
+  if(MULTI && SYS_SEL.size<SYSTEMS.length){
+    const inc=SYSTEMS.map((s,i)=>SYS_SEL.has(i)?(s.label||('System '+letter(i))):null).filter(Boolean).join(' · ');
+    pdf.setFont('times','bold');pdf.setFontSize(8);pdf.setTextColor(220,38,38);
+    pdf.text(tr2('Cakupan laporan: '+inc,120),M,y);y+=6;pdf.setTextColor(...GRAY);
+  }
+
+  let firstShown=true;
   SYSTEMS.forEach((s,si)=>{
-    if(si>0)nPage();
+    if(!sysIncluded(si))return;
+    if(!firstShown)nPage();firstShown=false;
     secBar((MULTI?letter(si)+' — ':'')+(s.label||('System '+letter(si))));
     if(s.truFields!==false){
       pdf.autoTable({...kvTheme,startY:y,body:[
@@ -924,6 +995,7 @@ async function generatePDF(opts={}){
 function buildSheets(){
   const sheets={};
   SYSTEMS.forEach((s,si)=>{
+    if(!sysIncluded(si))return;
     const pfx=MULTI?('s'+letter(si).toLowerCase()+'_'):'';
     const ref=v('s'+si+'-ref-elec')||s.potentialRef||CFG.potentialRef||'Cu/CuSO4';
     const tag=MULTI?(letter(si)+' — '):'';
@@ -1014,8 +1086,17 @@ async function submitToDb(){
   const base=DB.collectCheckSheetData(CFG.formId,CFG.assetTag,CFG.assetName,v('frequency')||CFG.frequency||'6 MONTHLY');
   if(!base.executionDate){DB.showSubmitResult(false,'Isi tanggal survey terlebih dahulu.');return;}
   if(!base.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+  if(MULTI&&!SYS_SEL.size){DB.showSubmitResult(false,'Pilih minimal satu sistem di "Cakupan Laporan & Submit".');return;}
   base.sheets=buildSheets();
   base.formNo=CFG.formNo||'';
+  if(MULTI){
+    base.reportScope=SYSTEMS.map((s,i)=>SYS_SEL.has(i)?(s.label||('System '+letter(i))):null).filter(Boolean);
+    if(SYS_SEL.size<SYSTEMS.length){
+      const units=[...new Set(SYSTEMS.filter((_,i)=>SYS_SEL.has(i)).map(s=>s.unit).filter(Boolean))];
+      base.assetName=CFG.assetName+' — '+(units.length?units.join(' / '):base.reportScope.join(' / '));
+      if(!confirm('Submit HANYA untuk: '+base.reportScope.join(', ')+' ?\n\nSistem lain tidak akan disertakan di submission ini.'))return;
+    }
+  }
 
   const target=await SubmitGuard.resolveSubmitTarget(base.woNumber,()=>generatePDF({silent:true}));
   if(target.mode==='cancel')return;
@@ -1071,6 +1152,7 @@ if(!CFG.formNo){const w=document.getElementById('form-no').closest('.mf');if(w)w
 if(CFG.frequency){const f=document.getElementById('frequency');[...f.options].forEach(o=>{if(o.value===CFG.frequency)f.value=CFG.frequency;});}
 
 renderSystems();
+renderScopePanel();
 initOptionalSections();
 renderPhotos('evidence');renderPhotos('tploc');
 loadDraft();

@@ -152,7 +152,7 @@ CONFIGS["ICCP_Yard_Piping_7EA-RECT-100G"] = {
     "pilePotential": None,
     "systems": [
         {
-            "label": "System D · 7EA-RECT-100G", "sublabel": "Precipitator Control Building — Unit 7",
+            "label": "System D · 7EA-RECT-100G", "sublabel": "Precipitator Control Building — Unit 7", "unit": "Unit 7",
             "potentialRef": "Cu/CuSO4",
             "anodeGroups": [{"g": "Yard Piping Anodes", "anodes": [
                 "P1-D1", "P1-D2", "P2-D3/D4A", "P2-D3/D4B", "P2-D3/D4C", "P2-D3/D4D",
@@ -169,14 +169,14 @@ CONFIGS["ICCP_Yard_Piping_7EA-RECT-100G"] = {
                 'TD1A (close to stack) · CPD 210'],
         },
         {
-            "label": "System E · 8EA-RECT-100E", "sublabel": "Precipitator Control Building — Unit 8",
+            "label": "System E · 8EA-RECT-100E", "sublabel": "Precipitator Control Building — Unit 8", "unit": "Unit 8",
             "potentialRef": "Cu/CuSO4",
             "anodeGroups": [{"g": "Yard Piping Anodes", "anodes": [
                 "P1-E1", "P1-E2", "P1-E2A", "P2-E3", "P2-E3A", "P2-E4", "P3-E5", "P3-E6", "P3-E6A"]}],
             "potentials": ['TF-1 (460) · CSW 100'],
         },
         {
-            "label": "System H · 8EA-RECT-100F", "sublabel": "Precipitator Control Building — Unit 8",
+            "label": "System H · 8EA-RECT-100F", "sublabel": "Precipitator Control Building — Unit 8", "unit": "Unit 8",
             "potentialRef": "Cu/CuSO4",
             "anodeGroups": [{"g": "Yard Piping Anodes", "anodes": ["P1-H1"]}],
             "potentials": ['BF-3 (473) · CSW 400', 'BF-3 (474) · CFO 700', 'TF-2 (488) · 8" CD 100'],
