@@ -2426,6 +2426,50 @@ after a draft restore) so `loadDraft()` re-creates added rows with their saved i
 generic value sweep lines up — an earlier timestamp-key version silently dropped added rows'
 values on reload.
 
+## `CHCB SWGR/` — 6 6.9 kV Switchgear Maintenance check sheets, template + generator
+
+Ported from `google-apps-script/Checksheet mentah/CHCB - SWGR - BKR.xlsx` — one HTML per
+worksheet tab (`Sheet3` is empty, skipped): `SWGR_7EN-SWGR-A1A`, `SWGR_8EN-SWGR-A1A`,
+`SWGR_CHCB_Breaker_Spare`, `SWGR_7EN-SWGR-A1A_Electrical`, `SWGR_8EN-SWGR-A1A_Electrical`,
+`SWGR_STRC-2`. Subfolder → `../`-prefixed shared includes; portal `href`s
+`CHCB%20SWGR/<file>.html`, category **`sg`** (existing Switchgear category), 6 cards.
+
+**GENERATED — do not hand-edit the `.html`.** `CHCB SWGR/_generate.py` substitutes
+`__TITLE__` + `__CONFIG__` into `CHCB SWGR/_swgr_template.tpl` (shared engine, one big
+`<script>`). Edit a sheet's data in `_generate.py`'s `CONFIGS`, behaviour in `_swgr_template.tpl`,
+then re-run `python3 "CHCB SWGR/_generate.py"`. The `.tpl` extension keeps GitHub Pages from
+serving the token-bearing template.
+
+**The engine is `SWGR_CONFIG`-driven.** `compartments:[{code,label}]` render as an editable
+legend panel (code fixed, description + Breaker S/N editable) AND as the column headers of every
+matrix/measurement table. `sections[]`, each with a `kind`:
+- `'matrix'` (default) — `items[]` × compartments, OK/NG toggle per cell (`ST` object + `.rb`
+  classes so `DB.collectCheckSheetData` scrapes them and Load & Merge restores), one Result/Remark
+  text per row. Item `type`: `'subhead'` (blue divider, optional `field`/`fields[]` text inputs
+  like "VCB No." / Positive-Interlock Open/Close), `'single'` (one toggle spanning all
+  compartments — the "0.531 in min" roller-appearance rows), `'remark'` (remark-only row, item 15
+  work history).
+- `'resistance'` — fixed rows (T1-T2/T2-T3/T3-T1) × columns, numeric mΩ.
+- `'megger'` — `times[]` rows (15"..10') × columns + auto **PI = R(10')/R(1')** and
+  **DAR = R(1')/R(30")** read-only rows (`recalcMegger()` on every `.meg-in` input; re-run in
+  `loadDraft`).
+- `'rtd'` — RTD1..`rtdCount` × columns.
+- `section.columns`: `'elec'` → `CFG.elecColumns` (electrical tests use a different, usually
+  smaller column set than the visual checklist — motor/XFMR compartments only, with `105A HV` /
+  `105A LV` split entries and `BUS A/B/C`), an explicit `[{code,label}]` array, or omitted →
+  `compartments`.
+The base sheets (7A1A/8A1A/Bkr-spare) = visual checklist (items 1-10) + Breaker Safety Locks
+(11-15). The `_Electrical` sheets = visual (1-10) + resistance + megger + RTD. `STRC-2` adds a
+second resistance+megger block for Power Cable / Slip Ring / VT&CPT / XFMR.
+
+PDF: **landscape A4** (matrix tables are up to 15 columns wide), navy cover + `willDrawPage`
+mini-header + one `pdf.addPage()` per section. `pdfSafe()` (not just `noEmoji`) maps `≥`→`>=`,
+`Ω`→`ohm`, `·`/`—`→`-`, `°`→` deg` etc before any `pdf.text()` — the criteria strings are full
+of these. `single`-type rows draw one `colSpan` cell, not the value repeated across every column.
+Standard stack otherwise (technician-auth on `checked-by`, autosave, PhotoKit `PHOTOS.evidence`,
+Load & Merge + CloudDraft, submit-guard, `Approvals.submitWithFiles`). `base.sheets` = one `s<i>`
+key per section + a `compartments` legend sheet.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that
