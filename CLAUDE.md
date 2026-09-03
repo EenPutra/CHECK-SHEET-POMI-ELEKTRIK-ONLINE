@@ -1477,6 +1477,13 @@ touch a report belonging to another account. Admin keeps its own fuller toolset 
   _isMyOwnReport()`) and the Status Laporan tab's `_msCard()` action row (Perbaiki / Hapus
   buttons under the same gates).
 
+- **Report card / detail titles carry the asset TAG** — `_assetTitleParts(a, cs)` returns
+  `{name, tag}`; the tag renders as a mono `.asset-tag-chip` next to the name in `_msCard()` and
+  `renderList()`, and appended as ` · <tag>` in the detail `d-title`. The tag is suppressed when
+  it's just a slug of the name (`norm(tag)` contained in `norm(name)`) or a synthetic per-visit
+  placeholder (`MANUAL-UPLOAD` / `WORK-ACTIVITY-RECORD` / `MAINTENANCE-CORRECTIVE-ACTION`); a
+  name-less approval falls back to showing the tag AS the name.
+
 ### Admin manual delete + monthly recap chart (`Review_Approval_Dashboard.html`)
 
 - **Admin can manually delete a single `approvals` entry from its detail view** — a `danger-zone`

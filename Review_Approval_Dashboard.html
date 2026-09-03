@@ -166,6 +166,7 @@ select.login-field:disabled{opacity:.55;cursor:not-allowed}
 .area-chk input{width:16px;height:16px;flex-shrink:0;accent-color:var(--pri)}
 .area-hint{font-size:11.5px;color:var(--txt-3);padding:3px 1px}
 .card-scope-tag{display:inline-block;background:var(--surf-2);border:1px solid var(--bdr);border-radius:6px;padding:1px 7px;font-size:10.5px;font-family:var(--mono);color:var(--txt-2);margin-left:6px}
+.asset-tag-chip{display:inline-block;background:var(--pri-soft);border:1px solid rgba(37,99,235,.22);border-radius:6px;padding:1px 7px;font-size:10.5px;font-family:var(--mono);font-weight:600;color:var(--pri-deep);margin-left:8px;vertical-align:1px;letter-spacing:.3px}
 
 /* TABS */
 .tabs{display:flex;gap:6px;border-bottom:1px solid var(--bdr);margin-bottom:16px}
@@ -1781,9 +1782,32 @@ function _msStepper(a){
 }
 function _msStep(n,label,cls){ return `<div class="ms-step ${cls}"><span class="d">${n}</span>${escHtml(label)}</div>`; }
 function _msLn(cls){ return `<span class="ms-ln ${cls}"></span>`; }
+// Report title = asset name + a mono chip with the asset TAG for quick
+// identification. The tag is hidden when it's just a slug of the name or a
+// synthetic per-visit placeholder (MANUAL-UPLOAD, etc.) — no value there.
+function _assetTitleParts(a, cs){
+  let name = ((cs && cs.assetName) || (a && a.assetName) || '').toString().trim();
+  let tag = ((cs && cs.assetTag) || (a && a.assetTag) || '').toString().trim();
+  if(!name){ return { name: tag || 'Laporan', tag: '' }; }  // tag-only → it IS the name
+  if(tag){
+    const norm = s => s.toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
+    const tn = norm(tag), nn = norm(name);
+    if(tn===nn || (tn && nn.includes(tn)) ||
+       /^(manual-upload|work-activity-record|maintenance-corrective-action)$/i.test(tag)){
+      tag = '';
+    }
+  }
+  return { name, tag };
+}
+function _assetTitleText(a, cs){
+  const p = _assetTitleParts(a, cs);
+  return p.name + (p.tag ? '  ·  ' + p.tag : '');
+}
+
 function _msCard(a){
   const cs = _checksheetCache[a.checksheetId] || {};
-  const title = cs.assetName || a.assetName || cs.assetTag || a.assetTag || 'Laporan';
+  const _t = _assetTitleParts(a, cs);
+  const titleHtml = escHtml(_t.name) + (_t.tag ? `<span class="asset-tag-chip">${escHtml(_t.tag)}</span>` : '');
   const who = a.submittedBy || cs.checkedBy || '—';
   let detail = '';
   if(a.review){
@@ -1822,7 +1846,7 @@ function _msCard(a){
   return `<div class="ms-card">
     <div class="ms-card-top">
       <div style="flex:1;min-width:170px">
-        <div class="ms-card-title">${escHtml(title)}</div>
+        <div class="ms-card-title">${titleHtml}</div>
         <div class="ms-card-meta">WO ${escHtml(a._wo||'—')}${a._date?' · '+escHtml(a._date):''} · oleh ${escHtml(who)} · disubmit ${fmtDate(a.createdAt)}${a._src?' · via '+escHtml(a._src):''}</div>
       </div>
       <span class="card-badge ${a.status}">${escHtml(Approvals.STATUS_LABELS[a.status]||a.status)}</span>
@@ -1934,7 +1958,7 @@ function renderList(){
   wrap.innerHTML = items.map(a => `
     <div class="card">
       <div class="card-main">
-        <div class="card-title">${escHtml(a.assetName||a.assetTag||'—')}${a._team?`<span class="card-scope-tag">${escHtml(a._team)} · ${escHtml(a._area||'?')}</span>`:''}${a._src?`<span class="card-scope-tag" style="background:var(--ind-soft);color:var(--ind);border-color:rgba(99,102,241,.25)">${escHtml(a._src)}</span>`:''}</div>
+        <div class="card-title">${(t=>escHtml(t.name)+(t.tag?`<span class="asset-tag-chip">${escHtml(t.tag)}</span>`:''))(_assetTitleParts(a,_checksheetCache[a.checksheetId]))}${a._team?`<span class="card-scope-tag">${escHtml(a._team)} · ${escHtml(a._area||'?')}</span>`:''}${a._src?`<span class="card-scope-tag" style="background:var(--ind-soft);color:var(--ind);border-color:rgba(99,102,241,.25)">${escHtml(a._src)}</span>`:''}</div>
         <div class="card-meta">${escHtml(a.submittedBy||'—')}${a._wo?' · WO '+escHtml(a._wo):''} · disubmit ${fmtDate(a.createdAt)}${a.revisionOf?' · <span title="Ini revisi dari submission sebelumnya">↻ revisi</span>':''}</div>
       </div>
       <span class="card-badge ${a.status}">${Approvals.STATUS_LABELS[a.status]||a.status}</span>
@@ -2304,7 +2328,7 @@ async function doPurgeAll(){
 }
 
 function renderDetail(a, cs){
-  document.getElementById('d-title').textContent = (cs && (cs.assetName||cs.assetTag)) || a.assetName || a.assetTag || 'Submission';
+  document.getElementById('d-title').textContent = _assetTitleText(a, cs) || 'Submission';
   document.getElementById('d-sub').textContent = 'WO '+(cs?.woNumber||'—')+' · '+(cs?.executionDate||'—')+' · '+Approvals.STATUS_LABELS[a.status];
 
   let html = '';
