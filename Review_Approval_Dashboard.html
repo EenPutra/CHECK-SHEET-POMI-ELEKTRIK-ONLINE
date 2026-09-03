@@ -1699,6 +1699,31 @@ function _msISubmitted(a){
   const cs = _checksheetCache[a.checksheetId];
   return !!cs && (_msMatches(cs.checkedBy) || _msMatches(cs.uploadedBy) || _msMatches(cs.uploadedByUsername));
 }
+// STRICT ownership check for the self-service edit/delete gate — unlike
+// _msMatches() (loose token overlap, read-only status view only), this
+// requires an EXACT case-insensitive match on the logged-in account's name OR
+// username. Same heuristic dashboard.html uses to scope a technician's own
+// data. Firestore rules are fully open, so this is a UI-layer gate consistent
+// with every other role check in this app, not a security boundary.
+function _isMyOwnReport(a, cs){
+  const me = new Set([ (loggedInName||'').trim().toLowerCase(), (loggedInUser||'').trim().toLowerCase() ].filter(Boolean));
+  if(!me.size) return false;
+  const cand = [
+    a && a.submittedBy,
+    cs && cs.checkedBy,
+    cs && cs.uploadedBy,
+    cs && cs.uploadedByUsername,
+  ];
+  return cand.some(x => { const s=(x||'').trim().toLowerCase(); return s && me.has(s); });
+}
+// A submitter may EDIT their own report while it's still in the review pipeline
+// (opening ?reviseOf= resets it appropriately on resubmit) but never once
+// APPROVED — that's final, contact admin.
+function _canOwnerEdit(a){ return a && a.status !== 'approved' && !!a.checksheetFile && !a._src; }
+// A submitter may DELETE their own report only while NOTHING a reviewer has
+// acted on — i.e. status 'submitted' / 'revised' (Approvals.isPendingReview).
+// Once reviewed / approved / returned it's real workflow history: contact admin.
+function _canOwnerDelete(a){ return a && Approvals.isPendingReview(a.status) && !a._src; }
 function _msIReviewed(a){ return a.review && _msMatches(a.review.reviewedBy); }
 function _msIApproved(a){ return a.approval && _msMatches(a.approval.approvedBy); }
 function _msInMyArea(a){
@@ -1784,6 +1809,15 @@ function _msCard(a){
   const acts = [`<button class="btn btn-sm btn-pri" onclick="openDetail('${a.id}')">Detail lengkap</button>`];
   if(a.status==='returned_to_technician' && a.checksheetFile && !a._src && _msISubmitted(a)){
     acts.push(`<a class="btn btn-sm" target="_blank" rel="noopener" href="${escHtml(a.checksheetFile.replace(/ /g,'%20'))}?reviseOf=${encodeURIComponent(a.id)}">Perbaiki &amp; kirim ulang</a>`);
+  }
+  // Own-report self-service (strict ownership) — never for another account's report
+  if(loggedInRole !== 'admin' && !a._src && _isMyOwnReport(a, cs)){
+    if(a.status!=='returned_to_technician' && _canOwnerEdit(a)){
+      acts.push(`<button class="btn btn-sm" onclick="openOwnRevision('${a.id}')">&#9999;&#65039; Perbaiki / Edit</button>`);
+    }
+    if(_canOwnerDelete(a)){
+      acts.push(`<button class="btn btn-sm btn-danger" onclick="doDeleteMyReport('${a.id}')">&#128465;&#65039; Hapus</button>`);
+    }
   }
   return `<div class="ms-card">
     <div class="ms-card-top">
@@ -2149,6 +2183,60 @@ function _afterApprovalRemoved(id){
   else if(_activeTab === 'mystatus') renderMyStatus();
   else renderList();
 }
+// ── Submitter self-service: edit / delete OWN report ──
+// The person who submitted a report (strict name/username match — _isMyOwnReport)
+// can fix or retract it while it hasn't been finalised. They can NEVER touch a
+// report belonging to another account. Admin keeps its own fuller toolset.
+function openOwnRevision(id){
+  const a = _allApprovals.find(x => x.id === id) || _curApproval;
+  if(!a || !a.checksheetFile){ alert('Check sheet asal tidak diketahui — hubungi admin.'); return; }
+  window.open(a.checksheetFile.replace(/ /g,'%20') + '?reviseOf=' + encodeURIComponent(id), '_blank', 'noopener');
+}
+async function doDeleteMyReport(id){
+  if(loggedInRole === 'admin'){ return; }              // admin path is doDeleteApproval / doPurgeAll
+  const a = _allApprovals.find(x => x.id === id) || _curApproval;
+  if(!a){ alert('Data tidak ditemukan.'); return; }
+  let cs = _checksheetCache[a.checksheetId];
+  if(cs === undefined){ try{ cs = await getChecksheet(a.checksheetId); }catch(e){ cs = null; } }
+  if(!_isMyOwnReport(a, cs)){
+    alert('Anda hanya bisa menghapus laporan milik akun Anda sendiri.');
+    return;
+  }
+  if(!_canOwnerDelete(a)){
+    alert('Laporan ini sudah diproses (direview / disetujui / dikembalikan) sehingga tidak bisa Anda hapus sendiri.\n\nHubungi admin bila memang ada kesalahan.');
+    return;
+  }
+  const label = (cs && (cs.assetName||cs.assetTag)) || a.assetName || a.assetTag || 'laporan ini';
+  if(!confirm('Hapus "'+label+'" secara PERMANEN?\n\nLaporan ini belum direview, jadi akan dihapus sepenuhnya:\n• entri Review & Approval\n• data checklist di database (hilang dari Dashboard: riwayat, grafik tren, export Excel)\n• foto & PDF terkait di Google Drive\n\nTindakan ini TIDAK DAPAT DIBATALKAN.')) return;
+
+  showFileProgress('Menghapus laporan…');
+  try{
+    const urls = [];
+    if(cs && cs.pdfUrl) urls.push(cs.pdfUrl);
+    if(cs && cs.photoUrls) Object.keys(cs.photoUrls).forEach(g => (cs.photoUrls[g]||[]).forEach(p => { if(p && p.url) urls.push(p.url); }));
+    if(a.finalPdfUrl) urls.push(a.finalPdfUrl);
+    for(let i=0;i<urls.length;i++){
+      setFileProgressPct(Math.round((i/Math.max(1,urls.length))*55), 'Menghapus file '+(i+1)+'/'+urls.length+'…');
+      try{ if(typeof Storage!=='undefined' && Storage.deleteByUrl) await Storage.deleteByUrl(urls[i]); }
+      catch(e){ console.warn('Gagal hapus file Drive', urls[i], e); }
+    }
+    setFileProgressPct(70, 'Menghapus entri approval…');
+    await Approvals.deleteById(a.id);
+    if(a.checksheetId){
+      setFileProgressPct(88, 'Menghapus data checklist…');
+      try{ await DB.deleteById(a.checksheetId); }
+      catch(e){ console.warn('Gagal hapus checksheet doc', e); hideFileProgress(); alert('Entri approval sudah dihapus, tetapi data checklist gagal dihapus dari database. Coba hapus dari Dashboard atau hubungi admin.'); _afterApprovalRemoved(a.id); await loadAll(); return; }
+    }
+    setFileProgressPct(100, 'Selesai');
+    hideFileProgress();
+    _afterApprovalRemoved(a.id);
+    await loadAll();
+  }catch(e){
+    hideFileProgress();
+    alert('Gagal menghapus: '+e.message);
+  }
+}
+
 async function doDeleteApproval(){
   if(loggedInRole !== 'admin' || !_curApproval) return;
   const label = (_curChecksheet && (_curChecksheet.assetName||_curChecksheet.assetTag)) || _curApproval.assetName || _curApproval.assetTag || 'submission ini';
@@ -2298,6 +2386,32 @@ function renderDetail(a, cs){
   }
 
   html += renderActionSection(a, cs);
+
+  // Submitter self-service: fix or retract YOUR OWN report if there's a
+  // mistake. Strict ownership (_isMyOwnReport) — never shown for a report
+  // belonging to another account. Admin has its own fuller toolset below.
+  if(loggedInRole !== 'admin' && !a._src && _isMyOwnReport(a, cs)){
+    const canEdit = _canOwnerEdit(a);
+    const canDel  = _canOwnerDelete(a);
+    html += `<div class="dsec danger-zone" style="border-color:rgba(37,99,235,.22);background:var(--pri-soft)">
+      <div class="dsec-title" style="color:var(--pri-deep)">&#9999;&#65039; Laporan Milik Anda — Koreksi</div>
+      <div class="readonly-hint" style="margin-bottom:10px">Laporan ini Anda yang submit. Perbaiki isian bila ada kesalahan, atau hapus bila belum direview.</div>`;
+    if(canEdit){
+      html += `<button class="btn btn-sm btn-pri" onclick="openOwnRevision('${a.id}')">&#9999;&#65039; Perbaiki / Edit Laporan Ini</button>
+        <div class="readonly-hint" style="margin:6px 0 0">Membuka check sheet dalam mode revisi. Setelah disimpan ulang, laporan kembali ke antrean review.</div>`;
+    }else{
+      html += `<div class="readonly-hint" style="color:var(--ng)">Laporan sudah <b>disetujui (final)</b> — tidak bisa diedit sendiri. Hubungi admin bila ada kesalahan.</div>`;
+    }
+    if(canDel){
+      html += `<div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
+        <div class="readonly-hint" style="margin-bottom:10px"><b style="color:var(--ng)">Hapus permanen.</b> Laporan ini belum direview, jadi entri approval, data checklist di Dashboard, serta foto &amp; PDF di Drive akan dihapus. Tidak bisa dibatalkan.</div>
+        <button class="btn btn-danger" onclick="doDeleteMyReport('${a.id}')">&#128465;&#65039; Hapus Laporan Ini</button>`;
+    }else{
+      html += `<div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
+        <div class="readonly-hint">Laporan sudah diproses (direview / disetujui / dikembalikan) sehingga tidak bisa Anda hapus sendiri. Hubungi admin bila memang ada kesalahan.</div>`;
+    }
+    html += `</div>`;
+  }
 
   // Admin-only: remove this entry from the Review & Approval workflow.
   // Scoped to the `approvals` collection ONLY — same boundary

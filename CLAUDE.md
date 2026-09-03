@@ -1450,6 +1450,33 @@ simulated network error): all 6 `submitted`-status orphans were deleted, the one
 notwithstanding), the genuinely valid submission was untouched, the pre-existing duplicate-cluster
 case still worked exactly as before, and the simulated network-error entry was never deleted.
 
+### Submitter self-service — edit / delete YOUR OWN report (`Review_Approval_Dashboard.html`)
+
+The person who submitted a report can fix or retract it if there's a mistake, but can **never**
+touch a report belonging to another account. Admin keeps its own fuller toolset (below).
+
+- **Ownership is a STRICT check — `_isMyOwnReport(a, cs)`** — exact case-insensitive match of the
+  logged-in account's `loggedInName` OR `loggedInUser` against `a.submittedBy` / `cs.checkedBy` /
+  `cs.uploadedBy` / `cs.uploadedByUsername`. Deliberately NOT `_msMatches()` (the loose
+  token-overlap used for the read-only Status Laporan view) — "Budi Santoso" must not be able to
+  delete "Budi Hartono"'s report. Same heuristic `dashboard.html`'s technician scoping uses;
+  Firestore rules are fully open so this is a UI-layer gate like every other role check here.
+- **Edit** (`openOwnRevision(id)` → opens `<checksheetFile>?reviseOf=<id>`) — allowed for any
+  status except `approved` (`_canOwnerEdit()`: `status!=='approved' && checksheetFile && !_src`).
+  Resubmitting through the revision flow resets the status appropriately.
+- **Delete** (`doDeleteMyReport(id)`) — allowed ONLY while `Approvals.isPendingReview(status)`
+  (`submitted` / `revised`), i.e. nothing a reviewer has acted on (`_canOwnerDelete()`). This is
+  a **full retraction** — it deletes the `approvals` doc AND the `checksheets` doc AND best-effort
+  Drive files (like `doPurgeAll()` but scoped to own + pre-review only, `confirm()`-gated not
+  "type HAPUS"). Appropriate because a never-reviewed mistake submission is equivalent to never
+  having submitted. Reviewed / approved / returned reports show a "contact admin" message
+  instead. `DB.deleteById()` failing after the approval is already gone surfaces a clear
+  "approval gone, checklist not — retry from Dashboard" alert.
+- Surfaced in two places: the detail overlay (`renderDetail()` — a blue-tinted `dsec` box
+  "Laporan Milik Anda — Koreksi", shown when `loggedInRole!=='admin' && !a._src &&
+  _isMyOwnReport()`) and the Status Laporan tab's `_msCard()` action row (Perbaiki / Hapus
+  buttons under the same gates).
+
 ### Admin manual delete + monthly recap chart (`Review_Approval_Dashboard.html`)
 
 - **Admin can manually delete a single `approvals` entry from its detail view** — a `danger-zone`
