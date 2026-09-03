@@ -1798,7 +1798,11 @@ though the exact same photos already exist in Drive from the original submission
   - a `{groupKey: [...]}` dict, one array per logical sub-asset (`PLTS_AshDisposal_PM.html`'s
     `PHOTOS` keyed by inverter, `4000_Hours_Mill_PM.html`'s `PHOTOS` keyed by per-tab asset —
     note the latter is keyed by the FIXED asset key, not by which Mill letter is selected, since
-    `submitToDb()` already saves it that way regardless of Mill)
+    `submitToDb()` already saves it that way regardless of Mill; `DRY_TRAFO_PM.html`'s `PHOTOS`
+    keyed by check-item group `megger`/`etm`/`etmset`/`cleaning` — this file's photo section was
+    converted from fixed single-photo slots to free-count keyed galleries, with `compressUnder1MB`
+    on every add/recrop/rotate path and a separate `dry_trafo_photos` localStorage key so photos
+    now survive a refresh)
   - a flat array with no grouping (`ESP_7BGPCP800A_B.html`, `UPS_7EB-UPS-AB_Monthly.html`) —
     `photoUrls`' groups get flattened into one list, and the fill-blank-only check collapses to
     "is the whole array non-empty", not per-group

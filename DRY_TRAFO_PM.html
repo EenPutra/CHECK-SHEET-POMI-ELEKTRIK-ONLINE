@@ -108,26 +108,27 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .rb.ng-act{background:var(--ng);color:#fff;box-shadow:0 0 0 2px rgba(220,38,38,0.3)}
 .rb:hover{opacity:.85;transform:translateY(-1px)}
 
-/* PHOTO SECTION */
+/* PHOTO SECTION — free-count gallery (same mechanism as ESP / 4000 Hours Mill) */
 .photo-section{padding:14px 16px;background:var(--bg2);border-top:2px dashed var(--bdr)}
 .photo-section-label{font-family:var(--raj);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--navy);margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .photo-section-label::before{content:'📷';font-size:13px}
-.photo-grid{display:grid;gap:12px}
-.photo-grid.cols-1{grid-template-columns:1fr}
-.photo-grid.cols-2{grid-template-columns:repeat(2,1fr)}
-.photo-grid.cols-3{grid-template-columns:repeat(3,1fr)}
-.photo-block{display:flex;flex-direction:column;gap:6px}
-.photo-block-title{font-family:var(--raj);font-size:11px;font-weight:600;color:var(--navy2);letter-spacing:1px;text-transform:uppercase}
-.photo-drop{border:2px dashed var(--bdr);border-radius:8px;aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;background:#fff;position:relative;overflow:hidden}
+.photo-drop{border:2px dashed var(--bdr);border-radius:8px;padding:16px 14px;text-align:center;cursor:pointer;transition:all .2s;background:#fff;margin-bottom:10px}
 .photo-drop:hover{border-color:var(--blue);background:var(--bg2)}
-.photo-drop input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
-.photo-drop img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;background:#f1f5f9;border-radius:6px}
-.photo-drop .del-btn{position:absolute;top:5px;right:5px;background:rgba(220,38,38,.85);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:13px;display:none;align-items:center;justify-content:center;z-index:5}
-.photo-drop.has-photo .del-btn{display:flex}.photo-drop .pk-crop-btn{position:absolute;top:5px;left:5px;background:rgba(37,99,235,.85);border:none;color:#fff;width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:12px;display:none;align-items:center;justify-content:center;z-index:5}.photo-drop.has-photo .pk-crop-btn{display:flex}.pk-sz{font-size:10px;color:#64748b;text-align:center;margin-top:3px;min-height:12px}
-.photo-icon{font-size:24px;margin-bottom:5px;pointer-events:none}
-.photo-hint{font-size:10px;color:var(--txt4);text-align:center;pointer-events:none;font-family:var(--mono)}
-.photo-cap{width:100%;border:1.5px solid var(--bdr);border-radius:5px;padding:5px 8px;font-size:12px;background:#fff;color:var(--txt);font-family:var(--sans)}
-.photo-cap:focus{outline:none;border-color:var(--blue)}
+.photo-icon{font-size:22px;margin-bottom:3px;pointer-events:none}
+.photo-hint{font-size:11px;color:var(--txt4);pointer-events:none}
+.photo-hint strong{color:var(--blue)}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.photo-item{border:1px solid var(--bdr);border-radius:8px;background:#fff;overflow:hidden}
+.photo-img-wrap{background:#eef4fb;display:flex;align-items:center;justify-content:center;height:140px}
+.photo-img-wrap img{max-width:100%;max-height:140px;width:auto;height:auto;object-fit:contain;display:block}
+.photo-ctrl{display:flex;flex-wrap:wrap;gap:3px;align-items:center;padding:5px 6px;border-top:1px solid var(--bdr)}
+.p-btn{border:1px solid var(--bdr);background:var(--bg2);color:var(--navy);border-radius:4px;padding:2px 6px;font-size:10px;font-weight:600;cursor:pointer;font-family:inherit}
+.p-btn:hover{background:var(--sky2,#bfdbfe)}
+.p-btn.del{border-color:#fecaca;background:#fee2e2;color:#b91c1c}
+.p-sz{font-size:9px;color:var(--txt4);font-family:var(--mono);margin-left:auto}
+.photo-cap{width:100%;border:none;border-top:1px solid var(--bdr);padding:5px 8px;font-size:12px;background:transparent;color:var(--txt);font-family:var(--sans)}
+.photo-cap:focus{outline:none;background:var(--bg2)}
+.photo-empty{color:var(--txt4);font-size:11px;text-align:center;padding:8px}
 
 /* NOTICE */
 .notice{padding:10px 16px;border-radius:6px;font-size:13px;display:none;margin:12px 0 0}
@@ -159,7 +160,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 @media print{
   @page{size:A4 portrait;margin:12mm 15mm}
   *,*::before,*::after{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-  .topbar,.action-row,.footer,.btn-add-photo,.del-btn,.tb-right,
+  .topbar,.action-row,.footer,.btn-add-photo,.del-btn,.tb-right,.photo-drop,.photo-ctrl,
   .sec-hdr-arrow,.live-dot,.hero-stats,.ss-drop,.notice{display:none!important}
   .print-header{display:flex!important}
   body{background:#fff!important;font-size:11px}
@@ -181,10 +182,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   .tbl-wrap{overflow:visible}
   .ct{min-width:unset!important;width:100%}
   .ct th,.ct td{font-size:10px!important;padding:5px 7px!important}
-  .photo-drop{border:1px solid #dbeafe!important;background:#fff!important;
-    aspect-ratio:unset!important;min-height:unset!important;padding:4px!important}
-  .photo-drop img{position:static!important;width:auto!important;height:auto!important;
-    max-width:100%!important;max-height:150px!important;object-fit:contain!important}
+  .photo-item{border:1px solid #dbeafe!important;break-inside:avoid}
+  .photo-img-wrap{height:auto!important;background:#fff!important}
+  .photo-img-wrap img{max-height:150px!important}
   .findings-grid{grid-template-columns:1fr 1fr!important}
   .photo-grid{grid-template-columns:repeat(2,1fr)!important}
 }
@@ -381,29 +381,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <!-- PHOTOS ITEM 6 -->
     <div class="photo-section">
-      <div class="photo-section-label">Evidence Photos — Item 6</div>
-      <div class="photo-grid cols-2">
-        <div class="photo-block">
-          <div class="photo-block-title">HV Megger Test Result</div>
-          <div class="photo-drop" id="pd-megger-hv">
-            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-megger-hv')">
-            <button class="del-btn" onclick="delPhoto('pd-megger-hv',event)">×</button>
-            <div class="photo-icon">📷</div>
-            <div class="photo-hint">Tap to upload</div>
-          </div>
-          <input class="photo-cap" type="text" id="cap-megger-hv" placeholder="Caption…">
-        </div>
-        <div class="photo-block">
-          <div class="photo-block-title">LV Megger Test Result</div>
-          <div class="photo-drop" id="pd-megger-lv">
-            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-megger-lv')">
-            <button class="del-btn" onclick="delPhoto('pd-megger-lv',event)">×</button>
-            <div class="photo-icon">📷</div>
-            <div class="photo-hint">Tap to upload</div>
-          </div>
-          <input class="photo-cap" type="text" id="cap-megger-lv" placeholder="Caption…">
-        </div>
+      <div class="photo-section-label">Evidence Photos — Item 6 (Megger / IR & PI Test)</div>
+      <div class="photo-drop" onclick="pickG('megger',this)">
+        <div class="photo-icon">📷</div>
+        <div class="photo-hint"><strong>Klik untuk menambah foto</strong> — HV / LV megger result, winding resistance, dll. Bisa banyak.</div>
       </div>
+      <div class="photo-grid" id="pg-megger"></div>
     </div>
   </div>
 </div>
@@ -546,29 +529,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <!-- PHOTOS ITEM 9 -->
     <div class="photo-section">
-      <div class="photo-section-label">Evidence Photos — Item 9</div>
-      <div class="photo-grid cols-2">
-        <div class="photo-block">
-          <div class="photo-block-title">ETM Display & Temperature Reading</div>
-          <div class="photo-drop" id="pd-etm-disp">
-            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-etm-disp')">
-            <button class="del-btn" onclick="delPhoto('pd-etm-disp',event)">×</button>
-            <div class="photo-icon">📷</div>
-            <div class="photo-hint">Tap to upload</div>
-          </div>
-          <input class="photo-cap" type="text" id="cap-etm-disp" placeholder="Caption…">
-        </div>
-        <div class="photo-block">
-          <div class="photo-block-title">Indicating Lamps Condition</div>
-          <div class="photo-drop" id="pd-etm-lamp">
-            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-etm-lamp')">
-            <button class="del-btn" onclick="delPhoto('pd-etm-lamp',event)">×</button>
-            <div class="photo-icon">📷</div>
-            <div class="photo-hint">Tap to upload</div>
-          </div>
-          <input class="photo-cap" type="text" id="cap-etm-lamp" placeholder="Caption…">
-        </div>
+      <div class="photo-section-label">Evidence Photos — Item 9 (ETM Energize & Indicating Lamps)</div>
+      <div class="photo-drop" onclick="pickG('etm',this)">
+        <div class="photo-icon">📷</div>
+        <div class="photo-hint"><strong>Klik untuk menambah foto</strong> — ETM display, temperature reading, indicating lamps, dll.</div>
       </div>
+      <div class="photo-grid" id="pg-etm"></div>
     </div>
   </div>
 </div>
@@ -613,19 +579,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <!-- PHOTO ETM SETTINGS -->
     <div class="photo-section">
-      <div class="photo-section-label">Evidence Photo — Item 10</div>
-      <div class="photo-grid cols-1" style="max-width:360px">
-        <div class="photo-block">
-          <div class="photo-block-title">ETM Setting Display (FAN / ALARM / TRIP)</div>
-          <div class="photo-drop" id="pd-etm-set">
-            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-etm-set')">
-            <button class="del-btn" onclick="delPhoto('pd-etm-set',event)">×</button>
-            <div class="photo-icon">📷</div>
-            <div class="photo-hint">Tap to upload</div>
-          </div>
-          <input class="photo-cap" type="text" id="cap-etm-set" placeholder="Caption…">
-        </div>
+      <div class="photo-section-label">Evidence Photos — Item 10 (ETM Temperature Settings)</div>
+      <div class="photo-drop" onclick="pickG('etmset',this)">
+        <div class="photo-icon">📷</div>
+        <div class="photo-hint"><strong>Klik untuk menambah foto</strong> — ETM setting display (FAN / ALARM / TRIP).</div>
       </div>
+      <div class="photo-grid" id="pg-etmset"></div>
     </div>
   </div>
 </div>
@@ -701,29 +660,12 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <!-- PHOTOS ITEM 12 -->
     <div class="photo-section">
-      <div class="photo-section-label">Evidence Photos — Item 12 (Before & After Cleaning)</div>
-      <div class="photo-grid cols-2">
-        <div class="photo-block">
-          <div class="photo-block-title">Before Cleaning — IR Thermal / Visual</div>
-          <div class="photo-drop" id="pd-before">
-            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-before')">
-            <button class="del-btn" onclick="delPhoto('pd-before',event)">×</button>
-            <div class="photo-icon">📷</div>
-            <div class="photo-hint">Tap to upload</div>
-          </div>
-          <input class="photo-cap" type="text" id="cap-before" placeholder="Max temp, hotspot location…">
-        </div>
-        <div class="photo-block">
-          <div class="photo-block-title">After Cleaning — IR Thermal / Visual</div>
-          <div class="photo-drop" id="pd-after">
-            <input type="file" accept="image/*" onchange="loadPhoto(this,'pd-after')">
-            <button class="del-btn" onclick="delPhoto('pd-after',event)">×</button>
-            <div class="photo-icon">📷</div>
-            <div class="photo-hint">Tap to upload</div>
-          </div>
-          <input class="photo-cap" type="text" id="cap-after" placeholder="Max temp after cleaning…">
-        </div>
+      <div class="photo-section-label">Evidence Photos — Item 12 (Before &amp; After Cleaning)</div>
+      <div class="photo-drop" onclick="pickG('cleaning',this)">
+        <div class="photo-icon">📷</div>
+        <div class="photo-hint"><strong>Klik untuk menambah foto</strong> — IR thermal / visual, before &amp; after cleaning. Tulis "before" / "after" di caption.</div>
       </div>
+      <div class="photo-grid" id="pg-cleaning"></div>
     </div>
   </div>
 </div>
@@ -828,16 +770,12 @@ function styleRemarks(){
 }
 
 // ── STATS ──────────────────────────────────────────
-const PHOTO_IDS=['pd-megger-hv','pd-megger-lv','pd-etm-disp','pd-etm-lamp','pd-etm-set','pd-before','pd-after'];
-const photoStore={};
-const photoDims={};  // slotId -> {w,h} natural pixels, so the PDF can keep each photo's aspect ratio
-
 function updateStats(){
   const vals=Object.values(ST);
   const ok=vals.filter(v=>v==='OK').length;
   const ng=vals.filter(v=>v==='NG').length;
   const total=TOG_IDS.length;
-  const photos=PHOTO_IDS.filter(id=>photoStore[id]).length;
+  const photos=(typeof PHOTO_GROUPS!=='undefined')?PHOTO_GROUPS.reduce((n,g)=>n+(PHOTOS[g]||[]).length,0):0;
   document.getElementById('h-total').textContent=total;
   document.getElementById('h-ok').textContent=ok;
   document.getElementById('h-ng').textContent=ng;
@@ -851,71 +789,136 @@ function updateStats(){
 // (img-helper) -> crop modal (Default / ratio preset / 1:1 / manual cm) -> an entry
 // that carries both its pixel size and its print size in cm. The PDF then draws it
 // at that exact size with its own aspect ratio, so nothing is ever stretched.
-const PE={};   // slotId -> PhotoKit entry
-function pkEntry(id){
-  const e=PE[id];if(e)return e;
-  const s=photoStore[id];if(!s)return null;
-  const d=(typeof photoDims!=='undefined'&&photoDims[id])||{};
-  return {src:s.src||s,w:d.w||s.w,h:d.h||s.h};
-}
-function pkChrome(slot,show){
-  slot.querySelectorAll('.photo-icon,.photo-hint,.photo-drop-icon,.photo-drop-hint').forEach(el=>el.style.display=show?'':'none');
-}
-function setPhoto(id,entry){
-  PE[id]=entry;photoStore[id]=entry.src;photoDims[id]={w:entry.w,h:entry.h};
-  const slot=document.getElementById(id);if(!slot)return;
-  let img=slot.querySelector('img');
-  if(!img){img=document.createElement('img');slot.appendChild(img);}
-  img.src=entry.src;slot.classList.add('has-photo');pkChrome(slot,false);
-  const sz=document.getElementById(id+'-sz');
-  if(sz)sz.textContent='Print '+entry.widthCm.toFixed(1)+' \u00d7 '+entry.heightCm.toFixed(1)+' cm';
-  if(typeof updateStats==='function')updateStats();
-}
-function pickPhoto(slot,id){PhotoKit.upload(slot,{},e=>{if(e)setPhoto(id,e);});}
-function recropPhoto(id,ev){ev.stopPropagation();const cur=pkEntry(id);if(!cur)return;PhotoKit.recrop(cur,e=>{if(e)setPhoto(id,e);});}
-function delPhoto(id,ev){
-  if(ev&&ev.stopPropagation)ev.stopPropagation();
-  const slot=document.getElementById(id);
-  if(slot){const img=slot.querySelector('img');if(img)img.remove();slot.classList.remove('has-photo');pkChrome(slot,true);}
-  const sz=document.getElementById(id+'-sz');if(sz)sz.textContent='';
-  delete photoStore[id];delete photoDims[id]; delete PE[id];
-  if(typeof updateStats==='function')updateStats();
-}
-// Replaces each drop zone's hidden <input type=file> with the PhotoKit picker and
-// adds a re-crop button, so the markup itself needs no per-slot edits.
-function pkWireDrops(){
-  document.querySelectorAll('.photo-drop').forEach(slot=>{
-    if(slot.dataset.pkWired)return;
-    const inp=slot.querySelector('input[type=file]');
-    let id=slot.id;
-    if(inp){const m=(inp.getAttribute('onchange')||'').match(/'([^']+)'/);if(m)id=m[1];inp.remove();}
-    if(!id)return;
-    slot.dataset.pkWired='1';
-    if(!slot.querySelector('.pk-crop-btn')){
-      const b=document.createElement('button');b.type='button';b.className='pk-crop-btn';
-      b.title='Crop & print size';b.innerHTML='&#9986;';
-      b.onclick=ev=>recropPhoto(id,ev);slot.appendChild(b);
-    }
-    slot.addEventListener('click',ev=>{if(ev.target.closest('button'))return;pickPhoto(slot,id);});
-    if(!document.getElementById(id+'-sz')){
-      const s=document.createElement('div');s.className='pk-sz';s.id=id+'-sz';
-      slot.parentNode.insertBefore(s,slot.nextSibling);
-    }
+// Free-count keyed galleries \u2014 same mechanism as ESP / 4000_Hours_Mill_PM:
+// source picker -> EXIF-upright downscale (img-helper) -> crop modal (cm print
+// size) -> compressUnder1MB (so a busy JPEG never bloats the submission / PDF)
+// -> a PhotoKit entry pushed into PHOTOS[group]. Add / recrop / rotate / delete
+// unlimited photos per group; the PDF draws each at its own aspect ratio.
+const PHOTO_GROUPS=['megger','etm','etmset','cleaning'];
+const PHOTO_GROUP_TITLES={megger:'Item 6 \u2014 Megger / IR & PI Test',etm:'Item 9 \u2014 ETM Energize & Indicating Lamps',etmset:'Item 10 \u2014 ETM Temperature Settings',cleaning:'Item 12 \u2014 Before & After Cleaning'};
+const PHOTOS={megger:[],etm:[],etmset:[],cleaning:[]};
+
+const PHOTO_MAX_BYTES=950*1024;
+function dataUrlBytes(u){const i=(u||'').indexOf(',');if(i<0)return 0;return Math.floor((u.length-i-1)*3/4);}
+function compressUnder1MB(dataUrl,w,h){
+  return new Promise(resolve=>{
+    if(dataUrlBytes(dataUrl)<=PHOTO_MAX_BYTES){resolve({src:dataUrl,w,h});return;}
+    const img=new Image();
+    img.onload=()=>{
+      let cw=w,ch=h,out=dataUrl;
+      const QS=[0.85,0.75,0.65,0.55,0.45];
+      for(let pass=0;pass<4;pass++){
+        const cv=document.createElement('canvas');
+        cv.width=Math.max(1,Math.round(cw));cv.height=Math.max(1,Math.round(ch));
+        cv.getContext('2d').drawImage(img,0,0,cv.width,cv.height);
+        let fit=false;
+        for(const q of QS){const cand=cv.toDataURL('image/jpeg',q);out=cand;cw=cv.width;ch=cv.height;if(dataUrlBytes(cand)<=PHOTO_MAX_BYTES){fit=true;break;}}
+        if(fit||cw<=480||ch<=480)break;
+        cw=Math.round(cw*0.8);ch=Math.round(ch*0.8);
+      }
+      resolve({src:out,w:cw,h:ch});
+    };
+    img.onerror=()=>resolve({src:dataUrl,w,h});
+    img.src=dataUrl;
   });
+}
+
+function pickG(key,el){
+  if(!PHOTOS[key])PHOTOS[key]=[];
+  PhotoKit.upload(el,{multiple:true},async entry=>{
+    if(!entry)return;
+    const c=await compressUnder1MB(entry.src,entry.w,entry.h);
+    entry.src=c.src;entry.dataUrl=c.src;entry.w=c.w;entry.h=c.h;entry.caption='';
+    PHOTOS[key].push(entry);renderG(key);autoSaveNow();
+  });
+}
+function recropG(key,i){
+  const cur=(PHOTOS[key]||[])[i];if(!cur)return;
+  PhotoKit.recrop(cur,async e=>{
+    if(!e)return;
+    const c=await compressUnder1MB(e.src,e.w,e.h);
+    e.src=c.src;e.dataUrl=c.src;e.w=c.w;e.h=c.h;e.caption=cur.caption||'';
+    PHOTOS[key][i]=e;renderG(key);autoSaveNow();
+  });
+}
+function rotateG(key,i,deg){
+  const p0=(PHOTOS[key]||[])[i];if(!p0)return;
+  const img=new Image();
+  img.onload=async()=>{
+    const W=img.naturalWidth,H=img.naturalHeight;
+    const norm=((deg%360)+360)%360,swap=norm===90||norm===270;
+    const cv=document.createElement('canvas');
+    cv.width=swap?H:W;cv.height=swap?W:H;
+    const ctx=cv.getContext('2d');
+    ctx.translate(cv.width/2,cv.height/2);ctx.rotate(deg*Math.PI/180);ctx.drawImage(img,-W/2,-H/2);
+    const c=await compressUnder1MB(cv.toDataURL('image/jpeg',0.92),cv.width,cv.height);
+    const p=PHOTOS[key][i];p.src=c.src;p.dataUrl=c.src;p.w=c.w;p.h=c.h;
+    if(swap&&p.widthCm&&p.heightCm){const t=p.widthCm;p.widthCm=p.heightCm;p.heightCm=t;}
+    renderG(key);autoSaveNow();
+  };
+  img.src=p0.src;
+}
+function delG(key,i){
+  if(!confirm('Hapus foto ini?'))return;
+  PHOTOS[key].splice(i,1);renderG(key);autoSaveNow();
+}
+function renderG(key){
+  const grid=document.getElementById('pg-'+key);if(!grid)return;
+  const list=PHOTOS[key]||[];
+  if(!list.length){grid.innerHTML='<div class="photo-empty">Belum ada foto. Klik area di atas untuk menambahkan.</div>';updateStats();return;}
+  grid.innerHTML=list.map((p,i)=>`
+    <div class="photo-item">
+      <div class="photo-img-wrap"><img src="${p.src}" alt="foto ${i+1}"></div>
+      <div class="photo-ctrl">
+        <button class="p-btn" onclick="recropG('${key}',${i})" title="Crop &amp; ukuran cetak">&#9986; Crop</button>
+        <button class="p-btn" onclick="rotateG('${key}',${i},-90)" title="Putar kiri">&#8634;</button>
+        <button class="p-btn" onclick="rotateG('${key}',${i},90)" title="Putar kanan">&#8635;</button>
+        <button class="p-btn del" onclick="delG('${key}',${i})" title="Hapus">&#10005;</button>
+        <span class="p-sz">${p.widthCm?p.widthCm.toFixed(1)+'\u00d7'+p.heightCm.toFixed(1)+'cm':''}</span>
+      </div>
+      <input class="photo-cap" type="text" placeholder="Caption / keterangan foto ${i+1}\u2026"
+        value="${(p.caption||'').replace(/"/g,'&quot;')}" oninput="PHOTOS['${key}'][${i}].caption=this.value">
+    </div>`).join('');
+  updateStats();
+}
+function renderAllGalleries(){PHOTO_GROUPS.forEach(renderG);}
+
+// Photos live in their own localStorage key \u2014 far bigger than the rest of the
+// draft, and a quota error must not take the whole draft down with it.
+function savePhotoDraft(){
+  try{
+    const out={};
+    PHOTO_GROUPS.forEach(k=>out[k]=(PHOTOS[k]||[]).map(p=>({src:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})));
+    localStorage.setItem('dry_trafo_photos',JSON.stringify(out));
+  }catch(e){ showNote('\u26a0\ufe0f Draft tersimpan, tapi foto terlalu besar untuk disimpan lokal.','err'); }
+}
+function loadPhotoDraft(){
+  try{
+    const raw=localStorage.getItem('dry_trafo_photos');if(!raw)return;
+    const d=JSON.parse(raw)||{};
+    PHOTO_GROUPS.forEach(k=>{PHOTOS[k]=Array.isArray(d[k])?d[k]:[];});
+    renderAllGalleries();
+  }catch(e){}
+}
+function autoSaveNow(){ try{ persistDraftSilent(); }catch(e){} }
+function persistDraftSilent(){
+  const d={};
+  document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>d['f'+i]=el.value);
+  d._st=ST;
+  try{ localStorage.setItem('dry_trafo_v2',JSON.stringify(d)); }catch(e){}
+  savePhotoDraft();
 }
 
 // ── DRAFT ──────────────────────────────────────────
 function saveDraft(){
-  const d={};
-  document.querySelectorAll('input[type=text],input[type=date],input[type=number],select,textarea').forEach((el,i)=>d['f'+i]=el.value);
-  d._st=ST;
   try{
-    localStorage.setItem('dry_trafo_v2',JSON.stringify(d));
+    persistDraftSilent();
     showNote('💾 Draft tersimpan.','ok');
   }catch(e){showNote('❌ '+e.message,'err');}
 }
 function loadDraft(){
   try{
+    loadPhotoDraft();
     const raw=localStorage.getItem('dry_trafo_v2');
     if(!raw)return;
     const d=JSON.parse(raw);
@@ -935,9 +938,12 @@ function resetForm(){
   document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file')el.value='';});
   Object.keys(ST).forEach(k=>delete ST[k]);
   document.querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
-  PHOTO_IDS.forEach(id=>delPhoto(id,{stopPropagation:()=>{}}));
+  PHOTO_GROUPS.forEach(k=>{PHOTOS[k]=[];renderG(k);});
+  try{ localStorage.removeItem('dry_trafo_photos'); localStorage.removeItem('dry_trafo_v2'); }catch(e){}
   updateStats();
 }
+// autosave on any field edit — photos already autosave via autoSaveNow()
+document.addEventListener('input',e=>{ if(e.target.matches('input,select,textarea')){ clearTimeout(window._dtT); window._dtT=setTimeout(()=>{try{persistDraftSilent();}catch(x){}},800); } });
 function showNote(msg,t){
   const n=document.getElementById('notice');
   n.textContent=msg;n.className='notice '+t;
@@ -1031,6 +1037,28 @@ async function generatePDF(opts){
     pdf.setTextColor(255,255,255);pdf.setFont('NotoSans','bold');pdf.setFontSize(8.5);
     pdf.text('▶  '+title,M+3,y+5);y+=10;
   }
+  // Generic 2-up evidence gallery — every photo drawn at its own aspect ratio
+  // (never stretched) via PhotoKit.fit()/draw(), page-break aware.
+  function drawGallery(key){
+    const list=PHOTOS[key]||[];
+    if(!list.length)return;
+    ckY(14);secHdr('Evidence Photos — '+(PHOTO_GROUP_TITLES[key]||key));
+    const colW=(W-M*2)/2-3,maxH=52,GAP=6;
+    for(let i=0;i<list.length;i+=2){
+      const row=list.slice(i,i+2);
+      const fits=row.map(p=>PhotoKit.fit(p,colW,maxH));
+      const rowH=Math.max(...fits.map(f=>f.h));
+      const hasCap=row.some(p=>p.caption);
+      ckY(rowH+(hasCap?12:6));
+      row.forEach((p,j)=>{
+        const x=M+j*(colW+GAP),f=fits[j];
+        PhotoKit.draw(pdf,p,x+f.dx,y,f.w,f.h,{align:'center'});
+        if(p.caption){pdf.setFont('NotoSans','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(p.caption,44),x,y+rowH+4);}
+      });
+      y+=rowH+(hasCap?11:6);
+    }
+    y+=4;
+  }
   function autoTbl(head,body){
     head = safeRows([head])[0];
     body = safeRows(body);
@@ -1097,22 +1125,7 @@ async function generatePDF(opts){
     [v('wr-h1h2'),v('wr-h1h3'),v('wr-h2h3'),v('wr-x1x2'),v('wr-x1x3'),v('wr-x2x3')]
   ]);
 
-  // Photos Item 6
-  const photos6=[{id:'pd-megger-hv',cap:'cap-megger-hv',title:'HV Megger Test'},{id:'pd-megger-lv',cap:'cap-megger-lv',title:'LV Megger Test'}];
-  const hasP6=photos6.filter(p=>photoStore[p.id]);
-  if(hasP6.length){
-    ckY(14);secHdr('Evidence Photos — Item 6');
-    const imgW=(W-M*2)/2-3;const maxImgH=48;
-    // Fit each photo to the column at its OWN aspect ratio, then size the row to the
-    // tallest result — passing imgW/imgH straight to addImage() stretched the photo.
-    const fits=hasP6.map(p=>PhotoKit.fit(pkEntry(p.id),imgW,maxImgH));
-    const imgH=Math.max(...fits.map(f=>f.h));ckY(imgH+14);
-    hasP6.forEach((p,i)=>{const x=M+i*(imgW+3);const f=fits[i];
-      pdf.setFont('NotoSans','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
-      PhotoKit.draw(pdf,pkEntry(p.id),x+f.dx,y+7,f.w,f.h,{align:'center'});
-      const cap=v(p.cap);if(cap){pdf.setFont('NotoSans','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
-    });y+=imgH+18;
-  }
+  drawGallery('megger');
 
   // Items 7-8
   ckY(14);secHdr('Item 7 — Reconnection & Bolt Tightness');
@@ -1137,21 +1150,7 @@ async function generatePDF(opts){
     ['No looseness on connection','All tight',gT('tog-9conn')],
     ['No corrosion or damage on ETM','No corrosion',gT('tog-9corr')],
   ]);
-  const photos9=[{id:'pd-etm-disp',cap:'cap-etm-disp',title:'ETM Display'},{id:'pd-etm-lamp',cap:'cap-etm-lamp',title:'Indicating Lamps'}];
-  const hasP9=photos9.filter(p=>photoStore[p.id]);
-  if(hasP9.length){
-    ckY(14);secHdr('Evidence Photos — Item 9');
-    const imgW=(W-M*2)/2-3;const maxImgH=48;
-    // Fit each photo to the column at its OWN aspect ratio, then size the row to the
-    // tallest result — passing imgW/imgH straight to addImage() stretched the photo.
-    const fits=hasP9.map(p=>PhotoKit.fit(pkEntry(p.id),imgW,maxImgH));
-    const imgH=Math.max(...fits.map(f=>f.h));ckY(imgH+14);
-    hasP9.forEach((p,i)=>{const x=M+i*(imgW+3);const f=fits[i];
-      pdf.setFont('NotoSans','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
-      PhotoKit.draw(pdf,pkEntry(p.id),x+f.dx,y+7,f.w,f.h,{align:'center'});
-      const cap=v(p.cap);if(cap){pdf.setFont('NotoSans','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
-    });y+=imgH+18;
-  }
+  drawGallery('etm');
 
   // Item 10
   ckY(14);secHdr('Item 10 — ETM Temperature Settings');
@@ -1160,16 +1159,7 @@ async function generatePDF(opts){
     ['ALARM','150°C',v('etm-alarm')+'°C',gT('tog-alarm')],
     ['TRIP','200°C',v('etm-trip')+'°C',gT('tog-trip')],
   ]);
-  if(photoStore['pd-etm-set']){
-    // Single photo: 70x52 was a fixed box; fit inside it instead so the shot keeps
-    // its own proportions.
-    const etmFit=PhotoKit.fit(pkEntry('pd-etm-set'),70,52);
-    const imgW=etmFit.w;const imgH=etmFit.h;ckY(imgH+16);
-    pdf.setFont('NotoSans','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text('ETM Setting Display',M,y+5);
-    PhotoKit.draw(pdf,pkEntry('pd-etm-set'),M,y+7,imgW,imgH,{align:'center'});  // imgW/imgH already aspect-correct
-    const cap=v('cap-etm-set');if(cap){pdf.setFont('NotoSans','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),M,y+7+imgH+4);}
-    y+=imgH+18;
-  }
+  drawGallery('etmset');
 
   // Item 11-12
   ckY(14);secHdr('Item 11 — Fan Operation Test');
@@ -1184,21 +1174,7 @@ async function generatePDF(opts){
     ['Max. Temp Before Cleaning',v('temp-before'),gT('tog-12temp')],
     ['Max. Temp After Cleaning',v('temp-after'),'—'],
   ]);
-  const photos12=[{id:'pd-before',cap:'cap-before',title:'Before Cleaning'},{id:'pd-after',cap:'cap-after',title:'After Cleaning'}];
-  const hasP12=photos12.filter(p=>photoStore[p.id]);
-  if(hasP12.length){
-    ckY(14);secHdr('Evidence Photos — Item 12 (Before & After Cleaning)');
-    const imgW=(W-M*2)/2-3;const maxImgH=58;
-    // Fit each photo to the column at its OWN aspect ratio, then size the row to the
-    // tallest result — passing imgW/imgH straight to addImage() stretched the photo.
-    const fits=hasP12.map(p=>PhotoKit.fit(pkEntry(p.id),imgW,maxImgH));
-    const imgH=Math.max(...fits.map(f=>f.h));ckY(imgH+14);
-    hasP12.forEach((p,i)=>{const x=M+i*(imgW+3);const f=fits[i];
-      pdf.setFont('NotoSans','bold');pdf.setFontSize(7.5);pdf.setTextColor(...NAVY);pdf.text(p.title,x,y+5);
-      PhotoKit.draw(pdf,pkEntry(p.id),x+f.dx,y+7,f.w,f.h,{align:'center'});
-      const cap=v(p.cap);if(cap){pdf.setFont('NotoSans','italic');pdf.setFontSize(7);pdf.setTextColor(100,130,160);pdf.text(tr2(cap,40),x,y+7+imgH+4);}
-    });y+=imgH+18;
-  }
+  drawGallery('cleaning');
 
   // Findings
   ckY(14);secHdr('Comments & Findings');
@@ -1232,7 +1208,7 @@ async function generatePDF(opts){
 buildToggles();
 styleRemarks();
 PhotoKit.configure({maxWcm:9.2,maxHcm:20,defaultWcm:9.2,defaultHcm:6.5});
-pkWireDrops();
+renderAllGalleries();
 loadDraft();
 updateStats();
 
@@ -1240,7 +1216,8 @@ LoadMergeModal.init({ assetTag: 'DRY-XFMR-USST' });
 SubmitGuard.init({ assetTag: 'DRY-XFMR-USST' });
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({ checkedByFieldId: "done-by" });
-CloudDraft.init({ formId:'dry-trafo', assetTag:'DRY-XFMR-USST', assetName:'Dry Transformer USST', frequency:'2 YEARLY' });
+CloudDraft.init({ formId:'dry-trafo', assetTag:'DRY-XFMR-USST', assetName:'Dry Transformer USST', frequency:'2 YEARLY',
+  photos:()=>PHOTO_GROUPS.reduce((a,k)=>a.concat(PHOTOS[k]||[]),[]) });
 
 // Auto-load last submission from database
 setTimeout(async()=>{
@@ -1249,42 +1226,18 @@ setTimeout(async()=>{
 },800);
 
 function printPage(){
+  // Browser Ctrl+P fallback only — the real export is generatePDF() (jsPDF).
+  // Photos are already compressed at upload (compressUnder1MB), so no runtime
+  // re-compression is needed here.
   const tag  = document.querySelector('[id*=tag],[id*=equip],[id*=asset]')?.value || '—';
   const date = document.querySelector('input[type=date]')?.value || '—';
   const wo   = document.querySelector('[id*=wo],[id*=work]')?.value || '—';
-  document.getElementById('ph-tag').textContent  = tag;
-  document.getElementById('ph-date').textContent = date;
-  document.getElementById('ph-wo').textContent   = wo;
+  const t=document.getElementById('ph-tag'); if(t)t.textContent=tag;
+  const dd=document.getElementById('ph-date'); if(dd)dd.textContent=date;
+  const ww=document.getElementById('ph-wo'); if(ww)ww.textContent=wo;
   document.querySelectorAll('.sec-hdr').forEach(h => h.classList.add('open'));
   document.querySelectorAll('.sec-body').forEach(b => b.style.display = 'block');
-  const MAX_PX = 560, QUALITY = 0.45;
-  const imgs = Array.from(document.querySelectorAll('.photo-drop img'));
-  const origSrcs = imgs.map(el => el.src);
-  function compressDataUrl(src){
-    return new Promise(resolve => {
-      const im = new Image();
-      im.onload = () => {
-        const W = im.naturalWidth, H = im.naturalHeight;
-        const scale = Math.min(1, MAX_PX / Math.max(W, H));
-        const cv = document.createElement('canvas');
-        cv.width = Math.round(W * scale); cv.height = Math.round(H * scale);
-        cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
-        resolve(cv.toDataURL('image/jpeg', QUALITY));
-      };
-      im.onerror = () => resolve(src);
-      im.src = src;
-    });
-  }
-  if(!imgs.length){ window.print(); return; }
-  Promise.all(origSrcs.map(compressDataUrl)).then(compressed => {
-    imgs.forEach((el, i) => { el.src = compressed[i]; });
-    const restore = () => {
-      imgs.forEach((el, i) => { el.src = origSrcs[i]; });
-      window.removeEventListener('afterprint', restore);
-    };
-    window.addEventListener('afterprint', restore);
-    window.print();
-  });
+  window.print();
 }
 
 async function submitToDb(){
@@ -1404,90 +1357,56 @@ async function submitToDb(){
   }
 }
 
-// Builds the {groupKey: [{src, caption}]} shape Approvals.submitWithFiles()
-// expects, from this file's own PhotoKit-backed single-photo drop zones
-// (photoStore[id] -> data URL, one slot per PHOTO_IDS entry — see the
-// "PhotoKit layer" section above). Each slot holds at most one photo, so
-// each group is a 0- or 1-element array.
+// Builds the {groupKey: [{src, caption, w, h, widthCm, heightCm}]} shape
+// Approvals.submitWithFiles() expects, straight from the free-count keyed
+// galleries (PHOTOS[group]). submitWithFiles() reuses these same URLs on an
+// overwrite so Drive is never hit twice for unchanged photos.
 function collectApprovalPhotos(){
   const photos = {};
-  PHOTO_IDS.forEach(id=>{
-    const src = photoStore[id];
-    if(!src) return;
-    const capId = 'cap-' + id.slice(3); // 'pd-megger-hv' -> 'cap-megger-hv'
-    photos[id] = [{src, caption: v(capId) || ''}];
+  PHOTO_GROUPS.forEach(k=>{
+    const list = (PHOTOS[k]||[]).map(p=>({src:p.src, caption:p.caption||'', w:p.w, h:p.h, widthCm:p.widthCm, heightCm:p.heightCm}));
+    if(list.length) photos[k] = list;
   });
   return photos;
 }
 
-// Mirrors this file's own PhotoKit.configure({maxWcm:9.2,...,defaultWcm:9.2,
-// defaultHcm:6.5}) call below. widthCm/heightCm are a DISPLAY-ONLY label here
-// (the "Print W x H cm" text under a slot) -- the PDF draws every photo from
-// its natural `w`/`h` pixels via PhotoKit.fit()/pkEntry(), never from these,
-// so this fallback only needs to be aspect-safe, not exact. Used when an
-// older approval record's photoUrls entry (saved before approval-helper.js
-// started carrying print size) has no widthCm/heightCm of its own.
-function calcRestoreCm(w,h){
-  const maxW=9.2, maxH=20;
-  if(!w||!h) return {widthCm:9.2,heightCm:6.5};
-  let wcm=maxW, hcm=wcm*h/w;
-  if(hcm>maxH){hcm=maxH;wcm=hcm*w/h;}
-  return {widthCm:wcm,heightCm:hcm};
-}
-
 // ── Review & Approval: restore photos pulled from Drive (Load & Merge /
-// revision banner) ──────────────────────────────────────────────────
-// Called by load-merge-modal.js's restorePhotosIfSupported() after a merge
-// or a revision-banner "load for revision", with the same
-// {groupKey: [{url, caption, w, h, widthCm, heightCm}, ...]} shape
-// Approvals.submitWithFiles() saved (see collectApprovalPhotos() above --
-// it keys `photos` by PHOTO_IDS slot id directly, one slot = one group, so
-// groupKey === a PHOTO_IDS slot id here; no group-to-slot fan-out needed,
-// unlike a sheet where one logical group can hold several photos).
-// overwrite=true replaces a slot's current photo outright; overwrite=false
-// (merge mode) only fills a slot that is CURRENTLY EMPTY in this session --
-// a technician's own in-progress photo is never silently replaced.
-// Resilient per-photo: a failed Storage.toDataUrl() for one slot is logged
-// and skipped, never aborts the rest.
+// revision banner) — called by load-merge-modal.js's
+// restorePhotosIfSupported() with the same {groupKey: [{url, caption, w, h,
+// widthCm, heightCm}, ...]} shape Approvals.submitWithFiles() saved.
+// groupKey is one of PHOTO_GROUPS; each group is a free-count array.
+// overwrite=true replaces a group's photos outright; overwrite=false (merge
+// mode) only fills a group that is CURRENTLY EMPTY in this session — a
+// technician's own in-progress photos are never silently replaced.
+// Resilient per-photo: a failed Storage.toDataUrl() is logged and skipped.
 window.restorePhotosFromUrls = async function(photoUrls, overwrite){
   let restored = 0;
   if(!photoUrls) return restored;
   for(const groupKey of Object.keys(photoUrls)){
-    if(!PHOTO_IDS.includes(groupKey)) continue; // unknown/foreign slot id -- skip defensively
+    if(!PHOTO_GROUPS.includes(groupKey)) continue;
     const list = photoUrls[groupKey];
     if(!list || !list.length) continue;
-    if(!overwrite && photoStore[groupKey]) continue; // fill-blank-only: slot already has a photo
-    // This file's slots hold at most one photo each -- take the first
-    // (most recently uploaded, per collectApprovalPhotos()'s own order).
-    const item = list[0];
-    let dataUrl;
-    try{
-      dataUrl = await Storage.toDataUrl(item.url);
-    }catch(e){
-      console.error('restorePhotosFromUrls: gagal ambil foto untuk '+groupKey, e);
-      continue;
+    if(!overwrite && (PHOTOS[groupKey]||[]).length) continue;
+    const out = [];
+    for(const item of list){
+      if(!item || !item.url) continue;
+      let dataUrl;
+      try{ dataUrl = await Storage.toDataUrl(item.url); }
+      catch(e){ console.error('restorePhotosFromUrls: gagal ambil foto untuk '+groupKey, e); continue; }
+      if(!dataUrl) continue;
+      out.push({
+        src: dataUrl, dataUrl: dataUrl,
+        caption: item.caption || '',
+        w: item.w, h: item.h,
+        widthCm: item.widthCm, heightCm: item.heightCm,
+      });
+      restored++;
     }
-    if(!dataUrl) continue;
-    const dims = calcRestoreCm(item.w, item.h);
-    const entry = {
-      src: dataUrl,
-      dataUrl: dataUrl,
-      w: item.w,
-      h: item.h,
-      widthCm: item.widthCm != null ? item.widthCm : dims.widthCm,
-      heightCm: item.heightCm != null ? item.heightCm : dims.heightCm,
-    };
-    try{
-      setPhoto(groupKey, entry);
-    }catch(e){
-      console.error('restorePhotosFromUrls: gagal set foto untuk '+groupKey, e);
-      continue;
-    }
-    const capId = 'cap-' + groupKey.slice(3);
-    const capEl = document.getElementById(capId);
-    if(capEl && item.caption) capEl.value = item.caption;
-    restored++;
+    if(!out.length) continue;
+    PHOTOS[groupKey] = overwrite ? out : (PHOTOS[groupKey]||[]).concat(out);
+    renderG(groupKey);
   }
+  try{ autoSaveNow(); }catch(e){}
   return restored;
 };
 </script>
