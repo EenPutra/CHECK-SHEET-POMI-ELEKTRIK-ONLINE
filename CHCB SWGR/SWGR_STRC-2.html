@@ -105,6 +105,10 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .cmp-card{border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;background:var(--bg2)}
 .cmp-card .code{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--navy);letter-spacing:1px}
 .cmp-card input{width:100%;border:1px solid var(--bdr);border-radius:4px;padding:4px 6px;font-size:12px;margin-top:4px;background:#fff}
+.diag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.diag-card{border:1px solid var(--bdr);border-radius:8px;background:#fff;overflow:hidden}
+.diag-card img{width:100%;height:auto;display:block;background:#fff}
+.diag-card .cap{font-size:11px;color:var(--txt4);padding:7px 10px;border-top:1px solid var(--bdr2);font-weight:600}
 .notice{padding:10px 16px;border-radius:6px;font-size:13px;display:none;margin:12px 0 0}
 .notice.ok{background:#dcfce7;border:1px solid #86efac;color:#15803d;display:block}
 .notice.err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;display:block}
@@ -201,6 +205,19 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 </div>
 
 <div id="sections"></div>
+
+<div class="panel" id="diagrams-panel" style="display:none">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📐</div>
+    <div><div class="sec-hdr-title">Breaker Interlock — Reference Diagrams</div>
+      <span class="sec-hdr-sub">Factory-set safety features · reference only</span></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div style="font-size:11px;color:var(--txt4);margin-bottom:10px">Diagram acuan untuk pemeriksaan Breaker Safety Locks (item 12–14). Fitur ini di-set pabrik — jangan disetel rutin di lapangan.</div>
+    <div class="diag-grid" id="diag-grid"></div>
+  </div>
+</div>
 
 <div class="panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
@@ -567,6 +584,15 @@ function renderCompartments(){
     </div>`).join('');
 }
 function compHead(cols){return cols.map(c=>`<th title="${esc(c.label||'')}">${esc(c.code||'')}</th>`).join('');}
+
+// ── INTERLOCK REFERENCE DIAGRAMS ──
+const DIAGRAMS=CFG.interlockDiagrams||[];
+function renderDiagrams(){
+  if(!DIAGRAMS.length){document.getElementById('diagrams-panel').style.display='none';return;}
+  document.getElementById('diagrams-panel').style.display='';
+  document.getElementById('diag-grid').innerHTML=DIAGRAMS.map(d=>`
+    <div class="diag-card"><img src="${d.uri}" alt="${esc(d.caption)}"><div class="cap">${esc(d.caption)}</div></div>`).join('');
+}
 function colsFor(sec){
   if(Array.isArray(sec.columns))return sec.columns;
   if(sec.columns==='elec')return ELEC;
@@ -756,7 +782,7 @@ function resetForm(){
   document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file'&&!el.readOnly)el.value='';});
   Object.keys(ST).forEach(k=>delete ST[k]);
   PHOTOS.evidence=[];renderPhotos('evidence');
-  renderCompartments();renderSections();updateStats();
+  renderCompartments();renderSections();renderDiagrams();updateStats();
 }
 function showNote(msg,t){const n=document.getElementById('notice');n.textContent=msg;n.className='notice '+t;clearTimeout(showNote._t);showNote._t=setTimeout(()=>n.className='notice',5000);}
 
@@ -905,6 +931,22 @@ async function generatePDF(opts={}){
     y=pdf.lastAutoTable.finalY+5;
   });
 
+  if(DIAGRAMS.length){
+    nPage();secBar('Breaker Interlock — Reference Diagrams (factory-set, reference only)');
+    const DC=Math.min(3,DIAGRAMS.length),G=6,DW=(W-M*2-G*(DC-1))/DC;
+    let dx=M,rowH=0;
+    DIAGRAMS.forEach((d,i)=>{
+      const ratio=(d.h&&d.w)?d.h/d.w:0.62;
+      const dh=Math.min(DW*ratio,110);
+      if(i%DC===0){dx=M;if(i)y+=rowH+8;rowH=0;ckY(dh+10);}
+      try{pdf.addImage(d.uri,'PNG',dx,y,DW,dh);}catch(e){}
+      pdf.setFont('times','italic');pdf.setFontSize(6.5);pdf.setTextColor(100,116,139);
+      pdf.text(pdfSafe(d.caption),dx+DW/2,y+dh+4,{align:'center',maxWidth:DW-2});
+      dx+=DW+G;rowH=Math.max(rowH,dh);
+    });
+    y+=rowH+8;
+  }
+
   if(PHOTOS.evidence.length){
     nPage();secBar('Evidence Photos');
     const PC=3,G=4,PW=(W-M*2-G*(PC-1))/PC,PH=68;
@@ -975,6 +1017,7 @@ if(CFG.frequency){const f=document.getElementById('frequency');if(![...f.options
 
 renderCompartments();
 renderSections();
+renderDiagrams();
 renderPhotos('evidence');
 loadDraft();
 updateStats();

@@ -2462,6 +2462,14 @@ The base sheets (7A1A/8A1A/Bkr-spare) = visual checklist (items 1-10) + Breaker 
 (11-15). The `_Electrical` sheets = visual (1-10) + resistance + megger + RTD. `STRC-2` adds a
 second resistance+megger block for Power Cable / Slip Ring / VT&CPT / XFMR.
 
+**Breaker interlock reference diagrams** — the 3 base sheets carry `interlockDiagrams:[{caption,
+uri,w,h}]` (the generator base64-embeds `CHCB SWGR/diagram_*.png`, extracted from the source
+.xlsx — Negative Interlock, Spring Discharge Interlock, Closed Latch Stop, the ones referencing
+the .531/.670/.561/.995-in positions in items 12-14). Rendered as a "Breaker Interlock —
+Reference Diagrams" panel and a PDF page (`pdf.addImage(uri,'PNG',…)`, aspect-preserved). The
+`_Electrical` / `STRC-2` sheets have no `interlockDiagrams` (no safety-locks section). The PNGs
+also sit in the folder as plain files.
+
 PDF: **landscape A4** (matrix tables are up to 15 columns wide), navy cover + `willDrawPage`
 mini-header + one `pdf.addPage()` per section. `pdfSafe()` (not just `noEmoji`) maps `≥`→`>=`,
 `Ω`→`ohm`, `·`/`—`→`-`, `°`→` deg` etc before any `pdf.text()` — the criteria strings are full

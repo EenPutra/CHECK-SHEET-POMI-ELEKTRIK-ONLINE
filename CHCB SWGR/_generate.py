@@ -3,10 +3,36 @@
 Run:  python3 "CHCB SWGR/_generate.py"   (from repo root)
 Ported from google-apps-script/Checksheet mentah/CHCB - SWGR - BKR.xlsx (one HTML per worksheet tab).
 """
-import json, os
+import base64, json, os, struct
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 TPL = open(os.path.join(HERE, "_swgr_template.tpl")).read()
+
+
+def _png_dims(path):
+    with open(path, "rb") as f:
+        f.read(16)
+        w, h = struct.unpack(">II", f.read(8))
+    return w, h
+
+
+def _diagram(fname, caption):
+    p = os.path.join(HERE, fname)
+    w, h = _png_dims(p)
+    uri = "data:image/png;base64," + base64.b64encode(open(p, "rb").read()).decode()
+    return {"caption": caption, "uri": uri, "w": w, "h": h}
+
+
+# Breaker-interlock reference diagrams (embedded from the source .xlsx) — shown on the
+# 3 base sheets that carry the "Breaker Safety Locks Inspection" section.
+INTERLOCK_DIAGRAMS = [
+    _diagram("diagram_negative_interlock.png",
+             "Negative Interlock — .531 in min position to open breaker · .670 in position to adjust interlock links"),
+    _diagram("diagram_spring_discharge_interlock.png",
+             "Spring Discharge Interlock — .561 in min position to discharge spring · .995 in min position to permit close latch reset"),
+    _diagram("diagram_closed_latch_stop.png",
+             "Closed Latch Stop — 1/2 to 3/4 turn adjusting screw · close latch pawl"),
+]
 
 
 def cmp(pairs):
@@ -83,6 +109,7 @@ C_7A1A = cmp([
     ("106A", "7A1AM"), ("107A", "7A1AT / 8A1A"),
 ])
 CONFIGS["SWGR_7EN-SWGR-A1A"] = {
+    "interlockDiagrams": INTERLOCK_DIAGRAMS,
     "formId": "swgr_7a1a", "assetTag": "7EN-SWGR-A1A", "assetName": "CHCB 6.9 kV Switchgear A1A (Unit 7)",
     "checksheetFile": "CHCB SWGR/SWGR_7EN-SWGR-A1A.html", "draftKey": "swgr_7a1a",
     "pageTitle": "SWGR 7EN-SWGR-A1A — CHCB", "heroTitle": "SWGR <em>7A1A</em>",
@@ -103,6 +130,7 @@ C_8A1A = cmp([
     ("114A", "8A1AA"), ("114B", "SPARE"), ("115A", "8A1A2"), ("115B", "CRN-300/400"),
 ])
 CONFIGS["SWGR_8EN-SWGR-A1A"] = {
+    "interlockDiagrams": INTERLOCK_DIAGRAMS,
     "formId": "swgr_8a1a", "assetTag": "8EN-SWGR-A1A", "assetName": "CHCB 6.9 kV Switchgear A1A (Unit 8)",
     "checksheetFile": "CHCB SWGR/SWGR_8EN-SWGR-A1A.html", "draftKey": "swgr_8a1a",
     "pageTitle": "SWGR 8EN-SWGR-A1A — CHCB", "heroTitle": "SWGR <em>8A1A</em>",
@@ -118,6 +146,7 @@ CONFIGS["SWGR_8EN-SWGR-A1A"] = {
 
 # ── Bkr-spare ────────────────────────────────────────────────────────────────
 CONFIGS["SWGR_CHCB_Breaker_Spare"] = {
+    "interlockDiagrams": INTERLOCK_DIAGRAMS,
     "formId": "swgr_bkrspare", "assetTag": "CHCB-SWGR-BKR-SPARE", "assetName": "CHCB 6.9 kV Switchgear — Spare Breakers",
     "checksheetFile": "CHCB SWGR/SWGR_CHCB_Breaker_Spare.html", "draftKey": "swgr_bkrspare",
     "pageTitle": "CHCB SWGR — Spare Breakers", "heroTitle": "SWGR <em>BKR SPARE</em>",
