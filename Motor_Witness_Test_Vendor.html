@@ -11,18 +11,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20260901d"></script>
-<script src="db-helper.js?v=20260901d"></script>
-<script src="storage-helper.js?v=20260901d"></script>
-<script src="approval-helper.js?v=20260901d"></script>
-<script src="submit-guard.js?v=20260901d"></script>
-<script src="pdf-preview.js?v=20260901d"></script>
-<script src="load-merge-modal.js?v=20260901d"></script>
-<script src="cloud-draft.js?v=20260901d"></script>
-<script src="auth-session.js?v=20260901d"></script>
-<script src="technician-auth.js?v=20260901d"></script>
-<script src="img-helper.js?v=20260901d"></script>
-<script src="photo-kit.js?v=20260901d"></script>
+<script src="firebase-config.js?v=20260904a"></script>
+<script src="db-helper.js?v=20260904a"></script>
+<script src="storage-helper.js?v=20260904a"></script>
+<script src="approval-helper.js?v=20260904a"></script>
+<script src="submit-guard.js?v=20260904a"></script>
+<script src="pdf-preview.js?v=20260904a"></script>
+<script src="load-merge-modal.js?v=20260904a"></script>
+<script src="cloud-draft.js?v=20260904a"></script>
+<script src="auth-session.js?v=20260904a"></script>
+<script src="technician-auth.js?v=20260904a"></script>
+<script src="img-helper.js?v=20260904a"></script>
+<script src="photo-kit.js?v=20260904a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 /* ===== BLUE THEME — light (default) ===== */
@@ -1161,6 +1161,24 @@ function applyIntervals(ul, rtdN){
 function resetIntervals(){
   UL_INT = UL_INT_DEFAULT.slice(); RTD_N = RTD_N_DEFAULT;
   fillUlWinding(); fillUlBearing(); fillSoloLocal();
+}
+// LoadMergeModal.beforeApply hook — recreate the dynamic RTD-winding count /
+// solo-run interval columns from the chosen doc(s) BEFORE the generic value
+// sweep. Without this, RTD values in columns beyond the current RTD_N (or
+// intervals beyond UL_INT) are silently dropped when a submitted session is
+// pulled back via "Muat / Lanjutkan dari Database" or the revision banner —
+// loadSession() (the motor-gate session list) already does this itself.
+// Never shrinks (takes the max), so a merge can't destroy existing columns.
+function mwBeforeMerge(docs){
+  let maxN = RTD_N, ul = null;
+  (Array.isArray(docs) ? docs : [docs]).forEach(d => {
+    if (!d) return;
+    const n = parseInt(d.rtdN != null ? d.rtdN : (d.extra && d.extra.rtdN), 10);
+    if (!isNaN(n) && n > maxN) maxN = n;
+    const u = d.ulIntervals || (d.extra && d.extra.ulIntervals);
+    if (Array.isArray(u) && u.length && (!ul || u.length > ul.length)) ul = u.slice();
+  });
+  applyIntervals(ul, maxN);
 }
 
 /* ── checkbox state (air-gap conclusion, bearing pedestal/flanged, DE/NDE comments) ── */
@@ -2469,7 +2487,7 @@ function _pdfSnapshot(){
 }
 
 /* ── Load & Merge helper (multi-asset: re-init per typed tag) ── */
-function openLoadMerge(){ LoadMergeModal.init({ assetTag: gv('asset-tag') || MW_TAG }); LoadMergeModal.open(); }
+function openLoadMerge(){ LoadMergeModal.init({ assetTag: gv('asset-tag') || MW_TAG, beforeApply: mwBeforeMerge }); LoadMergeModal.open(); }
 
 /* ════════════════════════════════════════════════════════════════════
    PHASE 1 — MOTOR MASTER (koleksi `motor_master`) + gate popup pilih motor
@@ -3001,7 +3019,7 @@ function applyMotor(m, opts){
   const chipT = document.getElementById('active-motor-tag');
   if (chip && chipT) { chipT.textContent = m.tag || '—'; chip.style.display = ''; }
   const t = m.tag || MW_TAG;
-  try { LoadMergeModal.init({ assetTag: t }); } catch (e) {}
+  try { LoadMergeModal.init({ assetTag: t, beforeApply: mwBeforeMerge }); } catch (e) {}
   try { SubmitGuard.init({ assetTag: t }); } catch (e) {}
   try { localStorage.setItem('mw_active_motor', mmSlug(t)); } catch (e) {}
   if (!opts.keepGate) {
@@ -3159,7 +3177,7 @@ drawAllIRCharts();
 // unified with the "Muat / Lanjutkan dari Database" modal + the motor gate's session
 // list. Local autosave (localStorage) still runs on every edit; there is no parallel
 // auto-cloud-save.
-LoadMergeModal.init({ assetTag: MW_TAG });
+LoadMergeModal.init({ assetTag: MW_TAG, beforeApply: mwBeforeMerge });
 LoadMergeModal.initRevisionBanner();
 SubmitGuard.init({ assetTag: MW_TAG });
 TechnicianAuth.init({ checkedByFieldId: 'checked-by' });
@@ -3178,7 +3196,7 @@ CloudDraft.init({
     if (x && (x.ulIntervals || x.rtdN)) applyIntervals(x.ulIntervals, x.rtdN);
   },
 });
-document.getElementById('asset-tag').addEventListener('change', ()=>{ const t=gv('asset-tag')||MW_TAG; LoadMergeModal.init({ assetTag:t }); SubmitGuard.init({ assetTag:t }); });
+document.getElementById('asset-tag').addEventListener('change', ()=>{ const t=gv('asset-tag')||MW_TAG; LoadMergeModal.init({ assetTag:t, beforeApply: mwBeforeMerge }); SubmitGuard.init({ assetTag:t }); });
 // Phase 1 — pilih / daftar motor sebelum mengisi check sheet
 initMotorFlow();
 </script>

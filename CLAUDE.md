@@ -1318,6 +1318,20 @@ the current design — **do not "simplify" these away**:
   `applyMergedBundleToForm()` are exposed on the module in case a check sheet needs to compose
   them directly (e.g. a multi-asset sheet re-running `init()` with a different `assetTag` per
   selection — see below).
+  - **`init({ beforeApply })` — optional host hook fired with the chosen doc(s) BEFORE any
+    value is written to the form.** For a page with **dynamic rows/columns whose count is data,
+    not fixed** (Motor Witness's RTD-winding count / solo-run interval columns), the generic
+    `getElementById()` sweep in `applyMergedBundleToForm()` only fills elements that already
+    exist — so values in a column beyond the current count are silently dropped when a
+    submitted session is pulled back via "Muat / Lanjutkan" or the revision banner. Same
+    reasoning as `restorePhotosFromUrls()`: the module can't know a page's dynamic-DOM shape,
+    so the page supplies the reconstruction step. `_runBeforeApply(docs)` calls it in both
+    `_confirm()` (after `CloudDraft.adopt`) and `loadRevisionSource()` (after `DB.getById`).
+    `Motor_Witness_Test_Vendor.html`'s `mwBeforeMerge(docs)` takes the max `rtdN` / longest
+    `ulIntervals` across the docs (reading `d.rtdN` for a submitted doc, `d.extra.rtdN` for a
+    CloudDraft) and calls its own `applyIntervals()` — never shrinks, so a merge can't destroy
+    existing columns. Its own motor-gate session list (`loadSession()`) already did this via
+    `applyDraftData()`; this closes the same gap on the shared-modal path.
   - **`?reviseOf=<approvalId>` opens the check sheet in revision/edit mode** for ANY status,
     not just returned items. `Review_Approval_Dashboard.html`'s review action section (the
     `canReview` branch of `renderActionSection()`) has an **"✏️ Edit Check Sheet"** button
