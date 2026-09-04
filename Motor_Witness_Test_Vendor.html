@@ -1502,7 +1502,7 @@ function afterPhotoChange(){ savePhotoDraft(); if(typeof autoSaveNow==='function
 function savePhotoDraft(){
   try{
     const out={ _pending:_pendingPhotoUrls, _loaded:_loadedPhotoUrls };
-    PHOTO_KEYS.forEach(k=>{ out[k]=(PHOTOS[k]||[]).map(p=>({src:p.src,dataUrl:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})); });
+    PHOTO_KEYS.forEach(k=>{ out[k]=(PHOTOS[k]||[]).map(p=>({src:p.src,dataUrl:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm,__cdUrl:p.__cdUrl,__cdSig:p.__cdSig})); });
     localStorage.setItem(DRAFT_PHOTOS_KEY, JSON.stringify(out));
   }catch(e){ note('⚠️ Draft tersimpan, tapi foto terlalu besar untuk localStorage.','err'); }
 }
@@ -1519,6 +1519,11 @@ function loadPhotoDraft(){
     renderAllPhotos();
   }catch(e){}
 }
+
+// Signature of a photo's data URL — MUST match cloud-draft.js's photoSig() so a
+// restored-from-Drive photo carries a stamp CloudDraft.save() will accept as
+// "already on Drive, don't re-upload". (length + head + tail of the data URL.)
+function _cdPhotoSig(src){ src = String(src || ''); return src.length + '~' + src.slice(0, 24) + src.slice(-24); }
 
 // Review & Approval / Load-merge photo restore — keyed per section
 // ── LAZY PHOTO LOADING ──────────────────────────────────────────────
@@ -1607,7 +1612,9 @@ async function loadPendingPhotos(){
         done++;
         if(dd){
           ok++;
-          (PHOTOS[j.key]=PHOTOS[j.key]||[]).push({src:dd,dataUrl:dd,caption:j.entry.caption||'',w:j.entry.w,h:j.entry.h,widthCm:j.entry.widthCm,heightCm:j.entry.heightCm});
+          // carry the Drive URL + a matching signature so a later "Simpan ke
+          // Database" reuses this file instead of uploading it again.
+          (PHOTOS[j.key]=PHOTOS[j.key]||[]).push({src:dd,dataUrl:dd,caption:j.entry.caption||'',w:j.entry.w,h:j.entry.h,widthCm:j.entry.widthCm,heightCm:j.entry.heightCm,__cdUrl:j.entry.url,__cdSig:_cdPhotoSig(dd)});
           // mark this url consumed so a partial re-run doesn't double-load it
           const pend=_pendingPhotoUrls[j.key]; if(pend){ const p=pend.indexOf(j.entry); if(p>=0) pend.splice(p,1); }
           renderPhotos(j.key);            // incremental — user sees each photo appear
@@ -1635,7 +1642,7 @@ window.loadPendingPhotos = loadPendingPhotos;
 function buildApprovalPhotos(){
   if(!photoTotal()) return null;
   const out={};
-  PHOTO_KEYS.forEach(k=>{ if((PHOTOS[k]||[]).length) out[k]=PHOTOS[k].map(p=>({src:p.src,caption:p.caption||'',w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})); });
+  PHOTO_KEYS.forEach(k=>{ if((PHOTOS[k]||[]).length) out[k]=PHOTOS[k].map(p=>({src:p.src,caption:p.caption||'',w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm,__cdUrl:p.__cdUrl,__cdSig:p.__cdSig})); });
   return out;
 }
 
