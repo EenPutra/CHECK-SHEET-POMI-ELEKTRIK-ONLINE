@@ -667,8 +667,10 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
         <button class="btn bo bsm" type="button" onclick="removeRtdCol()">➖ RTD</button>
       </div>
       <div class="tbl-wrap"><table class="ct" id="ul-wtemp"></table></div>
+      <div class="ir-chart-wrap"><canvas class="ir-chart" id="chart-ulw" width="1520" height="440"></canvas><div class="ircl" id="leg-ulw"></div></div>
       <div class="subttl" style="font-size:11px">Bearing Temperature — °C per interval</div>
       <div class="tbl-wrap"><table class="ct" id="ul-btemp"></table></div>
+      <div class="ir-chart-wrap"><canvas class="ir-chart" id="chart-ulb" width="1520" height="440"></canvas><div class="ircl" id="leg-ulb"></div></div>
       <div class="subttl" style="font-size:11px">Local Monitoring &amp; Current — per interval</div>
       <div class="tbl-wrap"><table class="ct" id="solo-local"></table></div>
 
@@ -1029,6 +1031,71 @@ function drawIRChart(prefix){
   if(leg) leg.innerHTML = series.map(s=>`<span><i style="background:${s.color}"></i>${s.label}</span>`).join('');
 }
 function drawAllIRCharts(){ drawIRChart('stator'); drawIRChart('hipot'); }
+
+// ── Solo Run: RTD winding + Bearing temperature vs time ──────────────
+function _seriesColor(i, total){
+  if(total<=IR_SERIES_COLORS.length) return IR_SERIES_COLORS[i%IR_SERIES_COLORS.length];
+  return 'hsl('+Math.round((i*360/Math.max(1,total))%360)+',62%,45%)';
+}
+// Generic time-series line chart (mirrors drawIRChart's look).
+function _drawTempChart(canvasId, legendId, xLabels, series, yLabel){
+  const canvas=document.getElementById(canvasId); if(!canvas) return;
+  const ctx=canvas.getContext('2d'); const CW=canvas.width, CH=canvas.height;
+  ctx.clearRect(0,0,CW,CH);
+  const cs=getComputedStyle(document.documentElement);
+  const gridC=(cs.getPropertyValue('--td-line')||'rgba(120,155,205,.26)').trim();
+  const axC=(cs.getPropertyValue('--t3')||'#6a82a6').trim();
+  const padL=64, padR=16, padT=16, padB=42;
+  const pw=CW-padL-padR, ph=CH-padT-padB;
+  const n=Math.max(2,xLabels.length), stepX=pw/(n-1);
+  const all=series.flatMap(s=>s.points).filter(v=>v!=null && !isNaN(v));
+  const leg=document.getElementById(legendId);
+  if(!all.length){
+    ctx.font='22px "Times New Roman",Georgia,serif'; ctx.fillStyle=axC; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('Isi tabel di atas — grafik muncul otomatis', CW/2, CH/2);
+    if(leg) leg.innerHTML=''; return;
+  }
+  let yMin=Math.min(...all), yMax=Math.max(...all);
+  const pad=(yMax-yMin)*0.15 || 2; yMin=Math.max(0,yMin-pad); yMax=yMax+pad;
+  ctx.font='20px "Times New Roman",Georgia,serif';
+  ctx.textAlign='right'; ctx.textBaseline='middle';
+  for(let i=0;i<=5;i++){
+    const yy=padT+ph-(ph*i/5), val=yMin+(yMax-yMin)*i/5;
+    ctx.strokeStyle=gridC; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(padL+pw,yy); ctx.stroke();
+    ctx.fillStyle=axC; ctx.fillText(val.toFixed(val<10?1:0), padL-8, yy);
+  }
+  ctx.strokeStyle=axC; ctx.lineWidth=1.5; ctx.beginPath();
+  ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+ph); ctx.lineTo(padL+pw,padT+ph); ctx.stroke();
+  ctx.textAlign='center'; ctx.textBaseline='top'; ctx.fillStyle=axC;
+  xLabels.forEach((t,i)=>{ ctx.fillText(t, padL+stepX*i, padT+ph+8); });
+  ctx.save(); ctx.translate(16,padT+ph/2); ctx.rotate(-Math.PI/2); ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillStyle=axC; ctx.fillText(yLabel,0,0); ctx.restore();
+  const Y=v=>padT+ph-((v-yMin)/(yMax-yMin||1)*ph);
+  series.forEach(s=>{
+    ctx.strokeStyle=s.color; ctx.lineWidth=2.5; ctx.beginPath(); let started=false;
+    s.points.forEach((v,i)=>{ if(v==null||isNaN(v))return; const x=padL+stepX*i, yy=Y(v); if(!started){ctx.moveTo(x,yy);started=true;} else ctx.lineTo(x,yy); });
+    ctx.stroke();
+    ctx.fillStyle=s.color;
+    s.points.forEach((v,i)=>{ if(v==null||isNaN(v))return; const x=padL+stepX*i, yy=Y(v); ctx.beginPath(); ctx.arc(x,yy,4,0,Math.PI*2); ctx.fill(); });
+  });
+  if(leg) leg.innerHTML=series.filter(s=>s.points.some(v=>v!=null&&!isNaN(v)))
+    .map(s=>`<span><i style="background:${s.color}"></i>${s.label}</span>`).join('');
+}
+function _num(id){ const s=gv(id); if(s==='')return null; const v=parseFloat(String(s).replace(',','.')); return isNaN(v)?null:v; }
+function drawSoloTempCharts(){
+  const x = (typeof UL_INT!=='undefined' && UL_INT.length) ? UL_INT.slice() : [];
+  // RTD winding — one line per RTD
+  const wSeries=[];
+  for(let i=1;i<=(typeof RTD_N!=='undefined'?RTD_N:0);i++){
+    wSeries.push({ label:'RTD'+i, color:_seriesColor(i-1,RTD_N),
+      points:x.map((_,r)=>_num('ulw_'+r+'_'+i)) });
+  }
+  _drawTempChart('chart-ulw','leg-ulw',x,wSeries,'Winding °C');
+  // Bearing — one line per sensor
+  const bDefs=[['DE-1','de1'],['DE-2','de2'],['NDE-1','nde1'],['NDE-2','nde2']];
+  const bSeries=bDefs.map((d,i)=>({ label:d[0], color:IR_SERIES_COLORS[i%IR_SERIES_COLORS.length],
+    points:x.map((_,r)=>_num('ulb_'+r+'_'+d[1])) }));
+  _drawTempChart('chart-ulb','leg-ulb',x,bSeries,'Bearing °C');
+}
 function calcUnbalance(){
   const a=parseFloat(gv('wr-14')), b=parseFloat(gv('wr-25')), c=parseFloat(gv('wr-36'));
   const vs=[a,b,c].filter(x=>!isNaN(x));
@@ -1127,6 +1194,7 @@ function addTimeInterval(){
   if (!lbl) return;
   arr.push(lbl);
   _rebuildG();
+  refreshSoloCharts();
   if (typeof autoSaveNow === 'function') autoSaveNow();
 }
 function removeTimeInterval(){
@@ -1134,12 +1202,14 @@ function removeTimeInterval(){
   if (!confirm('Hapus kolom waktu "' + UL_INT[UL_INT.length - 1] + '" beserta isinya?')) return;
   UL_INT.pop();
   _rebuildG();
+  refreshSoloCharts();
   if (typeof autoSaveNow === 'function') autoSaveNow();
 }
 function addRtdCol(){
   if (RTD_N >= RTD_N_MAX) { note('Maksimum ' + RTD_N_MAX + ' RTD.', 'info'); return; }
   RTD_N++;
   _preserveInputs(document.getElementById('p-g'), () => fillUlWinding());
+  refreshSoloCharts();
   if (typeof autoSaveNow === 'function') autoSaveNow();
 }
 function removeRtdCol(){
@@ -1147,6 +1217,7 @@ function removeRtdCol(){
   if (!confirm('Hapus kolom RTD' + RTD_N + ' beserta isinya?')) return;
   RTD_N--;
   _preserveInputs(document.getElementById('p-g'), () => fillUlWinding());
+  refreshSoloCharts();
   if (typeof autoSaveNow === 'function') autoSaveNow();
 }
 // re-apply saved interval array + RTD count (draft / loaded session) then rebuild.
@@ -1157,10 +1228,12 @@ function applyIntervals(ul, rtdN){
   const n = parseInt(rtdN, 10);
   if (!isNaN(n) && n >= RTD_N_MIN && n <= RTD_N_MAX && n !== RTD_N) { RTD_N = n; changed = true; }
   if (changed) { fillUlWinding(); fillUlBearing(); fillSoloLocal(); }
+  if (typeof refreshSoloCharts==='function') refreshSoloCharts();
 }
 function resetIntervals(){
   UL_INT = UL_INT_DEFAULT.slice(); RTD_N = RTD_N_DEFAULT;
   fillUlWinding(); fillUlBearing(); fillSoloLocal();
+  if (typeof refreshSoloCharts==='function') refreshSoloCharts();
 }
 // LoadMergeModal.beforeApply hook — recreate the dynamic RTD-winding count /
 // solo-run interval columns from the chosen doc(s) BEFORE the generic value
@@ -1370,7 +1443,8 @@ function mountPhotoPanels(){
     blk.className='photo-block';
     blk.dataset.key=sec.key;
     blk.innerHTML=
-      '<div class="pbh">📷 Foto Evidence <span class="cnt" id="pcnt-'+sec.key+'">0 foto</span></div>'
+      '<div class="pbh">📷 Foto Evidence <span class="cnt" id="pcnt-'+sec.key+'">0 foto</span>'
+      +'<button class="btn bo bsm" type="button" style="margin-left:8px" onclick="reloadDrivePhotos(\''+sec.key+'\')" title="Ambil ulang foto section ini dari Google Drive">☁️ Muat Foto Drive</button></div>'
       +'<div class="photo-drop sm" onclick="pickPhotos(\''+sec.key+'\',this)">'
       +'<div class="photo-drop-ico">📷</div>'
       +'<div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong> — kamera / galeri, bisa banyak</div></div>'
@@ -1456,9 +1530,26 @@ function loadPhotoDraft(){
 // render a "📥 N foto di Drive" banner per section, then pull them in the
 // background (parallel, capped). Save/Submit force-loads any still-pending
 // ones first so nothing is lost.
-let _pendingPhotoUrls = {};   // {sectionKey: [{url,caption,w,h,widthCm,heightCm}]}
+let _pendingPhotoUrls = {};   // {sectionKey: [{url,caption,w,h,widthCm,heightCm}]}  — not yet downloaded
+let _loadedPhotoUrls  = {};   // {sectionKey: [...]}  — the URL list of the session/draft currently open (for a manual re-fetch)
 function _pendingTotal(){ return Object.values(_pendingPhotoUrls).reduce((n,a)=>n+(a?a.length:0),0); }
 function _pgTarget(key){ return key==='h' ? 'g' : (PHOTO_KEYS.indexOf(key)!==-1 ? key : 'a'); }
+
+// "☁️ Muat Foto Drive" button per section — always visible so it's findable.
+async function reloadDrivePhotos(key){
+  if((_pendingPhotoUrls[key]||[]).length){ await loadPendingPhotos(); return; }
+  let src = (_loadedPhotoUrls[key]||[]).slice();
+  if(!src.length){
+    try{ const reuse = (window.CloudDraft && CloudDraft.getReusePhotoUrls && CloudDraft.getReusePhotoUrls()) || null;
+      if(reuse){ const t=_pgTarget(key); if(Array.isArray(reuse[key])) src=reuse[key].slice(); else if(Array.isArray(reuse[t])) src=reuse[t].slice(); } }catch(e){}
+  }
+  if(!src.length){ note('Tidak ada foto tersimpan di Drive untuk section ini pada sesi yang dimuat.','info'); return; }
+  _pendingPhotoUrls[key] = src;
+  PHOTOS[key] = [];
+  renderPhotos(key);
+  await loadPendingPhotos();
+}
+window.reloadDrivePhotos = reloadDrivePhotos;
 
 async function restorePhotosFromUrls(photoUrls, overwrite, opts){
   if(!photoUrls) return 0;
@@ -1470,6 +1561,7 @@ async function restorePhotosFromUrls(photoUrls, overwrite, opts){
     if(!overwrite && ((PHOTOS[target]||[]).length || (_pendingPhotoUrls[target]||[]).length)) continue;
     const entries=list.filter(e=>e&&e.url);
     if(!entries.length) continue;
+    _loadedPhotoUrls[target] = entries.slice();   // remembered for the manual "Muat Foto Drive" button
     _pendingPhotoUrls[target] = overwrite ? entries.slice() : (_pendingPhotoUrls[target]||[]).concat(entries);
     if(overwrite) PHOTOS[target]=[];
     staged += entries.length;
@@ -1674,6 +1766,7 @@ function applyDraftData(d){
   if(d._chk) applyChecks(d._chk);
   upStats(); calcUnbalance(); calcPI('stator'); calcPI('hipot');
   if(typeof calcAirGap==='function'){ calcAirGap('de'); calcAirGap('nde'); }
+  if(typeof refreshSoloCharts==='function') refreshSoloCharts();
 }
 function loadDraft(){
   try{
@@ -1682,11 +1775,14 @@ function loadDraft(){
     note('📂 Draft lokal dimuat.','info');
   }catch(e){}
 }
+let _soloChartT=null;
+function refreshSoloCharts(){ clearTimeout(_soloChartT); _soloChartT=setTimeout(()=>{ try{ drawSoloTempCharts(); }catch(e){} }, 120); }
 document.addEventListener('input', e=>{
   if(!e.target.matches('input,select,textarea')) return;
   scheduleAutoSave();
   const mtx=e.target.closest('#mtx-stator,#mtx-hipot');
   if(mtx) drawIRChart(mtx.id==='mtx-stator'?'stator':'hipot');
+  if(e.target.closest('#ul-wtemp,#ul-btemp')) refreshSoloCharts();
 });
 document.addEventListener('change', e=>{ if(e.target.matches('input,select,textarea')) scheduleAutoSave(); });
 // best-effort flush when leaving / backgrounding the tab
@@ -2745,13 +2841,14 @@ function clearSessionForm(){
   Object.keys(ST).forEach(k => delete ST[k]);
   document.querySelectorAll('.rb').forEach(b => b.classList.remove('a'));
   if (typeof PHOTOS === 'object') Object.keys(PHOTOS).forEach(k => { PHOTOS[k] = []; });
-  _pendingPhotoUrls = {};
+  _pendingPhotoUrls = {}; _loadedPhotoUrls = {};
   if (typeof renderAllPhotos === 'function') renderAllPhotos();
   if (typeof applyAttachList === 'function') applyAttachList([]);
   if (typeof applyChecks === 'function') applyChecks({});
   if (typeof resetIntervals === 'function') resetIntervals();
   if (typeof renderAirGap === 'function') { renderAirGap('de'); renderAirGap('nde'); renderBearingMeas(); }
   upStats(); if (typeof drawAllIRCharts === 'function') drawAllIRCharts();
+  if (typeof drawSoloTempCharts === 'function') drawSoloTempCharts();
 }
 
 async function loadSession(s){
@@ -2794,6 +2891,7 @@ async function loadSession(s){
   renderSessionBanner();
   renderSessionTabs();
   if (typeof drawAllIRCharts === 'function') drawAllIRCharts();
+  if (typeof drawSoloTempCharts === 'function') drawSoloTempCharts();
 }
 
 function renderSessionBanner(){
@@ -3242,6 +3340,7 @@ renderAllPhotos();
 renderAttach();
 upStats();
 drawAllIRCharts();
+drawSoloTempCharts();
 // Saving a session to the database is a deliberate action (💾 button -> CloudDraft),
 // unified with the "Muat / Lanjutkan dari Database" modal + the motor gate's session
 // list. Local autosave (localStorage) still runs on every edit; there is no parallel
