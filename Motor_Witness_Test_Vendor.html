@@ -348,6 +348,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
     <a class="btn-back" href="index.html">&#8592; Portal</a>
     <span class="clock" id="clock">--:--:--</span><div class="tsep"></div>
     <button class="theme-btn" id="theme-btn" title="Ganti tema (light / dark)" onclick="cycleTheme()">🌙</button>
+    <button class="btn bo bsm" onclick="pullFromDatabase()" title="Tarik / muat ulang data sesi dari database (mis. data belum lengkap terbaca di device ini)">📥 Tarik Database</button>
     <button class="btn bo bsm" onclick="saveSessionDraft()">💾 Draft</button>
     <button class="btn br bsm" onclick="openPdfModal()">📥 PDF</button>
     <button class="btn bg bsm" onclick="submitToDb()">🗄️ Submit DB</button>
@@ -726,6 +727,7 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
   </div>
 
   <div class="action-row" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding-top:12px">
+    <button class="btn bo" onclick="pullFromDatabase()" title="Muat ulang / tarik data sesi dari database jika di device ini data belum lengkap terbaca">📥 Tarik dari Database</button>
     <button class="btn bo" onclick="saveSessionDraft()">💾 Save Draft</button>
     <button class="btn bg" style="font-size:15px;padding:10px 22px" onclick="submitToDb()">&#128202; Submit to Database</button>
     <button class="btn bp" onclick="resetForm()">🔄 Reset</button>
@@ -2671,6 +2673,35 @@ function _pdfSnapshot(){
 /* ── Load & Merge helper (multi-asset: re-init per typed tag) ── */
 function openLoadMerge(){ LoadMergeModal.init({ assetTag: gv('asset-tag') || MW_TAG, beforeApply: mwBeforeMerge }); LoadMergeModal.open(); }
 
+/* ── "Tarik dari Database" — recover a session that loaded partially on this
+      device (e.g. RTD columns / photos not fully read). If a session is already
+      open, re-fetch it fresh from Firestore and re-apply; otherwise open the
+      Load & Merge picker so the user can choose one. ── */
+async function pullFromDatabase(){
+  const curId = (document.getElementById('session-id') || {}).value || '';
+  const tag = gv('asset-tag') || (_activeMotor && _activeMotor.tag) || MW_TAG;
+  if (curId) {
+    note('🔄 Menarik ulang data sesi ini dari database…', 'info');
+    try {
+      const fresh = await mmSessions(tag);
+      const s = (fresh || []).find(x => x.id === curId);
+      if (s) {
+        _sessions = fresh;
+        _editingSession = null;           // skip the "pindah sesi?" confirm — we are reloading the same one
+        await loadSession(s);
+        note('✅ Data sesi ditarik ulang dari database.', 'ok');
+        return;
+      }
+      note('⚠️ Sesi ini tidak ditemukan lagi di database — silakan pilih dari daftar.', 'err');
+    } catch (e) {
+      console.warn('pullFromDatabase:', e);
+      note('⚠️ Gagal menghubungi database — coba lagi.', 'err');
+      return;
+    }
+  }
+  openLoadMerge();
+}
+
 /* ════════════════════════════════════════════════════════════════════
    PHASE 1 — MOTOR MASTER (koleksi `motor_master`) + gate popup pilih motor
    ════════════════════════════════════════════════════════════════════ */
@@ -2919,10 +2950,11 @@ function renderSessionBanner(){
   if (!b) return;
   if (!_editingSession) { b.style.display = 'none'; return; }
   b.style.display = 'flex';
+  const reload = ' <button class="btn bo bsm" type="button" title="Tarik ulang data sesi ini dari database jika ada yang belum lengkap terbaca" onclick="pullFromDatabase()">📥 Tarik ulang</button>';
   if (_editingSession.isDraft) {
-    b.innerHTML = '☁️ <b>Melanjutkan draft sesi</b> — Simpan / Submit saat siap. <button class="btn bo bsm" type="button" onclick="mgNewSession()">➕ Test baru</button>';
+    b.innerHTML = '☁️ <b>Melanjutkan draft sesi</b> — Simpan / Submit saat siap. <button class="btn bo bsm" type="button" onclick="mgNewSession()">➕ Test baru</button>' + reload;
   } else {
-    b.innerHTML = '📋 <b>Sesi test tersimpan</b> (' + _esc(Approvals.STATUS_LABELS[_editingSession.status] || _editingSession.status) + ') — Submit akan menanyakan: revisi sesi ini atau sesi baru. <button class="btn bo bsm" type="button" onclick="mgNewSession()">➕ Test baru</button>';
+    b.innerHTML = '📋 <b>Sesi test tersimpan</b> (' + _esc(Approvals.STATUS_LABELS[_editingSession.status] || _editingSession.status) + ') — Submit akan menanyakan: revisi sesi ini atau sesi baru. <button class="btn bo bsm" type="button" onclick="mgNewSession()">➕ Test baru</button>' + reload;
   }
 }
 function renderSessionTabs(){
