@@ -96,16 +96,27 @@
     document.querySelectorAll('[onclick*="submitToDb"],[onclick*="saveToDatabase"],[onclick*="CloudDraft.save"],[onclick*="saveSessionDraft"]').forEach(b => { b.disabled = !!lock; });
   }
 
+  // Read a page global by name — works whether it's a `window.` property OR a
+  // top-level `let`/`const` (a lexical global, which is NOT on `window`). Most
+  // check sheets declare `let PHOTOS = ...` / `const PHOTOS = {}`, so the old
+  // `window.PHOTOS` check always missed them and a "Simpan ke Database" draft
+  // saved zero photos. `new Function` runs in true global scope.
+  function _pageGlobal(name) {
+    try { return (new Function('return (typeof ' + name + '!=="undefined")?' + name + ':undefined'))(); }
+    catch (e) { return undefined; }
+  }
   function autoPhotos() {
     try {
-      if (window.PHOTOS && typeof PHOTOS === 'object') {
-        if (Array.isArray(PHOTOS)) return PHOTOS.length ? { main: PHOTOS } : null;
+      const P = _pageGlobal('PHOTOS');
+      if (P && typeof P === 'object') {
+        if (Array.isArray(P)) return P.length ? { main: P } : null;
         const o = {}; let any = false;
-        Object.keys(PHOTOS).forEach(k => { if (Array.isArray(PHOTOS[k]) && PHOTOS[k].length) { o[k] = PHOTOS[k]; any = true; } });
+        Object.keys(P).forEach(k => { if (Array.isArray(P[k]) && P[k].length) { o[k] = P[k]; any = true; } });
         return any ? o : null;
       }
-      if (Array.isArray(window.FILES)) {
-        const imgs = window.FILES.filter(f => f && /^image\//.test(f.type || '') && (f.src || f.dataUrl));
+      const F = _pageGlobal('FILES');
+      if (Array.isArray(F)) {
+        const imgs = F.filter(f => f && /^image\//.test(f.type || '') && (f.src || f.dataUrl));
         return imgs.length ? { main: imgs } : null;
       }
     } catch (e) {}

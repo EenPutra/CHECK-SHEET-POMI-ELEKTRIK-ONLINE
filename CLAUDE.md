@@ -1974,8 +1974,16 @@ check sheets** (self-injecting like `submit-guard.js`). Firestore Rules must all
   The id lives in `localStorage['cd_<formId>_<tag>']` so re-saving UPDATES the same doc.
   **A photo already on Drive from an earlier save is NOT re-uploaded** — each entry gets a
   `__cdSig` (`length~head~tail` of its data URL) + `__cdUrl` stamp; a re-save with an unchanged
-  signature reuses the URL. Photos auto-detected from `window.PHOTOS`/`window.FILES` when the
-  host passes no `photos` getter.
+  signature reuses the URL. When the host passes no `photos` getter, `autoPhotos()` finds the
+  page's `PHOTOS` (or `FILES`) global via `new Function('return PHOTOS')` — a plain
+  `window.PHOTOS` check silently missed every sheet that declares `let PHOTOS` / `const PHOTOS`
+  (a lexical global, NOT a `window` property), so before this fix a "Simpan ke Database" draft
+  saved ZERO photos and reopening on another device showed an empty gallery. `Motor_Witness_
+  Test_Vendor.html` also passes an explicit `photos: buildApprovalPhotos` (returns the
+  `{sectionKey:[{src,caption,w,h,widthCm,heightCm}]}` shape directly). On restore, both
+  `loadSession()` (motor-gate list) and the shared modal's `restorePhotosIfSupported()` already
+  call the host's `restorePhotosFromUrls(photoUrls, overwrite)`; `listDrafts()` returns the full
+  draft doc (`photoUrls` included) so `buildMergedBundle()` has them to union.
 - **Continuing a draft uses the SAME "📥 Muat / Lanjutkan dari Database" button as Load & Merge**
   (the old "Pilih & Gabung Data" button, relabelled everywhere). `load-merge-modal.js`'s
   `open()` now also calls `CloudDraft.listDrafts()` and lists drafts above the submitted history,
