@@ -1397,9 +1397,17 @@ function removePhotoAt(key,i){ if(!confirm('Hapus foto ini?'))return; PHOTOS[key
 function renderPhotos(key){
   const grid=document.getElementById('pgrid-'+key); if(!grid)return;
   const list=PHOTOS[key]||[];
-  const cnt=document.getElementById('pcnt-'+key); if(cnt) cnt.textContent=list.length+' foto';
-  if(!list.length){ grid.innerHTML='<div class="photo-empty">Belum ada foto.</div>'; return; }
-  grid.innerHTML=list.map((p,i)=>`
+  const pend=(_pendingPhotoUrls[key]||[]).length;
+  const cnt=document.getElementById('pcnt-'+key); if(cnt) cnt.textContent=(list.length+pend)+' foto'+(pend?' ('+pend+' di Drive)':'');
+  const banner = pend
+    ? `<div class="photo-empty" style="border:1px dashed var(--steel);border-radius:8px;padding:8px 10px;margin-bottom:8px;color:var(--steel)">
+         &#128247; ${pend} foto tersimpan di Drive &mdash;
+         <button class="btn bo bsm" type="button" style="margin-left:6px" onclick="loadPendingPhotos()">&#128229; Muat Foto</button>
+         <span id="mw-photo-loading" style="margin-left:8px;font-size:11px"></span>
+       </div>` : '';
+  if(!list.length && !pend){ grid.innerHTML='<div class="photo-empty">Belum ada foto.</div>'; return; }
+  if(!list.length){ grid.innerHTML=banner; return; }
+  grid.innerHTML=banner+list.map((p,i)=>`
     <div class="photo-item">
       <div class="photo-img-wrap"><img src="${p.src}" alt="Foto ${i+1}"></div>
       <div class="photo-ctrl">
@@ -1417,7 +1425,7 @@ function renderAllPhotos(){ PHOTO_KEYS.forEach(renderPhotos); }
 function afterPhotoChange(){ savePhotoDraft(); if(typeof autoSaveNow==='function') autoSaveNow(); }
 function savePhotoDraft(){
   try{
-    const out={};
+    const out={ _pending:_pendingPhotoUrls };
     PHOTO_KEYS.forEach(k=>{ out[k]=(PHOTOS[k]||[]).map(p=>({src:p.src,dataUrl:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})); });
     localStorage.setItem(DRAFT_PHOTOS_KEY, JSON.stringify(out));
   }catch(e){ note('⚠️ Draft tersimpan, tapi foto terlalu besar untuk localStorage.','err'); }
@@ -1427,32 +1435,89 @@ function loadPhotoDraft(){
     const raw=localStorage.getItem(DRAFT_PHOTOS_KEY); if(!raw)return;
     const d=JSON.parse(raw)||{};
     if(Array.isArray(d)){ PHOTOS.a = d; }                 // migrate old flat-array drafts into section A
-    else PHOTO_KEYS.forEach(k=>{ if(Array.isArray(d[k])) PHOTOS[k]=d[k]; });
+    else {
+      PHOTO_KEYS.forEach(k=>{ if(Array.isArray(d[k])) PHOTOS[k]=d[k]; });
+      if(d._pending && typeof d._pending==='object'){
+        _pendingPhotoUrls = d._pending;
+        // resume the background pull if a refresh interrupted it
+        if(_pendingTotal()) setTimeout(()=>{ loadPendingPhotos().catch(()=>{}); }, 800);
+      }
+    }
     renderAllPhotos();
   }catch(e){}
 }
 
 // Review & Approval / Load-merge photo restore — keyed per section
-async function restorePhotosFromUrls(photoUrls, overwrite){
+// ── LAZY PHOTO LOADING ──────────────────────────────────────────────
+// Photos live on Drive and each one costs a ~2s round-trip through the
+// Apps Script proxy. Downloading them all inline is what made "load a saved
+// session" hang for 20-30s and look like the photos never came back. So on
+// a session/draft open we DEFER: stash the URLs, show the form immediately,
+// render a "📥 N foto di Drive" banner per section, then pull them in the
+// background (parallel, capped). Save/Submit force-loads any still-pending
+// ones first so nothing is lost.
+let _pendingPhotoUrls = {};   // {sectionKey: [{url,caption,w,h,widthCm,heightCm}]}
+function _pendingTotal(){ return Object.values(_pendingPhotoUrls).reduce((n,a)=>n+(a?a.length:0),0); }
+function _pgTarget(key){ return key==='h' ? 'g' : (PHOTO_KEYS.indexOf(key)!==-1 ? key : 'a'); }
+
+async function restorePhotosFromUrls(photoUrls, overwrite, opts){
   if(!photoUrls) return 0;
-  let restored=0;
+  opts = opts || {};
+  let staged=0;
   for(const key of Object.keys(photoUrls)){
     const list=photoUrls[key]; if(!Array.isArray(list)||!list.length) continue;
-    const target = key==='h' ? 'g' : (PHOTO_KEYS.indexOf(key)!==-1 ? key : 'a');   // unknown/legacy-h groups
-    if(!overwrite && (PHOTOS[target]||[]).length) continue;
-    const acc=[];
-    for(const entry of list){
-      if(!entry||!entry.url) continue;
-      try{ const dd=await Storage.toDataUrl(entry.url); if(!dd)continue;
-        acc.push({src:dd,dataUrl:dd,caption:entry.caption||'',w:entry.w,h:entry.h,widthCm:entry.widthCm,heightCm:entry.heightCm}); }
-      catch(e){ console.error('restore 1 foto gagal:',e); }
-    }
-    if(acc.length){ PHOTOS[target] = overwrite ? acc : (PHOTOS[target]||[]).concat(acc); restored+=acc.length; }
+    const target=_pgTarget(key);
+    if(!overwrite && ((PHOTOS[target]||[]).length || (_pendingPhotoUrls[target]||[]).length)) continue;
+    const entries=list.filter(e=>e&&e.url);
+    if(!entries.length) continue;
+    _pendingPhotoUrls[target] = overwrite ? entries.slice() : (_pendingPhotoUrls[target]||[]).concat(entries);
+    if(overwrite) PHOTOS[target]=[];
+    staged += entries.length;
   }
-  if(restored){ renderAllPhotos(); savePhotoDraft(); }
-  return restored;
+  renderAllPhotos();
+  if(opts.defer){
+    // background pull — never blocks the caller
+    setTimeout(()=>{ loadPendingPhotos().catch(e=>console.warn('bg photo load:',e)); }, 400);
+    return staged;
+  }
+  return await loadPendingPhotos();
 }
 window.restorePhotosFromUrls = restorePhotosFromUrls;
+
+// Download every deferred Drive photo (parallel, max 4 at a time) into PHOTOS.
+let _photoLoadBusy = false;
+async function loadPendingPhotos(){
+  if(_photoLoadBusy) return 0;
+  const jobs=[];
+  for(const key of Object.keys(_pendingPhotoUrls)){
+    (_pendingPhotoUrls[key]||[]).forEach(entry=>jobs.push({key,entry}));
+  }
+  if(!jobs.length) return 0;
+  _photoLoadBusy = true;
+  const took = {}; PHOTO_KEYS.forEach(k=>took[k]=[]);
+  let done=0;
+  try{
+    const CONC=4;
+    for(let i=0;i<jobs.length;i+=CONC){
+      const slice=jobs.slice(i,i+CONC);
+      await Promise.all(slice.map(async j=>{
+        try{
+          const dd=await Storage.toDataUrl(j.entry.url);
+          if(dd) took[j.key].push({src:dd,dataUrl:dd,caption:j.entry.caption||'',w:j.entry.w,h:j.entry.h,widthCm:j.entry.widthCm,heightCm:j.entry.heightCm});
+        }catch(e){ console.error('muat 1 foto gagal:',e); }
+        done++;
+      }));
+      const badge=document.getElementById('mw-photo-loading'); if(badge) badge.textContent='⏳ Memuat foto '+done+'/'+jobs.length+'…';
+    }
+    let restored=0;
+    PHOTO_KEYS.forEach(k=>{ if(took[k].length){ PHOTOS[k]=(PHOTOS[k]||[]).concat(took[k]); restored+=took[k].length; } });
+    _pendingPhotoUrls = {};
+    renderAllPhotos();
+    if(restored){ try{ savePhotoDraft(); }catch(e){} note('📷 '+restored+' foto dimuat dari Drive.','ok'); }
+    return restored;
+  }finally{ _photoLoadBusy=false; }
+}
+window.loadPendingPhotos = loadPendingPhotos;
 function buildApprovalPhotos(){
   if(!photoTotal()) return null;
   const out={};
@@ -1813,6 +1878,7 @@ async function submitToDb(){
   const woDate=gv('wo-date'), checkedBy=gv('checked-by');
   if(!woDate){ note('❌ Isi tanggal inspeksi terlebih dahulu.','err'); return; }
   if(!checkedBy){ note('❌ Isi nama Inspection By terlebih dahulu.','err'); return; }
+  if(_pendingTotal()){ note('⏳ Memuat foto dari Drive dulu sebelum submit…','info'); await loadPendingPhotos(); }
 
   const base = DB.collectCheckSheetData('mw', MW_TAG, MW_NAME, 'WITNESS');
   base.assetTag = gv('asset-tag') || MW_TAG;
@@ -2643,6 +2709,7 @@ async function mgLoadSession(i){ if (_sessions[i]) await loadSession(_sessions[i
 // new/updated draft in the session tab bar + banner (a fresh "Sesi Baru" has no
 // doc until this runs, so its tab would otherwise not appear).
 async function saveSessionDraft(){
+  if(_pendingTotal()){ note('⏳ Memuat foto dari Drive dulu sebelum menyimpan…','info'); await loadPendingPhotos(); }
   await CloudDraft.save();
   const sid = (CloudDraft.getActiveId && CloudDraft.getActiveId()) || '';
   if (sid) {
@@ -2678,6 +2745,7 @@ function clearSessionForm(){
   Object.keys(ST).forEach(k => delete ST[k]);
   document.querySelectorAll('.rb').forEach(b => b.classList.remove('a'));
   if (typeof PHOTOS === 'object') Object.keys(PHOTOS).forEach(k => { PHOTOS[k] = []; });
+  _pendingPhotoUrls = {};
   if (typeof renderAllPhotos === 'function') renderAllPhotos();
   if (typeof applyAttachList === 'function') applyAttachList([]);
   if (typeof applyChecks === 'function') applyChecks({});
@@ -2706,7 +2774,8 @@ async function loadSession(s){
 
   // photos
   if (s.photoUrls && typeof window.restorePhotosFromUrls === 'function') {
-    try { await window.restorePhotosFromUrls(s.photoUrls, true); } catch (e) { console.warn('restore foto sesi:', e); }
+    // defer: stash the URLs + show the form now; photos pull in the background
+    try { await window.restorePhotosFromUrls(s.photoUrls, true, { defer:true }); } catch (e) { console.warn('restore foto sesi:', e); }
   }
   // vendor PDF attachments (submitted -> s.attachments; draft -> s.extra.attachments)
   applyAttachList(s.attachments || (s.extra && s.extra.attachments) || []);

@@ -1984,6 +1984,18 @@ check sheets** (self-injecting like `submit-guard.js`). Firestore Rules must all
   `loadSession()` (motor-gate list) and the shared modal's `restorePhotosIfSupported()` already
   call the host's `restorePhotosFromUrls(photoUrls, overwrite)`; `listDrafts()` returns the full
   draft doc (`photoUrls` included) so `buildMergedBundle()` has them to union.
+  - **Lazy photo loading (`Motor_Witness_Test_Vendor.html`).** Each Drive photo is a ~2s
+    round-trip through the Apps Script proxy, so downloading a session's whole gallery inline
+    made "load a saved session" hang 20–30 s and look like the photos never came back.
+    `restorePhotosFromUrls(photoUrls, overwrite, {defer:true})` (used by `loadSession()`) now
+    STASHES the URLs in `_pendingPhotoUrls` + renders a "📥 N foto di Drive — Muat Foto" banner
+    per section + returns immediately; a `setTimeout` then pulls them in the background via
+    `loadPendingPhotos()` (parallel, 4 at a time, with a "Memuat foto n/N" badge). The
+    LoadMergeModal path passes no `{defer}` so it still downloads inline (it has its own
+    progress overlay + cache pre-warm). `saveSessionDraft()` / `submitToDb()` call
+    `await loadPendingPhotos()` first when `_pendingTotal()>0` so a still-pending photo is never
+    dropped from the save. `_pendingPhotoUrls` is persisted in the local photo draft
+    (`DRAFT_PHOTOS_KEY._pending`) so a mid-load refresh resumes.
 - **Continuing a draft uses the SAME "📥 Muat / Lanjutkan dari Database" button as Load & Merge**
   (the old "Pilih & Gabung Data" button, relabelled everywhere). `load-merge-modal.js`'s
   `open()` now also calls `CloudDraft.listDrafts()` and lists drafts above the submitted history,
