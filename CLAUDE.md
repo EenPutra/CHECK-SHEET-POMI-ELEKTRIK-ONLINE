@@ -483,6 +483,25 @@ itself, following this same pattern for consistency:
   `PhotoKit.draw()`/`PhotoKit.fit()` (see the photo section above). Passing a fixed width/height
   box to `addImage()` stretches the photo, because jsPDF scales the axes independently.
 
+- **A report with many photos can balloon to tens of MB — re-encode each photo for the PRINT BOX
+  it lands in, not for its on-screen working resolution.** `Motor_Witness_Test_Vendor.html`
+  embedded each `PHOTOS[k]` entry at PhotoKit's full working size (up to 1600px) straight into the
+  PDF; a report with dozens of photos across 8 sections could exceed the client's 15MB upload
+  limit. This is a DIFFERENT problem from the upload-time `compressUnder1MB()` bullet above (which
+  caps a photo's *stored/Firestore* size) — a photo already under ~950KB for storage is still far
+  bigger than it needs to be once it's only ever drawn inside a small fixed PDF box (a 2-up grid
+  here is ≈89×58mm). `pdfPhotoSrc(entry, boxWmm, boxHmm)` re-encodes a COPY sized for that exact
+  box at a print-adequate DPI (160) and quality (0.7, stepping down to 0.32 only if an unusually
+  detailed photo still exceeds a ~110KB per-photo safety cap), cached by `src+box` so regenerating
+  (preview, then the real download) doesn't redo the work. `sectionPhotos()` awaits this per photo
+  and draws a shallow-copied entry (`{...p, src: compressed}`, original `w`/`h`/`widthCm`/
+  `heightCm` kept so `PhotoKit.fit()`'s aspect-ratio math is unaffected) — the on-screen `PHOTOS`
+  entry itself is never mutated, so crop/rotate/re-export at full quality still works normally.
+  Verified with 40 synthetic worst-case (random-noise, hardest to compress) 1600×1200 photos
+  totalling 60MB at their original quality: the resulting PDF was 2.3MB, each embedded photo
+  ~43KB, generated in ~1.4s. A sheet with a different fixed photo-grid box size than this file's
+  2-up 89×58mm should pass its own `cw`/`MAXH` into `pdfPhotoSrc()` — the function is generic.
+
 - **Verifying changes to `generatePDF()`**: `pdf.save()` triggers a real browser download, so it
   can't be checked with a normal print-to-PDF screenshot. Uses the same headless-Chrome/CDP
   technique as "Running / testing changes" above; two ways to capture the output without ever

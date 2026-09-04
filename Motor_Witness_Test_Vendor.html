@@ -1425,6 +1425,45 @@ function clrSig(id){const c=document.getElementById(id);c.getContext('2d').clear
 function sigDataUrl(id){const c=document.getElementById(id);const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;return d.some(v=>v)?c.toDataURL('image/png'):'';}
 ['sig-insp','sig-vendor','sig-super'].forEach(initSig);
 
+/* ── PDF-only photo compression ───────────────────────────────────────────
+   Evidence photos are kept at PhotoKit's full working resolution (up to
+   1600px) on screen so crop/rotate stays sharp — but the PDF only ever draws
+   a photo inside a small fixed box (2-up ≈ 89x58mm), so embedding that full
+   resolution photo-for-photo is what makes a report with many photos balloon
+   to tens of MB. This re-encodes a copy sized for THAT print box at a print-
+   adequate DPI, just for the embed; the on-screen PHOTOS entry (src/w/h/crop)
+   is never touched. Cached by src+box so re-generating (preview, then the
+   real download) doesn't redo the work twice. */
+const PDF_PHOTO_CACHE = {};
+const PDF_PHOTO_DPI = 160, PDF_PHOTO_Q = 0.7, PDF_PHOTO_MAX_BYTES = 110*1024;
+function pdfPhotoSrc(p, boxWmm, boxHmm){
+  return new Promise(resolve=>{
+    const src = p && (p.src || p.dataUrl);
+    if(!src){ resolve(src); return; }
+    const key = src.length+'~'+src.slice(0,20)+'~'+Math.round(boxWmm)+'x'+Math.round(boxHmm);
+    if(PDF_PHOTO_CACHE[key]){ resolve(PDF_PHOTO_CACHE[key]); return; }
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const nW=img.naturalWidth||1, nH=img.naturalHeight||1;
+        const targetW=Math.max(90, Math.round(boxWmm/25.4*PDF_PHOTO_DPI));
+        const targetH=Math.max(70, Math.round(boxHmm/25.4*PDF_PHOTO_DPI));
+        const scale=Math.min(targetW/nW, targetH/nH, 1);   // never upscale
+        const w=Math.max(1,Math.round(nW*scale)), h=Math.max(1,Math.round(nH*scale));
+        const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        let q=PDF_PHOTO_Q, out=cv.toDataURL('image/jpeg', q);
+        // safety net for an unusually detailed photo even at report size
+        while(out.length*0.75 > PDF_PHOTO_MAX_BYTES && q>0.32){ q-=0.1; out=cv.toDataURL('image/jpeg', q); }
+        PDF_PHOTO_CACHE[key]=out;
+        resolve(out);
+      }catch(e){ resolve(src); }
+    };
+    img.onerror=()=>resolve(src);
+    img.src=src;
+  });
+}
+
 /* ── evidence photos — one gallery per card (section) ── */
 PhotoKit.configure({maxWcm:8.8,maxHcm:13,defaultWcm:8.8,defaultHcm:5.6});
 const PHOTO_SECTIONS = [
@@ -2509,17 +2548,21 @@ async function generatePDF(selSet, opts){
     pdf.setFontSize(6.8); pdf.setTextColor(120,120,120);
     pdf.text('File dapat dibuka dari check sheet / dashboard Review & Approval.', M+2, y+2.5); y+=6;
   }
-  function sectionPhotos(key){
+  async function sectionPhotos(key){
     const list=(PHOTOS[key]||[]).filter(p=>p&&p.src);
     if(!list.length) return;
     subTitle('Foto Evidence');
     const cw=(W-M*2-4)/2, MAXH=58;
     for(let i=0;i<list.length;i+=2){
       const g=list.slice(i,i+2);
-      const dims=g.map(p=>{ try{ return PhotoKit.fit(p,cw,MAXH); }catch(e){ return {w:cw,h:MAXH}; } });
+      // Re-encode each photo sized for the box it actually prints in (2-up),
+      // never the full PhotoKit working resolution — see pdfPhotoSrc() above.
+      const packed = await Promise.all(g.map(p=>pdfPhotoSrc(p,cw,MAXH)));
+      const gc = g.map((p,gi)=>Object.assign({}, p, {src:packed[gi], dataUrl:packed[gi]}));
+      const dims=gc.map(p=>{ try{ return PhotoKit.fit(p,cw,MAXH); }catch(e){ return {w:cw,h:MAXH}; } });
       const rh=Math.max(...dims.map(d=>d.h));
       checkY(rh+9);
-      g.forEach((p,pi)=>{
+      gc.forEach((p,pi)=>{
         const xo=M+pi*(cw+4);
         try{ PhotoKit.draw(pdf,p,xo,y,cw,MAXH,{align:'center'}); }catch(e){}
         if(p.caption){ pdf.setFont('helvetica','italic'); pdf.setFontSize(7.4); pdf.setTextColor(110,130,160); pdf.text(sanitize(p.caption).slice(0,70), xo, y+rh+3.4); }
@@ -2572,7 +2615,7 @@ async function generatePDF(selSet, opts){
     rtdWindingGrid(S.rtd_winding);
     subTitle('Bearing RTD / TC Sensor (deg C)');
     kvGrid(S.rtd_bearing.rows.filter(r=>r.values && r.values.Value!==undefined));
-    sectionPhotos('a');
+    await sectionPhotos('a');
   }
   if(selSet.has('b')){
     secBar('B. Stator Winding Resistance & Insulation Test');
@@ -2583,7 +2626,7 @@ async function generatePDF(selSet, opts){
     subTitle('IR / PI Matrix (Stator)');
     dataTable(S.stator_mtx, 'Waktu');
     irChartImage('stator');
-    sectionPhotos('b');
+    await sectionPhotos('b');
   }
   if(selSet.has('c')){
     secBar('C. Surge Comparison & Corona Test');
@@ -2591,7 +2634,7 @@ async function generatePDF(selSet, opts){
     kvGrid(S.surge.rows);
     subTitle('Corona Count During Surge Test'); dataTable(S.corona_surge, 'No');
     sectionAttach('c');
-    sectionPhotos('c');
+    await sectionPhotos('c');
   }
   if(selSet.has('d')){
     secBar('D. Tan Delta & Partial Discharge');
@@ -2601,7 +2644,7 @@ async function generatePDF(selSet, opts){
     kvGrid(S.td.rows);
     subTitle('Corona Count During TD / PD Test'); dataTable(S.corona_td, 'No');
     sectionAttach('d');
-    sectionPhotos('d');
+    await sectionPhotos('d');
   }
   if(selSet.has('e')){
     secBar('E. Stator High Potential Test');
@@ -2617,7 +2660,7 @@ async function generatePDF(selSet, opts){
     dataTable(S.hipot_mtx, 'Waktu');
     irChartImage('hipot');
     if(S.corona_hp.rows.length){ subTitle('Corona Count Hi-Pot dc'); dataTable(S.corona_hp, 'Terminal'); }
-    sectionPhotos('e');
+    await sectionPhotos('e');
   }
   if(selSet.has('f')){
     secBar('F. Mechanical Inspection');
@@ -2637,7 +2680,7 @@ async function generatePDF(selSet, opts){
     dataTable(S.bearing_recv, null);
     clrBand('Clearence Check Bearing to Journal Bearing', 'Using Filler Gauge');
     clrCombinedTable(S.bearing_journal, S.bearing_pedestal);
-    sectionPhotos('f');
+    await sectionPhotos('f');
   }
   if(selSet.has('g')){
     secBar('G. Unload / Solo Run Test');
@@ -2656,12 +2699,12 @@ async function generatePDF(selSet, opts){
     soloTempChartImage('chart-ulb', soloSeries.bSeries, 'Grafik Tren Suhu Bearing vs Waktu');
     subTitle('Local Monitoring & Current per Interval');
     dataTable(S.unload_local, null);
-    sectionPhotos('g');
+    await sectionPhotos('g');
   }
   if(selSet.has('i')){
     secBar('I. Kesimpulan & Tanda Tangan');
     kvGrid(S.conclusion.rows);
-    sectionPhotos('i');
+    await sectionPhotos('i');
     subTitle('Authorization & Signatures');
     checkY(40);
     const sw=(W-M*2)/3-4;
