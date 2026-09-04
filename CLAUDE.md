@@ -1489,14 +1489,17 @@ touch a report belonging to another account. Admin keeps its own fuller toolset 
 - **Edit** (`openOwnRevision(id)` → opens `<checksheetFile>?reviseOf=<id>`) — allowed for any
   status except `approved` (`_canOwnerEdit()`: `status!=='approved' && checksheetFile && !_src`).
   Resubmitting through the revision flow resets the status appropriately.
-- **Delete** (`doDeleteMyReport(id)`) — allowed ONLY while `Approvals.isPendingReview(status)`
-  (`submitted` / `revised`), i.e. nothing a reviewer has acted on (`_canOwnerDelete()`). This is
-  a **full retraction** — it deletes the `approvals` doc AND the `checksheets` doc AND best-effort
-  Drive files (like `doPurgeAll()` but scoped to own + pre-review only, `confirm()`-gated not
-  "type HAPUS"). Appropriate because a never-reviewed mistake submission is equivalent to never
-  having submitted. Reviewed / approved / returned reports show a "contact admin" message
-  instead. `DB.deleteById()` failing after the approval is already gone surfaces a clear
-  "approval gone, checklist not — retry from Dashboard" alert.
+- **Delete** (`doDeleteMyReport(id)`) — allowed at **ANY status** for a report the owner
+  submitted (`_canOwnerDelete()` = `!a._src`; the ownership check `_isMyOwnReport()` is the real
+  gate, not the workflow stage — the user asked for "hapus laporan jika ada kesalahan" without a
+  status limit). Always a **full retraction** — deletes the `approvals` doc AND the `checksheets`
+  doc AND best-effort Drive files (like `doPurgeAll()` but scoped to own). The `confirm()` dialog
+  escalates by status: a plain confirm for `submitted`/`revised`, a stronger confirm for
+  `reviewed`/`returned_to_technician` (noting the reviewer's work goes too), and a **`prompt()`
+  typing `HAPUS`** for `approved` (deleting an officially-approved final report also discards the
+  supervisor's signed approval). Only `_src` (external-feed) submissions can't be deleted here.
+  `DB.deleteById()` failing after the approval is already gone surfaces a clear "approval gone,
+  checklist not — retry from Dashboard" alert.
 - Surfaced in two places: the detail overlay (`renderDetail()` — a blue-tinted `dsec` box
   "Laporan Milik Anda — Koreksi", shown when `loggedInRole!=='admin' && !a._src &&
   _isMyOwnReport()`) and the Status Laporan tab's `_msCard()` action row (Perbaiki / Hapus

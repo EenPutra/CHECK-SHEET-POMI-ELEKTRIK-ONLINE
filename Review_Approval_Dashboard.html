@@ -1721,10 +1721,14 @@ function _isMyOwnReport(a, cs){
 // (opening ?reviseOf= resets it appropriately on resubmit) but never once
 // APPROVED — that's final, contact admin.
 function _canOwnerEdit(a){ return a && a.status !== 'approved' && !!a.checksheetFile && !a._src; }
-// A submitter may DELETE their own report only while NOTHING a reviewer has
-// acted on — i.e. status 'submitted' / 'revised' (Approvals.isPendingReview).
-// Once reviewed / approved / returned it's real workflow history: contact admin.
-function _canOwnerDelete(a){ return a && Approvals.isPendingReview(a.status) && !a._src; }
+// A submitter may DELETE their own report at ANY status if there was a
+// mistake — the gate is ownership (_isMyOwnReport), not workflow stage. The
+// confirm dialog in doDeleteMyReport() escalates by status: a plain confirm
+// for pending/returned, a "type HAPUS" prompt once it's been reviewed or
+// approved (that also discards the reviewer's / supervisor's signed work).
+// External-feed submissions (_src) still can't be deleted here — they live in
+// another app.
+function _canOwnerDelete(a){ return !!a && !a._src; }
 function _msIReviewed(a){ return a.review && _msMatches(a.review.reviewedBy); }
 function _msIApproved(a){ return a.approval && _msMatches(a.approval.approvedBy); }
 function _msInMyArea(a){
@@ -2227,11 +2231,24 @@ async function doDeleteMyReport(id){
     return;
   }
   if(!_canOwnerDelete(a)){
-    alert('Laporan ini sudah diproses (direview / disetujui / dikembalikan) sehingga tidak bisa Anda hapus sendiri.\n\nHubungi admin bila memang ada kesalahan.');
+    alert('Submission ini masuk lewat aplikasi lain sehingga tidak bisa dihapus dari sini.');
     return;
   }
   const label = (cs && (cs.assetName||cs.assetTag)) || a.assetName || a.assetTag || 'laporan ini';
-  if(!confirm('Hapus "'+label+'" secara PERMANEN?\n\nLaporan ini belum direview, jadi akan dihapus sepenuhnya:\n• entri Review & Approval\n• data checklist di database (hilang dari Dashboard: riwayat, grafik tren, export Excel)\n• foto & PDF terkait di Google Drive\n\nTindakan ini TIDAK DAPAT DIBATALKAN.')) return;
+  const common = '\n\nAkan dihapus sepenuhnya:\n• entri Review & Approval\n• data checklist di database (hilang dari Dashboard: riwayat, grafik tren, export Excel)\n• foto & PDF terkait di Google Drive\n\nTINDAKAN INI TIDAK DAPAT DIBATALKAN.';
+  const reviewed = a.status === 'reviewed' || (a.status === 'approved');
+  const approved = a.status === 'approved';
+  if(approved){
+    const who = (a.approval && a.approval.approvedBy) || 'supervisor';
+    const typed = prompt('Laporan "'+label+'" SUDAH DISETUJUI oleh '+who+' (laporan final).'+common+'\n\nKetik  HAPUS  (huruf besar) untuk menghapus laporan final ini beserta review & approval-nya:');
+    if(typed === null) return;
+    if(typed.trim() !== 'HAPUS'){ alert('Dibatalkan — teks konfirmasi tidak cocok.'); return; }
+  } else if(reviewed || a.status === 'returned_to_technician'){
+    const stage = a.status === 'returned_to_technician' ? 'sudah pernah diproses reviewer (dikembalikan untuk revisi)' : 'sudah direview oleh ' + ((a.review && a.review.reviewedBy) || 'TechOp2');
+    if(!confirm('Laporan "'+label+'" '+stage+' — hasil review/approval yang menyertainya juga akan ikut terhapus.'+common)) return;
+  } else {
+    if(!confirm('Hapus "'+label+'" secara PERMANEN?\n\nLaporan ini belum direview.'+common)) return;
+  }
 
   showFileProgress('Menghapus laporan…');
   try{
@@ -2419,20 +2436,25 @@ function renderDetail(a, cs){
     const canDel  = _canOwnerDelete(a);
     html += `<div class="dsec danger-zone" style="border-color:rgba(37,99,235,.22);background:var(--pri-soft)">
       <div class="dsec-title" style="color:var(--pri-deep)">&#9999;&#65039; Laporan Milik Anda — Koreksi</div>
-      <div class="readonly-hint" style="margin-bottom:10px">Laporan ini Anda yang submit. Perbaiki isian bila ada kesalahan, atau hapus bila belum direview.</div>`;
+      <div class="readonly-hint" style="margin-bottom:10px">Laporan ini Anda yang submit. Perbaiki isian bila ada kesalahan, atau hapus laporannya bila memang salah.</div>`;
     if(canEdit){
       html += `<button class="btn btn-sm btn-pri" onclick="openOwnRevision('${a.id}')">&#9999;&#65039; Perbaiki / Edit Laporan Ini</button>
         <div class="readonly-hint" style="margin:6px 0 0">Membuka check sheet dalam mode revisi. Setelah disimpan ulang, laporan kembali ke antrean review.</div>`;
     }else{
-      html += `<div class="readonly-hint" style="color:var(--ng)">Laporan sudah <b>disetujui (final)</b> — tidak bisa diedit sendiri. Hubungi admin bila ada kesalahan.</div>`;
+      html += `<div class="readonly-hint" style="color:var(--ng)">Laporan sudah <b>disetujui (final)</b> — tidak bisa diedit sendiri. Hubungi admin bila hanya perlu perbaikan isian (bukan hapus).</div>`;
     }
     if(canDel){
+      const warn = a.status==='approved'
+        ? 'Laporan ini <b>sudah disetujui (final)</b>. Menghapusnya juga membuang review &amp; approval yang menyertainya — perlu ketik <b>HAPUS</b> untuk konfirmasi.'
+        : (a.status==='reviewed' || a.status==='returned_to_technician')
+          ? 'Laporan ini sudah diproses reviewer — hasil review yang menyertainya juga akan ikut terhapus.'
+          : 'Laporan ini belum direview.';
       html += `<div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
-        <div class="readonly-hint" style="margin-bottom:10px"><b style="color:var(--ng)">Hapus permanen.</b> Laporan ini belum direview, jadi entri approval, data checklist di Dashboard, serta foto &amp; PDF di Drive akan dihapus. Tidak bisa dibatalkan.</div>
+        <div class="readonly-hint" style="margin-bottom:10px"><b style="color:var(--ng)">Hapus permanen.</b> ${warn} Entri approval, data checklist di Dashboard, serta foto &amp; PDF di Drive akan dihapus. Tidak bisa dibatalkan.</div>
         <button class="btn btn-danger" onclick="doDeleteMyReport('${a.id}')">&#128465;&#65039; Hapus Laporan Ini</button>`;
     }else{
       html += `<div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
-        <div class="readonly-hint">Laporan sudah diproses (direview / disetujui / dikembalikan) sehingga tidak bisa Anda hapus sendiri. Hubungi admin bila memang ada kesalahan.</div>`;
+        <div class="readonly-hint">Submission ini masuk lewat aplikasi lain — perbaikan/penghapusan dilakukan di aplikasi tersebut.</div>`;
     }
     html += `</div>`;
   }
