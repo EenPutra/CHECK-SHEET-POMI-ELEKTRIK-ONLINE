@@ -1499,7 +1499,7 @@ function renderAllPhotos(){ PHOTO_KEYS.forEach(renderPhotos); }
 function afterPhotoChange(){ savePhotoDraft(); if(typeof autoSaveNow==='function') autoSaveNow(); }
 function savePhotoDraft(){
   try{
-    const out={ _pending:_pendingPhotoUrls };
+    const out={ _pending:_pendingPhotoUrls, _loaded:_loadedPhotoUrls };
     PHOTO_KEYS.forEach(k=>{ out[k]=(PHOTOS[k]||[]).map(p=>({src:p.src,dataUrl:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm})); });
     localStorage.setItem(DRAFT_PHOTOS_KEY, JSON.stringify(out));
   }catch(e){ note('⚠️ Draft tersimpan, tapi foto terlalu besar untuk localStorage.','err'); }
@@ -1511,11 +1511,8 @@ function loadPhotoDraft(){
     if(Array.isArray(d)){ PHOTOS.a = d; }                 // migrate old flat-array drafts into section A
     else {
       PHOTO_KEYS.forEach(k=>{ if(Array.isArray(d[k])) PHOTOS[k]=d[k]; });
-      if(d._pending && typeof d._pending==='object'){
-        _pendingPhotoUrls = d._pending;
-        // resume the background pull if a refresh interrupted it
-        if(_pendingTotal()) setTimeout(()=>{ loadPendingPhotos().catch(()=>{}); }, 800);
-      }
+      if(d._pending && typeof d._pending==='object') _pendingPhotoUrls = d._pending;
+      if(d._loaded && typeof d._loaded==='object') _loadedPhotoUrls = d._loaded;
     }
     renderAllPhotos();
   }catch(e){}
@@ -1568,8 +1565,9 @@ async function restorePhotosFromUrls(photoUrls, overwrite, opts){
   }
   renderAllPhotos();
   if(opts.defer){
-    // background pull — never blocks the caller
-    setTimeout(()=>{ loadPendingPhotos().catch(e=>console.warn('bg photo load:',e)); }, 400);
+    // on-demand only — the form shows now, foto ditarik saat tombol
+    // "☁️ Muat Foto Drive" ditekan (atau otomatis sebelum Save/Submit).
+    if(staged) note('📷 '+staged+' foto tersimpan di Drive — klik "☁️ Muat Foto Drive" di section foto untuk menampilkannya.','info');
     return staged;
   }
   return await loadPendingPhotos();
@@ -1578,35 +1576,57 @@ window.restorePhotosFromUrls = restorePhotosFromUrls;
 
 // Download every deferred Drive photo (parallel, max 4 at a time) into PHOTOS.
 let _photoLoadBusy = false;
+function _photoProg(txt, warn){
+  const el=document.getElementById('autosave-indicator'); if(!el) return;
+  if(txt===null){ el.className='autosave-ind'; return; }
+  el.textContent=txt; el.className='autosave-ind show'+(warn?' warn':'');
+}
 async function loadPendingPhotos(){
-  if(_photoLoadBusy) return 0;
+  if(_photoLoadBusy){ note('⏳ Foto sedang diunduh… tunggu sebentar.','info'); return 0; }
   const jobs=[];
   for(const key of Object.keys(_pendingPhotoUrls)){
-    (_pendingPhotoUrls[key]||[]).forEach(entry=>jobs.push({key,entry}));
+    (_pendingPhotoUrls[key]||[]).forEach((entry,idx)=>jobs.push({key,entry,idx}));
   }
   if(!jobs.length) return 0;
   _photoLoadBusy = true;
-  const took = {}; PHOTO_KEYS.forEach(k=>took[k]=[]);
-  let done=0;
+  const total=jobs.length;
+  let done=0, ok=0, fail=0;
+  _photoProg('⏳ Mengunduh foto 0/'+total+'…');
+  note('⏳ Mengunduh '+total+' foto dari Google Drive… (± '+Math.ceil(total*2.5/3)+' detik)','info');
   try{
-    const CONC=4;
+    const CONC=3;   // gentle on the Apps Script proxy quota
     for(let i=0;i<jobs.length;i+=CONC){
-      const slice=jobs.slice(i,i+CONC);
-      await Promise.all(slice.map(async j=>{
-        try{
-          const dd=await Storage.toDataUrl(j.entry.url);
-          if(dd) took[j.key].push({src:dd,dataUrl:dd,caption:j.entry.caption||'',w:j.entry.w,h:j.entry.h,widthCm:j.entry.widthCm,heightCm:j.entry.heightCm});
-        }catch(e){ console.error('muat 1 foto gagal:',e); }
+      await Promise.all(jobs.slice(i,i+CONC).map(async j=>{
+        let dd=null;
+        for(let attempt=0; attempt<2 && !dd; attempt++){
+          try{ dd=await Storage.toDataUrl(j.entry.url); }
+          catch(e){ if(attempt) console.error('muat 1 foto gagal:',j.entry.url,e); await new Promise(r=>setTimeout(r,300)); }
+        }
         done++;
+        if(dd){
+          ok++;
+          (PHOTOS[j.key]=PHOTOS[j.key]||[]).push({src:dd,dataUrl:dd,caption:j.entry.caption||'',w:j.entry.w,h:j.entry.h,widthCm:j.entry.widthCm,heightCm:j.entry.heightCm});
+          // mark this url consumed so a partial re-run doesn't double-load it
+          const pend=_pendingPhotoUrls[j.key]; if(pend){ const p=pend.indexOf(j.entry); if(p>=0) pend.splice(p,1); }
+          renderPhotos(j.key);            // incremental — user sees each photo appear
+        }else{ fail++; }
+        _photoProg('⏳ Mengunduh foto '+done+'/'+total+(fail?' ('+fail+' gagal)':'')+'…', fail>0);
       }));
-      const badge=document.getElementById('mw-photo-loading'); if(badge) badge.textContent='⏳ Memuat foto '+done+'/'+jobs.length+'…';
     }
-    let restored=0;
-    PHOTO_KEYS.forEach(k=>{ if(took[k].length){ PHOTOS[k]=(PHOTOS[k]||[]).concat(took[k]); restored+=took[k].length; } });
-    _pendingPhotoUrls = {};
+    // drop empty pending groups
+    Object.keys(_pendingPhotoUrls).forEach(k=>{ if(!(_pendingPhotoUrls[k]||[]).length) delete _pendingPhotoUrls[k]; });
+    try{ savePhotoDraft(); }catch(e){}
     renderAllPhotos();
-    if(restored){ try{ savePhotoDraft(); }catch(e){} note('📷 '+restored+' foto dimuat dari Drive.','ok'); }
-    return restored;
+    if(fail){
+      _photoProg('⚠️ '+ok+'/'+total+' foto — '+fail+' gagal',true);
+      setTimeout(()=>_photoProg(null),6000);
+      note('📷 '+ok+' foto dimuat, '+fail+' gagal. Klik "☁️ Muat Foto Drive" lagi untuk mencoba sisanya.','err');
+    }else{
+      _photoProg('✅ '+ok+' foto dimuat');
+      setTimeout(()=>_photoProg(null),3500);
+      note('📷 '+ok+' foto dimuat dari Drive.','ok');
+    }
+    return ok;
   }finally{ _photoLoadBusy=false; }
 }
 window.loadPendingPhotos = loadPendingPhotos;
