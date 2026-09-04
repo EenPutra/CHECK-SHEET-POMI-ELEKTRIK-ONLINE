@@ -271,7 +271,24 @@ const Approvals = {
         const urls = [];
         for (let i = 0; i < list.length; i++) {
           const p = list[i];
-          if (!p || !p.src) continue;
+          if (!p) continue;
+          // A reference to a file already on Drive with NO local data URL — e.g.
+          // a photo from a session restore that was never downloaded into memory
+          // (deferred load / a failed "Muat Foto"). Keep its URL; nothing to
+          // upload. Without this it was silently dropped (the old `!p.src` skip).
+          if (p.__cdUrl && !p.src) {
+            urls.push({
+              url: p.__cdUrl, caption: p.caption || '',
+              ...(p.w != null ? { w: p.w } : {}),
+              ...(p.h != null ? { h: p.h } : {}),
+              ...(p.widthCm != null ? { widthCm: p.widthCm } : {}),
+              ...(p.heightCm != null ? { heightCm: p.heightCm } : {}),
+            });
+            uploadedPhotos++;
+            if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Foto ${key} sudah tersimpan (${uploadedPhotos}/${totalPhotos})...`);
+            continue;
+          }
+          if (!p.src) continue;
           const url = (p.__cdUrl && p.__cdSig === (String(p.src).length + '~' + String(p.src).slice(0, 24) + String(p.src).slice(-24)))
             ? p.__cdUrl
             : await Storage.uploadDataUrl(

@@ -11,18 +11,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20260904c"></script>
-<script src="db-helper.js?v=20260904c"></script>
-<script src="storage-helper.js?v=20260904c"></script>
-<script src="approval-helper.js?v=20260904c"></script>
-<script src="submit-guard.js?v=20260904c"></script>
-<script src="pdf-preview.js?v=20260904c"></script>
-<script src="load-merge-modal.js?v=20260904c"></script>
-<script src="cloud-draft.js?v=20260904c"></script>
-<script src="auth-session.js?v=20260904c"></script>
-<script src="technician-auth.js?v=20260904c"></script>
-<script src="img-helper.js?v=20260904c"></script>
-<script src="photo-kit.js?v=20260904c"></script>
+<script src="firebase-config.js?v=20260904d"></script>
+<script src="db-helper.js?v=20260904d"></script>
+<script src="storage-helper.js?v=20260904d"></script>
+<script src="approval-helper.js?v=20260904d"></script>
+<script src="submit-guard.js?v=20260904d"></script>
+<script src="pdf-preview.js?v=20260904d"></script>
+<script src="load-merge-modal.js?v=20260904d"></script>
+<script src="cloud-draft.js?v=20260904d"></script>
+<script src="auth-session.js?v=20260904d"></script>
+<script src="technician-auth.js?v=20260904d"></script>
+<script src="img-helper.js?v=20260904d"></script>
+<script src="photo-kit.js?v=20260904d"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
 <style>
 /* ===== BLUE THEME — light (default) ===== */
@@ -1640,10 +1640,21 @@ async function loadPendingPhotos(){
 }
 window.loadPendingPhotos = loadPendingPhotos;
 function buildApprovalPhotos(){
-  if(!photoTotal()) return null;
   const out={};
-  PHOTO_KEYS.forEach(k=>{ if((PHOTOS[k]||[]).length) out[k]=PHOTOS[k].map(p=>({src:p.src,caption:p.caption||'',w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm,__cdUrl:p.__cdUrl,__cdSig:p.__cdSig})); });
-  return out;
+  PHOTO_KEYS.forEach(k=>{
+    const live=(PHOTOS[k]||[]).map(p=>({src:p.src,caption:p.caption||'',w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm,__cdUrl:p.__cdUrl,__cdSig:p.__cdSig}));
+    const seen=new Set(live.map(p=>p.__cdUrl).filter(Boolean));
+    // Photos still on Drive that weren't downloaded into PHOTOS this session
+    // (deferred restore, or a failed "☁️ Muat Foto Drive"). Pass them through as
+    // URL-only references so a Save Draft / Submit never drops an already-
+    // uploaded photo just because it isn't in memory yet.
+    const pend=(_pendingPhotoUrls[k]||[])
+      .filter(e=>e&&e.url&&!seen.has(e.url))
+      .map(e=>({caption:e.caption||'',w:e.w,h:e.h,widthCm:e.widthCm,heightCm:e.heightCm,__cdUrl:e.url}));
+    const all=live.concat(pend);
+    if(all.length) out[k]=all;
+  });
+  return Object.keys(out).length?out:null;
 }
 
 /* ── vendor PDF attachments — per test session ──────────────────────────

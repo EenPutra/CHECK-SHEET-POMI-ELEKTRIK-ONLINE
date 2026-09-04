@@ -2001,6 +2001,23 @@ check sheets** (self-injecting like `submit-guard.js`). Firestore Rules must all
     dropped. The LoadMergeModal path passes no `{defer}` → downloads inline behind its own
     progress overlay. `_pendingPhotoUrls` / `_loadedPhotoUrls` persist in `DRAFT_PHOTOS_KEY`
     (`._pending` / `._loaded`) so a refresh keeps the banner + button working.
+  - **A "Save Draft" made while photos are still deferred used to WIPE them from the draft doc.**
+    `CloudDraft.save()` does `db.collection('checksheet_drafts').doc(id).set(payload)` — a full
+    replace — and `payload.photoUrls` was built purely from `cfg.photos()`. On Motor Witness a
+    restored session's photos sit in `_pendingPhotoUrls` (not `PHOTOS`) until "☁️ Muat Foto Drive"
+    downloads them, so `buildApprovalPhotos()` returned `null` and the `.set()` erased the
+    previously-saved `photoUrls: {b, f, …}` — successfully-uploaded photos then showed "0 foto" on
+    the next open, nothing to load. Fixed on three fronts (all `?v=` bumped repo-wide, this was a
+    shared-lib change): (1) `buildApprovalPhotos()` now also emits every `_pendingPhotoUrls[k]`
+    entry as a **URL-only reference** `{__cdUrl:<driveUrl>}` (no `src`), deduped against live
+    entries by `__cdUrl`; (2) `approval-helper.js`'s `submitWithFiles()` and `cloud-draft.js`'s
+    `save()` both learned to pass a `{__cdUrl, no src}` entry straight through as an
+    already-on-Drive file instead of the old `!p.src` → skip; (3) `cloud-draft.js` fetches the
+    existing draft doc's `photoUrls` up front (when `_activeDoc` doesn't have it) and, **only when
+    `cfg.photos()` returns `null` entirely** (a throw / load-order race — never when it returns an
+    object, where an absent group is a real delete), carries them forward so a `.set()` can't
+    erase the group. Verified headless: save while deferred → 0 uploads, `photoUrls` kept; a real
+    per-photo delete (7→4 live) → saved as 4, carry-forward does not resurrect the 3.
 - **Continuing a draft uses the SAME "📥 Muat / Lanjutkan dari Database" button as Load & Merge**
   (the old "Pilih & Gabung Data" button, relabelled everywhere). `load-merge-modal.js`'s
   `open()` now also calls `CloudDraft.listDrafts()` and lists drafts above the submitted history,
@@ -2035,7 +2052,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260901a`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20260904d`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a
