@@ -510,6 +510,19 @@ itself, following this same pattern for consistency:
   capturing it — a canvas some other tab last touched may be stale or was never drawn if the user
   never visited that tab on screen, and `display:none` on an ancestor does not stop a canvas from
   rendering or being read back, so redrawing is cheap insurance.
+  **Every on-screen auto-chart must be wired into `generatePDF()` explicitly — adding a chart to
+  the page does NOT add it to the report.** `Motor_Witness_Test_Vendor.html` shipped with its two
+  IR-trend charts (`ir-chart-stator`/`-hipot`) in the PDF but its later-added Solo-Run temperature
+  charts (`chart-ulw` winding / `chart-ulb` bearing) missing entirely. Fixed with a shared
+  `chartImage(canvas, series, title)` helper inside `generatePDF()` that redraws, checks the
+  series actually has data (so an empty chart's "isi tabel dulu" placeholder is never embedded),
+  `addImage`s it, and draws a wrapped `chartLegend()` row beneath it (the on-screen legend is
+  separate HTML — `#leg-ulw` etc — and does NOT ride along in `toDataURL()`, so without this a
+  10-line RTD chart in the PDF was unreadable). `cssColorToRgb()` converts the `#hex` / `hsl()`
+  series colours (`_seriesColor()` returns HSL once there are >4 RTDs) to jsPDF `[r,g,b]`. The
+  series data comes from `_soloTempSeries()` — one function feeding BOTH `drawSoloTempCharts()`
+  and the PDF so they can't drift. `chartImage()` reserves subtitle+chart+legend height in ONE
+  `checkY()` before drawing the subtitle so a page break never strands the title from its chart.
 
 - **Importing a megger tester's own exported report to auto-fill the 15s..10m matrix**:
   `4000_Hours_Mill_PM.html`'s PVR-500 megger matrix (`chk.special==='meggerMatrix'`) has a
