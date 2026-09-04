@@ -1332,6 +1332,17 @@ the current design — **do not "simplify" these away**:
     CloudDraft) and calls its own `applyIntervals()` — never shrinks, so a merge can't destroy
     existing columns. Its own motor-gate session list (`loadSession()`) already did this via
     `applyDraftData()`; this closes the same gap on the shared-modal path.
+  - **`DB.collectCheckSheetData()`'s `inputValues` sweep now matches typeless `<input>`s.**
+    An `input[type=text]` attribute selector does NOT match `<input>` with no `type` attribute,
+    so the old `input[type=text], input[type=number], input[type=date]` list silently dropped
+    every bare `<input class="ti">` — the RTD / IR-PI matrix / corona grid cells in
+    `Motor_Witness_Test_Vendor.html` (and any similar sheet). `submitToDb()` there papered over
+    it with an extra `.ct .ti, .mtx .ti` sweep, but **`CloudDraft.save()` ("💾 Simpan ke
+    Database") goes only through `collectCheckSheetData()`** — so a cloud draft saved from that
+    button lost all RTD/matrix values, and reopening on another device showed them blank. Fixed
+    in `db-helper.js` with a broad `input:not([type=file]):not([type=checkbox]):not([type=radio])
+    :not([type=button])…` selector (checkboxes/radios are still handled separately via
+    `toggleStates`/`checkStates`). Purely additive — captures more ids, never fewer.
   - **`?reviseOf=<approvalId>` opens the check sheet in revision/edit mode** for ANY status,
     not just returned items. `Review_Approval_Dashboard.html`'s review action section (the
     `canReview` branch of `renderActionSection()`) has an **"✏️ Edit Check Sheet"** button

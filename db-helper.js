@@ -196,8 +196,16 @@ const DB = {
     }
 
     // ── Save all input values by ID for exact restoration ──
+    // Broad selector: everything EXCEPT file/checkbox/radio/button (checkboxes
+    // are handled separately via toggleStates/checkStates). An `[type=text]`
+    // attribute selector does NOT match an <input> with no type attribute, so
+    // the old `input[type=text], input[type=number], input[type=date]` list
+    // silently dropped every bare `<input class="ti">` — the RTD / matrix /
+    // corona grid cells in Motor_Witness_Test_Vendor.html and others — from
+    // CloudDraft "Simpan ke Database" and any generic restore. Also picks up
+    // type=time / tel / etc. Purely additive: captures more ids, never fewer.
     const inputValues = {};
-    document.querySelectorAll('input[type=number], input[type=text], input[type=date], select, textarea').forEach(input => {
+    document.querySelectorAll('input:not([type=file]):not([type=checkbox]):not([type=radio]):not([type=button]):not([type=submit]):not([type=image]):not([type=reset]), select, textarea').forEach(input => {
       if (input.id && input.value) {
         inputValues[input.id] = input.value;
       }
