@@ -2618,7 +2618,7 @@ Standard stack otherwise (technician-auth on `checked-by`, autosave, PhotoKit `P
 Load & Merge + CloudDraft, submit-guard, `Approvals.submitWithFiles`). `base.sheets` = one `s<i>`
 key per section + a `compartments` legend sheet.
 
-## `Stacker Reclaimer/` — 10 Stacker/Reclaimer PM check sheets, template + generator
+## `Stacker Reclaimer/` — 11 Stacker/Reclaimer PM check sheets, template + generator
 
 Ported from the 9 `.xls` files in `google-apps-script/Checksheet mentah/` (all "Motor_Stacker
 *"). **The 9 raw files are NOT a 1:1 map to the 10 outputs here** — confirmed by actually reading
@@ -2757,6 +2757,23 @@ via the same `value_rows()` helper used everywhere else, same wording as the sta
 If another config in this family ever needs a similar "not in source, but requested" measurement
 added, follow this same pattern rather than searching the source for something that isn't there.
 
+**`STRC1_Main` (the 11th file) — the "STRC-1" tab's non-Long-Travel content, added on user
+request.** `Motor_Stacker 1.xlsx`'s `STRC-1` tab was originally read as "just an older duplicate
+of Long Travel, skip it" (see the top of this section) — true for the Long Travel Wheels PORTION
+of that tab, but incomplete: the SAME tab also combines Slewing/Luffing/Bucket Wheel/Boom
+Conveyor/Cable Reel/Rail Clamp (16 columns — the Stacker-1 analog of `STRC2_Main`'s equivalent
+subsystem set) into that one sheet, which had never been built. Caught only when the user pointed
+at this specific asset group with a screenshot of its column header row and asked for it, Long
+Travel explicitly excluded (already its own file). `STRC1_MAIN` compartments + `motor_sections()`
+— no `brake_label` (the source shows no brake-specific terminal-pair text for this equipment
+group, unlike Long Travel/Slewing — confirmed by checking, not assumed). The SAME tab also has a
+Transformer 40 kVA + Cable Reel 2-yearly block identical in shape to `STRC2_Cable_Reel_XFMR` —
+that's why that file's title already reads "Stacker Reclaimer 1/2" rather than "2" alone; it was
+scoped in ahead of time when that file was last touched. **Lesson**: "duplicate, skip it" was
+right for part of a tab and wrong to generalize to the whole tab — a tab that's 90% duplicate can
+still hold a genuinely unbuilt 10%; re-check a "skip" decision against the FULL tab dump, not just
+the portion that triggered the original judgement.
+
 Standard stack (technician-auth on `checked-by`, autosave, PhotoKit `PHOTOS.evidence`, Load &
 Merge + CloudDraft, submit-guard, `Approvals.submitWithFiles`, landscape A4 PDF with navy cover +
 `willDrawPage` mini-header) is unchanged from SWGR — verified per-file via headless Chrome across
@@ -2766,7 +2783,8 @@ widest matrix, the value-only XFMR sheet, and the 4-group Safety Device sheet; o
 `submitToDb()` run — including clicking through the real `PdfPreview` "review before submit"
 modal that the submit path shows by design, the same way a technician would — confirming
 `DB.save()`+`Approvals.submitWithFiles()` both fire with zero real Firestore/Drive writes against
-a fail-loud mock). Portal: new **`strc`** category ("Stacker / Reclaimer"), 10 cards, `href`s
+a fail-loud mock). Portal: new **`strc`** category ("Stacker / Reclaimer"), 11 cards (10 from the
+original build + `STRC1_Main` added afterward — see below), `href`s
 `Stacker%20Reclaimer/<file>.html`.
 
 ## Per-file conventions worth matching

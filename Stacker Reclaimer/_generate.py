@@ -280,6 +280,36 @@ CONFIGS["STRC1_FDR_CSRH"] = {
     "sections": motor_sections(FDR, one_monthly=True),
 }
 
+# ── 4b. STRC-1 Main (Slewing/Luffing/Bucket Wheel/Boom Conveyor/Cable Reel/Rail Clamp) ──
+# From the "STRC-1" tab in Motor_Stacker 1.xlsx, which — like STRC-2's own
+# "STRC-2" tab — combines every major moving subsystem OTHER than Long Travel
+# Wheels into one sheet. Long Travel is deliberately excluded here per
+# explicit user request (already covered by STRC1_Long_Travel.html) — the
+# rest of that tab (this asset group, plus a Transformer 40 kVA + Cable Reel
+# 2-yearly block identical in shape to STRC2_Cable_Reel_XFMR.html, which is
+# why that file's title reads "Stacker Reclaimer 1/2") is genuinely unbuilt.
+STRC1_MAIN = cmp([
+    ("CCH-STRC-120A1-M", "Motor for Boom Slewing #1"), ("CCH-STRC-120A2-M", "Motor for Boom Slewing #2"),
+    ("CCH-STRC-120A3-M", "Motor for Boom Slewing #3"),
+    ("CCH-STRC-120A1-B", "Disc Brake for Boom Slewing #1"), ("CCH-STRC-120A2-B", "Disc Brake for Boom Slewing #2"),
+    ("CCH-STRC-120A3-B", "Disc Brake for Boom Slewing #3"),
+    ("CCH-STRC-130A-M", "Motor for Boom Luffing"), ("CCH-STRC-130A-B", "Disc Brake for Boom Luffing"),
+    ("CCH-STRC-100A-M", "Motor for Boom Bucket Wheel"), ("CCH-STRC-100A-B", "Disc Brake for Boom Bucket Wheel"),
+    ("CCH-STRC-310A-M", "Motor for Boom Conveyor"), ("CCH-STRC-310A-B", "Disc Brake for Boom Conveyor"),
+    ("CCH-STRC-100A1-M", "Cable Reel for Power"), ("CCH-STRC-100A2-M", "Cable Reel for Control"),
+    ("CCH-STRC-100A3-M", "Rail Clamp 1"), ("CCH-STRC-100A4-M", "Rail Clamp 2"),
+])
+CONFIGS["STRC1_Main"] = {
+    "formId": "strc1_main", "assetTag": "STRC1-MAIN", "assetName": "Stacker Reclaimer 1 — Main PM (Slewing/Luffing/BW/BC/Cable Reel/Rail Clamp)",
+    "checksheetFile": "Stacker Reclaimer/STRC1_Main.html", "draftKey": "strc1_main",
+    "pageTitle": "STRC 1 Main PM", "heroTitle": "STRC <em>1 &middot; Main</em>",
+    "eyebrow": "Stacker Reclaimer 1 · Slewing / Luffing / Bucket Wheel / Boom Conveyor / Cable Reel / Rail Clamp",
+    "frequency": "6 MONTHLY",
+    "heroSub": "STRC-1 · 16 motor/brake positions across every major moving subsystem (excl. Long Travel — see its own check sheet)",
+    "assetLabel": "Stacker Reclaimer 1 · Main periodic PM (16 positions)", "compartments": STRC1_MAIN,
+    "sections": motor_sections(STRC1_MAIN),
+}
+
 # ── 5. STRC-2 main (Slewing/Luffing/Bucket Wheel/Boom Conveyor/Cable Reel/Rail Clamp/Power Cylinders) ──
 STRC2_MAIN = cmp([
     ("CCH-STRC-1201B1-M", "Motor for Boom Slewing #1"), ("CCH-STRC-1201B2-M", "Motor for Boom Slewing #2"),
