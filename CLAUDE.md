@@ -2721,6 +2721,28 @@ builds a config-specific "1 Yearly" section; every other config still uses the s
 constant unchanged (verified via headless Chrome: `STRC1_BW_BC`'s brake column still gets a plain
 input on every row, identical to before this change — no regression from adding this mechanism).
 
+**A whole section — "Basic Motor Data" — was missing end-to-end (not just from the PDF) across
+all 8 "motor + brake" configs, until a user report ("PDF layout doesn't match the checksheet,
+applies to every Stacker Reclaimer sheet") prompted re-checking every source sheet against
+`_generate.py` line by line.** Every one of those 8 sheets opens with a 5-row nameplate block
+(Rated Voltage / Rated Power / Full Load Ampere / Speed / Service Factor, one column per
+equipment tag) BEFORE "1 Monthly"/"6 Monthly" starts — confirmed present in every one of their
+source dumps — but `motor_sections()` never built a section for it, so it was absent from the
+on-screen form AND the PDF for every one of them; this wasn't a PDF-rendering bug; the data model
+itself was incomplete. Fixed by adding `BASIC_MOTOR_DATA` (5 `type:'value'` items, no criteria)
+as a new `s0` section prepended by `motor_sections()` — free-text per column, no pre-filled
+reference values, matching this repo's existing "Basic Motor Data" convention elsewhere (e.g.
+Motor Witness's `S.motordata`). `STRC2_Cable_Reel_XFMR` and `STRC2_Safety_Device` correctly do
+NOT get this section — neither has anything resembling it in its own source (confirmed, not
+assumed) — so `motor_sections()` is the only thing that changed; those 2 configs build their
+`sections` list by hand and are untouched. Verified via headless Chrome across all 10 files:
+the 8 motor+brake configs each report a `s0` section with exactly 5 items and generate a
+5-row "Basic Motor Data" PDF page (rendered and visually checked); the 2 non-motor configs are
+unaffected (section count unchanged, `val-0-0-0` absent). **Lesson for extending this template
+family further**: when a "layout doesn't match" report comes in, check whether a whole SECTION is
+missing from `_generate.py` before assuming it's a rendering/styling issue in `_strc_template.tpl`
+— the fix here was 12 lines of new config data, not a PDF change at all.
+
 Standard stack (technician-auth on `checked-by`, autosave, PhotoKit `PHOTOS.evidence`, Load &
 Merge + CloudDraft, submit-guard, `Approvals.submitWithFiles`, landscape A4 PDF with navy cover +
 `willDrawPage` mini-header) is unchanged from SWGR — verified per-file via headless Chrome across

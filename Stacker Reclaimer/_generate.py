@@ -81,6 +81,23 @@ def value2(no, desc, crit, sublabels):
 
 # ── shared item catalogs (verbatim wording from the source WORK COMPLETION
 #    REPORT tabs — identical across every "motor + brake" sheet) ──
+
+# Every "motor + brake" WORK COMPLETION REPORT tab opens with this 5-row
+# nameplate block (rows 8-12 in the source, right above "1 Monthly"/"6
+# Monthly") before this was caught it was missing end-to-end — not in the
+# on-screen form, not in the PDF, across all 8 motor+brake check sheets.
+# Free-text per column (no criteria, no OK/NG) — matches every other check
+# sheet in this repo's own "Basic Motor Data" convention (e.g. Motor Witness's
+# S.motordata section), technician fills in from the equipment's own
+# nameplate rather than a pre-filled reference value.
+BASIC_MOTOR_DATA = [
+    {"no": "1", "desc": "Rated Voltage", "crit": "", "type": "value"},
+    {"no": "2", "desc": "Rated Power", "crit": "", "type": "value"},
+    {"no": "3", "desc": "Full Load Ampere", "crit": "", "type": "value"},
+    {"no": "4", "desc": "Speed", "crit": "", "type": "value"},
+    {"no": "5", "desc": "Service Factor", "crit": "", "type": "value"},
+]
+
 ONE_MONTHLY = [
     {"no": "1", "desc": "Check mounting bolt and lock pin of motor support.", "crit": "No looseness\nNo dirty or corroded"},
     {"no": "2", "desc": "Check motor starter for contact resistances and power connection tightness.", "crit": "Tightness"},
@@ -173,7 +190,9 @@ def motor_sections(cols, one_monthly=False, brake_label=None):
     to `cols` — this is the shared shape behind Long Travel / Slewing / BW-BC /
     STRC-2 main / FDR-CSRH / the combined BW-BC-CR monthly sheet.
     `brake_label` — see one_yearly_items()."""
-    secs = []
+    secs = [
+        {"key": "s0", "icon": "\U0001F3F7", "title": "Basic Motor Data", "kind": "matrix", "items": BASIC_MOTOR_DATA},
+    ]
     if one_monthly:
         secs.append({"key": "s1m", "icon": "\U0001F527", "title": "1 Monthly - General PM of Electric Motor", "kind": "matrix", "items": ONE_MONTHLY})
     secs += [
