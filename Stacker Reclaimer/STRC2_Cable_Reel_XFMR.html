@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>STRC 2 Cable Reel & XFMR</title>
+<title>STRC 1/2 Cable Reel & XFMR</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -285,15 +285,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 window.STRC_CONFIG = {
   "formId": "strc2_cr_xfmr",
   "assetTag": "STRC2-CR-XFMR",
-  "assetName": "Stacker Reclaimer 2 — Cable Reel & Transformer 40 kVA / 6.9 kV / 416 V",
+  "assetName": "Stacker Reclaimer 1/2 — Cable Reel & Transformer 40 kVA / 6.9 kV / 416 V",
   "checksheetFile": "Stacker Reclaimer/STRC2_Cable_Reel_XFMR.html",
   "draftKey": "strc2_cr_xfmr",
-  "pageTitle": "STRC 2 Cable Reel & XFMR",
-  "heroTitle": "STRC <em>2 &middot; Cable Reel / XFMR</em>",
-  "eyebrow": "Stacker Reclaimer 2 · Cable Reel & 40 kVA Transformer",
+  "pageTitle": "STRC 1/2 Cable Reel & XFMR",
+  "heroTitle": "STRC <em>1/2 &middot; Cable Reel / XFMR</em>",
+  "eyebrow": "Stacker Reclaimer 1/2 · Cable Reel & 40 kVA Transformer",
   "frequency": "YEARLY",
   "heroSub": "Transformer 40 kVA / 6.9 kV / 416 V resistance + megger, and Cable Reel 2-yearly PM",
-  "assetLabel": "Stacker Reclaimer 2 · Cable Reel & Transformer 40 kVA / 6.9 kV / 416 V",
+  "assetLabel": "Stacker Reclaimer 1/2 · Cable Reel & Transformer 40 kVA / 6.9 kV / 416 V",
   "compartments": [],
   "sections": [
     {
@@ -398,16 +398,44 @@ window.STRC_CONFIG = {
         },
         {
           "no": "5.",
+          "desc": "Check resistance of motor winding.",
+          "crit": "Measured resistance within 5% of each other",
+          "type": "value",
+          "sub": "T1 - T2"
+        },
+        {
+          "no": "",
+          "desc": "",
+          "crit": "",
+          "type": "value",
+          "sub": "T1 - T3"
+        },
+        {
+          "no": "",
+          "desc": "",
+          "crit": "",
+          "type": "value",
+          "sub": "T2 - T3"
+        },
+        {
+          "no": "6.",
+          "desc": "Check the motor winding each phase (use megger).",
+          "crit": "Min. insulation resistance not less than 1.5 megaohm",
+          "type": "value",
+          "sub": "T1/T2/T3 - GROUND"
+        },
+        {
+          "no": "7.",
           "desc": "Brush cleaning, slip ring inspection (replace part if already worn out).",
           "crit": "No sign of damage\nNo dust or dirty"
         },
         {
-          "no": "6.",
+          "no": "8.",
           "desc": "Details instruction see JP attachment.",
           "crit": ""
         },
         {
-          "no": "7.",
+          "no": "9.",
           "desc": "Inform to supervisor if any defect found & raise new WO for history record.",
           "crit": ""
         }

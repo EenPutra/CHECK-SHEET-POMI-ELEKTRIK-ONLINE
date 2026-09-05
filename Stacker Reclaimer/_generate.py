@@ -158,15 +158,28 @@ BREAKER = (
     + [{"no": "7", "desc": "Check all indicating lights and replace as required", "crit": ""}]
 )
 
-CABLE_REEL_2Y = [
-    {"no": "1.", "desc": "Make sure PTW already issue & equipment have safe to access.", "crit": ""},
-    {"no": "2.", "desc": "Perform PM activities of 6 & 12 monthly periods.", "crit": ""},
-    {"no": "3.", "desc": "Open cable reel cover & cleaning inside.", "crit": "No sign of damage\nNo dust or dirty"},
-    {"no": "4.", "desc": "Retighten of cable termination.", "crit": "No looseness"},
-    {"no": "5.", "desc": "Brush cleaning, slip ring inspection (replace part if already worn out).", "crit": "No sign of damage\nNo dust or dirty"},
-    {"no": "6.", "desc": "Details instruction see JP attachment.", "crit": ""},
-    {"no": "7.", "desc": "Inform to supervisor if any defect found & raise new WO for history record.", "crit": ""},
-]
+CABLE_REEL_2Y = (
+    [
+        {"no": "1.", "desc": "Make sure PTW already issue & equipment have safe to access.", "crit": ""},
+        {"no": "2.", "desc": "Perform PM activities of 6 & 12 monthly periods.", "crit": ""},
+        {"no": "3.", "desc": "Open cable reel cover & cleaning inside.", "crit": "No sign of damage\nNo dust or dirty"},
+        {"no": "4.", "desc": "Retighten of cable termination.", "crit": "No looseness"},
+    ]
+    # Explicit user addition, not in the source workbook (the source's own
+    # Cable Reel section never measures the reel's drive motor electrically)
+    # — same wording/criteria as the standard motor 1-Yearly resistance/megger
+    # check used everywhere else in this template family, applied here too
+    # since the cable reel has its own small drive motor like any other.
+    + value_rows("5.", "Check resistance of motor winding.",
+                 "Measured resistance within 5% of each other", ["T1 - T2", "T1 - T3", "T2 - T3"])
+    + value_rows("6.", "Check the motor winding each phase (use megger).",
+                 "Min. insulation resistance not less than 1.5 megaohm", ["T1/T2/T3 - GROUND"])
+    + [
+        {"no": "7.", "desc": "Brush cleaning, slip ring inspection (replace part if already worn out).", "crit": "No sign of damage\nNo dust or dirty"},
+        {"no": "8.", "desc": "Details instruction see JP attachment.", "crit": ""},
+        {"no": "9.", "desc": "Inform to supervisor if any defect found & raise new WO for history record.", "crit": ""},
+    ]
+)
 
 XFMR_ITEMS = (
     [
@@ -298,12 +311,12 @@ XFMR_COLS = cmp([
 ])
 CABLE_REEL_COLS = cmp([("CCH-STRC-100B2-M", "Cable Reel Control"), ("CCH-STRC-100B1-M", "Cable Reel Power")])
 CONFIGS["STRC2_Cable_Reel_XFMR"] = {
-    "formId": "strc2_cr_xfmr", "assetTag": "STRC2-CR-XFMR", "assetName": "Stacker Reclaimer 2 — Cable Reel & Transformer 40 kVA / 6.9 kV / 416 V",
+    "formId": "strc2_cr_xfmr", "assetTag": "STRC2-CR-XFMR", "assetName": "Stacker Reclaimer 1/2 — Cable Reel & Transformer 40 kVA / 6.9 kV / 416 V",
     "checksheetFile": "Stacker Reclaimer/STRC2_Cable_Reel_XFMR.html", "draftKey": "strc2_cr_xfmr",
-    "pageTitle": "STRC 2 Cable Reel & XFMR", "heroTitle": "STRC <em>2 &middot; Cable Reel / XFMR</em>",
-    "eyebrow": "Stacker Reclaimer 2 · Cable Reel & 40 kVA Transformer", "frequency": "YEARLY",
+    "pageTitle": "STRC 1/2 Cable Reel & XFMR", "heroTitle": "STRC <em>1/2 &middot; Cable Reel / XFMR</em>",
+    "eyebrow": "Stacker Reclaimer 1/2 · Cable Reel & 40 kVA Transformer", "frequency": "YEARLY",
     "heroSub": "Transformer 40 kVA / 6.9 kV / 416 V resistance + megger, and Cable Reel 2-yearly PM",
-    "assetLabel": "Stacker Reclaimer 2 · Cable Reel & Transformer 40 kVA / 6.9 kV / 416 V",
+    "assetLabel": "Stacker Reclaimer 1/2 · Cable Reel & Transformer 40 kVA / 6.9 kV / 416 V",
     # each section below carries its OWN columns (XFMR test points vs cable reel
     # motors) — no single top-level compartment legend fits both, so leave it empty.
     "compartments": [],

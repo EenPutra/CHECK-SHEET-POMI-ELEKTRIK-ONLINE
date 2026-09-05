@@ -2743,6 +2743,20 @@ family further**: when a "layout doesn't match" report comes in, check whether a
 missing from `_generate.py` before assuming it's a rendering/styling issue in `_strc_template.tpl`
 — the fix here was 12 lines of new config data, not a PDF change at all.
 
+**`STRC2_Cable_Reel_XFMR`'s title reads "Stacker Reclaimer 1/2", by explicit user request** —
+every other STRC2-only config still says "Stacker Reclaimer 2" (`assetTag`/`formId`/`draftKey`
+untouched, so no existing draft/submission is affected — only the human-facing `assetName`/
+`pageTitle`/`heroTitle`/`eyebrow`/`assetLabel` strings changed, plus the matching portal card
+name). **Its Cable Reel section also gained a winding-resistance (T1-T2/T1-T3/T2-T3) and
+insulation-resistance (T1/T2/T3-GROUND) check, by explicit user request — this is NOT in the
+source workbook** (confirmed: the source's own Cable Reel section only ever cleans/retightens/
+inspects the reel mechanically, never measures its drive motor electrically). Added as items 5-6
+via the same `value_rows()` helper used everywhere else, same wording as the standard motor
+1-Yearly resistance/megger check, applied to both Control and Power cable-reel motor columns
+(neither tag ends in `-B`, so `isBrakeCol()` never fires here — plain per-column inputs on both).
+If another config in this family ever needs a similar "not in source, but requested" measurement
+added, follow this same pattern rather than searching the source for something that isn't there.
+
 Standard stack (technician-auth on `checked-by`, autosave, PhotoKit `PHOTOS.evidence`, Load &
 Merge + CloudDraft, submit-guard, `Approvals.submitWithFiles`, landscape A4 PDF with navy cover +
 `willDrawPage` mini-header) is unchanged from SWGR — verified per-file via headless Chrome across
