@@ -2618,6 +2618,101 @@ Standard stack otherwise (technician-auth on `checked-by`, autosave, PhotoKit `P
 Load & Merge + CloudDraft, submit-guard, `Approvals.submitWithFiles`). `base.sheets` = one `s<i>`
 key per section + a `compartments` legend sheet.
 
+## `Stacker Reclaimer/` — 10 Stacker/Reclaimer PM check sheets, template + generator
+
+Ported from the 9 `.xls` files in `google-apps-script/Checksheet mentah/` (all "Motor_Stacker
+*"). **The 9 raw files are NOT a 1:1 map to the 10 outputs here** — confirmed by actually reading
+every sheet's cell content (via LibreOffice `--convert-to xlsx` + `openpyxl`, since these are old
+binary `.xls`) before writing any code, the same "1 referensi dulu" caution this repo already
+applies elsewhere, here spent on understanding scope instead of piloting one file:
+- `"Motor_Stacker 1.xlsx"` is one giant workbook bundling 12 tabs, not 12 separate check sheets:
+  an OEM Operation & Maintenance manual (`STRC 1 - OM`, 232 real rows — the full inspection
+  *schedule* for the whole machine, not a fillable form), a JP work-instruction sheet (`Sheet1`,
+  same kind of reference text), two electrical-schedule excerpts of that SAME OEM manual
+  (`JP-STRC-E-6M`/`JP-STRC-E-3M` — identical header block to `STRC 1 - OM`, also reference-only),
+  and 8 real fillable "WORK COMPLETION REPORT" tabs. Of those 8, `Long Travel 1`/`Long Travel 2`
+  and `1 & 6 MONTHLY`/`1 & 6 MONTHLY (2)` are OLDER/superseded duplicates — the same content
+  exists in its own up-to-date standalone `.xls` elsewhere in the folder (confirmed by diffing:
+  `STRC-1`'s Long Travel tab only covers wheels A1-A10 sequentially and only the "6 Monthly"
+  section, while the standalone `Motor_Stacker 1 - Long Travel.xls` covers all 20 positions
+  A1-A20 split odd/even AND the full 6M+1Y+Breaker set). Only `BW-BC` and `FDR-CSRH` are unique
+  to this workbook — nothing else in the folder has that content. Skipping the superseded tabs
+  and the 3 reference-only tabs is what turns "12 tabs" into "2 real check sheets from this file".
+- Every "motor + brake" WORK COMPLETION REPORT tab — Long Travel, Slewing, BW-BC, the STRC-2
+  main sheet, FDR-CSRH, the combined BW-BC-CR monthly file — shares **verbatim identical**
+  checklist wording for its "1 Monthly", "6 Monthly", "1 Yearly" and "Circuit Breaker / Motor
+  Starter or Inverter" sections (confirmed cell-by-cell across multiple files — even typos like
+  "may any corrosion" match exactly). Only the equipment-tag COLUMNS differ per file. So the item
+  text lives ONCE in `_generate.py` (`ONE_MONTHLY`/`SIX_MONTHLY`/`ONE_YEARLY`/`BREAKER` constants,
+  built via `motor_sections(cols, one_monthly=bool)`) — every config just supplies its own
+  `compartments` (equipment columns) and picks which of those shared sections apply. Safety
+  Device sheets use a separate, much shorter shared list (`SAFETY_ITEMS`, 4 items) repeated once
+  per limit-switch group; Cable Reel & Transformer has its own `XFMR_ITEMS`/`CABLE_REEL_2Y`.
+- This was **not** put to the user as an open-ended "how should I scope this" question — the
+  redundancy was worked out first, then a concrete 10-vs-9-vs-"show me everything" choice was
+  asked via `AskUserQuestion` (10, deduplicated, was picked), alongside build-all-at-once vs.
+  one-reference-first (all-at-once was picked) and a new **`strc`** portal category vs. reusing
+  `motor` (new category was picked, mirroring how Cathodic Protection got its own `cp` category
+  rather than being folded into an existing one).
+
+**GENERATED — do not hand-edit the `.html`.** `Stacker Reclaimer/_generate.py` substitutes
+`__TITLE__` + `__CONFIG__` into `Stacker Reclaimer/_strc_template.tpl` (shared engine, adapted
+from `CHCB SWGR/_swgr_template.tpl` — same `STRC_CONFIG`-driven shape, same
+matrix/resistance/rtd/megger `kind`s, same submit/PDF/draft/photo plumbing). Edit a sheet's
+data (item wording, columns) in `_generate.py`, engine behaviour in `_strc_template.tpl`, then
+re-run `python3 "Stacker Reclaimer/_generate.py"`.
+
+**One new item type over the SWGR engine: `type:'value'`.** A SWGR-style matrix item is either a
+per-column OK/NG toggle (default), a single toggle spanning every column (`'single'`), a
+remark-only row (`'remark'`), or a subhead divider — none of those fit a row whose per-column
+answer is a MEASURED VALUE, not a pass/fail (e.g. "measure resistance of HV & LV winding": each
+transformer test-point column needs a free-text ohm reading). `type:'value'` renders one
+`<input class="mi wide">` per column instead of a toggle; `it.sub` (e.g. `"T1 - T2"`) turns one
+logical item into several print/screen ROWS without repeating the full instruction text — the
+first row shows `desc — sub`, continuation rows show just `↳ sub` — matching how the source
+spreadsheet itself lays out "check resistance" as one instruction followed by 3 bare T1-T2/T1-T3/
+T2-T3 rows. `value_rows()`/`value2()` in `_generate.py` build these chains. Wired into all three
+places a matrix item is read: on-screen rendering, `buildSheets()` (via `iv()`, not `tv()`), and
+the PDF body builder.
+
+**A wide equipment matrix breaks jsPDF-autoTable's header wrapping — this needed an actual fix,
+not just smaller fonts.** `STRC1_Long_Travel` alone has 40 equipment columns (`CCH-STRC-110A1-M`
+style tags, ~17 characters each); cramming all 40 plus the No/Item/Criteria/Remark columns onto
+one landscape A4 page forced autoTable to wrap each header letter-by-letter — confirmed by
+actually rendering a real PDF and looking at it (`pdftoppm`), not just checking the JS didn't
+throw: the header cells came out as a vertical stack of single characters, completely unreadable.
+Fixed on the PDF side only (the on-screen table already scrolls horizontally, `.tbl-wrap{overflow-
+x:auto}`, so it never had this problem): `chunkArr(cols, 8)` splits a matrix section's columns
+into print-sized groups of 8, each rendered as its OWN `autoTable` call (repeating No/Item/
+Criteria/Remark, with `secBar()` labelled "(lanjutan kolom X-Y)" on every group after the first) —
+the exact same idea the SOURCE workbook already used at a coarser grain (splitting 40 wheels into
+two 20-column files); this just narrows it further to a size that's actually legible. `pdfCode(c)`
+also strips the shared `"CCH-"` prefix from the PRINTED header only (never touches the real code
+used as the sheet/column key) so what's left fits the narrower per-chunk column width. Verified
+by regenerating the PDF post-fix and rendering it again: every header reads on one line
+(`STRC-110A1-M`, not 17 stacked single-character rows).
+
+**Two Safety-Device / Cable-Reel-XFMR configs intentionally pass `"compartments": []`.** The
+top-level `compartments` legend panel (and its `base.sheets.compartments` sheet) assumes every
+section in the file shares ONE column set — true for every "motor + brake" sheet, false for
+`STRC2_Safety_Device` (4 limit-switch groups, each with its own ~14 columns) and
+`STRC2_Cable_Reel_XFMR` (transformer test-points vs. cable-reel motors are different column
+sets entirely). Each section there supplies its own `"columns"` override instead; leaving the
+top-level `compartments` non-empty would have rendered ONE group's columns as if they applied to
+the whole page, which is simply wrong for the other groups/sections.
+
+Standard stack (technician-auth on `checked-by`, autosave, PhotoKit `PHOTOS.evidence`, Load &
+Merge + CloudDraft, submit-guard, `Approvals.submitWithFiles`, landscape A4 PDF with navy cover +
+`willDrawPage` mini-header) is unchanged from SWGR — verified per-file via headless Chrome across
+all 10 outputs (JS syntax + embedded config JSON parse for every file; on-screen render + toggle/
+value data collection + a real `generatePDF()` call producing an actual multi-page PDF for the
+widest matrix, the value-only XFMR sheet, and the 4-group Safety Device sheet; one full mocked
+`submitToDb()` run — including clicking through the real `PdfPreview` "review before submit"
+modal that the submit path shows by design, the same way a technician would — confirming
+`DB.save()`+`Approvals.submitWithFiles()` both fire with zero real Firestore/Drive writes against
+a fail-loud mock). Portal: new **`strc`** category ("Stacker / Reclaimer"), 10 cards, `href`s
+`Stacker%20Reclaimer/<file>.html`.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that
