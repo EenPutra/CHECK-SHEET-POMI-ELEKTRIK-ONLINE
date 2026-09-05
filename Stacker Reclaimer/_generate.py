@@ -310,6 +310,26 @@ CONFIGS["STRC1_Main"] = {
     "sections": motor_sections(STRC1_MAIN),
 }
 
+# ── 4c. STRC-1 Luffing & Rail Clamp (focused subset of STRC1_Main) ──
+# Explicit user request: a standalone check sheet for just these 4 of
+# STRC1_MAIN's 16 positions, same columns/tags/labels — mirrors how STRC-2
+# already has BOTH a combined "Main" sheet AND a focused "Slewing_Luffing"
+# one covering an overlapping subset (STRC2_Slewing_Luffing.html); STRC1_Main
+# itself is left exactly as-is, this doesn't remove anything from it.
+STRC1_LUFFING_RC = cmp([
+    ("CCH-STRC-130A-M", "Motor for Boom Luffing"), ("CCH-STRC-130A-B", "Disc Brake for Boom Luffing"),
+    ("CCH-STRC-100A3-M", "Rail Clamp 1"), ("CCH-STRC-100A4-M", "Rail Clamp 2"),
+])
+CONFIGS["STRC1_Luffing_RailClamp"] = {
+    "formId": "strc1_luff_rc", "assetTag": "STRC1-LUFFING-RC", "assetName": "Stacker Reclaimer 1 — Luffing & Rail Clamp",
+    "checksheetFile": "Stacker Reclaimer/STRC1_Luffing_RailClamp.html", "draftKey": "strc1_luff_rc",
+    "pageTitle": "STRC 1 Luffing & Rail Clamp", "heroTitle": "STRC <em>1 &middot; Luffing / Rail Clamp</em>",
+    "eyebrow": "Stacker Reclaimer 1 · Luffing & Rail Clamp", "frequency": "6 MONTHLY",
+    "heroSub": "STRC-1 · Boom Luffing motor/brake + Rail Clamp 1 & 2",
+    "assetLabel": "Stacker Reclaimer 1 · Luffing & Rail Clamp", "compartments": STRC1_LUFFING_RC,
+    "sections": motor_sections(STRC1_LUFFING_RC),
+}
+
 # ── 5. STRC-2 main (Slewing/Luffing/Bucket Wheel/Boom Conveyor/Cable Reel/Rail Clamp/Power Cylinders) ──
 STRC2_MAIN = cmp([
     ("CCH-STRC-1201B1-M", "Motor for Boom Slewing #1"), ("CCH-STRC-1201B2-M", "Motor for Boom Slewing #2"),

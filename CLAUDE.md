@@ -2618,7 +2618,7 @@ Standard stack otherwise (technician-auth on `checked-by`, autosave, PhotoKit `P
 Load & Merge + CloudDraft, submit-guard, `Approvals.submitWithFiles`). `base.sheets` = one `s<i>`
 key per section + a `compartments` legend sheet.
 
-## `Stacker Reclaimer/` — 11 Stacker/Reclaimer PM check sheets, template + generator
+## `Stacker Reclaimer/` — 12 Stacker/Reclaimer PM check sheets, template + generator
 
 Ported from the 9 `.xls` files in `google-apps-script/Checksheet mentah/` (all "Motor_Stacker
 *"). **The 9 raw files are NOT a 1:1 map to the 10 outputs here** — confirmed by actually reading
@@ -2774,17 +2774,28 @@ right for part of a tab and wrong to generalize to the whole tab — a tab that'
 still hold a genuinely unbuilt 10%; re-check a "skip" decision against the FULL tab dump, not just
 the portion that triggered the original judgement.
 
+**`STRC1_Luffing_RailClamp` (the 12th file) — a focused 4-column subset of `STRC1_Main`, added on
+user request.** Just Boom Luffing (motor + brake) and Rail Clamp 1 & 2 — same tags/labels/
+`motor_sections()` shape as their entries inside `STRC1_MAIN`, reused directly (not re-derived
+from the source `.xls` again). `STRC1_Main` itself is untouched; the two files now deliberately
+overlap on these 4 positions, mirroring how STRC-2 already has both a combined `STRC2_Main` and a
+focused `STRC2_Slewing_Luffing` covering an overlapping subset. If more such focused subsets are
+requested for other subsystems already inside a "Main" sheet, follow this same pattern — pull the
+matching `cmp()` entries into their own `CONFIGS[...]` and leave the combined sheet alone, rather
+than trying to make one sheet serve every workflow.
+
 Standard stack (technician-auth on `checked-by`, autosave, PhotoKit `PHOTOS.evidence`, Load &
 Merge + CloudDraft, submit-guard, `Approvals.submitWithFiles`, landscape A4 PDF with navy cover +
 `willDrawPage` mini-header) is unchanged from SWGR — verified per-file via headless Chrome across
-all 10 outputs (JS syntax + embedded config JSON parse for every file; on-screen render + toggle/
-value data collection + a real `generatePDF()` call producing an actual multi-page PDF for the
-widest matrix, the value-only XFMR sheet, and the 4-group Safety Device sheet; one full mocked
-`submitToDb()` run — including clicking through the real `PdfPreview` "review before submit"
-modal that the submit path shows by design, the same way a technician would — confirming
-`DB.save()`+`Approvals.submitWithFiles()` both fire with zero real Firestore/Drive writes against
-a fail-loud mock). Portal: new **`strc`** category ("Stacker / Reclaimer"), 11 cards (10 from the
-original build + `STRC1_Main` added afterward — see below), `href`s
+all 10 outputs from the original build (JS syntax + embedded config JSON parse for every file;
+on-screen render + toggle/value data collection + a real `generatePDF()` call producing an actual
+multi-page PDF for the widest matrix, the value-only XFMR sheet, and the 4-group Safety Device
+sheet; one full mocked `submitToDb()` run — including clicking through the real `PdfPreview`
+"review before submit" modal that the submit path shows by design, the same way a technician
+would — confirming `DB.save()`+`Approvals.submitWithFiles()` both fire with zero real Firestore/
+Drive writes against a fail-loud mock) plus the same syntax/config/render/PDF checks (lighter —
+no full mocked submit) for `STRC1_Main` and `STRC1_Luffing_RailClamp` when each was added. Portal:
+**`strc`** category ("Stacker / Reclaimer"), 12 cards, `href`s
 `Stacker%20Reclaimer/<file>.html`.
 
 ## Per-file conventions worth matching

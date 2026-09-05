@@ -1,0 +1,1110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STRC 1 Luffing & Rail Clamp</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="../firebase-config.js?v=20260904d"></script>
+<script src="../db-helper.js?v=20260904d"></script>
+<script src="../storage-helper.js?v=20260904d"></script>
+<script src="../approval-helper.js?v=20260904d"></script>
+<script src="../submit-guard.js?v=20260904d"></script>
+<script src="../pdf-preview.js?v=20260904d"></script>
+<script src="../load-merge-modal.js?v=20260904d"></script>
+<script src="../cloud-draft.js?v=20260904d"></script>
+<script src="../auth-session.js?v=20260904d"></script>
+<script src="../technician-auth.js?v=20260904d"></script>
+<script src="../img-helper.js?v=20260904d"></script>
+<script src="../photo-kit.js?v=20260904d"></script>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1e3a5f;--navy2:#0f2744;--blue:#2563eb;--sky:#7dd3fc;--sky2:#bfdbfe;
+  --bg:#f8fbff;--bg2:#f0f7ff;--surf:#ffffff;--bdr:#bfdbfe;--bdr2:#dbeafe;
+  --ok:#16a34a;--ok-ring:#bbf7d0;--ng:#dc2626;--ng-ring:#fecaca;
+  --idle:#e5e7eb;--idle-txt:#9ca3af;--txt:#0f172a;--txt4:#64748b;
+  --mono:'Share Tech Mono',monospace;--sans:'Barlow',sans-serif;--raj:'Rajdhani',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:100vh}
+.topbar{position:sticky;top:0;z-index:100;background:var(--navy2);height:52px;display:flex;align-items:center;padding:0 20px;gap:12px;border-bottom:2px solid var(--blue)}
+.tb-logo{font-family:var(--raj);font-size:20px;font-weight:700;letter-spacing:3px;color:#fff}
+.tb-logo em{color:var(--sky);font-style:normal}
+.tb-sep{width:1px;height:26px;background:rgba(255,255,255,0.15);flex-shrink:0}
+.tb-sub{font-size:11px;color:var(--sky);font-family:var(--mono);letter-spacing:1px;white-space:nowrap}
+.tb-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--sky);animation:pulse 2s ease-in-out infinite;flex-shrink:0}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.tb-time{font-family:var(--mono);font-size:12px;color:var(--sky);white-space:nowrap}
+.btn{padding:6px 14px;border-radius:5px;border:none;cursor:pointer;font-family:var(--raj);font-size:13px;font-weight:600;letter-spacing:1px;transition:all .15s;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.btn-draft{background:rgba(255,255,255,0.12);color:#fff;border:1px solid rgba(255,255,255,0.2)}
+.btn-draft:hover{background:rgba(255,255,255,0.2)}
+.btn-pdf{background:var(--blue);color:#fff}
+.btn-pdf:hover{background:#1d4ed8}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-back{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:1px;text-decoration:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);white-space:nowrap;flex-shrink:0}
+.btn-back:hover{background:rgba(255,255,255,0.2);color:#fff}
+.hero{background:var(--navy);padding:24px 20px 20px;color:#fff}
+.hero-eyebrow{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--sky)}
+.hero-title{font-family:var(--raj);font-size:clamp(26px,6vw,48px);font-weight:700;line-height:1;color:#fff;letter-spacing:1px}
+.hero-title em{color:var(--sky);font-style:normal}
+.hero-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-top:8px;font-weight:300}
+.hero-stats{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.hstat{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px 16px;text-align:center;min-width:74px}
+.hstat-n{font-family:var(--raj);font-size:24px;font-weight:700;color:#fff;line-height:1;display:block}
+.hstat-n.ok{color:#4ade80}.hstat-n.ng{color:#f87171}.hstat-n.pend{color:var(--sky)}
+.hstat-l{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.4);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;display:block}
+.wrap{max-width:1280px;margin:0 auto;padding:20px 16px 90px}
+.panel{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 6px rgba(30,58,95,0.06)}
+.wo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.mf{display:flex;flex-direction:column;gap:4px}
+.mf label{font-size:10px;color:var(--txt4);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+.mf input,.mf select,.mf textarea{border:1.5px solid var(--bdr);border-radius:5px;padding:7px 10px;font-family:var(--sans);font-size:13px;background:var(--bg2);color:var(--txt);width:100%}
+.mf input:focus,.mf select:focus,.mf textarea:focus{outline:none;border-color:var(--blue);background:#fff}
+.mf input[type=date],.mf input[type=time]{font-family:var(--mono)}
+.mf textarea{resize:vertical;min-height:80px}
+.sec-hdr{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--navy);cursor:pointer;user-select:none}
+.sec-hdr-icon{width:28px;height:28px;border-radius:6px;background:rgba(37,99,235,0.3);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.sec-hdr-title{font-family:var(--raj);font-size:15px;font-weight:700;color:#fff;letter-spacing:1.5px;text-transform:uppercase}
+.sec-hdr-sub{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:1px;margin-left:4px}
+.sec-hdr-cnt{margin-left:auto;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,0.4);padding:2px 8px;border:1px solid rgba(255,255,255,0.15);border-radius:10px}
+.sec-hdr-arrow{color:rgba(255,255,255,0.4);font-size:14px;transition:transform .2s;margin-left:6px}
+.sec-hdr:not(.open) .sec-hdr-arrow{transform:rotate(-90deg)}
+.sec-body{padding:14px 16px}
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl-wrap::-webkit-scrollbar{height:6px}
+.tbl-wrap::-webkit-scrollbar-thumb{background:var(--sky2);border-radius:3px}
+.ct{width:100%;border-collapse:collapse;font-size:12px;min-width:640px}
+.ct th{background:var(--navy);color:var(--sky2);padding:6px 6px;text-align:center;font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.08);position:sticky;top:0}
+.ct th.tl{text-align:left}
+.ct td{padding:5px 6px;border-bottom:1px solid var(--bdr2);background:var(--surf);vertical-align:middle;text-align:center;border-right:1px solid var(--bdr2)}
+.ct td:last-child,.ct th:last-child{border-right:none}
+.ct td.lbl{text-align:left;color:var(--txt);font-size:11px;min-width:220px;max-width:340px}
+.ct td.lbl small{display:block;font-size:10px;color:var(--txt4);font-style:italic;margin-top:1px}
+.ct td.no{font-family:var(--mono);font-size:11px;color:var(--txt4);min-width:24px}
+.ct td.crit{font-size:10px;color:var(--txt4);min-width:110px;max-width:150px;text-align:left}
+.subhead td{background:rgba(37,99,235,0.09)!important;font-family:var(--raj);font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--navy);font-size:11px;text-align:left}
+.tog{display:inline-flex;gap:2px;justify-content:center}
+.rb{font-size:9px;padding:3px 5px;border-radius:3px;cursor:pointer;font-weight:700;border:none;font-family:var(--mono);line-height:1}
+.rb.ok-idle,.rb.ng-idle{background:var(--idle);color:var(--idle-txt)}
+.rb.ok-act{background:var(--ok);color:#fff;box-shadow:0 0 0 2px var(--ok-ring)}
+.rb.ng-act{background:var(--ng);color:#fff;box-shadow:0 0 0 2px var(--ng-ring)}
+.rb:hover{opacity:.85}
+.mi{width:58px;font-size:11px;padding:3px 4px;border-radius:3px;font-family:var(--mono);text-align:center;border:1.5px solid var(--bdr);background:var(--bg2);color:var(--txt)}
+.mi:focus{outline:none;border-color:var(--blue);background:#fff}
+.mi.wide{width:100%;min-width:120px;text-align:left;font-family:var(--sans)}
+.mi.ro{background:#eef4fb;color:var(--navy);font-weight:700}
+.rmk{width:100%;min-width:120px;font-size:11px;padding:4px 6px;border-radius:3px;border:1.5px solid var(--bdr);background:var(--bg2);font-family:var(--sans)}
+.rmk:focus{outline:none;border-color:var(--blue);background:#fff}
+.ct td.na{color:var(--idle-txt);font-family:var(--mono)}
+.cmp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
+.cmp-card{border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;background:var(--bg2)}
+.cmp-card .code{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--navy);letter-spacing:1px}
+.cmp-card input{width:100%;border:1px solid var(--bdr);border-radius:4px;padding:4px 6px;font-size:12px;margin-top:4px;background:#fff}
+.diag-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.diag-card{border:1px solid var(--bdr);border-radius:8px;background:#fff;overflow:hidden}
+.diag-card img{width:100%;height:auto;display:block;background:#fff}
+.diag-card .cap{font-size:11px;color:var(--txt4);padding:7px 10px;border-top:1px solid var(--bdr2);font-weight:600}
+.notice{padding:10px 16px;border-radius:6px;font-size:13px;display:none;margin:12px 0 0}
+.notice.ok{background:#dcfce7;border:1px solid #86efac;color:#15803d;display:block}
+.notice.err{background:#fee2e2;border:1px solid #fca5a5;color:#b91c1c;display:block}
+.notice.info{background:#dbeafe;border:1px solid #93c5fd;color:#1e40af;display:block}
+.footer{background:var(--navy2);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:20px}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.3);letter-spacing:1px}
+.photo-drop{border:2px dashed var(--bdr);border-radius:10px;padding:18px 16px;text-align:center;cursor:pointer;background:var(--bg2);margin-bottom:12px}
+.photo-drop:hover{border-color:var(--blue);background:#eaf3ff}
+.photo-drop-ico{font-size:24px;margin-bottom:4px;pointer-events:none}
+.photo-drop-txt{color:var(--txt4);font-size:13px;pointer-events:none}
+.photo-drop-txt strong{color:var(--blue)}
+.photo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.photo-item{border:1px solid var(--bdr);border-radius:10px;background:var(--surf);overflow:hidden}
+.photo-img-wrap{background:#eef4fb;display:flex;align-items:center;justify-content:center;height:150px}
+.photo-img-wrap img{max-width:100%;max-height:150px;object-fit:contain}
+.photo-ctrl{display:flex;flex-wrap:wrap;gap:4px;align-items:center;padding:6px 7px;border-top:1px solid var(--bdr2)}
+.p-btn{border:1px solid var(--bdr);background:var(--bg2);color:var(--navy);border-radius:5px;padding:3px 7px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit}
+.p-btn:hover{background:var(--sky2)}
+.p-btn.del{border-color:#fecaca;background:#fee2e2;color:#b91c1c}
+.p-sz{font-size:10px;color:var(--txt4);font-family:var(--mono);margin-left:auto}
+.photo-cap{width:100%;border:none;border-top:1px solid var(--bdr2);padding:6px 8px;font-size:12px;font-family:inherit;background:transparent}
+.photo-cap:focus{outline:none;background:var(--bg2)}
+.photo-empty{color:var(--txt4);font-size:12px;text-align:center;padding:10px}
+@media(max-width:640px){.tb-sub,.tb-sep{display:none}.btn-draft{display:none}}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="live-dot"></div>
+  <span class="tb-logo" id="tb-logo">STRC <em>PM</em></span>
+  <div class="tb-sep"></div>
+  <span class="tb-sub" id="tb-sub">STACKER / RECLAIMER MAINTENANCE</span>
+  <div class="tb-right">
+    <a class="btn-back" href="../index.html">&#8592; Portal</a>
+    <span class="tb-time" id="clock">--:--:--</span>
+    <button class="btn btn-draft btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
+    <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 PDF</button>
+    <button class="btn btn-sm" style="background:#16a34a;color:#fff" onclick="submitToDb()">🗄️ Submit DB</button>
+  </div>
+</div>
+
+<div class="hero">
+  <div class="hero-eyebrow" id="hero-eyebrow">Stacker / Reclaimer Maintenance</div>
+  <div class="hero-title" id="hero-title">STRC</div>
+  <div class="hero-sub" id="hero-sub">Stacker / Reclaimer Preventive Maintenance Check Sheet</div>
+  <div class="hero-stats">
+    <div class="hstat"><span class="hstat-n" id="h-total">0</span><span class="hstat-l">Points</span></div>
+    <div class="hstat"><span class="hstat-n ok" id="h-ok">0</span><span class="hstat-l">OK</span></div>
+    <div class="hstat"><span class="hstat-n ng" id="h-ng">0</span><span class="hstat-l">NG</span></div>
+    <div class="hstat"><span class="hstat-n pend" id="h-pend">0</span><span class="hstat-l">Pending</span></div>
+  </div>
+</div>
+
+<div class="wrap">
+
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📋</div>
+    <div><div class="sec-hdr-title">Work Order Information</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid">
+      <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
+      <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
+      <div class="mf"><label>Time Start</label><input type="time" id="time-start"></div>
+      <div class="mf"><label>Time End</label><input type="time" id="time-end"></div>
+      <div class="mf"><label>Checked By</label><input type="text" id="checked-by" placeholder="Full name"></div>
+      <div class="mf"><label>NIK</label><input type="text" id="nik" placeholder="NIK"></div>
+      <div class="mf"><label>Reviewed By</label><input type="text" id="reviewed-by" placeholder="Supervisor name"></div>
+      <div class="mf"><label>Shift</label>
+        <select id="shift"><option>Normal Hours</option><option>Shift 1 (07:00–15:00)</option><option>Shift 2 (15:00–23:00)</option><option>Shift 3 (23:00–07:00)</option></select>
+      </div>
+      <div class="mf"><label>Frequency</label>
+        <select id="frequency"><option>YEARLY</option><option>2 YEARLY</option><option>6 MONTHLY</option><option>PERIODIC</option></select>
+      </div>
+    </div>
+    <div style="margin-top:14px">
+      <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="LoadMergeModal.open()">&#128229; Muat / Lanjutkan dari Database</button>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="cmp-panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🗄️</div>
+    <div><div class="sec-hdr-title">Compartments / Breaker Units</div>
+      <span class="sec-hdr-sub" id="cmp-sub"></span></div>
+    <span class="sec-hdr-cnt" id="cmp-cnt"></span>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body"><div class="cmp-grid" id="cmp-grid"></div></div>
+</div>
+
+<div id="sections"></div>
+
+<div class="panel" id="diagrams-panel" style="display:none">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📐</div>
+    <div><div class="sec-hdr-title">Breaker Interlock — Reference Diagrams</div>
+      <span class="sec-hdr-sub">Factory-set safety features · reference only</span></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div style="font-size:11px;color:var(--txt4);margin-bottom:10px">Diagram acuan untuk pemeriksaan Breaker Safety Locks (item 12–14). Fitur ini di-set pabrik — jangan disetel rutin di lapangan.</div>
+    <div class="diag-grid" id="diag-grid"></div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📷</div>
+    <div><div class="sec-hdr-title">Evidence Photos</div></div>
+    <span class="sec-hdr-cnt" id="evidence-cnt">0 foto</span>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="photo-drop" onclick="pickPhotos('evidence',this)">
+      <div class="photo-drop-ico">📷</div>
+      <div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong><br>
+        <small style="font-size:11px">Kamera / galeri · crop &amp; ukuran cetak diatur setelah foto dipilih</small></div>
+    </div>
+    <div class="photo-grid" id="grid-evidence"></div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📝</div>
+    <div><div class="sec-hdr-title">Findings &amp; Conclusion</div></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="wo-grid" style="padding-bottom:4px">
+      <div class="mf"><label>Overall Condition</label>
+        <select id="overall">
+          <option>✅ GOOD — Normal Operation</option>
+          <option>⚠️ FAIR — Requires Monitoring</option>
+          <option>🔧 POOR — Maintenance Required</option>
+          <option>🛑 CRITICAL — Must Shutdown</option>
+        </select>
+      </div>
+      <div class="mf"><label>Next PM Due</label><input type="date" id="next-pm"></div>
+    </div>
+    <div class="wo-grid" style="grid-template-columns:1fr 1fr">
+      <div class="mf"><label>Findings / Defects Found</label>
+        <textarea id="findings" placeholder="Catat semua defect / temuan (item 15: work history)…"></textarea>
+      </div>
+      <div class="mf"><label>Result of Work Carried Out / Recommendations</label>
+        <textarea id="recommendations" placeholder="Pekerjaan yang dilakukan dan rekomendasi…"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
+  <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
+  <button class="btn btn-draft" style="background:var(--navy);color:#fff" onclick="CloudDraft.save()">💾 Save Draft</button>
+  <button class="btn btn-pdf" onclick="generatePDF()">📄 Download PDF</button>
+  <button class="btn" style="background:#16a34a;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">📊 Submit to Database</button>
+</div>
+<div id="notice" class="notice"></div>
+
+</div>
+
+<footer class="footer">
+  <div class="footer-l" id="foot-l">STACKER / RECLAIMER MAINTENANCE</div>
+  <div class="footer-r" id="fdate">—</div>
+</footer>
+
+<script id="strc-config">
+window.STRC_CONFIG = {
+  "formId": "strc1_luff_rc",
+  "assetTag": "STRC1-LUFFING-RC",
+  "assetName": "Stacker Reclaimer 1 — Luffing & Rail Clamp",
+  "checksheetFile": "Stacker Reclaimer/STRC1_Luffing_RailClamp.html",
+  "draftKey": "strc1_luff_rc",
+  "pageTitle": "STRC 1 Luffing & Rail Clamp",
+  "heroTitle": "STRC <em>1 &middot; Luffing / Rail Clamp</em>",
+  "eyebrow": "Stacker Reclaimer 1 · Luffing & Rail Clamp",
+  "frequency": "6 MONTHLY",
+  "heroSub": "STRC-1 · Boom Luffing motor/brake + Rail Clamp 1 & 2",
+  "assetLabel": "Stacker Reclaimer 1 · Luffing & Rail Clamp",
+  "compartments": [
+    {
+      "code": "CCH-STRC-130A-M",
+      "label": "Motor for Boom Luffing"
+    },
+    {
+      "code": "CCH-STRC-130A-B",
+      "label": "Disc Brake for Boom Luffing"
+    },
+    {
+      "code": "CCH-STRC-100A3-M",
+      "label": "Rail Clamp 1"
+    },
+    {
+      "code": "CCH-STRC-100A4-M",
+      "label": "Rail Clamp 2"
+    }
+  ],
+  "sections": [
+    {
+      "key": "s0",
+      "icon": "🏷",
+      "title": "Basic Motor Data",
+      "kind": "matrix",
+      "items": [
+        {
+          "no": "1",
+          "desc": "Rated Voltage",
+          "crit": "",
+          "type": "value"
+        },
+        {
+          "no": "2",
+          "desc": "Rated Power",
+          "crit": "",
+          "type": "value"
+        },
+        {
+          "no": "3",
+          "desc": "Full Load Ampere",
+          "crit": "",
+          "type": "value"
+        },
+        {
+          "no": "4",
+          "desc": "Speed",
+          "crit": "",
+          "type": "value"
+        },
+        {
+          "no": "5",
+          "desc": "Service Factor",
+          "crit": "",
+          "type": "value"
+        }
+      ]
+    },
+    {
+      "key": "s6m",
+      "icon": "🧴",
+      "title": "6 Monthly - Electric Motor PM & Lubrication",
+      "kind": "matrix",
+      "note": "Grease specification: Shell Alvania EP2 or Almagard NLGI 02 (inject with grease gun).",
+      "items": [
+        {
+          "no": "1.",
+          "desc": "Ensure PTW already issue & equipment has isolate or safe for access.",
+          "crit": ""
+        },
+        {
+          "no": "2.",
+          "desc": "Cleaning motor body, air screen & fin cooler.",
+          "crit": "Clean"
+        },
+        {
+          "no": "3.",
+          "desc": "Check motor termination (termination seal, conduit, cable connection and dust).",
+          "crit": "No looseness\nClean"
+        },
+        {
+          "no": "4.",
+          "desc": "Cleaning termination and re-tighten the cable connection.",
+          "crit": "No looseness"
+        },
+        {
+          "no": "5.",
+          "desc": "Adding the lubricant to motor bearing.",
+          "crit": "Use grease +/- 20gr each bearing"
+        },
+        {
+          "no": "6.",
+          "desc": "Cleaning old grease & dust at the shaft bearing.",
+          "crit": "Clean"
+        },
+        {
+          "no": "7.",
+          "desc": "Put back all part to normal condition.",
+          "crit": ""
+        },
+        {
+          "no": "8.",
+          "desc": "Record the PM result into maximo database.",
+          "crit": ""
+        },
+        {
+          "no": "9.",
+          "desc": "Inform to supervisor & raise new WO if any defect found.",
+          "crit": ""
+        }
+      ]
+    },
+    {
+      "key": "s1y",
+      "icon": "🛢",
+      "title": "1 Yearly - Electric Motor PM & Bearing Lubrication",
+      "kind": "matrix",
+      "items": [
+        {
+          "no": "1.",
+          "desc": "Perform all activities PM in 6 monthly periods.",
+          "crit": ""
+        },
+        {
+          "no": "2.",
+          "desc": "Check resistance of motor winding & temperature sensor if any.",
+          "crit": "Measured resistance within 5% of each other",
+          "type": "value",
+          "sub": "T1 - T2"
+        },
+        {
+          "no": "",
+          "desc": "",
+          "crit": "",
+          "type": "value",
+          "sub": "T1 - T3"
+        },
+        {
+          "no": "",
+          "desc": "",
+          "crit": "",
+          "type": "value",
+          "sub": "T2 - T3"
+        },
+        {
+          "no": "3.",
+          "desc": "Check the motor winding each phase (use megger).",
+          "crit": "Min. insulation resistance not less than 1.5 megaohm",
+          "type": "value",
+          "sub": "T1/T2/T3 - GROUND"
+        },
+        {
+          "no": "4.",
+          "desc": "Check motor termination, retighten cable connection & check seal bearing.",
+          "crit": "No looseness\nClean\nNo leak"
+        },
+        {
+          "no": "5.",
+          "desc": "Replace old grease with new one (open the drain plug, inject grease until old grease comes out).",
+          "crit": ""
+        },
+        {
+          "no": "6.",
+          "desc": "Check motor support bolt, retighten if necessary, may any corrosion, etc.",
+          "crit": "No looseness\nNo dirty or corroded"
+        },
+        {
+          "no": "7.",
+          "desc": "Perform housekeeping after the job complete (make sure equipment has ready).",
+          "crit": ""
+        },
+        {
+          "no": "8.",
+          "desc": "Monitor the motor during running test.",
+          "crit": ""
+        }
+      ]
+    },
+    {
+      "key": "sbk",
+      "icon": "⚡",
+      "title": "Circuit Breaker and Motor Starter or Inverter",
+      "kind": "matrix",
+      "items": [
+        {
+          "no": "1",
+          "desc": "Visually inspect panel for any obvious signs of damage",
+          "crit": "No sign of damage"
+        },
+        {
+          "no": "2",
+          "desc": "Remove accumulated dust and dirt using a soft brush or vacuum cleaner",
+          "crit": "No dust or dirty"
+        },
+        {
+          "no": "3",
+          "desc": "Inspect all wiring checking for any deterioration in the insulation and tighten all connections.",
+          "crit": "No deterioration in insulation\nTightness"
+        },
+        {
+          "no": "4",
+          "desc": "Disconnect the coil of motor contactor and check the contact of contactors — dress the contact faces with a fine file if beads formed (never sandpaper/emery cloth, never oil the power unit).",
+          "crit": "",
+          "type": "value",
+          "sub": "Dressing the contact"
+        },
+        {
+          "no": "",
+          "desc": "",
+          "crit": "",
+          "type": "value",
+          "sub": "Replace the contact"
+        },
+        {
+          "no": "5",
+          "desc": "Operate each magnetic device by hand to ensure that moving parts operate freely.",
+          "crit": "Moving parts operate freely"
+        },
+        {
+          "no": "6",
+          "desc": "Check motor overload setting and compare with motor full load amps.",
+          "crit": "",
+          "type": "value",
+          "sub": "Bkr capacity"
+        },
+        {
+          "no": "",
+          "desc": "",
+          "crit": "",
+          "type": "value",
+          "sub": "Rating Plug"
+        },
+        {
+          "no": "",
+          "desc": "",
+          "crit": "",
+          "type": "value",
+          "sub": "OL type"
+        },
+        {
+          "no": "",
+          "desc": "",
+          "crit": "",
+          "type": "value",
+          "sub": "OL range"
+        },
+        {
+          "no": "",
+          "desc": "",
+          "crit": "",
+          "type": "value",
+          "sub": "OL setting"
+        },
+        {
+          "no": "7",
+          "desc": "Check all indicating lights and replace as required",
+          "crit": ""
+        }
+      ]
+    }
+  ]
+};
+</script>
+
+<script>
+const CFG=window.STRC_CONFIG;
+const COMPS=CFG.compartments||[];
+const ELEC=CFG.elecColumns&&CFG.elecColumns.length?CFG.elecColumns:COMPS;
+const SECTIONS=CFG.sections||[];
+const ST={};   // toggle state -> DB.collectCheckSheetData scrapes .rb.ok-act/.ng-act
+
+const esc=s=>String(s==null?'':s).replace(/"/g,'&quot;');
+const v=id=>{const e=document.getElementById(id);return e?String(e.value).trim():'';};
+const iv=id=>{const e=document.getElementById(id);return e&&String(e.value).trim()?String(e.value).trim():'—';};
+const tr2=(s,n)=>s&&s.length>n?s.slice(0,n)+'…':(s||'');
+const noEmoji=s=>String(s||'').replace(/[^\x20-\xFF‐-―‘-”]/g,'').trim();
+const pdfSafe=s=>String(s==null?'':s)
+  .replace(/[≥⩾]/g,'>=').replace(/[≤⩽]/g,'<=').replace(/[ΩΩ]/g,'ohm')
+  .replace(/[·•]/g,'-').replace(/[–—]/g,'-').replace(/[’‘]/g,"'").replace(/[“”]/g,'"')
+  .replace(/[±]/g,'+/-').replace(/[°]/g,' deg').replace(/[→]/g,'->')
+  .replace(/[^\x20-\x7E]/g,'');
+const num=s=>{const n=parseFloat(String(s).replace(',','.'));return isNaN(n)?null:n;};
+// Equipment tags in this family are long ("CCH-STRC-110A1-M") — strip the
+// common "CCH-" prefix for the PRINTED column header only (never touches the
+// real code used as the sheet key), so a wide matrix's header has a fighting
+// chance of staying on one line instead of wrapping character-by-character.
+const pdfCode=c=>String((c&&c.code)||'').replace(/^CCH-/,'');
+const chunkArr=(arr,n)=>{const out=[];for(let i=0;i<arr.length;i+=n)out.push(arr.slice(i,i+n));return out;};
+
+function tick(){
+  const n=new Date();
+  document.getElementById('clock').textContent=n.toLocaleTimeString('id-ID');
+  document.getElementById('fdate').textContent=n.toLocaleDateString('en-GB',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(tick,1000);tick();
+function toggleSec(hdr){hdr.classList.toggle('open');hdr.nextElementSibling.style.display=hdr.classList.contains('open')?'':'none';}
+
+// ── TOGGLES ──
+function setTog(id,val,btn){
+  btn.closest('.tog').querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
+  if(ST[id]===val)delete ST[id];
+  else{btn.className='rb '+(val==='OK'?'ok-act':'ng-act');ST[id]=val;}
+  updateStats();scheduleAutoSave();
+}
+function mkTog(id){
+  return `<span class="tog"><button class="rb ok-idle" data-v="OK" onclick="setTog('${id}','OK',this)">OK</button><button class="rb ng-idle" data-v="NG" onclick="setTog('${id}','NG',this)">NG</button></span>`;
+}
+
+// ── COMPARTMENT LEGEND ──
+function renderCompartments(){
+  const g=document.getElementById('cmp-grid');
+  if(!COMPS.length){document.getElementById('cmp-panel').style.display='none';return;}
+  document.getElementById('cmp-sub').textContent=CFG.assetLabel||'';
+  document.getElementById('cmp-cnt').textContent=COMPS.length+' compartment';
+  g.innerHTML=COMPS.map((c,i)=>`
+    <div class="cmp-card">
+      <div class="code">${esc(c.code||('CMP '+(i+1)))}</div>
+      <input type="text" id="cmpd-${i}" value="${esc(c.label||'')}" placeholder="Deskripsi / feeder">
+      <input type="text" id="cmps-${i}" placeholder="Breaker S/N (opsional)">
+    </div>`).join('');
+}
+function compHead(cols){return cols.map(c=>`<th title="${esc(c.label||'')}">${esc(c.code||'')}</th>`).join('');}
+// Brake tags in this family always end in "-B" (motors end in "-M") — used to
+// give a 'value' item different per-column behaviour: a brake coil's own
+// resistance is measured across different terminals (e.g. "TB 3-5") than a
+// motor winding's T1-T2/T1-T3/T2-T3, and only needs ONE reading, not three.
+function isBrakeCol(c){return /-B$/.test((c&&c.code)||'');}
+
+// ── INTERLOCK REFERENCE DIAGRAMS ──
+const DIAGRAMS=CFG.interlockDiagrams||[];
+function renderDiagrams(){
+  if(!DIAGRAMS.length){document.getElementById('diagrams-panel').style.display='none';return;}
+  document.getElementById('diagrams-panel').style.display='';
+  document.getElementById('diag-grid').innerHTML=DIAGRAMS.map(d=>`
+    <div class="diag-card"><img src="${d.uri}" alt="${esc(d.caption)}"><div class="cap">${esc(d.caption)}</div></div>`).join('');
+}
+function colsFor(sec){
+  if(Array.isArray(sec.columns))return sec.columns;
+  if(sec.columns==='elec')return ELEC;
+  return COMPS;
+}
+
+// ── RENDER SECTIONS ──
+function renderSections(){
+  const host=document.getElementById('sections');host.innerHTML='';
+  SECTIONS.forEach((sec,si)=>{
+    const p=document.createElement('div');p.className='panel';
+    const cols=colsFor(sec);
+    p.innerHTML=`
+      <div class="sec-hdr open" onclick="toggleSec(this)">
+        <div class="sec-hdr-icon">${sec.icon||'✔'}</div>
+        <div><div class="sec-hdr-title">${esc(sec.title)}</div>
+          ${sec.crit?`<span class="sec-hdr-sub">${esc(sec.crit)}</span>`:''}</div>
+        <span class="sec-hdr-arrow">▼</span>
+      </div>
+      <div class="sec-body"><div class="tbl-wrap">${sectionTable(sec,si,cols)}</div>
+        ${sec.note?`<div style="font-size:11px;color:var(--txt4);margin-top:6px">${esc(sec.note)}</div>`:''}</div>`;
+    host.appendChild(p);
+  });
+  attachMeggerCalc();
+}
+
+function sectionTable(sec,si,cols){
+  const kind=sec.kind||'matrix';
+  if(kind==='matrix')return matrixTable(sec,si,cols);
+  if(kind==='resistance')return gridTable(sec,si,cols,(sec.rows||['T1 - T2','T2 - T3','T3 - T1']),'res','Resistance (mΩ)');
+  if(kind==='rtd')return gridTable(sec,si,cols,Array.from({length:sec.rtdCount||13},(_,i)=>'RTD'+(i+1)),'rtd','RTD (Ω)');
+  if(kind==='megger')return meggerTable(sec,si,cols);
+  return '';
+}
+
+function matrixTable(sec,si,cols){
+  let h=`<table class="ct"><thead><tr>
+    <th class="tl" style="width:24px">No</th><th class="tl">Check Item / Point</th><th class="tl" style="width:120px">Criteria</th>
+    ${compHead(cols)}<th class="tl" style="width:150px">Result / Remark</th></tr></thead><tbody>`;
+  (sec.items||[]).forEach((it,ii)=>{
+    if(it.type==='subhead'){
+      const fields=(it.fields||(it.field?[it.field]:[])).map(f=>`<span style="margin-left:12px;font-weight:400;text-transform:none">${esc(f)}: <input class="mi" style="width:90px" type="text" id="f-${si}-${ii}-${esc(f)}"></span>`).join('');
+      h+=`<tr class="subhead"><td>${it.no||''}</td><td colspan="${cols.length+3}">${esc(it.desc)}${fields}</td></tr>`;
+      return;
+    }
+    if(it.type==='remark'){
+      h+=`<tr><td class="no">${it.no||''}</td><td class="lbl" colspan="2">${esc(it.desc)}</td>
+        <td colspan="${cols.length}"></td><td><input class="rmk" type="text" id="rmk-${si}-${ii}"></td></tr>`;
+      return;
+    }
+    const cells=it.type==='single'
+      ? `<td colspan="${cols.length}">${mkTog('t-'+si+'-'+ii+'-x')}</td>`
+      : it.type==='value'
+      ? cols.map((c,ci)=>{
+          if(it.motorOnly && isBrakeCol(c)) return `<td class="na">&mdash;</td>`;
+          const ph=(it.brakePlaceholder && isBrakeCol(c))?` placeholder="${esc(it.brakePlaceholder)}"`:'';
+          return `<td><input class="mi wide" type="text" id="val-${si}-${ii}-${ci}"${ph}></td>`;
+        }).join('')
+      : cols.map((c,ci)=>`<td>${mkTog('t-'+si+'-'+ii+'-'+ci)}</td>`).join('');
+    // a 'value' item with no of its own (a continuation sub-row, e.g. T1–T2/T1–T3/T2–T3
+    // under one parent "check resistance" item) shows its sub-label in place of desc.
+    const descHtml=it.desc
+      ? esc(it.desc)+(it.sub?` <span style="color:var(--txt4)">&mdash; ${esc(it.sub)}</span>`:'')
+      : (it.sub?`<span style="padding-left:14px;color:var(--txt4)">&#8618; ${esc(it.sub)}</span>`:'');
+    h+=`<tr><td class="no">${it.no||''}</td><td class="lbl">${descHtml}</td><td class="crit">${esc(it.crit||'')}</td>
+      ${cells}<td><input class="rmk" type="text" id="rmk-${si}-${ii}"></td></tr>`;
+  });
+  h+=`</tbody></table>`;
+  return h;
+}
+
+function gridTable(sec,si,cols,rows,pfx,unitLbl){
+  let h=`<table class="ct"><thead><tr><th class="tl" style="width:70px">${unitLbl}</th>${compHead(cols)}</tr></thead><tbody>`;
+  rows.forEach((rk,ri)=>{
+    h+=`<tr><td class="no" style="text-align:left">${esc(rk)}</td>`;
+    cols.forEach((c,ci)=>{h+=`<td><input class="mi" type="text" inputmode="decimal" id="${pfx}-${si}-${ri}-${ci}"></td>`;});
+    h+=`</tr>`;
+  });
+  h+=`<tr><td class="lbl" style="text-align:left" colspan="${cols.length+1}"><input class="rmk" type="text" id="rmk-${si}-r" placeholder="Remark"></td></tr>`;
+  h+=`</tbody></table>`;
+  return h;
+}
+
+function meggerTable(sec,si,cols){
+  const times=sec.times||["15\"","30\"","45\"","1'","2'","3'","4'","5'","6'","7'","8'","9'","10'"];
+  let h=`<table class="ct"><thead><tr><th class="tl" style="width:60px">Time</th>${compHead(cols)}</tr></thead><tbody>`;
+  times.forEach((t,ti)=>{
+    h+=`<tr><td class="no" style="text-align:left">${esc(t)}</td>`;
+    cols.forEach((c,ci)=>{h+=`<td><input class="mi meg-in" data-si="${si}" data-ci="${ci}" type="text" inputmode="decimal" id="meg-${si}-${ti}-${ci}"></td>`;});
+    h+=`</tr>`;
+  });
+  h+=`<tr><td class="no" style="text-align:left">PI</td>${cols.map((c,ci)=>`<td><input class="mi ro" readonly id="pi-${si}-${ci}"></td>`).join('')}</tr>`;
+  h+=`<tr><td class="no" style="text-align:left">DAR</td>${cols.map((c,ci)=>`<td><input class="mi ro" readonly id="dar-${si}-${ci}"></td>`).join('')}</tr>`;
+  h+=`<tr><td class="lbl" colspan="${cols.length+1}"><input class="rmk" type="text" id="rmk-${si}-r" placeholder="Remark"></td></tr>`;
+  h+=`</tbody></table>`;
+  sec._times=times;
+  return h;
+}
+function meggerTimeIndex(times,label){return times.findIndex(t=>t.replace(/[^0-9a-z]/gi,'')===label);}
+function recalcMegger(si,ci){
+  const sec=SECTIONS[si];const times=sec._times||[];
+  const idx=l=>times.findIndex(t=>t.replace(/["']/g,'').trim()===l);
+  const at=l=>{const i=idx(l);return i<0?null:num(v('meg-'+si+'-'+i+'-'+ci));};
+  const r30=at('30'),r1=at('1'),r10=at('10');
+  const pi=document.getElementById('pi-'+si+'-'+ci),dar=document.getElementById('dar-'+si+'-'+ci);
+  if(pi)pi.value=(r1&&r10)?(r10/r1).toFixed(2):'';
+  if(dar)dar.value=(r30&&r1)?(r1/r30).toFixed(2):'';
+}
+function attachMeggerCalc(){
+  document.querySelectorAll('.meg-in').forEach(inp=>{
+    inp.addEventListener('input',()=>recalcMegger(+inp.dataset.si,+inp.dataset.ci));
+  });
+}
+
+// ── STATS ──
+function updateStats(){
+  const total=document.querySelectorAll('.tog').length;
+  const ok=Object.values(ST).filter(x=>x==='OK').length;
+  const ng=Object.values(ST).filter(x=>x==='NG').length;
+  document.getElementById('h-total').textContent=total;
+  document.getElementById('h-ok').textContent=ok;
+  document.getElementById('h-ng').textContent=ng;
+  document.getElementById('h-pend').textContent=Math.max(0,total-ok-ng);
+}
+
+// ── PHOTOS ──
+const PHOTOS={evidence:[]};
+function pickPhotos(key,el){PhotoKit.upload(el,{multiple:true},e=>{if(!e)return;e.caption='';PHOTOS[key].push(e);renderPhotos(key);autoSaveNow();});}
+function recropPhotoAt(key,i){const c=PHOTOS[key][i];if(!c)return;PhotoKit.recrop(c,e=>{if(!e)return;e.caption=c.caption||'';PHOTOS[key][i]=e;renderPhotos(key);autoSaveNow();});}
+function rotatePhotoAt(key,i,deg){
+  const img=new Image();
+  img.onload=()=>{
+    const Wp=img.naturalWidth,Hp=img.naturalHeight,swap=((deg%360)+360)%360===90||((deg%360)+360)%360===270;
+    const cv=document.createElement('canvas');cv.width=swap?Hp:Wp;cv.height=swap?Wp:Hp;
+    const cx=cv.getContext('2d');cx.translate(cv.width/2,cv.height/2);cx.rotate(deg*Math.PI/180);cx.drawImage(img,-Wp/2,-Hp/2);
+    const p=PHOTOS[key][i];p.src=cv.toDataURL('image/jpeg',0.92);p.dataUrl=p.src;p.w=cv.width;p.h=cv.height;
+    if(swap&&p.widthCm){const t=p.widthCm;p.widthCm=p.heightCm;p.heightCm=t;}
+    renderPhotos(key);autoSaveNow();
+  };
+  img.src=PHOTOS[key][i].src;
+}
+function removePhotoAt(key,i){if(!confirm('Hapus foto ini?'))return;PHOTOS[key].splice(i,1);renderPhotos(key);autoSaveNow();}
+function renderPhotos(key){
+  const grid=document.getElementById('grid-'+key);if(!grid)return;
+  const cnt=document.getElementById(key+'-cnt');if(cnt)cnt.textContent=PHOTOS[key].length+' foto';
+  if(!PHOTOS[key].length){grid.innerHTML='<div class="photo-empty">Belum ada foto.</div>';return;}
+  grid.innerHTML=PHOTOS[key].map((p,i)=>`
+    <div class="photo-item"><div class="photo-img-wrap"><img src="${p.src}"></div>
+      <div class="photo-ctrl">
+        <button class="p-btn" onclick="recropPhotoAt('${key}',${i})">✂ Crop</button>
+        <button class="p-btn" onclick="rotatePhotoAt('${key}',${i},-90)">↺</button>
+        <button class="p-btn" onclick="rotatePhotoAt('${key}',${i},90)">↻</button>
+        <button class="p-btn del" onclick="removePhotoAt('${key}',${i})">✕</button>
+        <span class="p-sz">${p.widthCm?p.widthCm.toFixed(1)+'×'+p.heightCm.toFixed(1)+'cm':''}</span>
+      </div>
+      <input class="photo-cap" type="text" placeholder="Caption foto ${i+1}…" value="${esc(p.caption||'')}" oninput="PHOTOS['${key}'][${i}].caption=this.value"></div>`).join('');
+}
+
+// ── DRAFT ──
+function collectDraft(){
+  const d={_st:Object.assign({},ST)};
+  document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.id&&el.type!=='file')d[el.id]=el.value;});
+  return d;
+}
+function persistDraft(silent){
+  try{
+    localStorage.setItem(CFG.draftKey+'_draft',JSON.stringify(collectDraft()));
+    try{localStorage.setItem(CFG.draftKey+'_photos',JSON.stringify(PHOTOS));}catch(e){if(!silent)showNote('⚠️ Draft tersimpan, tapi foto terlalu besar.','err');}
+    if(!silent)showNote('💾 Draft tersimpan.','ok');
+  }catch(e){if(!silent)showNote('❌ Gagal menyimpan draft: '+e.message,'err');}
+}
+let _saveT=null;
+function scheduleAutoSave(){clearTimeout(_saveT);_saveT=setTimeout(()=>persistDraft(true),800);}
+function autoSaveNow(){clearTimeout(_saveT);persistDraft(true);}
+document.addEventListener('input',e=>{if(e.target.matches('input,select,textarea'))scheduleAutoSave();});
+document.addEventListener('change',e=>{if(e.target.matches('input,select,textarea'))scheduleAutoSave();});
+
+function loadDraft(){
+  try{
+    const rp=localStorage.getItem(CFG.draftKey+'_photos');
+    if(rp){PHOTOS.evidence=(JSON.parse(rp)||{}).evidence||[];renderPhotos('evidence');}
+    const raw=localStorage.getItem(CFG.draftKey+'_draft');if(!raw)return;
+    const d=JSON.parse(raw);
+    Object.entries(d).forEach(([id,val])=>{if(id==='_st')return;const el=document.getElementById(id);if(el&&el.type!=='file')el.value=val;});
+    if(d._st){Object.entries(d._st).forEach(([id,val])=>{
+      ST[id]=val;
+      const b=document.querySelector(`.tog .rb[data-v="${val}"][onclick*="'${id}'"]`);
+      if(b)b.className='rb '+(val==='OK'?'ok-act':'ng-act');
+    });}
+    // recompute megger PI/DAR
+    SECTIONS.forEach((s,si)=>{if((s.kind)==='megger')colsFor(s).forEach((c,ci)=>recalcMegger(si,ci));});
+    updateStats();
+  }catch(e){console.warn('loadDraft',e);}
+}
+function resetForm(){
+  if(!confirm('Reset semua data?'))return;
+  localStorage.removeItem(CFG.draftKey+'_draft');localStorage.removeItem(CFG.draftKey+'_photos');
+  document.querySelectorAll('input,select,textarea').forEach(el=>{if(el.type!=='file'&&!el.readOnly)el.value='';});
+  Object.keys(ST).forEach(k=>delete ST[k]);
+  PHOTOS.evidence=[];renderPhotos('evidence');
+  renderCompartments();renderSections();renderDiagrams();updateStats();
+}
+function showNote(msg,t){const n=document.getElementById('notice');n.textContent=msg;n.className='notice '+t;clearTimeout(showNote._t);showNote._t=setTimeout(()=>n.className='notice',5000);}
+
+// ── base.sheets ──
+function tv(id){return ST[id]||'—';}
+function buildSheets(){
+  const sheets={};
+  // compartment legend
+  if(COMPS.length){
+    sheets.compartments={title:'Compartments / Breaker Units',columns:['Description','Breaker S/N'],
+      rows:COMPS.map((c,i)=>({no:String(i+1),desc:c.code||'',crit:'',values:{'Description':v('cmpd-'+i)||c.label||'—','Breaker S/N':v('cmps-'+i)||'—'}}))};
+  }
+  SECTIONS.forEach((sec,si)=>{
+    const cols=colsFor(sec);const kind=sec.kind||'matrix';
+    const colNames=cols.map(c=>c.code||'');
+    if(kind==='matrix'){
+      const rows=[];
+      (sec.items||[]).forEach((it,ii)=>{
+        if(it.type==='subhead'){rows.push({no:it.no||'',desc:it.desc,section:it.desc,crit:'',values:{}});return;}
+        if(it.type==='remark'){rows.push({no:it.no||'',desc:it.desc,crit:'',values:{Remark:v('rmk-'+si+'-'+ii)||'—'}});return;}
+        const vals={};
+        if(it.type==='single'){colNames.forEach(cn=>vals[cn]=tv('t-'+si+'-'+ii+'-x'));}
+        else if(it.type==='value'){cols.forEach((c,ci)=>vals[c.code||ci]=iv('val-'+si+'-'+ii+'-'+ci));}
+        else{cols.forEach((c,ci)=>vals[c.code||ci]=tv('t-'+si+'-'+ii+'-'+ci));}
+        vals['Remark']=v('rmk-'+si+'-'+ii)||'—';
+        rows.push({no:it.no||'',desc:(it.desc||'')+(it.sub?(it.desc?' — ':'↳ ')+it.sub:''),crit:it.crit||'',values:vals});
+      });
+      sheets['s'+si]={title:sec.title,columns:colNames.concat(['Remark']),rows};
+    }else if(kind==='resistance'||kind==='rtd'){
+      const rowKeys=kind==='rtd'?Array.from({length:sec.rtdCount||13},(_,i)=>'RTD'+(i+1)):(sec.rows||['T1 - T2','T2 - T3','T3 - T1']);
+      const pfx=kind==='rtd'?'rtd':'res';
+      sheets['s'+si]={title:sec.title,columns:colNames,
+        rows:rowKeys.map((rk,ri)=>({no:String(ri+1),desc:rk,crit:sec.crit||'',
+          values:Object.fromEntries(cols.map((c,ci)=>[c.code||ci,iv(pfx+'-'+si+'-'+ri+'-'+ci)]))}))
+        .concat([{no:'',desc:'Remark',crit:'',values:Object.fromEntries(colNames.map(cn=>[cn, v('rmk-'+si+'-r')||'—']))}]),
+      };
+    }else if(kind==='megger'){
+      const times=sec._times||sec.times||[];
+      const rows=times.map((t,ti)=>({no:String(ti+1),desc:t,crit:sec.crit||'',
+        values:Object.fromEntries(cols.map((c,ci)=>[c.code||ci,iv('meg-'+si+'-'+ti+'-'+ci)]))}));
+      ['PI','DAR'].forEach(k=>rows.push({no:'',desc:k,crit:'',
+        values:Object.fromEntries(cols.map((c,ci)=>[c.code||ci,iv((k==='PI'?'pi-':'dar-')+si+'-'+ci)]))}));
+      rows.push({no:'',desc:'Remark',crit:'',values:Object.fromEntries(colNames.map(cn=>[cn,v('rmk-'+si+'-r')||'—']))});
+      sheets['s'+si]={title:sec.title,columns:colNames,rows};
+    }
+  });
+  return sheets;
+}
+
+// ── photo restore hook ──
+async function restorePhotosFromUrls(photoUrls,overwrite){
+  if(!photoUrls)return 0;
+  const entries=Object.values(photoUrls).reduce((a,x)=>a.concat(x||[]),[]);
+  if(!entries.length)return 0;
+  if(!overwrite&&PHOTOS.evidence.length)return 0;
+  const out=[];
+  for(const e of entries){
+    if(!e||!e.url)continue;
+    try{const d=await Storage.toDataUrl(e.url);if(d)out.push({src:d,dataUrl:d,caption:e.caption||'',w:e.w,h:e.h,widthCm:e.widthCm,heightCm:e.heightCm});}
+    catch(err){console.error('restorePhotos',err);}
+  }
+  if(!out.length)return 0;
+  PHOTOS.evidence=overwrite?out:PHOTOS.evidence.concat(out);
+  renderPhotos('evidence');try{autoSaveNow();}catch(e){}
+  return out.length;
+}
+window.restorePhotosFromUrls=restorePhotosFromUrls;
+
+// ── PDF ──
+async function generatePDF(opts={}){
+  if(!opts.silent){showNote('⏳ Membuat PDF…','info');await new Promise(r=>setTimeout(r,150));}
+  const{jsPDF}=window.jspdf||{};
+  if(!jsPDF){showNote('❌ jsPDF gagal dimuat.','err');return;}
+  await PhotoKit.prepare(PHOTOS.evidence);
+  const pdf=new jsPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const W=297,H=210,M=10;let y=M;
+  const NAVY=[30,58,95],BLUE=[37,99,235],SKY=[125,211,252],LT=[240,247,255],GRAY=[100,116,139],OK=[22,163,74],NG=[220,38,38];
+  function miniHdr(){
+    pdf.setFillColor(...NAVY);pdf.rect(0,0,W,8,'F');
+    pdf.setTextColor(...SKY);pdf.setFont('times','bold');pdf.setFontSize(7);
+    pdf.text((CFG.assetName||'').toUpperCase()+' — '+(CFG.assetTag||''),M,5.5);
+    pdf.setFont('times','normal');pdf.setFontSize(6.5);
+    pdf.text('Date: '+(v('wo-date')||'—')+'   By: '+(v('checked-by')||'—'),W-M,5.5,{align:'right'});
+    y=12;
+  }
+  function nPage(){pdf.addPage();y=M;miniHdr();}
+  function ckY(n){if(y+n>H-10)nPage();}
+  function secBar(t){ckY(12);pdf.setFillColor(...NAVY);pdf.rect(M,y,W-M*2,7,'F');pdf.setTextColor(255,255,255);pdf.setFont('times','bold');pdf.setFontSize(8.5);pdf.text(pdfSafe('> '+t),M+3,y+5);y+=10;}
+  const theme={theme:'grid',styles:{font:'times',fontSize:6.4,cellPadding:1.3,textColor:[15,23,42],lineColor:[191,219,254],lineWidth:0.15},
+    headStyles:{fillColor:NAVY,textColor:[125,211,252],fontStyle:'bold',fontSize:5.8,halign:'center'},
+    margin:{left:M,right:M,top:12,bottom:10},
+    willDrawPage:()=>{if(pdf.internal.getCurrentPageInfo().pageNumber>1)miniHdr();},
+    didParseCell:d=>{const t=d.cell.text[0];if(t==='OK'){d.cell.styles.textColor=OK;d.cell.styles.fontStyle='bold';}if(t==='NG'){d.cell.styles.textColor=NG;d.cell.styles.fontStyle='bold';}}};
+
+  pdf.setFillColor(...NAVY);pdf.rect(0,0,W,34,'F');pdf.setFillColor(...BLUE);pdf.rect(0,32,W,2,'F');
+  pdf.setTextColor(255,255,255);pdf.setFont('times','bold');pdf.setFontSize(15);
+  pdf.text(pdfSafe((CFG.pdfTitle||'STACKER / RECLAIMER MAINTENANCE').toUpperCase()),M,13);
+  pdf.setFontSize(10);pdf.setTextColor(...SKY);pdf.text((CFG.assetLabel||CFG.assetName||'')+'  —  '+(CFG.assetTag||''),M,21);
+  pdf.setFontSize(7.5);pdf.setFont('times','normal');
+  pdf.text('Generated: '+new Date().toLocaleString('en-GB'),M,28);
+  pdf.text('POMI — Unit 7/8 Electrical Maintenance',W-M,28,{align:'right'});
+  y=40;
+
+  pdf.setFillColor(...LT);pdf.setDrawColor(125,211,252);pdf.setLineWidth(0.25);pdf.roundedRect(M,y,W-M*2,20,2,2,'FD');
+  function ib(l,val,x,yy){pdf.setFont('times','bold');pdf.setFontSize(6);pdf.setTextColor(...GRAY);pdf.text(l.toUpperCase(),x,yy);
+    pdf.setFont('times','normal');pdf.setFontSize(8.5);pdf.setTextColor(...NAVY);pdf.text(tr2(val||'—',44),x,yy+4.5);}
+  const cx=[M+4,M+94,M+184];
+  ib('Date',v('wo-date'),cx[0],y+6);ib('WO No.',v('wo-no'),cx[1],y+6);ib('Frequency',v('frequency'),cx[2],y+6);
+  ib('Checked By',v('checked-by'),cx[0],y+14);ib('Reviewed By',v('reviewed-by'),cx[1],y+14);ib('Condition',noEmoji(v('overall')),cx[2],y+14);
+  y+=26;
+
+  if(COMPS.length){
+    secBar('Compartments / Breaker Units');
+    pdf.autoTable({...theme,startY:y,head:[['#','Code','Description','Breaker S/N']],
+      body:COMPS.map((c,i)=>[String(i+1),c.code||'',v('cmpd-'+i)||c.label||'—',v('cmps-'+i)||'—']),
+      styles:{...theme.styles,fontSize:7.5,cellPadding:1.8},columnStyles:{0:{cellWidth:8},1:{cellWidth:20}}});
+    y=pdf.lastAutoTable.finalY+5;
+  }
+
+  SECTIONS.forEach((sec,si)=>{
+    const cols=colsFor(sec);const kind=sec.kind||'matrix';
+    nPage();secBar(sec.title+(sec.crit?'   ['+sec.crit+']':''));
+    if(kind==='matrix'){
+      // A wide equipment matrix (long-travel wheels, safety-device limit
+      // switches, ...) can't fit 15+ columns worth of a long tag code on one
+      // landscape A4 page without every header wrapping character-by-
+      // character — split into print-sized column groups instead, each its
+      // own table with the No/Item/Criteria/Remark columns repeated. The
+      // SOURCE workbook already does exactly this at 20 columns (it splits
+      // "Long Travel 1"/"Long Travel 2" into separate sheets); this just
+      // applies the same idea at a narrower, always-legible chunk size.
+      const CHUNK=8;
+      const colChunks=cols.length>CHUNK?chunkArr(cols,CHUNK):[cols];
+      colChunks.forEach((cc,chi)=>{
+        if(chi>0){nPage();secBar(sec.title+'  (lanjutan kolom '+(chi*CHUNK+1)+'-'+Math.min(cols.length,(chi+1)*CHUNK)+')');}
+        const head=['No','Check Item','Criteria',...cc.map(pdfCode),'Remark'];
+        const body=[];
+        (sec.items||[]).forEach((it,ii)=>{
+          if(it.type==='subhead'){body.push([{content:pdfSafe(it.desc),colSpan:head.length,styles:{fontStyle:'bold',fillColor:[219,234,254],textColor:NAVY,halign:'left'}}]);return;}
+          if(it.type==='remark'){body.push([it.no||'',{content:pdfSafe(it.desc),colSpan:2},{content:v('rmk-'+si+'-'+ii)||'—',colSpan:cc.length+1,styles:{halign:'left'}}]);return;}
+          if(it.type==='single'){body.push([it.no||'',pdfSafe(it.desc),pdfSafe(it.crit||''),{content:tv('t-'+si+'-'+ii+'-x'),colSpan:cc.length,styles:{halign:'center',fontStyle:'bold'}},v('rmk-'+si+'-'+ii)||'—']);return;}
+          const descPdf=(it.desc?pdfSafe(it.desc):'')+(it.sub?(it.desc?' - ':'   > ')+pdfSafe(it.sub):'');
+          const rowVals=cc.map(c=>{
+            const ci=cols.indexOf(c);
+            if(it.type!=='value') return tv('t-'+si+'-'+ii+'-'+ci);
+            if(it.motorOnly && isBrakeCol(c)) return '—';
+            const raw=iv('val-'+si+'-'+ii+'-'+ci);
+            // nothing typed yet but this column has a different measurement point
+            // than the row's own label (e.g. a brake's "TB 3-5" vs the motor's
+            // "T1-T2") — print the hint so the blank cell still says what to measure
+            if(raw==='—' && it.brakePlaceholder && isBrakeCol(c)) return '('+pdfSafe(it.brakePlaceholder)+')';
+            return raw;
+          });
+          body.push([it.no||'',descPdf,pdfSafe(it.crit||''),...rowVals,v('rmk-'+si+'-'+ii)||'—']);
+        });
+        pdf.autoTable({...theme,startY:y,head:[head],body,styles:{...theme.styles,fontSize:6},
+          columnStyles:{0:{cellWidth:7},1:{cellWidth:58},2:{cellWidth:24},[head.length-1]:{cellWidth:30}}});
+        y=pdf.lastAutoTable.finalY+5;
+      });
+    }else if(kind==='resistance'||kind==='rtd'){
+      const rowKeys=kind==='rtd'?Array.from({length:sec.rtdCount||13},(_,i)=>'RTD'+(i+1)):(sec.rows||['T1 - T2','T2 - T3','T3 - T1']);
+      const pfx=kind==='rtd'?'rtd':'res';
+      pdf.autoTable({...theme,startY:y,head:[[kind==='rtd'?'RTD':'',...cols.map(c=>c.code||'')]],
+        body:rowKeys.map((rk,ri)=>[rk,...cols.map((c,ci)=>iv(pfx+'-'+si+'-'+ri+'-'+ci))]).concat([['Remark '+(v('rmk-'+si+'-r')||'—')]]),
+        styles:{...theme.styles,fontSize:7}});
+    }else if(kind==='megger'){
+      const times=sec._times||sec.times||[];
+      const body=times.map((t,ti)=>[t,...cols.map((c,ci)=>iv('meg-'+si+'-'+ti+'-'+ci))]);
+      body.push(['PI',...cols.map((c,ci)=>iv('pi-'+si+'-'+ci))]);
+      body.push(['DAR',...cols.map((c,ci)=>iv('dar-'+si+'-'+ci))]);
+      body.push(['Remark: '+(v('rmk-'+si+'-r')||'—')]);
+      pdf.autoTable({...theme,startY:y,head:[['Time',...cols.map(c=>c.code||'')]],body,styles:{...theme.styles,fontSize:7}});
+    }
+    y=pdf.lastAutoTable.finalY+5;
+  });
+
+  if(DIAGRAMS.length){
+    nPage();secBar('Breaker Interlock — Reference Diagrams (factory-set, reference only)');
+    const DC=Math.min(3,DIAGRAMS.length),G=6,DW=(W-M*2-G*(DC-1))/DC;
+    let dx=M,rowH=0;
+    DIAGRAMS.forEach((d,i)=>{
+      const ratio=(d.h&&d.w)?d.h/d.w:0.62;
+      const dh=Math.min(DW*ratio,110);
+      if(i%DC===0){dx=M;if(i)y+=rowH+8;rowH=0;ckY(dh+10);}
+      try{pdf.addImage(d.uri,'PNG',dx,y,DW,dh);}catch(e){}
+      pdf.setFont('times','italic');pdf.setFontSize(6.5);pdf.setTextColor(100,116,139);
+      pdf.text(pdfSafe(d.caption),dx+DW/2,y+dh+4,{align:'center',maxWidth:DW-2});
+      dx+=DW+G;rowH=Math.max(rowH,dh);
+    });
+    y+=rowH+8;
+  }
+
+  if(PHOTOS.evidence.length){
+    nPage();secBar('Evidence Photos');
+    const PC=3,G=4,PW=(W-M*2-G*(PC-1))/PC,PH=68;
+    for(let i=0;i<PHOTOS.evidence.length;i+=PC){
+      const row=PHOTOS.evidence.slice(i,i+PC);
+      const dims=row.map(p=>PhotoKit.fit(p,PW,PH));const rh=Math.max(...dims.map(d=>d.h));
+      const hasCap=row.some(p=>p.caption);ckY(rh+(hasCap?12:6));
+      row.forEach((p,ci)=>{const px=M+ci*(PW+G);PhotoKit.draw(pdf,p,px,y,PW,rh,{align:'center'});
+        if(p.caption){pdf.setFont('times','italic');pdf.setFontSize(7);pdf.setTextColor(...GRAY);pdf.text(p.caption,px+PW/2,y+rh+4,{align:'center',maxWidth:PW-2});}});
+      y+=rh+(hasCap?11:6);
+    }
+  }
+
+  nPage();secBar('Findings & Conclusion');
+  pdf.autoTable({...theme,startY:y,body:[
+    ['Overall Condition',noEmoji(v('overall'))],['Next PM Due',v('next-pm')||'—'],
+    ['Findings / Defects Found',v('findings')||'—'],['Result of Work / Recommendations',v('recommendations')||'—'],
+  ],styles:{...theme.styles,fontSize:8.5,cellPadding:2.5},columnStyles:{0:{cellWidth:56,fontStyle:'bold',fillColor:LT,textColor:NAVY}}});
+
+  const pages=pdf.internal.getNumberOfPages();
+  for(let pg=1;pg<=pages;pg++){pdf.setPage(pg);pdf.setFont('times','normal');pdf.setFontSize(6.5);pdf.setTextColor(150);
+    pdf.text('Page '+pg+'/'+pages,W-M,H-4,{align:'right'});pdf.text('POMI — '+(CFG.assetName||'')+' — '+(CFG.assetTag||''),M,H-4);}
+  const fn='STRC_'+(CFG.assetTag||'').replace(/[^a-zA-Z0-9]+/g,'-')+'_'+(v('wo-date')||new Date().toISOString().slice(0,10)).replace(/-/g,'')+'.pdf';
+  if(!opts.silent){pdf.save(fn);showNote('✅ PDF tersimpan: '+fn,'ok');}
+  return pdf;
+}
+
+// ── SUBMIT ──
+async function submitToDb(){
+  const base=DB.collectCheckSheetData(CFG.formId,CFG.assetTag,CFG.assetName,v('frequency')||CFG.frequency||'YEARLY');
+  if(!base.executionDate){DB.showSubmitResult(false,'Isi tanggal terlebih dahulu.');return;}
+  if(!base.checkedBy){DB.showSubmitResult(false,'Isi nama teknisi terlebih dahulu.');return;}
+  base.sheets=buildSheets();
+
+  const target=await SubmitGuard.resolveSubmitTarget(base.woNumber,()=>generatePDF({silent:true}));
+  if(target.mode==='cancel')return;
+  let id;
+  try{
+    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
+    id=target.mode==='overwrite'?await DB.update(target.targetId,base):await DB.save(base);
+    DB.showSubmitResult(true,'Data berhasil disimpan! ID: '+id);
+  }catch(e){SubmitGuard.hideProgress();DB.showSubmitResult(false,'Gagal menyimpan: '+e.message);return;}
+  try{
+    const ok=await Approvals.submitWithFiles(id,{
+      photos:{evidence:PHOTOS.evidence},
+      pdfBuilder:()=>generatePDF({silent:true}),
+      assetTag:CFG.assetTag,assetName:CFG.assetName,checksheetFile:CFG.checksheetFile,
+      submittedBy:base.checkedBy,revisionOf:LoadMergeModal.getReviseOfApprovalId(),
+      existingApprovalId:target.mode==='overwrite'?target.approvalId:null,
+      onProgress:(pct,label)=>SubmitGuard.setProgress(10+Math.round(pct*0.85),label),
+    });
+    if(!ok)showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah.','err');
+  }catch(e){console.error('submitWithFiles',e);showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah.','err');}
+  SubmitGuard.markSubmitted(id,{woNumber:base.woNumber,executionDate:base.executionDate,checkedBy:base.checkedBy});
+  try{CloudDraft.markSubmitted();}catch(e){}
+  SubmitGuard.setProgress(100,'Selesai!');setTimeout(()=>SubmitGuard.hideProgress(),500);
+}
+
+// ── INIT ──
+PhotoKit.configure({maxWcm:8.9,maxHcm:9,defaultWcm:8.9,defaultHcm:6.3});
+document.title=CFG.pageTitle||((CFG.assetName||'STRC')+' — Stacker/Reclaimer Maintenance');
+document.getElementById('tb-logo').innerHTML=CFG.tbLogo||'STRC <em>PM</em>';
+document.getElementById('tb-sub').textContent=(CFG.assetTag||'')+' · STACKER/RECLAIMER PM';
+document.getElementById('hero-eyebrow').textContent=CFG.eyebrow||'Stacker / Reclaimer Maintenance';
+document.getElementById('hero-title').innerHTML=CFG.heroTitle||('STRC <em>'+(CFG.subtitle||'')+'</em>');
+document.getElementById('hero-sub').textContent=CFG.heroSub||(CFG.assetLabel||'');
+document.getElementById('foot-l').textContent=(CFG.assetTag||'')+' · '+(CFG.assetName||'').toUpperCase();
+if(CFG.frequency){const f=document.getElementById('frequency');if(![...f.options].some(o=>o.value===CFG.frequency)){const o=document.createElement('option');o.textContent=CFG.frequency;f.appendChild(o);}f.value=CFG.frequency;}
+
+renderCompartments();
+renderSections();
+renderDiagrams();
+renderPhotos('evidence');
+loadDraft();
+updateStats();
+
+LoadMergeModal.init({assetTag:CFG.assetTag});
+SubmitGuard.init({assetTag:CFG.assetTag});
+LoadMergeModal.initRevisionBanner();
+TechnicianAuth.init({checkedByFieldId:'checked-by'});
+CloudDraft.init({formId:CFG.formId,assetTag:CFG.assetTag,assetName:CFG.assetName,frequency:CFG.frequency||'YEARLY',photos:()=>PHOTOS.evidence});
+
+setTimeout(async()=>{try{const d=await DB.loadLastSubmission(CFG.assetTag);if(d)showNote('📂 Data terakhir tersedia via "Muat / Lanjutkan dari Database".','info');}catch(e){}},900);
+</script>
+</body>
+</html>
