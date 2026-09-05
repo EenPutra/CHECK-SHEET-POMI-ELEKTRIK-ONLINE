@@ -101,6 +101,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .mi.ro{background:#eef4fb;color:var(--navy);font-weight:700}
 .rmk{width:100%;min-width:120px;font-size:11px;padding:4px 6px;border-radius:3px;border:1.5px solid var(--bdr);background:var(--bg2);font-family:var(--sans)}
 .rmk:focus{outline:none;border-color:var(--blue);background:#fff}
+.ct td.na{color:var(--idle-txt);font-family:var(--mono)}
 .cmp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:8px}
 .cmp-card{border:1px solid var(--bdr);border-radius:8px;padding:8px 10px;background:var(--bg2)}
 .cmp-card .code{font-family:var(--mono);font-size:11px;font-weight:700;color:var(--navy);letter-spacing:1px}
@@ -612,6 +613,11 @@ function renderCompartments(){
     </div>`).join('');
 }
 function compHead(cols){return cols.map(c=>`<th title="${esc(c.label||'')}">${esc(c.code||'')}</th>`).join('');}
+// Brake tags in this family always end in "-B" (motors end in "-M") — used to
+// give a 'value' item different per-column behaviour: a brake coil's own
+// resistance is measured across different terminals (e.g. "TB 3-5") than a
+// motor winding's T1-T2/T1-T3/T2-T3, and only needs ONE reading, not three.
+function isBrakeCol(c){return /-B$/.test((c&&c.code)||'');}
 
 // ── INTERLOCK REFERENCE DIAGRAMS ──
 const DIAGRAMS=CFG.interlockDiagrams||[];
@@ -674,7 +680,11 @@ function matrixTable(sec,si,cols){
     const cells=it.type==='single'
       ? `<td colspan="${cols.length}">${mkTog('t-'+si+'-'+ii+'-x')}</td>`
       : it.type==='value'
-      ? cols.map((c,ci)=>`<td><input class="mi wide" type="text" id="val-${si}-${ii}-${ci}"></td>`).join('')
+      ? cols.map((c,ci)=>{
+          if(it.motorOnly && isBrakeCol(c)) return `<td class="na">&mdash;</td>`;
+          const ph=(it.brakePlaceholder && isBrakeCol(c))?` placeholder="${esc(it.brakePlaceholder)}"`:'';
+          return `<td><input class="mi wide" type="text" id="val-${si}-${ii}-${ci}"${ph}></td>`;
+        }).join('')
       : cols.map((c,ci)=>`<td>${mkTog('t-'+si+'-'+ii+'-'+ci)}</td>`).join('');
     // a 'value' item with no of its own (a continuation sub-row, e.g. T1–T2/T1–T3/T2–T3
     // under one parent "check resistance" item) shows its sub-label in place of desc.
@@ -960,7 +970,17 @@ async function generatePDF(opts={}){
           if(it.type==='remark'){body.push([it.no||'',{content:pdfSafe(it.desc),colSpan:2},{content:v('rmk-'+si+'-'+ii)||'—',colSpan:cc.length+1,styles:{halign:'left'}}]);return;}
           if(it.type==='single'){body.push([it.no||'',pdfSafe(it.desc),pdfSafe(it.crit||''),{content:tv('t-'+si+'-'+ii+'-x'),colSpan:cc.length,styles:{halign:'center',fontStyle:'bold'}},v('rmk-'+si+'-'+ii)||'—']);return;}
           const descPdf=(it.desc?pdfSafe(it.desc):'')+(it.sub?(it.desc?' - ':'   > ')+pdfSafe(it.sub):'');
-          const rowVals=cc.map(c=>{const ci=cols.indexOf(c);return it.type==='value'?iv('val-'+si+'-'+ii+'-'+ci):tv('t-'+si+'-'+ii+'-'+ci);});
+          const rowVals=cc.map(c=>{
+            const ci=cols.indexOf(c);
+            if(it.type!=='value') return tv('t-'+si+'-'+ii+'-'+ci);
+            if(it.motorOnly && isBrakeCol(c)) return '—';
+            const raw=iv('val-'+si+'-'+ii+'-'+ci);
+            // nothing typed yet but this column has a different measurement point
+            // than the row's own label (e.g. a brake's "TB 3-5" vs the motor's
+            // "T1-T2") — print the hint so the blank cell still says what to measure
+            if(raw==='—' && it.brakePlaceholder && isBrakeCol(c)) return '('+pdfSafe(it.brakePlaceholder)+')';
+            return raw;
+          });
           body.push([it.no||'',descPdf,pdfSafe(it.crit||''),...rowVals,v('rmk-'+si+'-'+ii)||'—']);
         });
         pdf.autoTable({...theme,startY:y,head:[head],body,styles:{...theme.styles,fontSize:6},

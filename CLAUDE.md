@@ -2701,6 +2701,26 @@ sets entirely). Each section there supplies its own `"columns"` override instead
 top-level `compartments` non-empty would have rendered ONE group's columns as if they applied to
 the whole page, which is simply wrong for the other groups/sections.
 
+**A brake's resistance is measured across different terminals than a motor's — Long Travel and
+Slewing needed a real per-column behaviour difference, not just different numbers.** Re-checking
+the source after a user report (with a screenshot of the original spreadsheet) confirmed the
+"6 Monthly" resistance item's brake column ("-B" tag) isn't a T1-T2/T1-T3/T2-T3 winding check at
+all — it's ONE reading across a brake-coil terminal pair, labelled inline in the source (`"TB 3 -
+5 :"` for Long Travel, `"TB 3 - 4 :"` for Slewing — confirmed these differ, not a typo, by
+grepping every `"TB \d"` occurrence across every converted source file). None of the other 8
+configs' source data shows this pattern at all (their brake columns are simply blank in that
+region) — so this is scoped to exactly the 2 files that have it, not applied blanket. Two new
+optional flags on a `type:'value'` item (`value_rows(..., brake_label=…)` / `brake_na=True` in
+`_generate.py`): `brakePlaceholder` gives a brake column's first-row `<input>` that terminal-pair
+as a placeholder (on-screen hint; printed as `"(TB 3 - 5)"` in the PDF when still blank, via
+`isBrakeCol(c)` — `/-B$/` on the tag — so the printed sheet still says what to measure even
+unfilled); `motorOnly` renders a brake column's cell as a plain non-input dash instead (used for
+the resistance item's 2 continuation rows, since a brake only gets ONE reading, and for the whole
+megger item, since the source shows no brake megger reading at all). `one_yearly_items(brake_label)`
+builds a config-specific "1 Yearly" section; every other config still uses the shared `ONE_YEARLY`
+constant unchanged (verified via headless Chrome: `STRC1_BW_BC`'s brake column still gets a plain
+input on every row, identical to before this change — no regression from adding this mechanism).
+
 Standard stack (technician-auth on `checked-by`, autosave, PhotoKit `PHOTOS.evidence`, Load &
 Merge + CloudDraft, submit-guard, `Approvals.submitWithFiles`, landscape A4 PDF with navy cover +
 `willDrawPage` mini-header) is unchanged from SWGR — verified per-file via headless Chrome across

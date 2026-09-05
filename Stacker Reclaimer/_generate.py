@@ -38,15 +38,37 @@ def cmp(pairs):
     return [{"code": c, "label": l} for c, l in pairs]
 
 
-def value_rows(no, desc, crit, sublabels):
+def value_rows(no, desc, crit, sublabels, brake_label=None, brake_na=False):
     """One 'parent' item (no/desc/crit, itself also a value row for the first
     sub-label) followed by a continuation 'value' row per remaining sub-label —
     used for the resistance (T1-T2/T1-T3/T2-T3) and megger (T1/T2/T3-GROUND)
     checks that the source spreadsheet lays out as several bare rows under one
-    instruction."""
-    rows = [{"no": no, "desc": desc, "crit": crit, "type": "value", "sub": sublabels[0]}]
-    for sl in sublabels[1:]:
-        rows.append({"no": "", "desc": "", "crit": "", "type": "value", "sub": sl})
+    instruction.
+
+    Brake columns (tag ends "-B") measure something DIFFERENT here than a
+    motor winding does — confirmed from source: Long Travel's brake coil is
+    measured across terminals "TB 3-5" (one reading), Slewing's across
+    "TB 3-4" — never the motor's T1-T2/T1-T3/T2-T3, and never a megger
+    reading at all. Two ways to express that, mutually exclusive:
+      brake_label — the FIRST row's brake cell gets that as an input
+        placeholder (own measurement, one reading); every continuation row's
+        brake cell is 'motorOnly' (not applicable, shown as a dash).
+      brake_na — EVERY row's brake cell is 'motorOnly' (this whole item
+        doesn't apply to a brake column at all, e.g. the megger check).
+    Neither flag set (the default, every config besides Long Travel/Slewing)
+    leaves brake columns behaving exactly like motor columns, unchanged."""
+    rows = []
+    for i, sl in enumerate(sublabels):
+        row = {"no": no if i == 0 else "", "desc": desc if i == 0 else "",
+               "crit": crit if i == 0 else "", "type": "value", "sub": sl}
+        if brake_na:
+            row["motorOnly"] = True
+        elif brake_label:
+            if i == 0:
+                row["brakePlaceholder"] = brake_label
+            else:
+                row["motorOnly"] = True
+        rows.append(row)
     return rows
 
 
@@ -78,20 +100,31 @@ SIX_MONTHLY = [
     {"no": "9.", "desc": "Inform to supervisor & raise new WO if any defect found.", "crit": ""},
 ]
 
-ONE_YEARLY = (
-    [{"no": "1.", "desc": "Perform all activities PM in 6 monthly periods.", "crit": ""}]
-    + value_rows("2.", "Check resistance of motor winding & temperature sensor if any.",
-                 "Measured resistance within 5% of each other", ["T1 - T2", "T1 - T3", "T2 - T3"])
-    + value_rows("3.", "Check the motor winding each phase (use megger).",
-                 "Min. insulation resistance not less than 1.5 megaohm", ["T1/T2/T3 - GROUND"])
-    + [
-        {"no": "4.", "desc": "Check motor termination, retighten cable connection & check seal bearing.", "crit": "No looseness\nClean\nNo leak"},
-        {"no": "5.", "desc": "Replace old grease with new one (open the drain plug, inject grease until old grease comes out).", "crit": ""},
-        {"no": "6.", "desc": "Check motor support bolt, retighten if necessary, may any corrosion, etc.", "crit": "No looseness\nNo dirty or corroded"},
-        {"no": "7.", "desc": "Perform housekeeping after the job complete (make sure equipment has ready).", "crit": ""},
-        {"no": "8.", "desc": "Monitor the motor during running test.", "crit": ""},
-    ]
-)
+def one_yearly_items(brake_label=None):
+    """The shared "1 Yearly" section. Pass `brake_label` (e.g. "TB 3 - 5") for
+    a config whose source confirms a brake-specific resistance test point —
+    only Long Travel ("TB 3 - 5") and Slewing ("TB 3 - 4") do, per the source
+    workbook; every other config calls this with no argument, which leaves
+    brake columns identical to motor columns (unchanged from before)."""
+    return (
+        [{"no": "1.", "desc": "Perform all activities PM in 6 monthly periods.", "crit": ""}]
+        + value_rows("2.", "Check resistance of motor winding & temperature sensor if any.",
+                     "Measured resistance within 5% of each other", ["T1 - T2", "T1 - T3", "T2 - T3"],
+                     brake_label=brake_label)
+        + value_rows("3.", "Check the motor winding each phase (use megger).",
+                     "Min. insulation resistance not less than 1.5 megaohm", ["T1/T2/T3 - GROUND"],
+                     brake_na=bool(brake_label))
+        + [
+            {"no": "4.", "desc": "Check motor termination, retighten cable connection & check seal bearing.", "crit": "No looseness\nClean\nNo leak"},
+            {"no": "5.", "desc": "Replace old grease with new one (open the drain plug, inject grease until old grease comes out).", "crit": ""},
+            {"no": "6.", "desc": "Check motor support bolt, retighten if necessary, may any corrosion, etc.", "crit": "No looseness\nNo dirty or corroded"},
+            {"no": "7.", "desc": "Perform housekeeping after the job complete (make sure equipment has ready).", "crit": ""},
+            {"no": "8.", "desc": "Monitor the motor during running test.", "crit": ""},
+        ]
+    )
+
+
+ONE_YEARLY = one_yearly_items()
 
 BREAKER = (
     [
@@ -135,17 +168,19 @@ SAFETY_ITEMS = [
 ]
 
 
-def motor_sections(cols, one_monthly=False):
+def motor_sections(cols, one_monthly=False, brake_label=None):
     """The 4 standard sections (optionally starting with '1 Monthly') applied
     to `cols` — this is the shared shape behind Long Travel / Slewing / BW-BC /
-    STRC-2 main / FDR-CSRH / the combined BW-BC-CR monthly sheet."""
+    STRC-2 main / FDR-CSRH / the combined BW-BC-CR monthly sheet.
+    `brake_label` — see one_yearly_items()."""
     secs = []
     if one_monthly:
         secs.append({"key": "s1m", "icon": "\U0001F527", "title": "1 Monthly - General PM of Electric Motor", "kind": "matrix", "items": ONE_MONTHLY})
     secs += [
         {"key": "s6m", "icon": "\U0001F9F4", "title": "6 Monthly - Electric Motor PM & Lubrication", "kind": "matrix",
          "note": "Grease specification: Shell Alvania EP2 or Almagard NLGI 02 (inject with grease gun).", "items": SIX_MONTHLY},
-        {"key": "s1y", "icon": "\U0001F6E2", "title": "1 Yearly - Electric Motor PM & Bearing Lubrication", "kind": "matrix", "items": ONE_YEARLY},
+        {"key": "s1y", "icon": "\U0001F6E2", "title": "1 Yearly - Electric Motor PM & Bearing Lubrication", "kind": "matrix",
+         "items": one_yearly_items(brake_label) if brake_label else ONE_YEARLY},
         {"key": "sbk", "icon": "⚡", "title": "Circuit Breaker and Motor Starter or Inverter", "kind": "matrix", "items": BREAKER},
     ]
     return secs
@@ -163,7 +198,9 @@ CONFIGS["STRC1_Long_Travel"] = {
     "eyebrow": "Stacker Reclaimer 1 · Long Travel Wheels", "frequency": "6 MONTHLY",
     "heroSub": "STRC-1 · 20 Gantry Travel wheel positions (Motor + Brake each) — Long Travel Wheels #1-#20",
     "assetLabel": "Stacker Reclaimer 1 · Long Travel Wheels #1-#20", "compartments": LT1,
-    "sections": motor_sections(LT1),
+    # confirmed from source: the brake coil's own resistance is measured across
+    # terminals "TB 3-5" (one reading), never the motor's T1-T2/T1-T3/T2-T3.
+    "sections": motor_sections(LT1, brake_label="TB 3 - 5"),
 }
 
 # ── 2. STRC-1 Slewing (3 wheel positions) ──
@@ -176,7 +213,9 @@ CONFIGS["STRC1_Slewing"] = {
     "eyebrow": "Stacker Reclaimer 1 · Slewing", "frequency": "6 MONTHLY",
     "heroSub": "STRC-1 · Boom Slewing motor + disc brake #1-#3",
     "assetLabel": "Stacker Reclaimer 1 · Boom Slewing #1-#3", "compartments": SLEW1,
-    "sections": motor_sections(SLEW1),
+    # confirmed from source: the brake coil's own resistance is measured across
+    # terminals "TB 3-4" here (Long Travel's brake uses "TB 3-5" instead).
+    "sections": motor_sections(SLEW1, brake_label="TB 3 - 4"),
 }
 
 # ── 3. STRC-1 Bucket Wheel + Boom Conveyor ──
