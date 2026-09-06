@@ -2112,6 +2112,30 @@ new page HTML depends on. The revision-overwrite flow in particular is triggered
 check sheet's `submitToDb()`, so a stale `submit-guard.js` / `approval-helper.js` there
 would silently fall back to the old behavior.
 
+**The 3 generator templates (`_swgr_template.tpl` / `_strc_template.tpl` / `_cp_template.tpl`)
+and their generated `.html` had drifted to `?v=20260901d` while the rest of the repo moved to
+`20260904*`/`20260906a`** — a past repo-wide bump's `sed` matched only the then-current suffix, and
+these files were on an older one, so it skipped them, and later regenerations re-stamped them from
+the still-stale template. Symptom: the ~26 SWGR/STRC/CP sheets weren't picking up recent
+`cloud-draft.js` changes (the CloudDraft photo fix in particular). Normalised everything to
+`20260906a` in one pass. **When bumping repo-wide, bump the `.tpl` files too, and grep for EVERY
+distinct `?v=` value present (`grep -rho '\.js?v=[0-9a-z]*'` — expect exactly one) rather than
+assuming a single known "from" suffix.**
+
+## Mobile — the bottom "Save Draft" button must stay visible
+
+Every generator template and ~30 standalone check sheets had `@media(max-width:640px){ … .btn-draft{display:none} }`
+— intended to declutter the crowded topbar on a phone, but the class `btn-draft` is on **both** the
+compact topbar `💾 Draft` button AND the full bottom action-row `💾 Save Draft` button, so on a
+phone BOTH vanished and there was no way to save a draft in the field at all. Fixed by scoping the
+rule to `.btn-draft.btn-sm{display:none}` — only the topbar button carries `btn-sm`, so the bottom
+action-row one (which lives in a `flex-wrap:wrap` row that handles narrow screens fine) stays
+visible. Applied to all 3 templates + every standalone file that had the rule; verified via a
+390px headless viewport that the topbar draft button is `display:none` while the bottom one is
+visible and hit-testable. `Motor_Witness_Test_Vendor.html` (its own `saveSessionDraft()` buttons,
+no `btn-draft` class) and files that never had the rule (e.g. `4000_Hours_Mill_PM.html`) were
+already fine.
+
 ## `pdf-preview.js` — the shared "preview before it goes anywhere" modal
 
 Self-injecting like `submit-guard.js`. Monkey-patches `window.jspdf.jsPDF.API.save` so every

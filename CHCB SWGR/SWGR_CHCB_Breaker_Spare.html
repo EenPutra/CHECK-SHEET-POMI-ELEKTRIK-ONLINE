@@ -8,18 +8,18 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="../firebase-config.js?v=20260901d"></script>
-<script src="../db-helper.js?v=20260901d"></script>
-<script src="../storage-helper.js?v=20260901d"></script>
-<script src="../approval-helper.js?v=20260901d"></script>
-<script src="../submit-guard.js?v=20260901d"></script>
-<script src="../pdf-preview.js?v=20260901d"></script>
-<script src="../load-merge-modal.js?v=20260901d"></script>
-<script src="../cloud-draft.js?v=20260901d"></script>
-<script src="../auth-session.js?v=20260901d"></script>
-<script src="../technician-auth.js?v=20260901d"></script>
-<script src="../img-helper.js?v=20260901d"></script>
-<script src="../photo-kit.js?v=20260901d"></script>
+<script src="../firebase-config.js?v=20260906a"></script>
+<script src="../db-helper.js?v=20260906a"></script>
+<script src="../storage-helper.js?v=20260906a"></script>
+<script src="../approval-helper.js?v=20260906a"></script>
+<script src="../submit-guard.js?v=20260906a"></script>
+<script src="../pdf-preview.js?v=20260906a"></script>
+<script src="../load-merge-modal.js?v=20260906a"></script>
+<script src="../cloud-draft.js?v=20260906a"></script>
+<script src="../auth-session.js?v=20260906a"></script>
+<script src="../technician-auth.js?v=20260906a"></script>
+<script src="../img-helper.js?v=20260906a"></script>
+<script src="../photo-kit.js?v=20260906a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -132,7 +132,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .photo-cap{width:100%;border:none;border-top:1px solid var(--bdr2);padding:6px 8px;font-size:12px;font-family:inherit;background:transparent}
 .photo-cap:focus{outline:none;background:var(--bg2)}
 .photo-empty{color:var(--txt4);font-size:12px;text-align:center;padding:10px}
-@media(max-width:640px){.tb-sub,.tb-sep{display:none}.btn-draft{display:none}}
+@media(max-width:640px){.tb-sub,.tb-sep{display:none}.btn-draft.btn-sm{display:none}}
 </style>
 </head>
 <body>

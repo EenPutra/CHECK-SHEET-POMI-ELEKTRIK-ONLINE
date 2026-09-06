@@ -133,7 +133,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .photo-cap{width:100%;border:none;border-top:1px solid var(--bdr2);padding:6px 8px;font-size:12px;font-family:inherit;background:transparent}
 .photo-cap:focus{outline:none;background:var(--bg2)}
 .photo-empty{color:var(--txt4);font-size:12px;text-align:center;padding:10px}
-@media(max-width:640px){.tb-sub,.tb-sep{display:none}.btn-draft{display:none}}
+@media(max-width:640px){.tb-sub,.tb-sep{display:none}.btn-draft.btn-sm{display:none}}
 </style>
 </head>
 <body>
