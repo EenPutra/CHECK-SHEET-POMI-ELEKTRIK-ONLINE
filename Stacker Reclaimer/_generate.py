@@ -310,23 +310,24 @@ CONFIGS["STRC1_Main"] = {
     "sections": motor_sections(STRC1_MAIN),
 }
 
-# ── 4c. STRC-1 Luffing & Rail Clamp (focused subset of STRC1_Main) ──
-# Explicit user request: a standalone check sheet for just these 4 of
-# STRC1_MAIN's 16 positions, same columns/tags/labels — mirrors how STRC-2
-# already has BOTH a combined "Main" sheet AND a focused "Slewing_Luffing"
-# one covering an overlapping subset (STRC2_Slewing_Luffing.html); STRC1_Main
-# itself is left exactly as-is, this doesn't remove anything from it.
+# ── 4c. STRC-1 Hydraulic Pack & Rail Clamp (focused subset of STRC1_Main) ──
+# Explicit user request: a standalone check sheet for the boom-luffing drive +
+# both rail clamps. On STRC-1 the boom luffing is a hydraulic power pack, not
+# an electric motor + disc brake, so the two old "Boom Luffing" columns
+# (CCH-STRC-130A-M / -130A-B) are collapsed into ONE "Hydraulic Pack" column
+# (CCH-STRC-130A). assetTag/formId/draftKey/filename kept stable so existing
+# drafts/submissions don't break. STRC1_Main is left exactly as-is.
 STRC1_LUFFING_RC = cmp([
-    ("CCH-STRC-130A-M", "Motor for Boom Luffing"), ("CCH-STRC-130A-B", "Disc Brake for Boom Luffing"),
+    ("CCH-STRC-130A", "Hydraulic Pack"),
     ("CCH-STRC-100A3-M", "Rail Clamp 1"), ("CCH-STRC-100A4-M", "Rail Clamp 2"),
 ])
 CONFIGS["STRC1_Luffing_RailClamp"] = {
-    "formId": "strc1_luff_rc", "assetTag": "STRC1-LUFFING-RC", "assetName": "Stacker Reclaimer 1 — Luffing & Rail Clamp",
+    "formId": "strc1_luff_rc", "assetTag": "STRC1-LUFFING-RC", "assetName": "Stacker Reclaimer 1 — Hydraulic Pack & Rail Clamp",
     "checksheetFile": "Stacker Reclaimer/STRC1_Luffing_RailClamp.html", "draftKey": "strc1_luff_rc",
-    "pageTitle": "STRC 1 Luffing & Rail Clamp", "heroTitle": "STRC <em>1 &middot; Luffing / Rail Clamp</em>",
-    "eyebrow": "Stacker Reclaimer 1 · Luffing & Rail Clamp", "frequency": "6 MONTHLY",
-    "heroSub": "STRC-1 · Boom Luffing motor/brake + Rail Clamp 1 & 2",
-    "assetLabel": "Stacker Reclaimer 1 · Luffing & Rail Clamp", "compartments": STRC1_LUFFING_RC,
+    "pageTitle": "STRC 1 Hydraulic Pack & Rail Clamp", "heroTitle": "STRC <em>1 &middot; Hydraulic Pack / Rail Clamp</em>",
+    "eyebrow": "Stacker Reclaimer 1 · Hydraulic Pack & Rail Clamp", "frequency": "6 MONTHLY",
+    "heroSub": "STRC-1 · Hydraulic Pack + Rail Clamp 1 & 2",
+    "assetLabel": "Stacker Reclaimer 1 · Hydraulic Pack & Rail Clamp", "compartments": STRC1_LUFFING_RC,
     "sections": motor_sections(STRC1_LUFFING_RC),
 }
 
