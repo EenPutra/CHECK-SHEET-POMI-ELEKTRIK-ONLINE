@@ -778,7 +778,7 @@ LoadMergeModal.init({assetTag:CFG.assetTag});
 SubmitGuard.init({assetTag:CFG.assetTag});
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({checkedByFieldId:'checked-by'});
-CloudDraft.init({formId:CFG.formId,assetTag:CFG.assetTag,assetName:CFG.assetName,frequency:CFG.frequency||'YEARLY',photos:()=>PHOTOS.evidence});
+CloudDraft.init({formId:CFG.formId,assetTag:CFG.assetTag,assetName:CFG.assetName,frequency:CFG.frequency||'YEARLY',photos:()=>({evidence:PHOTOS.evidence})});
 
 setTimeout(async()=>{try{const d=await DB.loadLastSubmission(CFG.assetTag);if(d)showNote('📂 Data terakhir tersedia via "Muat / Lanjutkan dari Database".','info');}catch(e){}},900);
 </script>

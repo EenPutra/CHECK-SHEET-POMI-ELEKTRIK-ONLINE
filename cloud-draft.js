@@ -172,7 +172,13 @@
     try {
       // 1. photos → Drive, skipping any unchanged since last save
       let photoUrls = null;
-      const photos = (typeof cfg.photos === 'function') ? cfg.photos() : autoPhotos();
+      let photos = (typeof cfg.photos === 'function') ? cfg.photos() : autoPhotos();
+      // A host that passes `photos: () => somePhotoArray` (a bare array, not the
+      // `{group: [...]}` dict this function needs) used to silently save ZERO
+      // photos — `Object.keys([...])` is `["0","1",...]` and `photos["0"].length`
+      // is `undefined`, so every "group" got filtered out. Normalise it here the
+      // same way autoPhotos() already does for the no-arg path.
+      if (Array.isArray(photos)) photos = photos.length ? { evidence: photos } : null;
       if (photos && typeof Storage !== 'undefined' && Storage.uploadDataUrl) {
         photoUrls = {};
         const groups = Object.keys(photos).filter(g => (photos[g] || []).length);

@@ -2010,9 +2010,30 @@ check sheets** (self-injecting like `submit-guard.js`). Firestore Rules must all
   page's `PHOTOS` (or `FILES`) global via `new Function('return PHOTOS')` — a plain
   `window.PHOTOS` check silently missed every sheet that declares `let PHOTOS` / `const PHOTOS`
   (a lexical global, NOT a `window` property), so before this fix a "Simpan ke Database" draft
-  saved ZERO photos and reopening on another device showed an empty gallery. `Motor_Witness_
+  saved ZERO photos and reopening on another device showed an empty gallery.
+  **`cfg.photos` MUST return the `{group: [...]}` dict shape, NOT a bare array.** `autoPhotos()`
+  wraps a bare `PHOTOS` array as `{main: [...]}`, but a host-supplied `photos: () => somePhotoArray`
+  getter used to be passed straight through, and `Object.keys(["e1","e2"])` is `["0","1"]` with
+  `photos["0"].length === undefined`, so every "group" got filtered out and the draft saved ZERO
+  photos with no error. This hit **27 check sheets at once** — all 3 template families (`_strc_
+  template.tpl` / `_swgr_template.tpl` / `_cp_template.tpl`, generating the 12 Stacker Reclaimer, 6
+  CHCB SWGR, 8 Cathodic Protection sheets) plus `DRY_TRAFO_PM.html`, each passing `photos: () =>
+  PHOTOS.evidence` / `() => [...PHOTOS.a, ...PHOTOS.b]` / a `.reduce(...concat...)` — every one a
+  bare array. Fixed on both ends: `save()` now normalises a bare-array `cfg.photos()` return to
+  `{evidence: [...]}` the same way `autoPhotos()` does (safety net for any future caller), AND the 4
+  sources were changed to return a proper dict (`() => ({evidence: PHOTOS.evidence})`, `() =>
+  ({evidence: …, tploc: …})`, `() => PHOTO_GROUPS.reduce((o,k)=>{o[k]=PHOTOS[k]||[];return o;},{})`)
+  so the draft-save group keys match what each file's own `submitToDb()` passes (keeping
+  `Approvals.submitWithFiles`'s `reusePhotoUrls` count-match working on final submit). Verified via
+  headless Chrome with a fail-loud `db`/`Storage` mock: before, `uploads:0` / `photoUrls:null`;
+  after, `uploads:1` / `savedPhotoUrlKeys:["evidence"]` (or the file's own keyed groups) across a
+  Stacker Reclaimer, a CHCB SWGR, a Cathodic Protection and `DRY_TRAFO_PM` file, with the
+  `autoPhotos()`-path files (ESP/Battery/UPS flat array, 4000-Hours-Mill keyed) confirmed
+  unchanged.
+  `Motor_Witness_
   Test_Vendor.html` also passes an explicit `photos: buildApprovalPhotos` (returns the
-  `{sectionKey:[{src,caption,w,h,widthCm,heightCm}]}` shape directly). On restore, both
+  `{sectionKey:[{src,caption,w,h,widthCm,heightCm}]}` shape directly — a proper dict, so it was
+  never affected by the above). On restore, both
   `loadSession()` (motor-gate list) and the shared modal's `restorePhotosIfSupported()` already
   call the host's `restorePhotosFromUrls(photoUrls, overwrite)`; `listDrafts()` returns the full
   draft doc (`photoUrls` included) so `buildMergedBundle()` has them to union.
@@ -2084,7 +2105,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260904d`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20260906a`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a

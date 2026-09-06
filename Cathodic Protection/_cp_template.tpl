@@ -1092,7 +1092,7 @@ SubmitGuard.init({assetTag:CFG.assetTag});
 LoadMergeModal.initRevisionBanner();
 TechnicianAuth.init({checkedByFieldId:'checked-by'});
 CloudDraft.init({formId:CFG.formId,assetTag:CFG.assetTag,assetName:CFG.assetName,frequency:CFG.frequency||'6 MONTHLY',
-  photos:()=>[...PHOTOS.evidence,...PHOTOS.tploc]});
+  photos:()=>({evidence:PHOTOS.evidence,tploc:PHOTOS.tploc})});
 
 setTimeout(async()=>{
   try{const d=await DB.loadLastSubmission(CFG.assetTag);if(d)showNote('📂 Data terakhir tersedia di menu "Muat / Lanjutkan dari Database".','info');}catch(e){}
