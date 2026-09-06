@@ -9,16 +9,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js?v=20260906b"></script>
 <script src="db-helper.js?v=20260906b"></script>
-<script src="storage-helper.js?v=20260906b"></script>
-<script src="approval-helper.js?v=20260906b"></script>
-<script src="submit-guard.js?v=20260906b"></script>
-<script src="pdf-preview.js?v=20260906b"></script>
-<script src="load-merge-modal.js?v=20260906b"></script>
-<script src="cloud-draft.js?v=20260906b"></script>
-<script src="auth-session.js?v=20260906b"></script>
-<script src="technician-auth.js?v=20260906b"></script>
-<script src="img-helper.js?v=20260906b"></script>
-<script src="photo-kit.js?v=20260906b"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -271,7 +261,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <a class="btn-back" href="index.html" title="Back to Portal">&#8592; Portal</a>
     
     <span class="tb-time" id="clock">--:--:--</span>
-    <button class="btn btn-draft btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
+    <button class="btn btn-draft btn-sm" onclick="saveDraft()">💾 Draft</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">🖨️ Print / PDF</button>
     <button class="btn btn-submit btn-sm" onclick="submitToDb()">🗄️ Submit</button>
   </div>
@@ -322,10 +312,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Compartment</label><input type="text" id="compartment" readonly placeholder="Auto-filled"></div>
       <div class="mf"><label>Acknowledge Date</label><input type="date" id="ack-date"></div>
       <div class="mf"><label>Acknowledge By</label><input type="text" id="ack-by" placeholder="Full name"></div>
-    </div>
-    <div style="padding:0 16px 14px">
-      <button class="btn btn-draft btn-sm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Muat / Lanjutkan dari Database</button>
-      <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk tag ini dan gabungkan (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
 </div>
@@ -402,7 +388,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   </div>
   <div class="sec-body">
     <div class="photo-upload-area">
-      <div class="photo-drop" onclick="pickPhotos(this)"
+      <div class="photo-drop" onclick="document.getElementById('photo-input').click()"
            ondragover="event.preventDefault();this.style.borderColor='var(--blue)'"
            ondragleave="this.style.borderColor=''"
            ondrop="event.preventDefault();this.style.borderColor='';onAddPhotos({files:event.dataTransfer.files})">
@@ -459,7 +445,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 
 <div class="actions">
   <button class="btn" style="background:var(--navy);color:#fff" onclick="resetForm()">🔄 Reset</button>
-  <button class="btn btn-draft" onclick="CloudDraft.save()">💾 Save Draft</button>
+  <button class="btn btn-draft" onclick="saveDraft()">💾 Save Draft</button>
   <button class="btn btn-pdf" onclick="generatePDF()">🖨️ Print / Save PDF</button>
   <button class="btn btn-submit" style="font-size:14px;padding:8px 24px" onclick="submitToDb()">🗄️ Submit to Database</button>
 </div>
@@ -540,10 +526,6 @@ function selectTag(tag){
   selectedMotor = m;
   document.getElementById('tag-search').value = m.tag;
   document.getElementById('tag-desc').value = m.desc || '';
-  // Keep the Load & Merge modal scoped to whichever motor tag is currently
-  // selected — each submission of this sheet is for one specific tag, not
-  // one fixed asset, so the modal's query target has to move with it.
-  LoadMergeModal.init({ assetTag: m.tag });
   document.getElementById('location').value = m.location || '';
   document.getElementById('compartment').value = m.compartment || '';
   document.getElementById('ss-drop').classList.remove('open');
@@ -789,7 +771,7 @@ function saveDraft(){
     localStorage.setItem('lv_motor_mcc_draft', JSON.stringify(d));
     // Photos stored separately to avoid exceeding localStorage limit
     try{
-      localStorage.setItem('lv_motor_mcc_photos', JSON.stringify(PHOTOS.map(p=>({src:p.src,caption:p.caption,w:p.w,h:p.h,widthCm:p.widthCm,heightCm:p.heightCm}))));
+      localStorage.setItem('lv_motor_mcc_photos', JSON.stringify(PHOTOS.map(p=>({src:p.src,caption:p.caption}))));
     }catch(e){}
     showNote('💾 Draft tersimpan.', 'ok');
   }catch(e){ showNote('❌ Gagal simpan draft: '+e.message, 'err'); }
@@ -895,66 +877,21 @@ async function submitToDb(){
     ]},
   };
 
-  // Multi-asset sheet: re-init with the currently searched/selected tag
-  // right before resolving, so the duplicate-check queries THIS motor's
-  // history, not a stale tag from a previous search this session.
-  SubmitGuard.init({ assetTag: tag });
-  const target = await SubmitGuard.resolveSubmitTarget(base.woNumber, () => generatePDF({ silent: true }));
-  if(target.mode==='cancel') return;
-
-  let id;
   try{
     showNote('⏳ Menyimpan ke database...', 'info');
-    SubmitGuard.setProgress(5,'Menyimpan data checklist...');
-    id = target.mode==='overwrite' ? await DB.update(target.targetId,base) : await DB.save(base);
+    const id = await DB.save(base);
+    showNote('✅ Data berhasil disimpan. ID: '+id, 'ok');
     document.getElementById('doc-id-display').textContent = 'DOC: '+id;
   }catch(e){
-    SubmitGuard.hideProgress();
     showNote('❌ Gagal simpan: '+e.message, 'err');
-    return;
-  }
-
-  // Photos + archival PDF + the review/approval workflow record are all
-  // best-effort ON TOP of the checksheet doc saved above. A Storage hiccup
-  // must never make this look like the whole submission failed — the
-  // checklist data the technician actually filled in is already safely
-  // saved by this point.
-  let filesOk = true;
-  try{
-    showNote('⏳ Mengunggah foto & PDF untuk alur review/approval...', 'info');
-    filesOk = await Approvals.submitWithFiles(id, {
-      photos: { main: PHOTOS },
-      pdfBuilder: () => generatePDF({ silent: true }),
-      assetTag: tag,
-      assetName: gv('tag-desc') || 'LV Motor MCC PM',
-      checksheetFile: 'LV_Motor_MCC.html',
-      submittedBy: doneBy,
-      revisionOf: LoadMergeModal.getReviseOfApprovalId(),
-      existingApprovalId: target.mode==='overwrite' ? target.approvalId : null,
-      onProgress: (pct,label) => SubmitGuard.setProgress(10+Math.round(pct*0.85),label),
-    });
-  }catch(e){
-    filesOk = false;
-    console.error('Upload foto/PDF/approval record gagal:', e);
-  }
-
-  SubmitGuard.markSubmitted(id, {woNumber: base.woNumber, executionDate: base.executionDate, checkedBy: doneBy}); try{ CloudDraft.markSubmitted(); }catch(e){}
-  SubmitGuard.setProgress(100,'Selesai!');
-  setTimeout(()=>SubmitGuard.hideProgress(),500);
-
-  if(filesOk){
-    showNote('✅ Data, foto & PDF berhasil disimpan. ID: '+id, 'ok');
-  }else{
-    showNote('⚠️ Data checklist tersimpan (ID: '+id+'), tapi foto/PDF gagal diunggah untuk alur review — pastikan Firebase Storage sudah aktif, lalu coba submit ulang.', 'err');
   }
 }
 
 // ═══════════════════════════════════════════════════
 //  PDF GENERATION
 // ═══════════════════════════════════════════════════
-async function generatePDF(opts){
-  opts = opts || {};
-  if(!opts.silent) showNote('⏳ Membuat PDF, harap tunggu...', 'info');
+async function generatePDF(){
+  showNote('⏳ Membuat PDF, harap tunggu...', 'info');
   await new Promise(r => setTimeout(r, 200));
   const {jsPDF} = window.jspdf;
   const pdf = new jsPDF({orientation:'portrait', unit:'mm', format:'a4'});
@@ -1154,19 +1091,15 @@ async function generatePDF(opts){
     // Pre-load all images to get natural dimensions
     const imgInfoArr = await Promise.all(PHOTOS.map(p => new Promise(res => {
       const im = new Image();
-      if(p.w && p.h){ res({src:p.src, nw:p.w, nh:p.h, caption:p.caption||'', widthCm:p.widthCm, heightCm:p.heightCm}); return; }
-      im.onload = () => res({src:p.src, nw:im.naturalWidth, nh:im.naturalHeight, caption:p.caption||'', widthCm:p.widthCm, heightCm:p.heightCm});
+      im.onload = () => res({src:p.src, nw:im.naturalWidth, nh:im.naturalHeight, caption:p.caption||''});
       im.onerror = () => res(null);
       im.src = p.src;
     })));
     const validImgs = imgInfoArr.filter(Boolean);
 
-    // Aspect-ratio-preserving fit, shared with every other check sheet so photos
-    // are sized identically everywhere (see img-helper.js).
-    // Size comes from the crop modal's cm, capped to the column, aspect kept.
-    function fitImg(p,maxW,maxH){
-      const f = PhotoKit.fit({src:p.src,w:p.nw,h:p.nh,widthCm:p.widthCm,heightCm:p.heightCm}, maxW, maxH);
-      return {w:f.w, h:f.h};
+    function fitImg(nw,nh,maxW,maxH){
+      const scale = Math.min(maxW/nw, maxH/nh);
+      return {w:nw*scale, h:nh*scale};
     }
 
     const COL_W = (CW - 5) / 2; // 2 columns with 5mm gap
@@ -1176,8 +1109,8 @@ async function generatePDF(opts){
     for(let i=0; i<validImgs.length; i+=2){
       const p1 = validImgs[i];
       const p2 = validImgs[i+1] || null;
-      const f1 = fitImg(p1, COL_W, MAX_H);
-      const f2 = p2 ? fitImg(p2, COL_W, MAX_H) : null;
+      const f1 = fitImg(p1.nw, p1.nh, COL_W, MAX_H);
+      const f2 = p2 ? fitImg(p2.nw, p2.nh, COL_W, MAX_H) : null;
       const rowImgH = Math.max(f1.h, f2 ? f2.h : 0);
       const rowTotalH = rowImgH + CAP_H + 4;
 
@@ -1190,7 +1123,7 @@ async function generatePDF(opts){
       // Image 1 — centered in cell
       const x1off = (COL_W - f1.w) / 2;
       const y1off = (rowImgH - f1.h) / 2;
-      PhotoKit.draw(pdf, {src:p1.src,w:p1.nw,h:p1.nh,widthCm:p1.widthCm,heightCm:p1.heightCm}, M + x1off, y + 1 + y1off, f1.w, f1.h, {align:'center'});
+      try{ pdf.addImage(p1.src, 'JPEG', M + x1off, y + 1 + y1off, f1.w, f1.h); }catch(e){}
 
       // Caption 1
       pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(...GR);
@@ -1204,7 +1137,7 @@ async function generatePDF(opts){
         pdf.roundedRect(x2, y, COL_W, rowImgH+2, 1, 1, 'FD');
         const x2off = (COL_W - f2.w) / 2;
         const y2off = (rowImgH - f2.h) / 2;
-        PhotoKit.draw(pdf, {src:p2.src,w:p2.nw,h:p2.nh,widthCm:p2.widthCm,heightCm:p2.heightCm}, x2 + x2off, y + 1 + y2off, f2.w, f2.h, {align:'center'});
+        try{ pdf.addImage(p2.src, 'JPEG', x2 + x2off, y + 1 + y2off, f2.w, f2.h); }catch(e){}
         const cap2 = p2.caption || ('Foto '+(i+2));
         pdf.setFont('helvetica','italic'); pdf.setFontSize(7.5); pdf.setTextColor(...GR);
         pdf.text(cap2, x2 + COL_W/2, y + rowImgH + 7, {align:'center', maxWidth:COL_W});
@@ -1277,16 +1210,8 @@ async function generatePDF(opts){
 
   const safeTag = tag.replace(/[^A-Za-z0-9_-]/g,'_') || 'UNKNOWN';
   const dateStr = gv('wo-date').replace(/-/g,'') || new Date().toISOString().slice(0,10).replace(/-/g,'');
-  // opts.silent: used by submitToDb() to build the archival PDF that gets
-  // uploaded to Storage for the review/approval workflow — no download
-  // dialog, just hand the built pdf object back to the caller.
-  if(opts.silent){
-    // no-op: caller reads the returned pdf object directly
-  } else {
-    pdf.save('LV_Motor_MCC_'+safeTag+'_'+dateStr+'.pdf');
-    showNote('✅ PDF berhasil dibuat.', 'ok');
-  }
-  return pdf;
+  pdf.save('LV_Motor_MCC_'+safeTag+'_'+dateStr+'.pdf');
+  showNote('✅ PDF berhasil dibuat.', 'ok');
 }
 
 // ═══════════════════════════════════════════════════
@@ -1355,50 +1280,22 @@ function normalizeImgOrientation(dataUrl){
 // ═══════════════════════════════════════════════════
 let PHOTOS = []; // [{src, caption}]
 
-function pickPhotos(el){
-  // Source picker -> EXIF-upright downscale (img-helper) -> crop modal, one photo
-  // at a time. The entry keeps its pixel size AND its print size in cm, which is
-  // what the PDF draws it at -- always at its own aspect ratio.
-  PhotoKit.upload(el,{multiple:true},entry=>{
-    if(!entry)return;
-    entry.caption='';
-    PHOTOS.push(entry);
-    renderPhotos();
+function onAddPhotos(inp){
+  const files = Array.from(inp.files||[]); if(!files.length) return;
+  let pending = 0;
+  files.forEach(f => {
+    if(f.size > 20*1024*1024){showNote('File terlalu besar (maks 20 MB): '+f.name,'err');return;}
+    pending++;
+    const r = new FileReader();
+    r.onload = async e => {
+      const fixed = await normalizeImgOrientation(e.target.result);
+      PHOTOS.push({src:fixed, caption:''});
+      pending--;
+      if(pending===0) renderPhotos();
+    };
+    r.readAsDataURL(f);
   });
-}
-
-function recropPhotoAt(idx){
-  const cur=PHOTOS[idx];if(!cur)return;
-  PhotoKit.recrop(cur,e=>{
-    if(!e)return;
-    e.caption=cur.caption||'';
-    PHOTOS[idx]=e;          // replace in place: order and caption must not shift
-    renderPhotos();
-  });
-}
-
-function rotatePhoto(idx, deg){
-  const img = new Image();
-  img.onload = () => {
-    const W=img.naturalWidth, H=img.naturalHeight;
-    const norm = ((deg%360)+360)%360;
-    const swap = norm===90||norm===270;
-    const cv = document.createElement('canvas');
-    cv.width = swap?H:W; cv.height = swap?W:H;
-    const ctx = cv.getContext('2d');
-    ctx.translate(cv.width/2, cv.height/2);
-    ctx.rotate(deg*Math.PI/180);
-    ctx.drawImage(img, -W/2, -H/2);
-    PHOTOS[idx].src = cv.toDataURL('image/jpeg', 0.92);
-    // A quarter turn swaps the axes: the stored pixel size and the print size in
-    // cm have to swap with it, or the PDF keeps drawing the pre-rotation shape.
-    PHOTOS[idx].w = cv.width; PHOTOS[idx].h = cv.height;
-    if(swap && PHOTOS[idx].widthCm && PHOTOS[idx].heightCm){
-      const t=PHOTOS[idx].widthCm; PHOTOS[idx].widthCm=PHOTOS[idx].heightCm; PHOTOS[idx].heightCm=t;
-    }
-    renderPhotos();
-  };
-  img.src = PHOTOS[idx].src;
+  inp.value = '';
 }
 
 function renderPhotos(){
@@ -1418,9 +1315,7 @@ function renderPhotos(){
         <span style="font-size:10px;color:var(--txt4);font-family:var(--mono)">Foto ${i+1}</span>
         <button class="p-btn" onclick="rotatePhoto(${i},-90)" title="Putar kiri">↺</button>
         <button class="p-btn" onclick="rotatePhoto(${i},90)" title="Putar kanan">↻</button>
-        <button class="p-btn" onclick="recropPhotoAt(${i})" title="Crop &amp; ukuran cetak">✂ Crop</button>
         <button class="p-btn del" onclick="removePhoto(${i})" title="Hapus">✕ Hapus</button>
-        <span style="font-size:10px;color:var(--txt4);font-family:var(--mono)">${p.widthCm?('Cetak '+p.widthCm.toFixed(1)+' × '+p.heightCm.toFixed(1)+' cm'):''}</span>
       </div>
       <input class="photo-cap" type="text" placeholder="Caption / keterangan foto ${i+1}..."
         value="${p.caption.replace(/"/g,'&quot;')}" oninput="PHOTOS[${i}].caption=this.value">
@@ -1428,55 +1323,29 @@ function renderPhotos(){
   `).join('');
 }
 
+function rotatePhoto(idx, deg){
+  const img = new Image();
+  img.onload = () => {
+    const W=img.naturalWidth, H=img.naturalHeight;
+    const norm = ((deg%360)+360)%360;
+    const swap = norm===90||norm===270;
+    const cv = document.createElement('canvas');
+    cv.width = swap?H:W; cv.height = swap?W:H;
+    const ctx = cv.getContext('2d');
+    ctx.translate(cv.width/2, cv.height/2);
+    ctx.rotate(deg*Math.PI/180);
+    ctx.drawImage(img, -W/2, -H/2);
+    PHOTOS[idx].src = cv.toDataURL('image/jpeg', 0.92);
+    renderPhotos();
+  };
+  img.src = PHOTOS[idx].src;
+}
 
 function removePhoto(idx){
   if(!confirm('Hapus foto ini?')) return;
   PHOTOS.splice(idx,1);
   renderPhotos();
 }
-
-// Load & Merge / revision-banner restore hook (see load-merge-modal.js's
-// restorePhotosIfSupported()). This file's own upload path saves photos as
-// `photos: { main: PHOTOS }` (submitToDb() above) — one flat array, no
-// per-slot/named-group system. There is only ever one gallery on this page,
-// so every entry across every group key in `photoUrls` restores into that
-// same PHOTOS array (in practice the key is always 'main', since that's the
-// only key submitToDb() ever writes — flattening rather than hardcoding
-// `.main` just avoids a silent no-op if that key name ever changes).
-// overwrite=true  -> replace PHOTOS entirely with the restored set.
-// overwrite=false -> fill-blank-only: only restore into PHOTOS if it's
-//                     currently empty (never append to/replace a
-//                     technician's own in-progress photos).
-async function restorePhotosFromUrls(photoUrls, overwrite){
-  const list = photoUrls ? Object.values(photoUrls).flat() : [];
-  if(!list.length) return 0;
-  if(!overwrite && PHOTOS.length > 0) return 0; // group already has content in merge mode
-
-  const restored = [];
-  for(const entry of list){
-    try{
-      const dataUrl = await Storage.toDataUrl(entry.url);
-      if(!dataUrl) continue;
-      restored.push({
-        src: dataUrl,
-        dataUrl: dataUrl,
-        caption: entry.caption || '',
-        w: entry.w,
-        h: entry.h,
-        widthCm: entry.widthCm,
-        heightCm: entry.heightCm,
-      });
-    }catch(e){
-      console.error('restorePhotosFromUrls: gagal memuat satu foto, lanjut ke foto berikutnya:', e);
-    }
-  }
-  if(!restored.length) return 0;
-
-  PHOTOS = overwrite ? restored : PHOTOS.concat(restored);
-  renderPhotos();
-  return restored.length;
-}
-window.restorePhotosFromUrls = restorePhotosFromUrls;
 
 // ═══════════════════════════════════════════════════
 // ═══════════════════════════════════════════════════
@@ -1550,16 +1419,6 @@ function printPage(){
 //  INIT
 // ═══════════════════════════════════════════════════
 buildTable();
-PhotoKit.configure({maxWcm:9.0,maxHcm:20,defaultWcm:9.0,defaultHcm:6.5});
-// Default assetTag is empty until a motor tag is picked — selectTag()
-// re-inits LoadMergeModal with the real tag (including via loadDraft()'s
-// own selectTag() call below), this just guarantees _config is non-null
-// so an early click on "Pilih & Gabung" never throws.
-LoadMergeModal.init({ assetTag: document.getElementById('tag-search').value.trim() || '' });
-SubmitGuard.init({ assetTag: document.getElementById('tag-search').value.trim() || '' });
-LoadMergeModal.initRevisionBanner();
-TechnicianAuth.init({ checkedByFieldId: "done-by" });
-CloudDraft.init({ formId:'lvmcc', assetTag:()=>{try{return document.getElementById('tag-search').value.trim()}catch(e){return ''}}, assetName:'LV Motor MCC PM', frequency:'PERIODIC' });
 loadDraft();
 updateStats();
 </script>

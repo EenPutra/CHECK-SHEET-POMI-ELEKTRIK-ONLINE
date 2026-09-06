@@ -21,7 +21,13 @@
 (function () {
   if (window.AuthSession) return; // already loaded on this page
 
-  const IDLE_MS = 60 * 60 * 1000; // 1 hour of no activity -> logout
+  const IDLE_MS = 60 * 60 * 1000; // 1 hour of no activity -> logout (dashboards)
+  // Check sheets are filled over a whole field visit — a technician logs in,
+  // then walks off to do the physical inspection for well over an hour before
+  // coming back to the form. technician-auth.js calls setIdleMs() to widen the
+  // window on those pages so the login doesn't drop out mid-visit; the
+  // dashboards keep the tighter default.
+  let _idleMs = IDLE_MS;
   const K = {
     user: 'dashboard_user', role: 'dashboard_role', name: 'dashboard_name',
     loginTime: 'dashboard_login_time', act: 'dashboard_last_activity',
@@ -59,7 +65,13 @@
 
   function isExpired() {
     const last = parseInt(lsGet(K.act) || lsGet(K.loginTime) || '0', 10);
-    return !last || (now() - last) >= IDLE_MS;
+    return !last || (now() - last) >= _idleMs;
+  }
+  // Widen (or narrow) the idle-timeout window for this page. Clamped to at
+  // least the 1h default so a caller can't accidentally make it tighter.
+  function setIdleMs(ms) {
+    ms = parseInt(ms, 10);
+    if (ms && ms > IDLE_MS) _idleMs = ms;
   }
 
   // Returns the live session {user, role, name, team, area, signature} or
@@ -131,7 +143,7 @@
 
   window.AuthSession = {
     IDLE_MS,
-    get, set, touch, clear, isExpired,
+    get, set, touch, clear, isExpired, setIdleMs,
     onExpire(fn) { _onExpire = fn; },
   };
 })();

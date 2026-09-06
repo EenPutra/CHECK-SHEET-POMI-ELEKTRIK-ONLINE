@@ -229,6 +229,11 @@ const TechnicianAuth = (function () {
   function init(config) {
     _config = Object.assign({ checkedByFieldId: 'checked-by' }, config);
     if (!document.getElementById(_config.checkedByFieldId)) return; // this sheet doesn't have that field — nothing to do
+    // A check sheet is filled across a whole field visit — widen the idle
+    // timeout so the login doesn't drop out while the technician is away from
+    // the form doing the physical inspection (the 1h default logs them out
+    // mid-visit). 12h comfortably covers a work shift.
+    if (window.AuthSession && window.AuthSession.setIdleMs) window.AuthSession.setIdleMs(12 * 60 * 60 * 1000);
     injectDom();
     const session = currentSession();
     if (session) applySession(session);
