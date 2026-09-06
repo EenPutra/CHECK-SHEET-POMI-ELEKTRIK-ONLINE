@@ -82,6 +82,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .ct{width:100%;border-collapse:collapse;font-size:12px;min-width:640px}
 .ct th{background:var(--navy);color:var(--sky2);padding:6px 6px;text-align:center;font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;border-right:1px solid rgba(255,255,255,0.08);position:sticky;top:0}
 .ct th.tl{text-align:left}
+.ct th .th-lbl{display:block;margin-top:2px;font-size:8px;font-weight:400;letter-spacing:0;text-transform:none;color:#fff;opacity:.72;white-space:normal;max-width:96px}
 .ct td{padding:5px 6px;border-bottom:1px solid var(--bdr2);background:var(--surf);vertical-align:middle;text-align:center;border-right:1px solid var(--bdr2)}
 .ct td:last-child,.ct th:last-child{border-right:none}
 .ct td.lbl{text-align:left;color:var(--txt);font-size:11px;min-width:220px;max-width:340px}
@@ -594,7 +595,11 @@ function renderCompartments(){
       <input type="text" id="cmps-${i}" placeholder="Breaker S/N (opsional)">
     </div>`).join('');
 }
-function compHead(cols){return cols.map(c=>`<th title="${esc(c.label||'')}">${esc(c.code||'')}</th>`).join('');}
+// column header shows the compartment CODE + its description/feeder label
+// (e.g. "100B" over "E-1") so the matrix is readable without cross-checking
+// the compartment legend.
+function compHead(cols){return cols.map(c=>`<th title="${esc(c.label||'')}">${esc(c.code||'')}${c.label?`<span class="th-lbl">${esc(c.label)}</span>`:''}</th>`).join('');}
+const colHdr=c=>((c&&c.code)||'')+((c&&c.label)?'\n'+c.label:'');
 
 // ── INTERLOCK REFERENCE DIAGRAMS ──
 const DIAGRAMS=CFG.interlockDiagrams||[];
@@ -922,7 +927,7 @@ async function generatePDF(opts={}){
     const cols=colsFor(sec);const kind=sec.kind||'matrix';
     nPage();secBar(sec.title+(sec.crit?'   ['+sec.crit+']':''));
     if(kind==='matrix'){
-      const head=['No','Check Item','Criteria',...cols.map(c=>c.code||''),'Remark'];
+      const head=['No','Check Item','Criteria',...cols.map(colHdr),'Remark'];
       const body=[];
       (sec.items||[]).forEach((it,ii)=>{
         if(it.type==='subhead'){body.push([{content:pdfSafe(it.desc),colSpan:head.length,styles:{fontStyle:'bold',fillColor:[219,234,254],textColor:NAVY,halign:'left'}}]);return;}
@@ -935,7 +940,7 @@ async function generatePDF(opts={}){
     }else if(kind==='resistance'||kind==='rtd'){
       const rowKeys=kind==='rtd'?Array.from({length:sec.rtdCount||13},(_,i)=>'RTD'+(i+1)):(sec.rows||['T1 - T2','T2 - T3','T3 - T1']);
       const pfx=kind==='rtd'?'rtd':'res';
-      pdf.autoTable({...theme,startY:y,head:[[kind==='rtd'?'RTD':'',...cols.map(c=>c.code||'')]],
+      pdf.autoTable({...theme,startY:y,head:[[kind==='rtd'?'RTD':'',...cols.map(colHdr)]],
         body:rowKeys.map((rk,ri)=>[rk,...cols.map((c,ci)=>iv(pfx+'-'+si+'-'+ri+'-'+ci))]).concat([['Remark '+(v('rmk-'+si+'-r')||'—')]]),
         styles:{...theme.styles,fontSize:7}});
     }else if(kind==='megger'){
@@ -944,7 +949,7 @@ async function generatePDF(opts={}){
       body.push(['PI',...cols.map((c,ci)=>iv('pi-'+si+'-'+ci))]);
       body.push(['DAR',...cols.map((c,ci)=>iv('dar-'+si+'-'+ci))]);
       body.push(['Remark: '+(v('rmk-'+si+'-r')||'—')]);
-      pdf.autoTable({...theme,startY:y,head:[['Time',...cols.map(c=>c.code||'')]],body,styles:{...theme.styles,fontSize:7}});
+      pdf.autoTable({...theme,startY:y,head:[['Time',...cols.map(colHdr)]],body,styles:{...theme.styles,fontSize:7}});
     }
     y=pdf.lastAutoTable.finalY+5;
   });

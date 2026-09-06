@@ -2627,7 +2627,13 @@ serving the token-bearing template.
 
 **The engine is `SWGR_CONFIG`-driven.** `compartments:[{code,label}]` render as an editable
 legend panel (code fixed, description + Breaker S/N editable) AND as the column headers of every
-matrix/measurement table. `sections[]`, each with a `kind`:
+matrix/measurement table — **the header shows BOTH the code and the label** (e.g. "100B" over
+"E-1"), user request, so the matrix reads without cross-checking the legend. On screen the label
+is a `.th-lbl` sub-line under the code; in the PDF it's `colHdr(c)` = `code + "\n" + label`
+(autoTable wraps the newline). The header label is the STATIC config `label`, not wired to the
+editable legend description input — that stays a fuller free-text note. This is SWGR-only; the
+Stacker Reclaimer / Cathodic Protection templates have their own `compHead()` and much longer
+labels ("Motor for Boom Slewing #1") that wouldn't fit a header, so they were left as code-only.
 - `'matrix'` (default) — `items[]` × compartments, OK/NG toggle per cell (`ST` object + `.rb`
   classes so `DB.collectCheckSheetData` scrapes them and Load & Merge restores), one Result/Remark
   text per row. Item `type`: `'subhead'` (blue divider, optional `field`/`fields[]` text inputs —
