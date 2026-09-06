@@ -57,25 +57,32 @@ VISUAL = [
 ]
 
 SAFETY_LOCKS = [
-    {"no": "11", "desc": "Breaker Safety Locks — Rating Interference Interlock", "type": "subhead", "field": "VCB No."},
+    {"no": "11", "desc": "Breaker Safety Locks — Rating Interference Interlock", "type": "subhead"},
+    # VCB No. is entered per breaker column (was one shared subhead field).
+    {"desc": "VCB No.", "crit": "", "type": "value", "ph": "VCB No."},
     {"desc": "Interference lock plate installed", "crit": "Installed"},
     {"desc": "Rating suitability", "crit": "appropriate (Amp)", "type": "single"},
     {"no": "12", "desc": "Negative Interlock and IL/MS and LCS switch", "type": "subhead"},
-    {"desc": "Negative interlock roller appearance — 0.531 in minimum position to open breaker", "crit": "0.531 in min", "type": "single"},
-    {"desc": "Negative interlock roller appearance — 0.670 in position to adjust interlock link", "crit": "0.670 in", "type": "single"},
+    # Roller-appearance dimensions are MEASURED values per breaker, not OK/NG —
+    # crit column still shows the target; ph is the input hint.
+    {"desc": "Negative interlock roller appearance — 0.531 in minimum position to open breaker", "crit": "0.531 in min", "type": "value", "ph": "0.531 in"},
+    {"desc": "Negative interlock roller appearance — 0.670 in position to adjust interlock link", "crit": "0.670 in", "type": "value", "ph": "0.670 in"},
     {"desc": "Negative Interlock mounting bracket bolts tightened", "crit": "Tightness"},
     {"desc": "No sign of mechanism bend, breakage", "crit": "No bend or breakage"},
     {"desc": "IL/MS and LCS switch mounting tightened", "crit": "Tightness"},
     {"desc": "IL/MS and LCS switch contacts are open on activation of negative interlock", "crit": "Contacts open"},
     {"desc": "Negative Interlock: “Electrical Trip Free” and “Mechanical Trip Free” functional test successful", "crit": "Test OK"},
-    {"no": "13", "desc": "Positive Interlock", "type": "subhead", "fields": ["Open", "Close"]},
+    {"no": "13", "desc": "Positive Interlock", "type": "subhead"},
+    # Open / Close positions are measured per breaker column (were two shared subhead fields).
+    {"desc": "Positive Interlock — Open position", "crit": "", "type": "value", "ph": "Open"},
+    {"desc": "Positive Interlock — Close position", "crit": "", "type": "value", "ph": "Close"},
     {"desc": "No sign of mechanism bend, breakage", "crit": "No bend or breakage"},
     {"desc": "Positive Interlock functional test successful", "crit": "Test OK"},
     {"desc": "Positive interlock bar appearance", "crit": "Good"},
     {"no": "14", "desc": "Closing Spring Discharge Interlock and CL/MS switch", "type": "subhead"},
     {"desc": "No sign of mechanism bend, breakage", "crit": "No bend or breakage"},
-    {"desc": "Closing Spring Discharge interlock roller appearance — 0.561 in minimum position to discharge spring", "crit": "0.561 in min", "type": "single"},
-    {"desc": "Closing Spring Discharge interlock roller appearance — 0.995 in position to permit close latch reset", "crit": "0.995 in", "type": "single"},
+    {"desc": "Closing Spring Discharge interlock roller appearance — 0.561 in minimum position to discharge spring", "crit": "0.561 in min", "type": "value", "ph": "0.561 in"},
+    {"desc": "Closing Spring Discharge interlock roller appearance — 0.995 in position to permit close latch reset", "crit": "0.995 in", "type": "value", "ph": "0.995 in"},
     {"desc": "Closing Spring Discharge Interlock mounting bracket bolts tightened", "crit": "Tightness"},
     {"desc": "CL/MS switch mounting tightened", "crit": "Tightness"},
     {"desc": "CL/MS switch contacts are open on activation of spring discharge interlock", "crit": "Contacts open"},

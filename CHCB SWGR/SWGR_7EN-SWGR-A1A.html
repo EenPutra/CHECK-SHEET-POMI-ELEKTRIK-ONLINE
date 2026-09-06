@@ -451,8 +451,13 @@ window.SWGR_CONFIG = {
         {
           "no": "11",
           "desc": "Breaker Safety Locks — Rating Interference Interlock",
-          "type": "subhead",
-          "field": "VCB No."
+          "type": "subhead"
+        },
+        {
+          "desc": "VCB No.",
+          "crit": "",
+          "type": "value",
+          "ph": "VCB No."
         },
         {
           "desc": "Interference lock plate installed",
@@ -471,12 +476,14 @@ window.SWGR_CONFIG = {
         {
           "desc": "Negative interlock roller appearance — 0.531 in minimum position to open breaker",
           "crit": "0.531 in min",
-          "type": "single"
+          "type": "value",
+          "ph": "0.531 in"
         },
         {
           "desc": "Negative interlock roller appearance — 0.670 in position to adjust interlock link",
           "crit": "0.670 in",
-          "type": "single"
+          "type": "value",
+          "ph": "0.670 in"
         },
         {
           "desc": "Negative Interlock mounting bracket bolts tightened",
@@ -501,11 +508,19 @@ window.SWGR_CONFIG = {
         {
           "no": "13",
           "desc": "Positive Interlock",
-          "type": "subhead",
-          "fields": [
-            "Open",
-            "Close"
-          ]
+          "type": "subhead"
+        },
+        {
+          "desc": "Positive Interlock — Open position",
+          "crit": "",
+          "type": "value",
+          "ph": "Open"
+        },
+        {
+          "desc": "Positive Interlock — Close position",
+          "crit": "",
+          "type": "value",
+          "ph": "Close"
         },
         {
           "desc": "No sign of mechanism bend, breakage",
@@ -531,12 +546,14 @@ window.SWGR_CONFIG = {
         {
           "desc": "Closing Spring Discharge interlock roller appearance — 0.561 in minimum position to discharge spring",
           "crit": "0.561 in min",
-          "type": "single"
+          "type": "value",
+          "ph": "0.561 in"
         },
         {
           "desc": "Closing Spring Discharge interlock roller appearance — 0.995 in position to permit close latch reset",
           "crit": "0.995 in",
-          "type": "single"
+          "type": "value",
+          "ph": "0.995 in"
         },
         {
           "desc": "Closing Spring Discharge Interlock mounting bracket bolts tightened",
@@ -678,6 +695,11 @@ function matrixTable(sec,si,cols){
     }
     const cells=it.type==='single'
       ? `<td colspan="${cols.length}">${mkTog('t-'+si+'-'+ii+'-x')}</td>`
+      : it.type==='value'
+      // one free-text input per breaker column instead of an OK/NG toggle —
+      // for a MEASURED value (interlock roller dimension, VCB No., positive-
+      // interlock Open/Close position, ...) rather than a pass/fail.
+      ? cols.map((c,ci)=>`<td><input class="mi wide" type="text" id="val-${si}-${ii}-${ci}"${it.ph?` placeholder="${esc(it.ph)}"`:''}></td>`).join('')
       : cols.map((c,ci)=>`<td>${mkTog('t-'+si+'-'+ii+'-'+ci)}</td>`).join('');
     h+=`<tr><td class="no">${it.no||''}</td><td class="lbl">${esc(it.desc)}</td><td class="crit">${esc(it.crit||'')}</td>
       ${cells}<td><input class="rmk" type="text" id="rmk-${si}-${ii}"></td></tr>`;
@@ -838,6 +860,7 @@ function buildSheets(){
         if(it.type==='remark'){rows.push({no:it.no||'',desc:it.desc,crit:'',values:{Remark:v('rmk-'+si+'-'+ii)||'—'}});return;}
         const vals={};
         if(it.type==='single'){colNames.forEach(cn=>vals[cn]=tv('t-'+si+'-'+ii+'-x'));}
+        else if(it.type==='value'){cols.forEach((c,ci)=>vals[c.code||ci]=iv('val-'+si+'-'+ii+'-'+ci));}
         else{cols.forEach((c,ci)=>vals[c.code||ci]=tv('t-'+si+'-'+ii+'-'+ci));}
         vals['Remark']=v('rmk-'+si+'-'+ii)||'—';
         rows.push({no:it.no||'',desc:it.desc,crit:it.crit||'',values:vals});
@@ -944,7 +967,8 @@ async function generatePDF(opts={}){
         if(it.type==='subhead'){body.push([{content:pdfSafe(it.desc),colSpan:head.length,styles:{fontStyle:'bold',fillColor:[219,234,254],textColor:NAVY,halign:'left'}}]);return;}
         if(it.type==='remark'){body.push([it.no||'',{content:pdfSafe(it.desc),colSpan:2},{content:v('rmk-'+si+'-'+ii)||'—',colSpan:cols.length+1,styles:{halign:'left'}}]);return;}
         if(it.type==='single'){body.push([it.no||'',pdfSafe(it.desc),pdfSafe(it.crit||''),{content:tv('t-'+si+'-'+ii+'-x'),colSpan:cols.length,styles:{halign:'center',fontStyle:'bold'}},v('rmk-'+si+'-'+ii)||'—']);return;}
-        body.push([it.no||'',pdfSafe(it.desc),pdfSafe(it.crit||''),...cols.map((c,ci)=>tv('t-'+si+'-'+ii+'-'+ci)),v('rmk-'+si+'-'+ii)||'—']);
+        const rowVals=it.type==='value'?cols.map((c,ci)=>iv('val-'+si+'-'+ii+'-'+ci)):cols.map((c,ci)=>tv('t-'+si+'-'+ii+'-'+ci));
+        body.push([it.no||'',pdfSafe(it.desc),pdfSafe(it.crit||''),...rowVals,v('rmk-'+si+'-'+ii)||'—']);
       });
       pdf.autoTable({...theme,startY:y,head:[head],body,columnStyles:{0:{cellWidth:7},1:{cellWidth:64},2:{cellWidth:26},[head.length-1]:{cellWidth:34}}});
     }else if(kind==='resistance'||kind==='rtd'){

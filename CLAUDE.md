@@ -2606,10 +2606,20 @@ legend panel (code fixed, description + Breaker S/N editable) AND as the column 
 matrix/measurement table. `sections[]`, each with a `kind`:
 - `'matrix'` (default) — `items[]` × compartments, OK/NG toggle per cell (`ST` object + `.rb`
   classes so `DB.collectCheckSheetData` scrapes them and Load & Merge restores), one Result/Remark
-  text per row. Item `type`: `'subhead'` (blue divider, optional `field`/`fields[]` text inputs
-  like "VCB No." / Positive-Interlock Open/Close), `'single'` (one toggle spanning all
-  compartments — the "0.531 in min" roller-appearance rows), `'remark'` (remark-only row, item 15
-  work history).
+  text per row. Item `type`: `'subhead'` (blue divider, optional `field`/`fields[]` text inputs —
+  **no longer used**, see next line), `'single'` (one toggle spanning all compartments — e.g. the
+  "Rating suitability" row), `'value'` (one free-text `<input class="mi wide" id="val-<si>-<ii>-<ci>">`
+  per compartment column instead of a toggle, with an optional `ph` placeholder — for a MEASURED
+  value, not a pass/fail: VCB No., the interlock roller-appearance dimensions ("0.531 in min"
+  etc — the `crit` column keeps showing the target), Positive-Interlock Open/Close positions;
+  ported from `_strc_template.tpl`, wired into `matrixTable()` / `buildSheets()` / the PDF body),
+  `'remark'` (remark-only row, item 15 work history).
+  **Items 11-14's per-breaker measurements are `'value'` rows, not `'subhead'` fields or `'single'`
+  toggles** — user request: VCB No. and the Open/Close / 0.531 / 0.670 / 0.561 / 0.995 dimensions
+  are each entered per breaker column, so they moved out of the subhead into their own `'value'`
+  rows (item 11's `field:"VCB No."` and item 13's `fields:["Open","Close"]` are gone). Only the 3
+  base sheets (7A1A/8A1A/Bkr-spare) carry `SAFETY_LOCKS`, so only they change; the `_Electrical`/
+  `STRC-2` sheets just pick up the inert template `'value'` code.
 - `'resistance'` — fixed rows (T1-T2/T2-T3/T3-T1) × columns, numeric mΩ.
 - `'megger'` — `times[]` rows (15"..10') × columns + auto **PI = R(10')/R(1')** and
   **DAR = R(1')/R(30")** read-only rows (`recalcMegger()` on every `.meg-in` input; re-run in
@@ -2620,7 +2630,8 @@ matrix/measurement table. `sections[]`, each with a `kind`:
   `105A LV` split entries and `BUS A/B/C`), an explicit `[{code,label}]` array, or omitted →
   `compartments`.
 The base sheets (7A1A/8A1A/Bkr-spare) = visual checklist (items 1-10) + Breaker Safety Locks
-(11-15). The `_Electrical` sheets = visual (1-10) + resistance + megger + RTD. `STRC-2` adds a
+(11-15, with items 11-14's dimensional measurements as per-breaker `'value'` rows — see above).
+The `_Electrical` sheets = visual (1-10) + resistance + megger + RTD. `STRC-2` adds a
 second resistance+megger block for Power Cable / Slip Ring / VT&CPT / XFMR.
 
 **Breaker interlock reference diagrams** — the 3 base sheets carry `interlockDiagrams:[{caption,
