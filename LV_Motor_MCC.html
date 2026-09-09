@@ -7,18 +7,19 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20260906b"></script>
-<script src="db-helper.js?v=20260906b"></script>
-<script src="storage-helper.js?v=20260906b"></script>
-<script src="approval-helper.js?v=20260906b"></script>
-<script src="submit-guard.js?v=20260906b"></script>
-<script src="pdf-preview.js?v=20260906b"></script>
-<script src="load-merge-modal.js?v=20260906b"></script>
-<script src="cloud-draft.js?v=20260906b"></script>
-<script src="auth-session.js?v=20260906b"></script>
-<script src="technician-auth.js?v=20260906b"></script>
-<script src="img-helper.js?v=20260906b"></script>
-<script src="photo-kit.js?v=20260906b"></script>
+<script src="firebase-config.js?v=20260908a"></script>
+<script src="db-helper.js?v=20260908a"></script>
+<script src="storage-helper.js?v=20260908a"></script>
+<script src="approval-helper.js?v=20260908a"></script>
+<script src="submit-guard.js?v=20260908a"></script>
+<script src="pdf-preview.js?v=20260908a"></script>
+<script src="load-merge-modal.js?v=20260908a"></script>
+<script src="cloud-draft.js?v=20260908a"></script>
+<script src="auth-session.js?v=20260908a"></script>
+<script src="technician-auth.js?v=20260908a"></script>
+<script src="table-nav.js?v=20260908a"></script>
+<script src="img-helper.js?v=20260908a"></script>
+<script src="photo-kit.js?v=20260908a"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -144,6 +145,8 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .ol-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:10px}
 .ol-tbl th{background:var(--navy);color:var(--sky2);padding:5px 10px;text-align:center;font-family:var(--mono);font-size:9px;letter-spacing:1px}
 .ol-tbl td{border:1px solid var(--bdr2);padding:5px 10px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--navy)}
+.ol-tbl td input.ol-m{width:100%;min-width:56px;border:1.5px solid var(--bdr);border-radius:3px;padding:3px 4px;font-family:var(--mono);font-size:11px;text-align:center;background:#fff;color:var(--navy)}
+.ol-tbl td input.ol-m:focus{outline:none;border-color:var(--blue)}
 .meas-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:6px}
 .meas-tbl th{background:rgba(30,58,95,0.08);padding:6px 10px;text-align:center;
   font-family:var(--mono);font-size:9.5px;letter-spacing:1px;color:var(--navy);border:1px solid var(--bdr2)}
@@ -480,6 +483,11 @@ const OL_HEATERS=[{"code": "C087A", "stdMin": 0.65, "stdMax": 0.74, "ambMin": 0.
 // ═══════════════════════════════════════════════════
 let selectedMotor = null;
 let olSize = null;
+// Manual overload-heater range entry — used when the built-in OL_HEATERS table
+// has no row for the chosen (code, size), e.g. NEMA Contactor Size 5, which the
+// bundled Cutler-Hammer heater table (Sizes 0–4 only) doesn't cover.
+let olManual = { code:'', stdMin:'', stdMax:'', ambMin:'', ambMax:'' };
+const OL_MANUAL_EMPTY = () => ({ code:'', stdMin:'', stdMax:'', ambMin:'', ambMax:'' });
 const resultState = {};
 
 // ═══════════════════════════════════════════════════
@@ -565,6 +573,7 @@ function selectTag(tag){
 
   // Reset size selection and range table
   olSize = null;
+  olManual = OL_MANUAL_EMPTY();
   document.querySelectorAll('.sz-btn').forEach(b => b.classList.remove('active'));
   refreshOLTable();
 }
@@ -574,7 +583,7 @@ function selectTag(tag){
 // ═══════════════════════════════════════════════════
 function getHeaterRow(code, sz){
   if(!code || sz === null) return null;
-  const labels = {0:['Size 0 and 1'], 1:['Size 0 and 1','Size 1'], 2:['Size 2'], 3:['Size 3'], 4:['Size 4']};
+  const labels = {0:['Size 0 and 1'], 1:['Size 0 and 1','Size 1'], 2:['Size 2'], 3:['Size 3'], 4:['Size 4'], 5:['Size 5']};
   const valid = labels[sz] || [];
   return OL_HEATERS.find(h => h.code === code && valid.includes(h.size)) || null;
 }
@@ -587,21 +596,37 @@ function selectSize(n){
 
 function refreshOLTable(){
   const tbody = document.getElementById('ol-range-body');
+  if(!tbody) return;
   const code = document.getElementById('ol-code').textContent;
   if(olSize === null || !code || code === '—'){
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--txt4);font-style:italic;padding:8px">Select contactor size to see heater ranges</td></tr>';
     return;
   }
   const row = getHeaterRow(code, olSize);
-  if(!row){
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:#dc2626;padding:8px">No heater data for ${code} — Size ${olSize}</td></tr>`;
+  if(row){
+    const f = v => (v != null) ? v : '—';
+    tbody.innerHTML = `<tr>
+      <td>${row.code}</td><td>${f(row.stdMin)}</td><td>${f(row.stdMax)}</td>
+      <td>${f(row.ambMin)}</td><td>${f(row.ambMax)}</td>
+    </tr>`;
     return;
   }
-  const f = v => (v != null) ? v : '—';
-  tbody.innerHTML = `<tr>
-    <td>${row.code}</td><td>${f(row.stdMin)}</td><td>${f(row.stdMax)}</td>
-    <td>${f(row.ambMin)}</td><td>${f(row.ambMax)}</td>
-  </tr>`;
+  // No row in the bundled table (Size 5, or an OL code not listed for this size) —
+  // fall back to manual entry so the technician can key the ranges from the OL
+  // relay / manufacturer heater sheet instead of hitting a dead "no data" wall.
+  const ev = s => String(s == null ? '' : s).replace(/"/g,'&quot;');
+  const preCode = olManual.code || (code && code !== '—' ? code : '');
+  tbody.innerHTML = `
+    <tr>
+      <td><input class="ol-m" id="ol-m-code"   value="${ev(preCode)}"       placeholder="code" oninput="olManual.code=this.value"></td>
+      <td><input class="ol-m" id="ol-m-stdmin" value="${ev(olManual.stdMin)}" placeholder="A" oninput="olManual.stdMin=this.value"></td>
+      <td><input class="ol-m" id="ol-m-stdmax" value="${ev(olManual.stdMax)}" placeholder="A" oninput="olManual.stdMax=this.value"></td>
+      <td><input class="ol-m" id="ol-m-ambmin" value="${ev(olManual.ambMin)}" placeholder="A" oninput="olManual.ambMin=this.value"></td>
+      <td><input class="ol-m" id="ol-m-ambmax" value="${ev(olManual.ambMax)}" placeholder="A" oninput="olManual.ambMax=this.value"></td>
+    </tr>
+    <tr><td colspan="5" style="text-align:center;color:#b45309;font-size:10px;font-style:italic;padding:4px 8px">
+      Size ${olSize}: tidak ada di tabel heater bawaan (tabel hanya Size 0–4) — isi rentang heater manual dari data OL relay / nameplate.
+    </td></tr>`;
 }
 
 // ═══════════════════════════════════════════════════
@@ -663,7 +688,7 @@ function buildTable(){
             </div>
             <div class="ol-size-row">
               <span class="ol-size-lbl">Contactor Size :</span>
-              ${[0,1,2,3,4].map(n=>`<button class="sz-btn" onclick="selectSize(${n})">${n}</button>`).join('')}
+              ${[0,1,2,3,4,5].map(n=>`<button class="sz-btn" onclick="selectSize(${n})">${n}</button>`).join('')}
             </div>
             <table class="ol-tbl">
               <thead><tr>
@@ -778,7 +803,7 @@ function showNote(msg, t){
 //  DRAFT (localStorage)
 // ═══════════════════════════════════════════════════
 function saveDraft(){
-  const d = {_tag: document.getElementById('tag-search').value, _st: {...resultState}, _olSize: olSize};
+  const d = {_tag: document.getElementById('tag-search').value, _st: {...resultState}, _olSize: olSize, _olManual: {...olManual}};
   document.querySelectorAll('input,select,textarea').forEach(el => {
     if(el.id && el.value && el.id !== 'photo-input') d['f_'+el.id] = el.value;
   });
@@ -809,6 +834,7 @@ function loadDraft(){
       const sel = document.getElementById('res-'+id);
       if(sel){ sel.value = val; onResChange(sel, id); }
     });
+    if(d._olManual && typeof d._olManual === 'object') olManual = Object.assign(OL_MANUAL_EMPTY(), d._olManual);
     if(d._olSize !== null && d._olSize !== undefined) selectSize(d._olSize);
     // Restore photos
     try{
@@ -824,7 +850,7 @@ function resetForm(){
   document.querySelectorAll('input,select,textarea').forEach(el => { if(el.type !== 'file') el.value = ''; });
   Object.keys(resultState).forEach(k => delete resultState[k]);
   document.querySelectorAll('.r-sel').forEach(s => { s.value=''; s.className='r-sel'; });
-  olSize = null; selectedMotor = null;
+  olSize = null; selectedMotor = null; olManual = OL_MANUAL_EMPTY();
   PHOTOS = []; renderPhotos();
   document.querySelectorAll('.sz-btn').forEach(b => b.classList.remove('active'));
   ['ol-code','ol-plug','ol-setting'].forEach(id => document.getElementById(id).textContent = '—');
@@ -850,11 +876,18 @@ async function submitToDb(){
   base.maintPurpose = gv('maint-purpose'); base.location = gv('location');
   base.compartment = gv('compartment'); base.ackDate = gv('ack-date'); base.ackBy = gv('ack-by');
   base.photoCount = PHOTOS.length; base.photoCaptions = PHOTOS.map(p=>p.caption);
+  const _olRow = olSize !== null ? getHeaterRow(document.getElementById('ol-code').textContent, olSize) : null;
   base.olData = {
     heaterCode: document.getElementById('ol-code').textContent,
     ratingPlug: document.getElementById('ol-plug').textContent,
     olSetting:  document.getElementById('ol-setting').textContent,
-    size: olSize
+    size: olSize,
+    manualEntry: olSize !== null && !_olRow,
+    heaterCodeUsed: _olRow ? _olRow.code : (olManual.code || document.getElementById('ol-code').textContent),
+    stdMin: _olRow ? _olRow.stdMin : (olManual.stdMin || null),
+    stdMax: _olRow ? _olRow.stdMax : (olManual.stdMax || null),
+    ambMin: _olRow ? _olRow.ambMin : (olManual.ambMin || null),
+    ambMax: _olRow ? _olRow.ambMax : (olManual.ambMax || null),
   };
 
   const sels = [...document.querySelectorAll('.r-sel')];
@@ -871,8 +904,20 @@ async function submitToDb(){
     });
   });
 
+  const _olV = x => (x != null && x !== '') ? x : '—';
   base.sheets = {
     sCheck:{title:'Check Items',columns:['Result','Remark'],rows:sCheckRows},
+    sOL:{title:'Item 6 — Overload Heater / Contactor',columns:['Value'],rows:[
+      {no:'6',desc:'OL Heater Code',values:{Value:_olV(base.olData.heaterCode)}},
+      {no:'',desc:'Rating Plug (A)',values:{Value:_olV(base.olData.ratingPlug)}},
+      {no:'',desc:'OL Setting (%)',values:{Value:_olV(base.olData.olSetting)}},
+      {no:'',desc:'Contactor Size',values:{Value:base.olData.size!=null?('Size '+base.olData.size):'—'}},
+      {no:'',desc:'Std. Min / Max (A)',values:{Value:_olV(base.olData.stdMin)+' / '+_olV(base.olData.stdMax)}},
+      {no:'',desc:'Amb. Comp. Min / Max (A)',values:{Value:_olV(base.olData.ambMin)+' / '+_olV(base.olData.ambMax)}},
+      {no:'',desc:'Heater range source',values:{Value:base.olData.manualEntry?'Manual entry (not in bundled Size 0–4 table)':'Bundled table'}},
+      {no:'',desc:'Result',values:{Value:gv('res-c6')||'—'}},
+      {no:'',desc:'Remark',values:{Value:gv('rmk-c6')||'—'}},
+    ]},
     sMegger:{title:'Item 11 — Megger Test (500 Vdc, Phase to Ground)',columns:['Value (MΩ)','Result','Remark'],rows:[
       {no:'',desc:'1 minute reading',values:{'Value (MΩ)':gv('meg-1min')||'—',Result:gv('res-c11')||'—',Remark:gv('rmk-c11')||'—'}},
       {no:'',desc:'10 minute reading',values:{'Value (MΩ)':gv('meg-10min')||'—',Result:'—',Remark:'—'}},
@@ -1033,19 +1078,23 @@ async function generatePDF(opts){
   const olSetTxt  = document.getElementById('ol-setting').textContent;
   const szLabel   = olSize !== null ? 'Size '+olSize : '—';
   const hlRow     = olSize !== null ? getHeaterRow(olCode, olSize) : null;
+  // Size 5 (or an unlisted code) has no bundled row — use the manual entry.
+  const manualOL  = olSize !== null && !hlRow;
+  const olF       = v => (v != null && v !== '') ? v : '—';
+  const olNum     = k => hlRow ? hlRow[k] : (manualOL ? olManual[k] : null);
 
   pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
   pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(...WH);
-  pdf.text('OVERLOAD HEATER DATA (Point 6)', M+3, y+5.5);
+  pdf.text('OVERLOAD HEATER DATA (Point 6)'+(manualOL?' — manual entry':''), M+3, y+5.5);
   y += 10;
 
   pdf.autoTable({
     startY:y,
     head:[['OL Heater Code','Rating Plug (A)','OL Setting (%)','Contactor Size',
            'Std. Min (A)','Std. Max (A)','Amb. Min (A)','Amb. Max (A)']],
-    body:[[olCode, olPlug, olSetTxt, szLabel,
-           hlRow?hlRow.stdMin:'—', hlRow?hlRow.stdMax:'—',
-           hlRow?hlRow.ambMin:'—', hlRow?hlRow.ambMax:'—']],
+    body:[[ (manualOL && olManual.code) ? olManual.code : olCode, olPlug, olSetTxt, szLabel,
+           olF(olNum('stdMin')), olF(olNum('stdMax')),
+           olF(olNum('ambMin')), olF(olNum('ambMax'))]],
     styles:{fontSize:8,cellPadding:3},
     headStyles:{fillColor:BLUE,textColor:WH,fontStyle:'bold'},
     alternateRowStyles:{fillColor:LT},
