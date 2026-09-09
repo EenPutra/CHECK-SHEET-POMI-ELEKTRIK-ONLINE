@@ -110,6 +110,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .ct td.subk{font-family:var(--mono);font-size:10.5px;color:var(--navy);font-weight:700;text-align:left;background:rgba(37,99,235,0.05)}
 .ct tr.sub-div td{background:rgba(37,99,235,0.09);font-family:var(--raj);font-size:11px;font-weight:700;
   letter-spacing:1.5px;text-transform:uppercase;color:var(--navy);text-align:left}
+.mm-sub{padding:14px 16px 2px;font-family:var(--raj);font-size:12px;font-weight:700;letter-spacing:1.5px;
+  color:var(--navy);text-transform:uppercase;border-top:1px solid var(--bdr2);margin-top:6px}
+.mm-sub:first-child{border-top:none;margin-top:0}
+#rtd-win td.subk{width:56px;text-align:center}
+#rtd-win .mi{width:100%;min-width:70px}
 .mi{width:96px;font-size:11px;padding:4px 5px;border-radius:3px;font-family:var(--mono);text-align:center;
   border:1.5px solid var(--bdr);background:var(--bg2);color:var(--txt);transition:border-color .15s}
 .mi:focus{outline:none;border-color:var(--blue);background:#fff}
@@ -269,6 +274,36 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <div style="padding:10px 16px 4px;font-size:10px;color:var(--txt4);font-family:var(--mono)">
       5.3 — Insulation resistance winding: &gt; 2 M&#937; @ 5000 V Megger. &nbsp; DAR = R(1 min) / R(30 sec) &nbsp;·&nbsp; PI = R(10 min) / R(1 min) (auto).
       &nbsp; 5.7 — Motor heater resistance (&#937;), per nameplate.
+    </div>
+  </div>
+</div>
+
+<!-- HEATER & TEMPERATURE SENSOR MEASUREMENT -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">🌡️</div>
+    <div><div class="sec-hdr-title">Heater &amp; Temperature Sensor Measurement</div><span class="sec-hdr-sub">Heater · Winding RTD/TC · Bearing RTD/TC</span></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div class="mm-sub">Heater Motor Measurement</div>
+    <div class="wo-grid" style="padding-top:8px">
+      <div class="mf"><label>Type Heater</label><input type="text" id="ht-type" placeholder="Flat belt / …"></div>
+      <div class="mf"><label>Resistance Total (Ω)</label><input type="text" id="ht-r" placeholder="Ω"></div>
+      <div class="mf"><label>Current (A)</label><input type="text" id="ht-i" placeholder="A"></div>
+      <div class="mf"><label>IR Heater (GΩ)</label><input type="text" id="ht-ir" placeholder="GΩ"></div>
+      <div class="mf"><label>Raise Temp Heater 1 (°C)</label><input type="text" id="ht-t1" placeholder="°C"></div>
+      <div class="mf"><label>Raise Temp Heater 2 (°C)</label><input type="text" id="ht-t2" placeholder="°C"></div>
+    </div>
+    <div class="mm-sub">Motor Temperature Sensor — Winding RTD / TC</div>
+    <div style="padding:0 16px;font-size:11px;color:var(--txt4);font-style:italic">RTD / TC winding / phase temperature — nilai °C tiap titik (nilai Ω PT100 mentah di lampiran).</div>
+    <div class="tbl-wrap" style="padding:8px 16px 0"><table class="ct" id="rtd-win"></table></div>
+    <div class="mm-sub" style="font-size:11px">Bearing RTD / TC Sensor (°C)</div>
+    <div class="wo-grid" style="padding-top:8px">
+      <div class="mf"><label>DE-1</label><input type="text" id="brtd-de1" placeholder="°C"></div>
+      <div class="mf"><label>DE-2</label><input type="text" id="brtd-de2" placeholder="°C"></div>
+      <div class="mf"><label>NDE-1</label><input type="text" id="brtd-nde1" placeholder="°C"></div>
+      <div class="mf"><label>NDE-2</label><input type="text" id="brtd-nde2" placeholder="°C"></div>
     </div>
   </div>
 </div>
@@ -621,6 +656,38 @@ function buildInstructionSheet(){
   return {title:'5.0 — Instruction Details',columns:['Result / Remark'],rows};
 }
 
+// ── Heater / RTD / bearing (like Motor_Witness_Test_Vendor.html) ──
+const HEATER_FIELDS = [
+  ['ht-type','Type Heater'], ['ht-r','Resistance Total (Ω)'], ['ht-i','Current (A)'],
+  ['ht-ir','IR Heater (GΩ)'], ['ht-t1','Raise Temp Heater 1 (°C)'], ['ht-t2','Raise Temp Heater 2 (°C)'],
+];
+const BEARING_FIELDS = [ ['brtd-de1','DE-1'], ['brtd-de2','DE-2'], ['brtd-nde1','NDE-1'], ['brtd-nde2','NDE-2'] ];
+
+function buildRtdWin(){
+  const t=document.getElementById('rtd-win'); if(!t) return;
+  let h='<thead><tr>';
+  for(let g=0;g<3;g++) h+='<th class="tl" style="width:56px">Point</th><th class="tl">°C</th>';
+  h+='</tr></thead><tbody>';
+  for(let row=0;row<6;row++){
+    h+='<tr>';
+    for(let g=0;g<3;g++){ const n=g*6+row+1; h+=`<td class="subk">T${n}</td><td><input class="mi" type="text" id="rtd${n}" placeholder="°C"></td>`; }
+    h+='</tr>';
+  }
+  h+='</tbody>'; t.innerHTML=h;
+}
+function buildHeaterSheet(){
+  return { title:'Heater Motor Measurement', columns:['Value'],
+    rows:HEATER_FIELDS.map(([id,label])=>({no:'',desc:label,crit:'',values:{Value:iv(id)}})) };
+}
+function buildRtdWindingSheet(){
+  const rows=[]; for(let n=1;n<=18;n++) rows.push({no:'',desc:'T'+n,crit:'',values:{Point:'T'+n,'°C':iv('rtd'+n)}});
+  return { title:'Motor Temperature Sensor — Winding RTD / TC', columns:['Point','°C'], rows };
+}
+function buildBearingSheet(){
+  return { title:'Bearing RTD / TC Sensor (°C)', columns:['Value'],
+    rows:BEARING_FIELDS.map(([id,label])=>({no:'',desc:label,crit:'',values:{Value:iv(id)}})) };
+}
+
 // ═══════════════════════════════════════════════════════════════
 //  PDF — portrait A4, POMI/Paiton letterhead background
 // ═══════════════════════════════════════════════════════════════
@@ -726,6 +793,50 @@ async function generatePDF(opts){
       }
       if(d.section==='body' && d.column.index===1 && /^(T1\/T2\/T3|   T1\/T2\/T3)/.test(d.cell.raw)){ d.cell.styles.fontStyle='bold'; }
     },
+  });
+  y=pdf.lastAutoTable.finalY+6;
+
+  // Heater Motor Measurement
+  secBar('Heater Motor Measurement');
+  const htr=buildHeaterSheet().rows;
+  const htrPairs=[];
+  for(let i=0;i<htr.length;i+=2){
+    htrPairs.push([htr[i].desc, htr[i].values.Value, htr[i+1]?htr[i+1].desc:'', htr[i+1]?htr[i+1].values.Value:'']);
+  }
+  pdf.autoTable({
+    ...kvTheme, startY:y,
+    body:htrPairs.map(Srow),
+    columnStyles:{0:{cellWidth:46,fontStyle:'bold',fillColor:LABEL_BG},1:{cellWidth:47},2:{cellWidth:46,fontStyle:'bold',fillColor:LABEL_BG},3:{cellWidth:47}},
+  });
+  y=pdf.lastAutoTable.finalY+6;
+
+  // Motor Temperature Sensor — Winding RTD / TC (18 points, 3-up)
+  secBar('Motor Temperature Sensor - Winding RTD / TC');
+  const rtdBody=[];
+  for(let row=0;row<6;row++){
+    const c=[];
+    for(let g=0;g<3;g++){ const n=g*6+row+1; c.push('T'+n, iv('rtd'+n)); }
+    rtdBody.push(c);
+  }
+  pdf.autoTable({
+    ...kvTheme, startY:y,
+    head:[['Point','°C','Point','°C','Point','°C'].map(Sx)],
+    body:rtdBody.map(Srow),
+    columnStyles:{0:{cellWidth:20,fontStyle:'bold',fillColor:LABEL_BG,halign:'center'},1:{cellWidth:42,halign:'center'},
+                  2:{cellWidth:20,fontStyle:'bold',fillColor:LABEL_BG,halign:'center'},3:{cellWidth:42,halign:'center'},
+                  4:{cellWidth:20,fontStyle:'bold',fillColor:LABEL_BG,halign:'center'},5:{cellWidth:42,halign:'center'}},
+  });
+  y=pdf.lastAutoTable.finalY+6;
+
+  // Bearing RTD / TC Sensor
+  secBar('Bearing RTD / TC Sensor (deg C)');
+  pdf.autoTable({
+    ...kvTheme, startY:y,
+    body:[
+      ['DE-1', iv('brtd-de1'), 'DE-2', iv('brtd-de2')],
+      ['NDE-1', iv('brtd-nde1'), 'NDE-2', iv('brtd-nde2')],
+    ].map(Srow),
+    columnStyles:{0:{cellWidth:24,fontStyle:'bold',fillColor:LABEL_BG},1:{cellWidth:69},2:{cellWidth:24,fontStyle:'bold',fillColor:LABEL_BG},3:{cellWidth:69}},
   });
   y=pdf.lastAutoTable.finalY+6;
 
@@ -880,10 +991,16 @@ async function submitToDb(){
   base.recommendations = base.recommendations || v('recommendations');
   base.notes = v('notes-extra');
   base.motorData = Object.fromEntries([['motor-tag',v('motor-tag')],['tag-desc',v('tag-desc')],...MD_FIELDS.map(([id])=>[id,v(id)])]);
+  base.heaterData = Object.fromEntries(HEATER_FIELDS.map(([id])=>[id,v(id)]));
+  base.rtdWinding = Array.from({length:18},(_,i)=>v('rtd'+(i+1)));
+  base.bearingRtd = Object.fromEntries(BEARING_FIELDS.map(([id])=>[id,v(id)]));
 
   base.sheets={
     motordata:   buildMotorDataSheet(),
     s5:          buildInstructionSheet(),
+    heater:      buildHeaterSheet(),
+    rtd_winding: buildRtdWindingSheet(),
+    rtd_bearing: buildBearingSheet(),
   };
 
   SubmitGuard.init({ assetTag: tag });
@@ -931,6 +1048,7 @@ async function submitToDb(){
 // ═══════════════════════════════════════════════════════════════
 PhotoKit.configure({maxWcm:8.8,maxHcm:12,defaultWcm:8.8,defaultHcm:6.0});
 buildMatrix();
+buildRtdWin();
 renderPhotos();
 loadDraft();
 updateStats();
