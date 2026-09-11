@@ -273,7 +273,25 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <div style="padding:10px 16px 4px;font-size:10px;color:var(--txt4);font-family:var(--mono)">
       5.3 — Insulation resistance winding: &gt; 2 M&#937; @ 5000 V Megger. &nbsp; DAR = R(1 min) / R(30 sec) &nbsp;·&nbsp; PI = R(10 min) / R(1 min) (auto).
-      &nbsp; 5.7 — Motor heater resistance (&#937;), per nameplate.
+      Ambient temperature &amp; humidity at time of test are recorded right below PI. &nbsp; 5.7 — Motor heater resistance (&#937;), per nameplate.
+    </div>
+  </div>
+</div>
+
+<!-- 5.3 IR TREND CHART -->
+<div class="panel">
+  <div class="sec-hdr open" onclick="toggleSec(this)">
+    <div class="sec-hdr-icon">📈</div>
+    <div><div class="sec-hdr-title">5.3 — Insulation Resistance Trend</div><span class="sec-hdr-sub">T1/T2/T3 – Ground · 15 sec – 10 min (MΩ)</span></div>
+    <span class="sec-hdr-arrow">▼</span>
+  </div>
+  <div class="sec-body">
+    <div style="padding:14px 16px 4px">
+      <canvas id="ir-chart" width="900" height="240" style="width:100%;height:220px;display:block"></canvas>
+    </div>
+    <div style="padding:0 16px 14px;font-size:11px;color:var(--txt4);font-style:italic">
+      Auto-updates from the 5.3 readings above. A healthy curve rises steadily — a flat or falling
+      curve after ~1 minute can indicate winding contamination or moisture.
     </div>
   </div>
 </div>
@@ -509,6 +527,14 @@ function buildMatrix(){
       <tr>
         <td class="no"></td><td class="subk">PI</td><td class="crit">R(10min)/R(1min) · &gt; 2.0</td>
         <td><input class="mi ro" type="text" id="ir-pi" readonly placeholder="auto"></td>
+      </tr>
+      <tr>
+        <td class="no"></td><td class="subk">Ambient Temperature</td><td class="crit">°C at time of test</td>
+        <td><input class="mi" type="text" id="ir-temp" placeholder="°C" oninput="drawIRChart()"></td>
+      </tr>
+      <tr>
+        <td class="no"></td><td class="subk">Relative Humidity</td><td class="crit">% at time of test</td>
+        <td><input class="mi" type="text" id="ir-rh" placeholder="%" oninput="drawIRChart()"></td>
       </tr>`;
     } else if(chk.kind==='htr'){
       html+=`<tr>
@@ -536,7 +562,53 @@ function recalcDARPI(){
   const dar=document.getElementById('ir-dar'), pi=document.getElementById('ir-pi');
   if(dar) dar.value = (r30>0 && r1>0) ? (r1/r30).toFixed(2) : '';
   if(pi)  pi.value  = (r1>0 && r10>0) ? (r10/r1).toFixed(2) : '';
+  drawIRChart();
   scheduleAutoSave();
+}
+
+// Hand-rolled canvas line chart (repo convention — no charting library
+// needed) for the 5.3 insulation-resistance time series (15 sec .. 10 min).
+// Re-drawn on every ir-g-* input via recalcDARPI(), and again fresh inside
+// generatePDF() right before capturing it, per CLAUDE.md's PDF-chart rule.
+function drawIRChart(canvas){
+  canvas = canvas || document.getElementById('ir-chart');
+  if(!canvas) return;
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const padL=42, padR=10, padT=18, padB=24;
+  const plotW=W-padL-padR, plotH=H-padT-padB;
+  ctx.fillStyle='#64748b'; ctx.font='10px Arial'; ctx.textAlign='left'; ctx.textBaseline='alphabetic';
+  ctx.fillText('MΩ', 2, 11);
+  const labels = IR_TIMES.map(([,lab])=>lab);
+  const data = IR_TIMES.map(([k])=>num('ir-g-'+k));
+  const valid = data.filter(x=>x!=null);
+  const maxV = valid.length ? Math.max(...valid) : 1;
+  const yMax = maxV>0 ? maxV*1.15 : 1;
+  const NAVY='#1e3a5f', GRID='#e2e8f0', AXIS='#94a3b8', LBL='#64748b';
+  ctx.strokeStyle=AXIS; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
+  ctx.font='11px Arial'; ctx.textBaseline='middle'; ctx.textAlign='right';
+  for(let g=0; g<=4; g++){
+    const yy=padT+plotH-(plotH*g/4);
+    const val=yMax*g/4;
+    ctx.strokeStyle=GRID; ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(padL+plotW,yy); ctx.stroke();
+    ctx.fillStyle=LBL; ctx.fillText(val.toFixed(0), padL-6, yy);
+  }
+  const n=labels.length;
+  const stepX = n>1 ? plotW/(n-1) : 0;
+  ctx.textAlign='center'; ctx.textBaseline='top'; ctx.font='9.5px Arial';
+  labels.forEach((lb,i)=>{ ctx.fillStyle=LBL; ctx.fillText(lb, padL+stepX*i, padT+plotH+6); });
+  const yOf = val => padT+plotH-(val/yMax*plotH);
+  ctx.strokeStyle=NAVY; ctx.lineWidth=2; ctx.beginPath(); let started=false;
+  data.forEach((val,i)=>{
+    if(val==null) return;
+    const x=padL+stepX*i, y=yOf(val);
+    if(!started){ ctx.moveTo(x,y); started=true; } else ctx.lineTo(x,y);
+  });
+  ctx.stroke();
+  ctx.fillStyle=NAVY;
+  data.forEach((val,i)=>{ if(val==null) return; ctx.beginPath(); ctx.arc(padL+stepX*i,yOf(val),2.6,0,Math.PI*2); ctx.fill(); });
 }
 
 function updateStats(){
@@ -645,6 +717,8 @@ function buildInstructionSheet(){
       IR_TIMES.forEach(([k,lab])=>put('','      '+lab+' (MΩ)','',iv('ir-g-'+k)));
       put('','   DAR','R(1min)/R(30sec) · > 1.25',iv('ir-dar'));
       put('','   PI','R(10min)/R(1min) · > 2.0',iv('ir-pi'));
+      put('','   Ambient Temperature (°C)','at time of test',iv('ir-temp'));
+      put('','   Relative Humidity (%)','at time of test',iv('ir-rh'));
     } else if(chk.kind==='htr'){
       put(chk.no,chk.desc+' (Ω)',chk.crit,iv('htr'));
     } else {
@@ -795,6 +869,19 @@ async function generatePDF(opts){
     },
   });
   y=pdf.lastAutoTable.finalY+6;
+
+  // 5.3 Insulation Resistance trend — redraw fresh at higher res right
+  // before capturing it (a canvas last touched on a different tab, or
+  // never redrawn since the last input, must not be embedded stale).
+  {
+    const chH=46;
+    checkY(chH+14);
+    secBar('5.3 — Insulation Resistance Trend (MΩ)');
+    const off=document.createElement('canvas'); off.width=1100; off.height=300;
+    drawIRChart(off);
+    try{ pdf.addImage(off.toDataURL('image/png'),'PNG', M, y, CW, chH); }catch(e){}
+    y+=chH+6;
+  }
 
   // Heater Motor Measurement
   secBar('Heater Motor Measurement');
@@ -1051,6 +1138,7 @@ buildMatrix();
 buildRtdWin();
 renderPhotos();
 loadDraft();
+drawIRChart();
 updateStats();
 
 LoadMergeModal.init({ assetTag: currentTag() });
