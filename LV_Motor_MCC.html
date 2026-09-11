@@ -136,6 +136,15 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .ol-field{display:flex;flex-direction:column;gap:3px}
 .ol-field label{font-size:9px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px}
 .ol-field span{font-family:var(--mono);font-size:13px;color:var(--navy);font-weight:700}
+.ol-field span[contenteditable="true"]{background:#fff;border:1.5px dashed var(--blue);border-radius:4px;
+  padding:2px 7px;outline:none;cursor:text;min-width:60px;display:inline-block}
+.ol-field span[contenteditable="true"]:focus{border-style:solid}
+.btn-manual{background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr);border-radius:5px;padding:7px 14px;
+  font-family:var(--raj);font-weight:600;font-size:12px;letter-spacing:.5px;cursor:pointer;white-space:nowrap;width:100%}
+.btn-manual:hover{background:var(--bdr2)}
+.btn-manual.active{background:#fef3c7;border-color:#f59e0b;color:#92400e}
+.manual-note{font-size:11px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;
+  padding:8px 12px;margin:0 16px 12px;display:none}
 .ol-size-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
 .ol-size-lbl{font-size:10px;color:var(--txt4);font-weight:500;text-transform:uppercase;letter-spacing:1px}
 .sz-btn{padding:4px 11px;border:1.5px solid var(--bdr);border-radius:4px;background:#fff;
@@ -315,6 +324,9 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
         <label>Tag Description</label>
         <input type="text" id="tag-desc" readonly placeholder="Auto-filled from tag selection">
       </div>
+      <div class="mf"><label>&nbsp;</label>
+        <button type="button" class="btn-manual" id="btn-manual-motor" onclick="toggleManualMotor()">✏️ Motor Tidak Ada di List</button>
+      </div>
       <div class="mf"><label>Date</label><input type="date" id="wo-date"></div>
       <div class="mf"><label>Done By</label><input type="text" id="done-by" placeholder="Full name"></div>
       <div class="mf"><label>WO Number</label><input type="text" id="wo-no" placeholder="WO-2026-XXXX"></div>
@@ -326,8 +338,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
       <div class="mf"><label>Acknowledge Date</label><input type="date" id="ack-date"></div>
       <div class="mf"><label>Acknowledge By</label><input type="text" id="ack-by" placeholder="Full name"></div>
     </div>
+    <div class="manual-note" id="manual-motor-note">
+      ✏️ <strong>Mode input manual aktif</strong> — Tag Description, data motor dasar (Basic Motor Data di bawah), Location/Compartment,
+      dan OL Type/Heater · Rating Plug · OL Setting sekarang bisa diketik langsung (biasanya "Auto-fill"). Klik tombolnya lagi untuk
+      mematikan, atau pilih tag dari daftar pencarian untuk kembali ke auto-fill.
+    </div>
     <div style="padding:0 16px 14px">
-      <button class="btn btn-draft btn-sm" id="btn-load-last" onclick="LoadMergeModal.open()">📥 Muat / Lanjutkan dari Database</button>
+      <button class="btn btn-draft btn-sm" id="btn-load-last" onclick="openLoadMergeModal()">📥 Muat / Lanjutkan dari Database</button>
       <span style="font-size:11px;color:var(--txt4);margin-left:8px">Pilih satu atau lebih submission sebelumnya untuk tag ini dan gabungkan (union, tidak menghapus) ke form ini.</span>
     </div>
   </div>
@@ -482,6 +499,11 @@ const OL_HEATERS=[{"code": "C087A", "stdMin": 0.65, "stdMax": 0.74, "ambMin": 0.
 //  STATE
 // ═══════════════════════════════════════════════════
 let selectedMotor = null;
+let manualMotorMode = false;
+// Fields normally auto-filled (and locked) from MCC_MOTORS — unlocked for
+// direct typing when the plant tag isn't in the bundled master list.
+const MANUAL_MOTOR_FIELDS = ['tag-desc','m-v','m-a','m-pwr','m-rpm','m-sf','location','compartment'];
+const MANUAL_OL_SPANS = ['ol-code','ol-plug','ol-setting'];
 let olSize = null;
 // Manual overload-heater range entry — used when the built-in OL_HEATERS table
 // has no row for the chosen (code, size), e.g. NEMA Contactor Size 5, which the
@@ -523,7 +545,7 @@ function filterTags(){
 
 function renderDrop(list){
   const drop = document.getElementById('ss-drop');
-  if(!list.length){ drop.innerHTML = '<div class="ss-empty">No results found</div>'; return; }
+  if(!list.length){ drop.innerHTML = '<div class="ss-empty">Tidak ditemukan — klik "✏️ Motor Tidak Ada di List" untuk isi manual</div>'; return; }
   drop.innerHTML = list.map(m =>
     `<div class="ss-item" onmousedown="selectTag('${m.tag.replace(/'/g,"\\'")}')">`+
     `<strong>${m.tag}</strong><small>${m.desc||'—'}</small></div>`
@@ -541,11 +563,68 @@ function closeDrop(){
   }, 200);
 }
 
+// ═══════════════════════════════════════════════════
+//  MANUAL MOTOR ENTRY — plant tag not in MCC_MOTORS
+// ═══════════════════════════════════════════════════
+// Unlocks the otherwise auto-fill-only fields (Tag Description, Basic
+// Motor Data, Location, Compartment) plus the OL box's three identity
+// spans (they're <span>, not <input> — made contenteditable so every
+// existing .textContent read/write elsewhere in this file keeps working
+// unchanged) so a motor missing from the bundled master list can still
+// get a full submission instead of a form full of locked blanks.
+function setManualMode(on){
+  manualMotorMode = on;
+  MANUAL_MOTOR_FIELDS.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.readOnly = !on;
+  });
+  MANUAL_OL_SPANS.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.contentEditable = on ? 'true' : 'false';
+  });
+  const ph = on ? 'Isi manual' : 'Auto-fill';
+  ['m-v','m-a','m-pwr','m-rpm','m-sf'].forEach(id => { const el=document.getElementById(id); if(el) el.placeholder = ph; });
+  const td = document.getElementById('tag-desc'); if(td) td.placeholder = on ? 'Isi manual' : 'Auto-filled from tag selection';
+  const loc = document.getElementById('location'); if(loc) loc.placeholder = on ? 'Isi manual (opsional)' : 'Auto-filled';
+  const comp = document.getElementById('compartment'); if(comp) comp.placeholder = on ? 'Isi manual (opsional)' : 'Auto-filled';
+  const btn = document.getElementById('btn-manual-motor');
+  if(btn){
+    btn.textContent = on ? '✅ Mode Manual Aktif' : '✏️ Motor Tidak Ada di List';
+    btn.classList.toggle('active', on);
+  }
+  const note = document.getElementById('manual-motor-note');
+  if(note) note.style.display = on ? 'block' : 'none';
+}
+
+function toggleManualMotor(){
+  if(!manualMotorMode){
+    selectedMotor = null;
+    setManualMode(true);
+    const search = document.getElementById('tag-search');
+    if(search) search.focus();
+    showNote('✏️ Mode input manual aktif — isi Tag Description, data motor, dan OL heater langsung.', 'info');
+  } else {
+    setManualMode(false);
+    showNote('Mode input manual dimatikan. Pilih tag dari daftar untuk auto-fill lagi.', 'info');
+  }
+}
+
+// Multi-asset sheet (CLAUDE.md rule): re-init Load & Merge with whatever
+// tag is CURRENTLY in the search box right before opening it — a manually
+// typed tag (not in MCC_MOTORS, so selectTag() never fires) would otherwise
+// leave the modal scoped to a stale tag from page load or an earlier pick.
+function openLoadMergeModal(){
+  const tag = document.getElementById('tag-search').value.trim();
+  if(tag) LoadMergeModal.init({ assetTag: tag });
+  LoadMergeModal.open();
+}
+
 function selectTag(tag){
   clearTimeout(dropTimer);
   const m = MCC_MOTORS.find(x => x.tag === tag);
   if(!m) return;
   selectedMotor = m;
+  if(manualMotorMode) setManualMode(false);   // picking a real motor always exits manual entry
   document.getElementById('tag-search').value = m.tag;
   document.getElementById('tag-desc').value = m.desc || '';
   // Keep the Load & Merge modal scoped to whichever motor tag is currently
@@ -803,7 +882,12 @@ function showNote(msg, t){
 //  DRAFT (localStorage)
 // ═══════════════════════════════════════════════════
 function saveDraft(){
-  const d = {_tag: document.getElementById('tag-search').value, _st: {...resultState}, _olSize: olSize, _olManual: {...olManual}};
+  const d = {_tag: document.getElementById('tag-search').value, _st: {...resultState}, _olSize: olSize, _olManual: {...olManual},
+    // Manual-motor-entry state: whether the auto-fill fields are unlocked, plus
+    // the OL identity spans — those are <span contenteditable>, not <input>, so
+    // the generic input/select/textarea sweep below never sees them.
+    _manualMotor: manualMotorMode,
+    _olSpans: { code: document.getElementById('ol-code').textContent, plug: document.getElementById('ol-plug').textContent, setting: document.getElementById('ol-setting').textContent }};
   document.querySelectorAll('input,select,textarea').forEach(el => {
     if(el.id && el.value && el.id !== 'photo-input') d['f_'+el.id] = el.value;
   });
@@ -826,6 +910,17 @@ function loadDraft(){
     if(!raw) return;
     const d = JSON.parse(raw);
     if(d._tag) selectTag(d._tag);
+    // Manual-motor-entry: unlock the fields BEFORE the generic sweep restores
+    // their values (readonly wouldn't block a programmatic .value= anyway,
+    // but this also restores the OL spans, which the sweep can't reach).
+    if(d._manualMotor){
+      setManualMode(true);
+      if(d._olSpans){
+        if(d._olSpans.code != null)    document.getElementById('ol-code').textContent    = d._olSpans.code;
+        if(d._olSpans.plug != null)    document.getElementById('ol-plug').textContent    = d._olSpans.plug;
+        if(d._olSpans.setting != null) document.getElementById('ol-setting').textContent = d._olSpans.setting;
+      }
+    }
     document.querySelectorAll('input,select,textarea').forEach(el => {
       if(el.id && d['f_'+el.id] !== undefined) el.value = d['f_'+el.id];
     });
@@ -853,6 +948,7 @@ function resetForm(){
   olSize = null; selectedMotor = null; olManual = OL_MANUAL_EMPTY();
   PHOTOS = []; renderPhotos();
   document.querySelectorAll('.sz-btn').forEach(b => b.classList.remove('active'));
+  setManualMode(false);
   ['ol-code','ol-plug','ol-setting'].forEach(id => document.getElementById(id).textContent = '—');
   refreshOLTable();
   updateStats();
@@ -875,6 +971,7 @@ async function submitToDb(){
   base.recommendations = base.recommendations || gv('actions-taken');
   base.maintPurpose = gv('maint-purpose'); base.location = gv('location');
   base.compartment = gv('compartment'); base.ackDate = gv('ack-date'); base.ackBy = gv('ack-by');
+  base.motorManualEntry = manualMotorMode; // true when the tag wasn't in MCC_MOTORS and data was typed in by hand
   base.photoCount = PHOTOS.length; base.photoCaptions = PHOTOS.map(p=>p.caption);
   const _olRow = olSize !== null ? getHeaterRow(document.getElementById('ol-code').textContent, olSize) : null;
   base.olData = {
@@ -937,6 +1034,7 @@ async function submitToDb(){
       {no:'',desc:'Mounting',values:{Value:gv('m-mount')||'—'}},
       {no:'',desc:'Frame Size',values:{Value:gv('m-frame')||'—'}},
       {no:'',desc:'Manufacturer',values:{Value:gv('m-mfr')||'—'}},
+      {no:'',desc:'Data Source',values:{Value: manualMotorMode ? 'Manual entry (tag not in MCC master list)' : 'MCC master list'}},
     ]},
   };
 
@@ -1054,7 +1152,7 @@ async function generatePDF(opts){
   ckY(28);
   pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
   pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(...WH);
-  pdf.text('BASIC MOTOR DATA', M+3, y+5.5);
+  pdf.text('BASIC MOTOR DATA'+(manualMotorMode?' — manual entry (tag not in MCC list)':''), M+3, y+5.5);
   y += 10;
   const mdF = [
     ['Rated Voltage', gv('m-v')], ['Full Load Ampere', gv('m-a')], ['Rated Power', gv('m-pwr')],
