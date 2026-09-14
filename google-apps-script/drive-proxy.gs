@@ -45,7 +45,7 @@
 //   *** files keep failing to download exactly as before.
 // ============================================================
 
-const ROOT_FOLDER_ID = 'PASTE_YOUR_DRIVE_FOLDER_ID_HERE';
+const ROOT_FOLDER_ID = '1FxT9LM6ABuNnD6KFWwTWCsTWGBYMEC_r';
 
 // Shared secret with storage-helper.js's DRIVE_PROXY_TOKEN in the repo.
 // '' = disabled (accept every request — the original behaviour). To turn
@@ -107,22 +107,36 @@ function doGet(e) {
     // original whole-blob-then-slice approach (still correct, just slower)
     // if the range fetch fails for any reason — never a hard failure just
     // because the faster path didn't work this time.
+    const t0 = Date.now();
     let total = null;
     try { total = file.getSize(); } catch (szErr) { total = null; }
     const length = hasRange && e.parameter.length != null ? parseInt(e.parameter.length, 10) : total;
 
     let slice = null;
     let mimeType = null;
+    // DIAGNOSTIC FIELDS (2026-09-14, temporary): a user report of "still
+    // very slow" came back with Apps Script's own Executions log showing
+    // every call as "Completed" — meaning the slowness isn't a server-side
+    // error at all, which points straight at fetchDriveRange() silently
+    // failing and falling through to the slow whole-file-read path on
+    // every call (still "completes" successfully, just slowly, so it never
+    // shows as Failed). These fields make that visible directly in the
+    // JSON response (check the Network tab) instead of needing another
+    // round of guessing — remove once the real cause is confirmed.
+    let _usedRange = false, _rangeError = null;
     if (hasRange && total != null) {
       const end = Math.min(total, offset + Math.max(0, length || 0)) - 1;
       if (end >= offset) {
         try {
           slice = fetchDriveRange(fileId, offset, end);
+          _usedRange = true;
         } catch (rangeErr) {
           slice = null; // fall through to the full-blob path below
+          _rangeError = String((rangeErr && rangeErr.message) || rangeErr);
         }
       } else {
         slice = []; // requested a zero/negative-length range — empty chunk, not an error
+        _usedRange = true;
       }
     }
 
@@ -149,6 +163,9 @@ function doGet(e) {
       totalSize: total,
       offset: offset,
       chunkSize: slice.length,
+      _debugMs: Date.now() - t0,
+      _debugUsedRange: _usedRange,
+      _debugRangeError: _rangeError,
     });
   } catch (err) {
     return jsonOutput({ error: err.message });
