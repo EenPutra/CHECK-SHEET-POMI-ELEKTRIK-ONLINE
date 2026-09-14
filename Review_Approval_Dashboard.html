@@ -238,6 +238,8 @@ select.login-field:disabled{opacity:.55;cursor:not-allowed}
 .ms-card-top{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap}
 .ms-card-title{font-weight:700;font-size:13.5px;flex:1;min-width:170px}
 .ms-card-meta{font-family:var(--mono);font-size:10.5px;color:var(--txt-3);margin-top:2px}
+.ms-card-extra{font-size:11.5px;color:var(--txt-2);margin-top:5px;line-height:1.5}
+.ms-card-extra b{color:var(--txt)}
 .ms-stepper{display:flex;align-items:center;margin:11px 0 3px;flex-wrap:wrap}
 .ms-step{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt-3)}
 .ms-step .d{width:17px;height:17px;border-radius:50%;border:2px solid var(--bdr-2);display:grid;place-items:center;font-size:9px;font-weight:800;background:var(--surf);flex-shrink:0}
@@ -1890,11 +1892,34 @@ function _assetTitleText(a, cs){
   return p.name + (p.tag ? '  ·  ' + p.tag : '');
 }
 
+// Work_Activity_Record.html and Maintenance_Corrective_Action.html save
+// under one FIXED synthetic title/tag (per visit — see CLAUDE.md's
+// "Multi-asset..."/"MCA" sections), so unlike every other check sheet the
+// card title alone never says which real equipment a given submission is
+// about. The real asset + a short failure/work description are free-typed
+// fields INSIDE the form instead — pulled from `cs.inputValues` (populated
+// by DB.collectCheckSheetData()'s generic sweep) so they're visible right
+// under the title without opening "Detail lengkap". Field ids differ
+// between the two files (see CLAUDE.md's "data contract" per-file id
+// variance), so both conventions are tried.
+function _msExtraLine(a, cs){
+  const tag = ((cs && cs.assetTag) || a.assetTag || '').trim().toUpperCase();
+  if(tag !== 'WORK-ACTIVITY-RECORD' && tag !== 'MAINTENANCE-CORRECTIVE-ACTION') return '';
+  const iv = (cs && cs.inputValues) || {};
+  const assetNo   = (iv['asset-tag'] || iv['asset'] || '').trim();
+  const assetDesc = (iv['asset-desc'] || iv['desc'] || '').trim();
+  const failure   = (iv['failure-desc'] || '').trim();
+  const parts = [];
+  if(assetNo || assetDesc) parts.push(`<b>Asset:</b> ${escHtml([assetNo, assetDesc].filter(Boolean).join(' — '))}`);
+  if(failure) parts.push(`<b>Failure/Work Desc:</b> ${escHtml(failure)}`);
+  return parts.length ? `<div class="ms-card-extra">${parts.join(' &nbsp;·&nbsp; ')}</div>` : '';
+}
 function _msCard(a){
   const cs = _checksheetCache[a.checksheetId] || {};
   const _t = _assetTitleParts(a, cs);
   const titleHtml = escHtml(_t.name) + (_t.tag ? `<span class="asset-tag-chip">${escHtml(_t.tag)}</span>` : '');
   const who = a.submittedBy || cs.checkedBy || '—';
+  const extraLine = _msExtraLine(a, cs);
   let detail = '';
   if(a.review){
     detail += `<div><b>Review</b> oleh ${escHtml(a.review.reviewedBy||'—')} · ${fmtDate(a.review.reviewedAt)}`
@@ -1936,6 +1961,7 @@ function _msCard(a){
       <div style="flex:1;min-width:170px">
         <div class="ms-card-title">${titleHtml}</div>
         <div class="ms-card-meta">WO ${escHtml(a._wo||'—')}${a._date?' · '+escHtml(a._date):''} · oleh ${escHtml(who)} · disubmit ${fmtDate(a.createdAt)}${a._src?' · via '+escHtml(a._src):''}</div>
+        ${extraLine}
       </div>
       <span class="card-badge ${a.status}">${escHtml(Approvals.STATUS_LABELS[a.status]||a.status)}</span>
     </div>
