@@ -12,14 +12,14 @@
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=20260906b"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=20260914a"></script>
 <!-- ?v bumped on every change to a shared lib so GitHub Pages' 10-min asset
      cache doesn't serve a stale copy (symptom: "Approvals.xxx is not a function"). -->
-<script src="db-helper.js?v=20260906b"></script>
-<script src="storage-helper.js?v=20260906b"></script>
-<script src="approval-helper.js?v=20260906b"></script>
-<script src="auth-session.js?v=20260906b"></script>
-<script src="team-routing.js?v=20260906b"></script>
+<script src="db-helper.js?v=20260914a"></script>
+<script src="storage-helper.js?v=20260914a"></script>
+<script src="approval-helper.js?v=20260914a"></script>
+<script src="auth-session.js?v=20260914a"></script>
+<script src="team-routing.js?v=20260914a"></script>
 <style>
 :root{
   --bg:#f4f7fb; --bg-2:#eaf0f7; --surf:#ffffff; --surf-2:#f8fafc;
@@ -1173,6 +1173,11 @@ async function saveSignatureFromSettings(){
 // flow: writes a `checksheets` doc + uploads the PDF + images to Drive +
 // creates an `approvals` doc (status 'submitted') with explicit team/area
 // routing. scopeOfApproval() reads that team/area straight off the approval.
+// Set once a manual-upload attempt has saved its checksheet doc, cleared
+// only once submitWithFiles() actually succeeds (see submitManualUpload) —
+// lets a retry after a failed upload reuse the SAME doc via DB.update()
+// instead of DB.save()-ing a brand-new one every time "Submit" is clicked.
+let _muInFlightId = null;
 function openManualUpload(){
   const ov = document.getElementById('manual-overlay');
   ov.style.display = 'flex'; ov.classList.remove('hide');
@@ -1185,6 +1190,7 @@ function openManualUpload(){
   document.getElementById('mu-images').value = '';
   document.getElementById('mu-img-count').textContent = '';
   document.getElementById('mu-err').textContent = '';
+  _muInFlightId = null; // a fresh form is a fresh report — abandon any earlier failed-attempt doc id
 }
 function closeManualUpload(){
   const ov = document.getElementById('manual-overlay');
@@ -1267,8 +1273,20 @@ async function submitManualUpload(){
         { no: '7', desc: 'Catatan', values: { Value: notes || '—' } },
       ] } },
     };
-    setFileProgressPct(6, 'Menyimpan data laporan…');
-    const id = await DB.save(base);
+    // Reuse the SAME checksheet doc across a retry (see _muInFlightId above)
+    // — otherwise a failed upload followed by clicking "Submit" again would
+    // DB.save() a second, duplicate checksheet doc with no approval record
+    // ever pointing at it (an orphan nothing in this app cleans up
+    // automatically, unlike an orphaned APPROVAL — see CLAUDE.md).
+    let id = _muInFlightId;
+    if(id){
+      setFileProgressPct(6, 'Melanjutkan laporan yang tersimpan…');
+      await DB.update(id, base);
+    }else{
+      setFileProgressPct(6, 'Menyimpan data laporan…');
+      id = await DB.save(base);
+      _muInFlightId = id;
+    }
 
     // Compress images up front so submitWithFiles just uploads them.
     const photoEntries = [];
@@ -1288,16 +1306,18 @@ async function submitManualUpload(){
       team, area, src: 'Upload manual',
       onProgress: (pct, label) => setFileProgressPct(10 + Math.round(pct * 0.85), label),
     });
-    if(!ok) throw new Error('Upload file / pencatatan approval gagal — cek koneksi lalu coba lagi.');
+    if(!ok) throw new Error('Sebagian file gagal diupload — cek koneksi lalu tekan Submit lagi (data laporan sudah tersimpan, tidak akan dobel).');
 
     finishFileProgress();
+    _muInFlightId = null; // fully succeeded — a later Manual Upload starts a fresh doc
     closeManualUpload();
     alert('✅ Laporan manual masuk ke Review & Approval (team ' + team + ' · ' + area + ').');
     await loadAll();
   }catch(err){
     hideFileProgress();
     console.error('Manual upload gagal:', err);
-    errEl.textContent = 'Gagal: ' + (err.message || err);
+    errEl.textContent = 'Gagal: ' + (err.message || err) +
+      (_muInFlightId ? ' Data laporan sudah tersimpan — tekan Submit lagi untuk melanjutkan (tidak akan dobel).' : '');
   }
   btn.disabled = false; btn.textContent = '📤 Submit ke Review & Approval';
 }
@@ -2559,9 +2579,17 @@ function showFileProgress(label){
   }, 350);
 }
 function _fpMeta(){ return _fpLoaded ? _fpBytes(_fpLoaded) + ' diunduh' : 'Menyambungkan…'; }
-// p: {loaded,total} while streaming, or {phase:'decode'} once fetched.
+// p: {loaded,total} while streaming, {phase:'decode'} once fetched, or
+// {phase:'retry',attempt,max,error} when storage-helper.js is silently
+// retrying a transient Drive-proxy failure — surfaced here instead of the
+// progress bar just looking frozen for several seconds.
 function updateFileProgress(p){
   if(p && p.phase === 'decode'){ _fpSet(96, 'Menyiapkan file…'); return; }
+  if(p && p.phase === 'retry'){
+    document.getElementById('fp-label').textContent = 'Koneksi bermasalah, mencoba lagi… (percobaan ' + p.attempt + '/' + p.max + ')';
+    _fpRender('Mohon tunggu…');
+    return;
+  }
   const loaded = (p && p.loaded) || 0, total = (p && p.total) || 0;
   _fpLoaded = Math.max(_fpLoaded, loaded);
   if(total > 0){
@@ -2835,7 +2863,12 @@ async function doApprove(){
     };
     const blob = await buildFinalPdf(approvalForPdf, _curChecksheet, updateFileProgress);
     setFileProgressPhase('Mengunggah PDF final…');
-    const finalPdfUrl = await Storage.uploadBlob(`approvals/${_curApproval.id}/final.pdf`, blob, 'application/pdf');
+    // storage-helper.js already retries a transient upload failure a few
+    // times with backoff before this reaches the catch below — the
+    // {phase:'retry'} events it fires along the way flow into
+    // updateFileProgress() so a slow/flaky connection shows "mencoba lagi"
+    // instead of the bar just sitting still.
+    const finalPdfUrl = await Storage.uploadBlob(`approvals/${_curApproval.id}/final.pdf`, blob, 'application/pdf', updateFileProgress);
     await Approvals.approve(_curApproval.id, {notes, signature, approvedBy, finalPdfUrl});
     finishFileProgress();
     alert('Submission disetujui. PDF final siap diunduh.');
@@ -2843,7 +2876,10 @@ async function doApprove(){
     await loadAll();
   }catch(e){
     hideFileProgress();
-    alert('Gagal approve: '+e.message);
+    // Nothing here has side effects that can't be safely redone — approve()
+    // itself is a plain Firestore update, so retrying after any failure
+    // (fetch original, merge, upload final PDF) is always safe.
+    alert('Gagal approve: '+e.message+' — koneksi mungkin bermasalah, silakan coba lagi.');
   }finally{
     btn.disabled = false; btn.textContent = '✅ Approve & Buat PDF Final';
   }

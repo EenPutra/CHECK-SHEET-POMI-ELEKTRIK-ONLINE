@@ -14,12 +14,15 @@
 //   1. Create a folder in Google Drive for check-sheet uploads (e.g.
 //      "POMI Check Sheet Files"). Open it, copy its id from the URL
 //      (drive.google.com/drive/folders/<THIS PART>).
-//   1b. Right-click that SAME folder -> Share -> General access ->
-//      "Anyone with the link" -> Viewer. Do this once, by hand, in the
-//      normal Drive UI — NOT via DriveApp.setSharing() in code, which
-//      Google blocks for unverified Apps Script projects even with full
-//      Drive scope granted. Every file this script creates inside the
-//      folder inherits this same link-access automatically.
+//   1b. LEVEL 1 SECURITY (2026-09): keep this folder PRIVATE ("Restricted").
+//      doGet() below reads each file as the script owner ("Execute as:
+//      Me"), so the app displays photos/PDFs fine without any public
+//      sharing. Sharing the folder "Anyone with the link" makes every
+//      uploaded evidence photo and report world-readable by URL — if an
+//      earlier setup did that, right-click the folder -> Share -> General
+//      access -> "Restricted". (The old workaround note about
+//      DriveApp.setSharing() being blocked only mattered for a direct-
+//      link download path this code does not use.) See SECURITY.md.
 //   2. Go to https://script.google.com -> New project.
 //   3. Delete the default Code.gs content, paste this ENTIRE file in.
 //   4. Replace ROOT_FOLDER_ID below with the folder id from step 1.
@@ -37,7 +40,20 @@
 
 const ROOT_FOLDER_ID = 'PASTE_YOUR_DRIVE_FOLDER_ID_HERE';
 
+// Shared secret with storage-helper.js's DRIVE_PROXY_TOKEN in the repo.
+// '' = disabled (accept every request — the original behaviour). To turn
+// it on: put the SAME random string here and in storage-helper.js, then
+// Deploy -> Manage deployments -> New version. See SECURITY.md step 4.
+const SHARED_SECRET = '';
+
+function checkAuth(e, body) {
+  if (!SHARED_SECRET) return true;
+  var t = (e && e.parameter && e.parameter.token) || (body && body.token) || '';
+  return t === SHARED_SECRET;
+}
+
 function doGet(e) {
+  if (!checkAuth(e)) return jsonOutput({ error: 'unauthorized' });
   const fileId = e.parameter.id;
   if (!fileId) return jsonOutput({ error: 'Parameter id diperlukan' });
   try {
@@ -66,6 +82,7 @@ function doGet(e) {
 function doPost(e) {
   try {
     const body = JSON.parse(e.postData.contents);
+    if (!checkAuth(e, body)) return jsonOutput({ error: 'unauthorized' });
 
     if (body.action === 'delete') {
       DriveApp.getFileById(body.id).setTrashed(true);

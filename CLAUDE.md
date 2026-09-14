@@ -30,8 +30,12 @@ merge-modal layer — not every check sheet needs these last three, but all 22 c
   are loaded from `<script src="https://...">` tags at the top of each file — an internet
   connection is required even when running locally.
 - Firestore project credentials live in `firebase-config.js` (shared by every check sheet).
-  There is no local emulator config (`firebase.json` doesn't exist) — writes go to the real
-  `pomi-checksheet-e7` project.
+  There is no local emulator config — writes go to the real `pomi-checksheet-e7` project.
+  `firebase.json` + `.firebaserc` DO now exist, but only to deploy **Firestore Security
+  Rules** (`firebase deploy --only firestore:rules`) — no Hosting, Functions, or emulator
+  config. The rules themselves live in `firestore.rules` (that file is the source of truth;
+  Console and CLI both deploy from it). See `SECURITY.md` for the hardening roadmap and the
+  collection inventory the rules must stay in sync with.
 - There is no linter or test command. Verify JS changes with `node --check` on the extracted
   inline `<script>` body before considering an edit done, since a syntax error inside one
   `<script>` block silently kills every function defined after it on that page.
@@ -152,6 +156,61 @@ This is the part most likely to regress if a check sheet is edited without check
   there was nothing further downstream to unblock). The OL box's own visibility is still not
   restored, same reasoning as above — the `special:'ol'` marker's correct home in `CHECKS` is
   still ambiguous.
+
+**`LV_Motor_MCC.html`'s OL box — Contactor Size 5 + manual heater-range entry.** The bundled
+`OL_HEATERS` table (Cutler-Hammer/Westinghouse Type W part-number heater table, C-/F-series
+codes) only covers **NEMA Contactor Sizes 0–4** — same in `HV_Motor_SWGR.html` and
+`4000_Hours_Mill_PM.html`. A user flagged that a Size 5 MCC starter (e.g. the ~250 A rating-plug
+motors like `7BF-FAN-620A`) had no button. Fix in `LV_Motor_MCC.html` only: the size row is now
+`[0,1,2,3,4,5]`, `getHeaterRow()`'s `labels` map gained `5:['Size 5']`, and `refreshOLTable()`
+falls back to a **manual-entry row** (Heater Code + Std Min/Max + Amb Comp Min/Max, 5 `input.ol-m`
+fields backed by a module-level `olManual` object) whenever the bundled table has no row for the
+chosen `(code, size)` — which is always the case for Size 5, and also covers a motor whose real
+OL code isn't listed at the size picked. `olManual` round-trips through the draft (`_olManual`),
+is reset by `selectTag()` / `resetForm()`, and is folded into `base.olData` (adds `manualEntry`,
+`heaterCodeUsed`, `stdMin/stdMax/ambMin/ambMax`) plus a new `base.sheets.sOL` sheet so the
+dashboard and PDF show the resolved ranges regardless of auto-vs-manual. The PDF's OVERLOAD
+HEATER DATA table reads from `olManual` when `!hlRow` and appends " — manual entry" to its
+header. No Size 5 heater data was fabricated — the technician keys it from the actual OL relay /
+manufacturer sheet. `HV_Motor_SWGR.html` / `4000_Hours_Mill_PM.html` were left as-is (Sizes 0–4);
+port the same three-part change there if a Size 5 case comes up for them too.
+
+**`LV_Motor_MCC.html` — manual motor entry when the plant tag isn't in `MCC_MOTORS`.** Before
+this, `tag-desc`/`m-v`/`m-a`/`m-pwr`/`m-rpm`/`m-sf`/`location`/`compartment` were all `readonly`
+(only ever written by `selectTag()` on a real match) and the OL box's `ol-code`/`ol-plug`/
+`ol-setting` were plain `<span>`s with no input at all — a motor missing from the bundled master
+list had no way to get a real submission beyond the free-typed Plant Tag No. itself. Fix: a
+**"✏️ Motor Tidak Ada di List" toggle** (`toggleManualMotor()` / `setManualMode(on)`) next to the
+tag search that unlocks those `readonly` fields for direct typing AND flips the three OL spans to
+`contentEditable` — chosen specifically because a `<span contenteditable>` keeps `.textContent`
+working exactly as every existing read/write site (`selectTag()`, `refreshOLTable()`,
+`submitToDb()`, `generatePDF()`) already expects, so none of them needed touching. Selecting a
+real motor from the dropdown (`selectTag()` finding a match) always force-exits manual mode
+first, re-locking everything — picking from the list is never ambiguous with manual entry.
+`resetForm()` also exits it. The dropdown's empty state ("no results") now points at the button.
+- **Draft round-trip needed explicit handling for the OL spans specifically** — `saveDraft()`'s
+  generic sweep is `querySelectorAll('input,select,textarea')`, which does not match a `<span>`,
+  so a manually-typed OL code/plug/setting would otherwise vanish on reload even though the
+  `<input>` fields (readonly doesn't block a programmatic `.value=`) survive that sweep fine.
+  `_manualMotor` + a `_olSpans:{code,plug,setting}` triple are saved explicitly; `loadDraft()`
+  calls `setManualMode(true)` (unlocking + restoring the spans) **before** the generic sweep runs,
+  same "unlock first" ordering the Size 5 `olManual` restore already established.
+- **Load & Merge's `assetTag` scoping got a real bug fix riding along with this**: the "📥 Muat /
+  Lanjutkan dari Database" button called `LoadMergeModal.open()` directly, so it only ever used
+  whatever tag `LoadMergeModal.init()` was last called with (page load, or the last real
+  `selectTag()` pick) — a manually-typed tag (which never calls `selectTag()`) left the modal
+  scoped to a stale tag. Wrapped in `openLoadMergeModal()`, which re-`init()`s with
+  `tag-search`'s live value before opening — the same multi-asset re-init pattern CLAUDE.md
+  already requires inside `submitToDb()` for this file, just missing from this one other call site.
+- `base.motorManualEntry` (top-level flag) + a trailing **"Data Source"** row in
+  `base.sheets.sMotor` (`'Manual entry (tag not in MCC master list)'` vs `'MCC master list'`) so
+  the dashboard can tell which submissions used which path. PDF's `BASIC MOTOR DATA` header gets
+  the same `— manual entry (tag not in MCC list)` suffix the OL section already used for Size 5.
+  Verified via headless Chrome: fields locked/unlocked correctly on toggle, manual values
+  (including the OL spans) entered and preserved across a real page reload, picking a real motor
+  afterward correctly force-exits manual mode and re-locks, a mocked `submitToDb()` shows
+  `motorManualEntry:true` + the correct `sMotor` Data Source row, and a real PDF renders both the
+  manual Basic Motor Data and Overload Heater Data sections with the typed values.
 
 ## Submit Guard: `submit-guard.js` — insert-vs-overwrite prompt + real upload progress bar
 
@@ -1247,22 +1306,33 @@ the current design — **do not "simplify" these away**:
   Share). Every file the script creates *inside* that folder tree inherits the same link-access
   permission automatically, because Drive's permission model is folder-hierarchy-inherited
   regardless of whether the file was created via the UI or the API. This is documented as step
-  1b in `drive-proxy.gs`'s own header comment — don't skip it, a freshly (re)deployed proxy
-  with an unshared root folder will upload files successfully but nothing will be able to
-  *view* them.
+  1b in `drive-proxy.gs`'s own header comment.
+  **LEVEL 1 SECURITY UPDATE (2026-09) — this "share the folder publicly" step is now
+  REVERSED.** Downloads flow through `doGet()`, which reads each file as the script owner
+  ("Execute as: Me"), so public folder sharing was never actually needed for the app to
+  display photos/PDFs — it only made every uploaded evidence photo and report world-readable
+  by URL (and `checksheets` being world-readable means the file ids are discoverable too).
+  The folder should be set back to **"Restricted"**. `drive-proxy.gs` also gained an optional
+  `SHARED_SECRET` (paired with `storage-helper.js`'s `DRIVE_PROXY_TOKEN`), inert while both
+  are `''`. See `SECURITY.md` step 4 for both changes and the rollout order.
 
 ### Firestore setup this system needs (Console-side, not in this repo)
 
-- **Security rules must explicitly allow the `approvals` collection.** This project's
-  Firestore rules are collection-allowlisted (`match /checksheets/{doc} { allow read, write: if
-  true; }` etc., all under one fully-open trust model — no real per-request auth exists
-  anywhere in this app, consistent with the public API key already committed in
-  `firebase-config.js`), so a brand-new collection with no matching `match` block is
-  **denied by default**, not allowed by default. Confirmed the hard way: a real submit through
-  `PLTS_AshDisposal_PM.html` saved the checksheet doc and attached photo/PDF URLs to it fine
-  (both hit the already-allowed `checksheets` collection), but `Approvals.create()` threw
-  `Missing or insufficient permissions` because the `approvals` collection had no rule yet. Add
-  `match /approvals/{doc} { allow read, write: if true; }` alongside the existing blocks.
+- **Security rules must explicitly allow each collection.** The rules are
+  collection-allowlisted — a brand-new collection with no matching `match` block is
+  **denied by default**, not allowed by default. As of the Level 1 hardening (2026-09) the
+  rules live in **`firestore.rules`** in this repo (deploy: `firebase deploy --only
+  firestore:rules`, or paste into the Console). They are no longer a flat `allow read,
+  write: if true` per collection — each collection now splits create/update/delete and
+  validates a few invariants (no admin self-registration, role frozen on user updates,
+  `createdAt` frozen on a checksheet overwrite, drafts must be `status:'draft'`,
+  `dashboard_config` read-only). There is still **no per-request auth** (reads and deletes
+  stay open — that needs Firebase Authentication, "Level 2" in `SECURITY.md`). **When you
+  add a new collection, add a `match` block to `firestore.rules` AND a row to `SECURITY.md`'s
+  inventory table**, then redeploy the rules — otherwise the first write throws
+  `Missing or insufficient permissions` (this is how the `approvals` collection was missed
+  originally: a real submit through `PLTS_AshDisposal_PM.html` saved the checksheet doc fine
+  but `Approvals.create()` threw because `approvals` had no rule yet).
 - **A composite index is needed for `Approvals.getByChecksheetId()`** (`where('checksheetId',
   '==', ...).orderBy('createdAt', 'desc')` — a compound query needing a composite index in
   Firestore, unlike a single-field `orderBy` alone, which is auto-indexed). Firestore's own
@@ -1301,6 +1371,19 @@ the current design — **do not "simplify" these away**:
   URL `drive-proxy.gs` is actually deployed at (ends in `/exec`); if it still contains the
   literal string `PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE`, every upload throws a clear error
   telling you so rather than failing silently or hitting a dead URL.
+  **Reliability (2026-09-14): every Drive-proxy call now retries automatically.** User report —
+  "download/upload sering gagal" on `Review_Approval_Dashboard.html` — traced to the actual root
+  cause: `uploadToDrive()` and `fetchMeta()` were a single bare `fetch()`/XHR with no retry and no
+  timeout, so one transient Apps Script hiccup (a free-tier cold start, a momentary quota error, a
+  flaky mobile connection dropping mid-request) failed the whole operation outright, and a hung
+  request left the progress bar stuck forever with nothing to retry. Both are now wrapped in
+  `withStorageRetry()` (3 attempts, exponential backoff + jitter, ~0.9s/1.8s/3.6s) and a 45s
+  `AbortController`/`xhr.timeout` hard timeout; a `{phase:'retry',attempt,max,error}` event flows
+  through the existing `onProgress` callback so a caller's UI can show "mencoba lagi" instead of
+  looking frozen — both dashboards' `updateFileProgress()` handle it. `uploadDataUrl`/`uploadBlob`
+  gained an optional 4th `onProgress` param for this (backward compatible — every existing 3-arg
+  call site is untouched). A config error (blank `DRIVE_PROXY_URL`) is marked `.noRetry` so it
+  fails fast instead of retrying something a retry can never fix.
 - **`approval-helper.js`** (`window.Approvals`) — the `approvals` Firestore collection, kept
   **deliberately separate** from `checksheets` (never a field bolted onto a checksheet doc) so
   the append-only `checksheets` collection that `dashboard.html`'s trend charts/dedupe/exports
@@ -1318,6 +1401,17 @@ the current design — **do not "simplify" these away**:
   `revisionOf`) — `photos: null` and `pdfBuilder: null` are both valid for a sheet with no
   photo feature / no jsPDF export (e.g. `Hoist_Inspection_Maintenance.html`, which only has
   `window.print()`).
+  **Reliability (2026-09-14): one failed photo no longer discards the whole submission.** Before
+  this, the per-photo upload loop and the PDF upload were inside ONE try block — a single failed
+  `Storage.uploadDataUrl()` (rare now that storage-helper.js retries internally, but still
+  possible offline) threw out of the whole function, which skipped `DB.attachFiles()` AND skipped
+  creating/updating the `approvals` record entirely. That meant one bad photo in a 10-photo batch
+  didn't just lose that one photo — the submission never even entered the review queue, with no
+  indication why. Each photo (and the PDF) is now upload-attempted in its own try/catch; whatever
+  succeeds is still attached, the approval record is still written, and `ok` is `false` only when
+  something genuinely failed — `failedItems` (logged) names exactly what didn't make it, so a
+  caller's "checklist tersimpan, file gagal" message stays accurate instead of overstating the
+  failure.
   **Submitter-role auto-advance (applies to every check sheet automatically — no per-file
   code):** `submitWithFiles()` reads `window.AuthSession.get()` at submit time. When the
   logged-in submitter's `role` is `techop2` (level 2), the TechOp2 review step is skipped —
@@ -1686,6 +1780,17 @@ This was an explicit user request; the design decisions were confirmed up front:
   `checkedBy`). `dashboard.html`'s technician-scope filter matches `checkedBy` **OR**
   `uploadedBy` **OR** `uploadedByUsername` so the uploader can track approval status there;
   both detail views show a "Diinput oleh" row when `uploadedBy` is set.
+  **Reliability (2026-09-14): retrying a failed Manual Upload no longer creates a duplicate
+  checksheet.** `submitManualUpload()` called `DB.save()` unconditionally every time — so if
+  `Approvals.submitWithFiles()` failed after that (a flaky upload) and the user clicked "Submit"
+  again (the obvious, expected reaction to an error), a SECOND `checksheets` doc was created with
+  no `approvals` record ever pointing at the first one — an orphaned checksheet doc nothing in
+  this app cleans up automatically (unlike an orphaned *approval*, see
+  `cleanupDuplicateApprovals()` above). Fixed with a module-level `_muInFlightId`: the first
+  attempt's doc id is remembered across a failure and reused via `DB.update(id, base)` on retry
+  instead of `DB.save()`-ing a new one; cleared only on full success (or when the modal is
+  reopened fresh). The error message now tells the user this explicitly ("tekan Submit lagi...
+  tidak akan dobel") instead of leaving them to guess whether retrying is safe.
 - **External feeds** (`EXTERNAL_SUBMITTER_SCOPE`): other POMI mini-apps post into the same
   `checksheets`/`approvals` collections via `Approvals.submitWithFiles()` but can't hold
   `dashboard_users` accounts, so they send a **fixed synthetic `submittedBy` per plant area**
@@ -2105,7 +2210,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260906a`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20260914a`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a
@@ -2156,6 +2261,32 @@ all pages, mobile-safe) first; `SubmitGuard.resolveSubmitTarget(wo, pdfBuilder)`
   `_installed` (not `_realSave`) is the "hook already applied" guard now.
 - Verified headless (CDP `Browser.setDownloadBehavior` + `downloadWillBegin`/`downloadProgress`):
   clicking "Unduh PDF" writes a valid multi-page `MCA_*.pdf` to disk.
+
+## `table-nav.js` — keyboard arrow-key navigation for table form fields
+
+Self-installing, zero-config (`<script src="table-nav.js">` — `../table-nav.js` in a subfolder —
+after `photo-kit.js`, no `init()` call). One document-level capture-phase `keydown` listener that
+moves focus between `<input>`/`<textarea>`/`<select>` fields inside any `<table>` cell, so a
+technician filling a wide measurement matrix (megger 13×15, resistance, RTD, per-breaker `value`
+rows, etc.) never has to Tab through dozens of cells or reach for the mouse. **Every active
+portal check sheet has it** as of 2026-09-08 (all 3 template families + the ~26 standalone
+sheets); the 3 legacy dups (`esp_checksheet.html`, `4000 Hours Mill/*.html`) are skipped like
+every other shared lib. A brand-new check sheet just needs the one `<script>` tag.
+
+- **ArrowUp/Down** → same visual column (colSpan-aware), previous/next row, skipping rows with no
+  editable field (sub-header dividers, pure-toggle matrix rows). Native on a `<select>` (arrows
+  change the option there).
+- **ArrowLeft/Right** → previous/next editable field in the row; for a text field it only
+  navigates once the caret is at the very start/end, so in-cell editing is unaffected. Wraps to
+  the adjacent row at a row edge.
+- **Enter / Shift+Enter** → ArrowDown / ArrowUp (not for `<textarea>`/`<select>`). These sheets
+  have no `<form>`, so Enter had no prior behavior to clash with.
+- Readonly (`.mi.ro` PI/DAR), disabled, hidden, `type=file/checkbox/radio/button` fields are all
+  skipped; navigation never leaves the current `<table>`. Landing on a text field selects its
+  contents (Excel-style overwrite-on-type). Ctrl/Alt/Meta+arrow are left untouched.
+- Works on dynamically-rendered tables (delegated listener, no per-table wiring) — verified
+  headless across the SWGR megger grid, `Motor_Witness_Test_Vendor.html`,
+  `Transformer_AT_NoDGA_Weekly.html`, and `4000_Hours_Mill_PM.html` with zero console errors.
 
 ## Technician login on check sheets — auto-filling "Checked By" (`technician-auth.js`)
 
@@ -2859,6 +2990,105 @@ Drive writes against a fail-loud mock) plus the same syntax/config/render/PDF ch
 no full mocked submit) for `STRC1_Main` and `STRC1_Luffing_RailClamp` when each was added. Portal:
 **`strc`** category ("Stacker / Reclaimer"), 12 cards, `href`s
 `Stacker%20Reclaimer/<file>.html`.
+
+## `HV_Motor_Spare_Warehouse_6M.html` — 6-monthly PM of an HV spare motor at the warehouse
+
+Ported from **`google-apps-script/Checksheet mentah/Copy of 6M - HV Motor Spare at warehouse.xls`
+tab `Spare (2)`** — the *corrected* layout. The first build used the old `Spare` tab's 3-motor
+matrix; the user flagged that as wrong ("ADA KESALAHAN, BUAT CHECK SHEETNYA SEPERTI SHEET SPARE
+(2)"). `Spare (2)` is **one spare motor per submission** (single `Result / Remark` column headed
+"SPARE" with an editable "MOTOR TAG"), and its 5.3 is a full IR time-series, not a 2-point grid.
+The Basic Motor Data block was added on the same request from **`Motor_HV MOTOR-6M.xls` tab
+`6M_HV_Motor`** (its "BASIC MOTOR DATA" section). `pvr` / `CRSH` / `Sheet3` / `Sheet1` tabs in the
+workbook are still deliberately unused.
+
+- **Single-page, single motor.** Repo-root file, portal category `motor`. `assetTag` = the
+  **entered Motor Tag** (`currentTag()`), falling back to `HV-MOTOR-SPARE-WHS` when blank — this is
+  a multi-asset sheet per CLAUDE.md's rule, so `SubmitGuard.init` / `LoadMergeModal.init` are
+  re-called with `currentTag()` inside `submitToDb()` / `openLoadMerge()`, and `CloudDraft.init`
+  gets `assetTag:()=>currentTag()` (getter). "Tarik Data Terakhir" is a manual button
+  (`pullLast()`), plus a one-shot auto-load on page load when a tag is already present.
+- **Basic Motor Data** panel: Motor Tag + Tag Description + `MD_FIELDS` (Serial No., Storage/ST
+  No., Rated Voltage, Rated Power HP + kW, FLA, Speed, Hz, Service Factor, Insulation Class,
+  Mounting `<select>` Horizontal/Vertical, Frame Size, Manufacture, Poles). Saved to
+  `base.motorData` (flat map) AND `base.sheets.motordata`.
+- **5.0 Instruction Details** — items 5.1–5.7 verbatim from `Spare (2)`, one `Result / Remark`
+  column. `CHECKS[].kind`: `tog` (5.1/5.2/5.4/5.5/5.6 = OK/NG toggle + remark), `htr` (5.7 = Ω
+  input), `ir` (5.3). **5.3 block**: `IR_PAIRS` = T1-T2 / T2-T3 / T3-T1 (MΩ each), then a
+  `T1/T2/T3 – GROUND` divider, then `IR_TIMES` = 15 sec / 30 sec / 45 sec / 1..10 min (13 MΩ
+  inputs), then **DAR** (`R(1min)/R(30sec)`, > 1.25) and **PI** (`R(10min)/R(1min)`, > 2.0), both
+  read-only and auto-computed by `recalcDARPI()` on every `.ir-g` input, then two more rows —
+  **Ambient Temperature (°C)** (`ir-temp`) and **Relative Humidity (%)** (`ir-rh`) — recorded at
+  time of test (IEEE 43 practice: IR is temperature-dependent, so the reading is meaningless
+  without the ambient condition alongside it). Added on user request together with the trend
+  chart below; not part of the source `Spare (2)` sheet, but placed inside the same 5.3 block
+  since both belong to "conditions at the moment of this specific IR test", not the visit-level
+  Environmental fields elsewhere in this codebase's other check sheets.
+- **5.3 trend chart** — a dedicated panel right after the 5.0 table, `drawIRChart(canvas)` (hand-
+  rolled `<canvas>` line chart, repo convention — no Chart.js), plotting the 13 `IR_TIMES` MΩ
+  readings against their 15 sec .. 10 min labels. Redrawn on every `.ir-g` input (called from
+  inside `recalcDARPI()`, so it also refreshes after Load & Merge / "Tarik Data Terakhir" /
+  draft-restore, all of which already call `recalcDARPI()`) and once explicitly at page init
+  (`loadDraft()` returns early with no chart draw when there's no saved draft, since it has
+  nothing to restore). `generatePDF()` takes an optional `canvas` param and, right after the 5.0
+  table, redraws it fresh into an offscreen 1100×300 canvas before embedding — same "never trust
+  a canvas last drawn on a different input than the current one" rule as the solo-run charts.
+- **PDF = portrait A4, shared `WAR_BG_URI` letterhead**, `willDrawPage:()=>ensureBg()`, autoTable;
+  single `Result / Remark` column mirrors the on-screen table exactly. `Sx()` sanitises Ω→`ohm`,
+  dashes, `·`, `µ`, emoji before every `pdf.text()` / cell (jsPDF Times renders Ω as `©`) — PDF
+  layer only, `base.sheets` keeps real Unicode. `TOP_START=28, BOTTOM_LIMIT=264`.
+- Standard stack: technician-auth on `checked-by`, delegated-listener autosave (`hvspare6m_draft`
+  + `hvspare6m_draft_photos`), PhotoKit flat `PHOTOS` (`{main:PHOTOS}`), Load & Merge + CloudDraft,
+  submit-guard, `Approvals.submitWithFiles`, `restorePhotosFromUrls` (flat).
+  `base.sheets = { motordata, s5 }` via `buildMotorDataSheet()` / `buildInstructionSheet()` (shared
+  by submit + PDF). Verified via headless Chrome: 26+2 matrix rows (incl. the temp/RH rows) / 5
+  toggles / 3 phase-pair + 13 time-series IR inputs / 14 motor-data fields, DAR-PI auto-calc
+  (2400/1800=1.33, 5600/2400=2.33), the chart canvas confirmed non-blank after typing (pixel-data
+  sample), a fail-loud mocked `submitToDb()` (DB.save with the motor tag as assetTag,
+  `motordata`+`s5` sheets, submitWithFiles + pdfBuilder all fire, zero real writes), and a real
+  3-page PDF rendered + visually checked (letterhead every page, the IR trend chart embedded and
+  legible with its own section header, no `©`/garbage glyphs).
+
+## `Motor_Solo_Run_Test.html` — pre-commissioning solo-run verification
+
+Repo-standard rebuild of a user-supplied standalone file (`checksheet_solo_run_motor rev
+final.html`, since deleted) that had its own paper/steel theme, an inlined ~200 KB Chart.js, and
+`window.print()` as its only "export". Rebuilt to match every other check sheet: navy topbar/hero
+theme, full shared stack (technician-auth on `checked-by`, delegated-listener autosave
+`solorun_draft` + `solorun_photos`, Load & Merge + CloudDraft, submit-guard, `Approvals.
+submitWithFiles`, table-nav, pdf-preview), and a portrait-A4 jsPDF export on the shared
+`WAR_BG_URI` letterhead whose sections/tables mirror the on-screen form 1:1.
+
+- **Single motor per submission**, `assetTag` = the entered Motor Tag (`currentTag()`, fallback
+  `MOTOR-SOLO-RUN`) — multi-asset pattern, so `SubmitGuard.init` / `LoadMergeModal.init` are
+  re-called with `currentTag()` inside `submitToDb()` / `openLoadMerge()`, `CloudDraft.init` gets
+  `assetTag:()=>currentTag()`, plus a manual "📥 Tarik Data Terakhir" button + one-shot auto-load.
+- **Sections**: Work Order · Motor Data · Housing Bearing Inspection (DE + NDE: 3 identity fields
+  + a single-slot PhotoKit diagram + a 4-point × upper/mid/lower table each) · Pre-Test
+  Measurements (winding R motor-only + after-terminal, IR motor-only + with-cable, protection &
+  rotation incl. an OK/NG rotation toggle, vibration 6-axis, environmental, pre-test photos) ·
+  Solo Run Test (dynamic time-log table, `SR_COLS` — DE/NDE/Shaft/Housing × Thermal+Infrared,
+  Current IR/IS/IT) · Trend Charts · Photo Documentation · Acceptance Criteria (collapsed static
+  reference) · Findings.
+- **Charts are hand-rolled** (`drawChart()` on `<canvas>` — repo convention, NOT Chart.js), 2
+  series each (solid = Thermal Imager, dashed = Infrared), live-redrawn (debounced) on any
+  `#tbl-sr` input and on row add/remove. `generatePDF()` redraws each into a fresh 1000×260
+  offscreen canvas and embeds it via `toDataURL('image/png')`.
+- **Photos**: `PHOTOS` is a `{hb_de, hb_nde, pretest, general}` dict — `hb_de`/`hb_nde` are
+  single-slot (diagram), the other two are free galleries. Passed straight to
+  `Approvals.submitWithFiles({photos: PHOTOS})` and `CloudDraft.init({photos:()=>PHOTOS})`;
+  `restorePhotosFromUrls()` routes an unknown group into `general`.
+- **Solo-run rows** are keyed `sr-<seq>-<col>`; `loadDraft()` pre-creates enough rows (from
+  `_srN` + the max `sr-N-` index seen in the draft) before the generic id-sweep fills them —
+  same RTD-row-precreate technique used elsewhere. Always keeps ≥1 row.
+- `base.sheets` = 13 keys via `buildAllSheets()` (`motordata`, `hb_de`/`hb_de_m`/`hb_nde`/
+  `hb_nde_m`, `wres_motor`/`wres_term`/`ir_motor`/`ir_cable`, `protection`, `vibration`,
+  `environ`, `solorun`), shared by submit + PDF. `Sx()` sanitises Ω/dashes/µ/° for the PDF layer
+  only. Verified headless: 2 housing blocks / 12 DE inputs / 3-3-4-4 meas rows / 1 solo row on
+  load; a fail-loud mocked `submitToDb()` (DB.save with the tag, 13 sheets, photos keys
+  hb_de/hb_nde/pretest/general, pdfBuilder → 5-page PDF, zero real writes); real 5-page PDF
+  rendered + visually checked (letterhead every page, charts embedded, no garbage glyphs);
+  portal card added under `motor` (count 55→56).
 
 ## Per-file conventions worth matching
 

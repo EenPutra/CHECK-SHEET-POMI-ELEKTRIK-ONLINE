@@ -207,6 +207,18 @@ const Approvals = {
   // any part failed (logged to console) — the checksheet doc itself was
   // ALREADY saved by the caller before this runs, so a false return here
   // must never be treated as "the whole submission failed."
+  //
+  // Resilience note: a single failed photo (or the PDF) no longer aborts
+  // everything else in this call. Before this, one flaky upload in the
+  // middle of a 10-photo loop threw out of the whole try block — which
+  // skipped attachFiles() AND skipped creating/updating the approvals
+  // record, so a submission with one bad photo silently never even entered
+  // the review queue (not just "missing a photo", the whole workflow entry
+  // never existed). Now each photo/the PDF is upload-attempted independently
+  // (storage-helper.js itself already retries transient failures with
+  // backoff before giving up); whatever succeeds is still attached and the
+  // approval record is still written, `ok` is false only when something
+  // actually failed, and `failedItems` names exactly what to re-upload.
   async submitWithFiles(checksheetId, opts = {}) {
     const { photos, pdfBuilder, assetTag, assetName, checksheetFile, submittedBy, revisionOf, existingApprovalId, onProgress, src } = opts;
     let { team, area } = opts;
@@ -242,6 +254,7 @@ const Approvals = {
         }
       }
     } catch (e) { /* session lookup is best-effort */ }
+    const failedItems = [];
     try {
       const photoUrls = {};
       const groups = Object.keys(photos || {});
@@ -289,39 +302,58 @@ const Approvals = {
             continue;
           }
           if (!p.src) continue;
-          const url = (p.__cdUrl && p.__cdSig === (String(p.src).length + '~' + String(p.src).slice(0, 24) + String(p.src).slice(-24)))
-            ? p.__cdUrl
-            : await Storage.uploadDataUrl(
-                `checksheets/${checksheetId}/photos/${key}-${i}.jpg`, p.src, 'image/jpeg'
-              );
-          // w/h/widthCm/heightCm ride along so a later restore (revision
-          // banner / Load & Merge — see load-merge-modal.js's
-          // restorePhotosFromUrls hook) can recreate the exact same PhotoKit
-          // entry shape, not just the picture. Per CLAUDE.md's "Photos"
-          // section: without these, a restored photo falls back to
-          // PhotoKit's default box instead of the crop the technician
-          // actually chose. Harmless if the source entry doesn't have them
-          // (older photos, or a sheet not using PhotoKit) — just omitted.
-          urls.push({
-            url, caption: p.caption || '',
-            ...(p.w != null ? { w: p.w } : {}),
-            ...(p.h != null ? { h: p.h } : {}),
-            ...(p.widthCm != null ? { widthCm: p.widthCm } : {}),
-            ...(p.heightCm != null ? { heightCm: p.heightCm } : {}),
-          });
-          uploadedPhotos++;
-          if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Mengunggah foto ${uploadedPhotos}/${totalPhotos}...`);
+          // Each photo is attempted independently — storage-helper.js already
+          // retries a transient network/Apps Script failure internally with
+          // backoff, so by the time an error reaches HERE it's a real,
+          // non-transient failure (bad data, quota exhausted, offline). One
+          // such photo must not cost every OTHER already-uploaded photo (or
+          // the PDF, or the approval record itself) — see the resilience note
+          // above submitWithFiles.
+          try {
+            const url = (p.__cdUrl && p.__cdSig === (String(p.src).length + '~' + String(p.src).slice(0, 24) + String(p.src).slice(-24)))
+              ? p.__cdUrl
+              : await Storage.uploadDataUrl(
+                  `checksheets/${checksheetId}/photos/${key}-${i}.jpg`, p.src, 'image/jpeg',
+                  info => { if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Foto ${key} #${i + 1}: koneksi bermasalah, mencoba lagi (${info.attempt}/${info.max})...`); }
+                );
+            // w/h/widthCm/heightCm ride along so a later restore (revision
+            // banner / Load & Merge — see load-merge-modal.js's
+            // restorePhotosFromUrls hook) can recreate the exact same PhotoKit
+            // entry shape, not just the picture. Per CLAUDE.md's "Photos"
+            // section: without these, a restored photo falls back to
+            // PhotoKit's default box instead of the crop the technician
+            // actually chose. Harmless if the source entry doesn't have them
+            // (older photos, or a sheet not using PhotoKit) — just omitted.
+            urls.push({
+              url, caption: p.caption || '',
+              ...(p.w != null ? { w: p.w } : {}),
+              ...(p.h != null ? { h: p.h } : {}),
+              ...(p.widthCm != null ? { widthCm: p.widthCm } : {}),
+              ...(p.heightCm != null ? { heightCm: p.heightCm } : {}),
+            });
+            uploadedPhotos++;
+            if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Mengunggah foto ${uploadedPhotos}/${totalPhotos}...`);
+          } catch (photoErr) {
+            console.error(`Approvals.submitWithFiles: gagal upload foto ${key}#${i}:`, photoErr);
+            failedItems.push(`Foto ${key} #${i + 1}`);
+          }
         }
         if (urls.length) photoUrls[key] = urls;
       }
 
       let pdfUrl = null;
       if (typeof pdfBuilder === 'function') {
-        report(72, 'Membuat PDF arsip...');
-        const pdf = await pdfBuilder();
-        const blob = pdf.output('blob');
-        report(80, 'Mengunggah PDF...');
-        pdfUrl = await Storage.uploadBlob(`checksheets/${checksheetId}/original.pdf`, blob, 'application/pdf');
+        try {
+          report(72, 'Membuat PDF arsip...');
+          const pdf = await pdfBuilder();
+          const blob = pdf.output('blob');
+          report(80, 'Mengunggah PDF...');
+          pdfUrl = await Storage.uploadBlob(`checksheets/${checksheetId}/original.pdf`, blob, 'application/pdf',
+            info => report(80, `PDF arsip: koneksi bermasalah, mencoba lagi (${info.attempt}/${info.max})...`));
+        } catch (pdfErr) {
+          console.error('Approvals.submitWithFiles: gagal upload PDF arsip:', pdfErr);
+          failedItems.push('PDF arsip');
+        }
       }
 
       if (Object.keys(photoUrls).length || pdfUrl) {
@@ -367,7 +399,13 @@ const Approvals = {
       } else {
         await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf, team, area, src, autoReview });
       }
-      report(100, 'Selesai');
+      if (failedItems.length) {
+        ok = false;
+        console.warn('Approvals.submitWithFiles: selesai dengan file gagal diupload:', failedItems);
+        report(100, `Selesai — ${failedItems.length} file gagal diupload (${failedItems.join(', ')})`);
+      } else {
+        report(100, 'Selesai');
+      }
     } catch (e) {
       ok = false;
       console.error('Approvals.submitWithFiles gagal:', e);

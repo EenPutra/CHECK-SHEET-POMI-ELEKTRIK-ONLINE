@@ -1,0 +1,138 @@
+rules_version = '2';
+
+// ============================================================
+//  Firestore Security Rules — project pomi-checksheet-e7
+//
+//  SOURCE OF TRUTH: this file. Deploy with either
+//    firebase deploy --only firestore:rules
+//  or copy-paste into Firebase Console -> Firestore Database ->
+//  Rules -> Publish. See SECURITY.md for the full rollout + test
+//  checklist.
+//
+//  ---------------------------------------------------------------
+//  LEVEL 1 HARDENING (2026-09)
+//  This app currently has NO per-request authentication (no Firebase
+//  Authentication yet — that is "Level 2" in SECURITY.md). Firestore
+//  rules therefore CANNOT check WHO is making a write, only the SHAPE
+//  and a few invariants of the data. What Level 1 rules still buy us:
+//    - per-collection allow-list (an unknown collection is denied)
+//    - dashboard_config is read-only to clients
+//    - a self-registered account can never grant itself role 'admin'
+//    - a profile/password/signature update can never change an
+//      account's role (no privilege escalation via Settings)
+//    - a checksheet "overwrite" can never rewrite createdAt (keeps
+//      dedupe / trend charts / sort order honest)
+//    - drafts must actually look like drafts
+//  What Level 1 rules DO NOT buy us (needs Level 2 / Firebase Auth):
+//    - stopping an anonymous client from reading all data
+//    - stopping deletes (dedupe / admin purge / owner-retract all run
+//      client-side today with no way to prove a role)
+//    - hiding password hashes on read (login reads the user doc and
+//      compares the hash in the browser)
+//  The real Level 1 perimeter is Cloudflare Access (SSO gate in front
+//  of the whole site) + Firebase App Check. See SECURITY.md.
+// ============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers ----
+    function isString(v) { return v is string; }
+
+    function roleUnchanged() {
+      return (('role' in resource.data) == ('role' in request.resource.data))
+        && (!('role' in request.resource.data)
+            || request.resource.data.role == resource.data.role);
+    }
+
+    // ---------------------------------------------------------
+    //  checksheets — append-only PM submission store.
+    //   create : DB.save() from every check sheet + manual upload
+    //   update : DB.update() overwrite-same-visit + DB.attachFiles()
+    //            (merge photoUrls/pdfUrl)
+    //   delete : still open — dedupe / admin purge / owner-retract
+    //            run in the browser with no role proof. Closes at L2.
+    // ---------------------------------------------------------
+    match /checksheets/{doc} {
+      allow read: if true;
+      // create left open: an external POMI mini-app feed (PM Unit 7, etc.)
+      // also writes here and we can't test its exact payload. The invariant
+      // worth enforcing is on UPDATE — an "overwrite same visit" must never
+      // rewrite createdAt (dedupe / trend charts / sort order depend on it).
+      allow create: if true;
+      allow update: if !('createdAt' in resource.data)
+                    || request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if true;   // TODO(level-2): admin/owner only
+    }
+
+    // ---------------------------------------------------------
+    //  approvals — review/approval workflow state (mutated in place).
+    //   statuses: submitted -> reviewed -> approved
+    //             (or -> returned_to_technician -> revised)
+    // ---------------------------------------------------------
+    match /approvals/{doc} {
+      allow read: if true;
+      allow create: if isString(request.resource.data.checksheetId)
+                    && request.resource.data.status in ['submitted', 'reviewed'];
+      allow update: if request.resource.data.status in
+                    ['submitted', 'reviewed', 'approved', 'returned_to_technician', 'revised'];
+      allow delete: if true;   // TODO(level-2): admin/owner only
+    }
+
+    // ---------------------------------------------------------
+    //  checksheet_drafts — "Simpan ke Database (Lanjut Nanti)".
+    //  CloudDraft.save() always writes status:'draft'; deleted on
+    //  successful final submit or on Reset.
+    // ---------------------------------------------------------
+    match /checksheet_drafts/{doc} {
+      allow read: if true;
+      allow create, update: if request.resource.data.status == 'draft';
+      allow delete: if true;
+    }
+
+    // ---------------------------------------------------------
+    //  dashboard_users — login accounts (dashboards + technician-auth).
+    //  No Firebase Auth yet, so anyone can still create/read these;
+    //  the two invariants we CAN enforce:
+    //   - self-registration can pick technician / techop2 / supervisor
+    //     but NEVER admin (admin stays Console-provisioned)
+    //   - an update (profile / password / signature / team) can never
+    //     change the account's role
+    //  read stays open: login queries this collection and verifies the
+    //  password hash in the browser (removed entirely at Level 2).
+    // ---------------------------------------------------------
+    match /dashboard_users/{doc} {
+      allow read: if true;
+      allow create: if request.resource.data.role in ['technician', 'techop2', 'supervisor'];
+      allow update: if roleUnchanged();
+      allow delete: if false;   // accounts are only removed from the Console
+    }
+
+    // ---------------------------------------------------------
+    //  dashboard_config — e.g. dashboard_config/registration.code
+    //  (the elevated-role registration access code). App only ever
+    //  READS this; it is created/edited by an admin in the Console.
+    // ---------------------------------------------------------
+    match /dashboard_config/{doc} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // ---------------------------------------------------------
+    //  weekly_dashboard/{name} (+ /workOrders/{wo} subcollection) —
+    //  "Weekly Report Dashboard EIC7.html" manual cloud sync. Separate
+    //  mini-app, its own client-side password gate. Left permissive at
+    //  Level 1; revisit at Level 2 with the rest.
+    // ---------------------------------------------------------
+    match /weekly_dashboard/{name} {
+      allow read, write: if true;
+      match /workOrders/{wo} {
+        allow read, write: if true;
+      }
+    }
+
+    // No catch-all: any collection not matched above is DENIED. Add a
+    // new match block here (and to SECURITY.md's inventory) when a new
+    // collection is introduced.
+  }
+}
