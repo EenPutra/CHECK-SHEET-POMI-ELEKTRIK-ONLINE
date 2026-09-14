@@ -228,10 +228,34 @@ function doPost(e) {
 function getOrCreateFolder(subfolderPath) {
   let folder = DriveApp.getFolderById(ROOT_FOLDER_ID);
   if (!subfolderPath) return folder;
-  subfolderPath.split('/').filter(Boolean).forEach(name => {
-    const existing = folder.getFoldersByName(name);
-    folder = existing.hasNext() ? existing.next() : folder.createFolder(name);
-  });
+  // LOCKED (2026-09): several evidence photos for the SAME submission now
+  // upload CONCURRENTLY (approval-helper.js parallelizes the photo-upload
+  // loop up to 4 at a time) — all racing to resolve/create the exact same
+  // subfolder path (e.g. checksheets/<id>/photos) at once. Without a lock,
+  // each concurrent execution independently checks getFoldersByName()
+  // before any of them has finished creating it, so several see "doesn't
+  // exist" and each calls createFolder() — Drive allows multiple folders
+  // with the identical name under one parent (no uniqueness error), so
+  // this silently created several near-duplicate "photos" folders instead
+  // of throwing, scattering one submission's photos across them. This is
+  // very likely the real cause behind "koneksi bermasalah saat upload"
+  // reports right after concurrent uploads shipped — a lock-starved Drive
+  // operation under this race can surface to the client as a slow/failed
+  // request that then retries, not just a silently wrong folder.
+  // getScriptLock() serializes just this folder-resolution step (fast — a
+  // few hundred ms at most) across every concurrent execution of this
+  // script, so only the FIRST request racing for a given path actually
+  // creates it; the rest wait briefly, then find it already there.
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    subfolderPath.split('/').filter(Boolean).forEach(name => {
+      const existing = folder.getFoldersByName(name);
+      folder = existing.hasNext() ? existing.next() : folder.createFolder(name);
+    });
+  } finally {
+    lock.releaseLock();
+  }
   return folder;
 }
 

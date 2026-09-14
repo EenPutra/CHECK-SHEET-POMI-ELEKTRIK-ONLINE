@@ -1463,6 +1463,29 @@ the current design — **do not "simplify" these away**:
   slowness if each chunk naively re-reads the whole file; true byte-range reads are what actually
   make chunking cheap. Diagnose which of these three you're looking at (transient vs. hard ceiling
   vs. re-read cost) before reaching for the same fix that worked last time.
+  **Fourth follow-up (2026-09-14) — a NEW "koneksi bermasalah" report right after
+  approval-helper.js's photo-upload parallelization shipped (see that entry below), traced to a
+  concurrency bug this session's OWN concurrency fix introduced.** `getOrCreateFolder(subfolderPath)`
+  resolves/creates each path segment with a plain read-then-write: `getFoldersByName()` to check,
+  `createFolder()` only if not found — safe for one request at a time, but now up to 4 evidence
+  photos for the SAME submission upload concurrently, all resolving the exact same subfolder path
+  (`checksheets/<id>/photos`) at once. Several concurrent executions can all see "doesn't exist"
+  before any of them finishes creating it, and Drive allows multiple identically-named folders
+  under one parent (no uniqueness error) — so this silently created several duplicate "photos"
+  folders instead of throwing, scattering one submission's photos across them, and the
+  lock-starved contention on the shared Drive folder is a plausible surface for exactly the kind
+  of slow/erroring request that looks like "koneksi bermasalah" from the client. **Fixed with
+  `LockService.getScriptLock()`** wrapping just the folder-resolution loop (`waitLock(30000)` /
+  `releaseLock()` in a `finally`, so a mid-call error still releases it — no deadlock risk) —
+  serializes only that fast critical section across every concurrent execution of the script, not
+  the actual file upload itself, so the speed benefit of parallel uploads is barely affected.
+  Verified with a mocked `DriveApp`/`LockService`: a naive simulation of the OLD unlocked code
+  racing 4 concurrent "photos" folder resolutions produced 4 duplicate folders (reproducing the
+  bug exactly); the NEW locked `getOrCreateFolder()` run repeatedly for the same nested path
+  created each segment exactly once and reused it every time (1 "photos" folder, not 4), and a
+  forced mid-call DriveApp error still released the lock rather than leaving it stuck. **Same
+  manual redeploy requirement as every other `drive-proxy.gs` entry above** — paste this file into
+  script.google.com, Deploy -> Manage deployments -> New version.
 - **`approval-helper.js`** (`window.Approvals`) — the `approvals` Firestore collection, kept
   **deliberately separate** from `checksheets` (never a field bolted onto a checksheet doc) so
   the append-only `checksheets` collection that `dashboard.html`'s trend charts/dedupe/exports
