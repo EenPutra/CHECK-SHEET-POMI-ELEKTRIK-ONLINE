@@ -225,6 +225,7 @@ select.login-field:disabled{opacity:.55;cursor:not-allowed}
 
 /* STATUS LAPORAN TAB */
 .ms-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:20px}
+.ms-filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px}
 .ms-sc{background:var(--surf);border:1px solid var(--bdr);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow)}
 .ms-sc .n{font-family:var(--display);font-size:24px;font-weight:700;line-height:1}
 .ms-sc .l{font-size:11px;color:var(--txt-2);font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
@@ -612,6 +613,16 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
        review, with a Submit -> Review -> Approval timeline per report. -->
   <div id="mystatus-area" style="display:none">
     <div class="ms-summary" id="ms-summary"></div>
+    <div class="ms-filters">
+      <input type="text" class="filter-sel" id="ms-search" placeholder="Cari nama / tag / PIC / WO…" oninput="renderMyStatus()" style="min-width:190px;flex:1">
+      <select class="filter-sel" id="ms-date-mode" onchange="onMsDateModeChange()">
+        <option value="all">Semua tanggal</option>
+        <option value="month">Per Bulan</option>
+        <option value="week">Per Minggu</option>
+      </select>
+      <select class="filter-sel" id="ms-period" onchange="renderMyStatus()" style="display:none"></select>
+      <button class="btn btn-sm" onclick="resetMsFilters()">Reset</button>
+    </div>
     <div id="ms-sections"></div>
   </div>
 
@@ -1503,7 +1514,7 @@ async function loadAll(){
   updateTabCounts();
   populateHistoryAreaOptions();
   if(_activeTab === 'recap'){ populateRecapPersonOptions(); renderRecapChart(); }
-  else if(_activeTab === 'mystatus'){ renderMyStatus(); }
+  else if(_activeTab === 'mystatus'){ populateMsPeriodOptions(); renderMyStatus(); }
   else renderList();
   maybeOpenFromUrl();
 }
@@ -1673,7 +1684,7 @@ function switchTab(tab){
   document.getElementById('recap-area').style.display = isRecap ? '' : 'none';
   document.getElementById('mystatus-area').style.display = isMy ? '' : 'none';
   if(isRecap){ populateRecapPersonOptions(); renderRecapChart(); }
-  else if(isMy){ renderMyStatus(); }
+  else if(isMy){ populateMsPeriodOptions(); renderMyStatus(); }
   else{ renderList(); }
 }
 function updateTabCounts(){
@@ -1780,10 +1791,61 @@ function myStatusSections(){
   }
   return [{ h:'📋 Semua laporan', sub:'Admin melihat seluruh laporan di sistem.', items:_allApprovals.slice() }];
 }
+// Returns the deduped set of approval OBJECTS across every section (an item
+// can legitimately appear in more than one section — e.g. a TechOp2's own
+// submission — so this is keyed by id to count/list each report once).
 function myStatusItems(){
-  const seen = new Set();
-  myStatusSections().forEach(s => s.items.forEach(a => seen.add(a.id)));
-  return [...seen];
+  const seen = new Map();
+  myStatusSections().forEach(s => s.items.forEach(a => seen.set(a.id, a)));
+  return [...seen.values()];
+}
+// Free-text search across the fields a person would actually search by —
+// same field set as the "Semua Riwayat" tab's #hf-search, for consistency.
+function _msMatchesSearch(a, cs, q){
+  if(!q) return true;
+  const t = _assetTitleParts(a, cs);
+  const hay = [t.name, t.tag, a.submittedBy, cs && cs.checkedBy, a._wo, a._area, a._src,
+    Approvals.STATUS_LABELS[a.status]].filter(Boolean).join(' ').toLowerCase();
+  return hay.includes(q);
+}
+// Week/Month filter (item 2 of the request): buckets by a.createdAt — the
+// actual upload/submit timestamp — not executionDate, since the ask was
+// explicitly "per tanggal uploadnya". 'all' mode (default) never filters.
+function _msInSelectedPeriod(a){
+  const mode = document.getElementById('ms-date-mode').value;
+  if(mode === 'all') return true;
+  const period = document.getElementById('ms-period').value;
+  if(!period) return true; // period list still populating / nothing picked yet
+  const key = mode === 'week' ? weekKey(a.createdAt) : monthKey(a.createdAt);
+  return key === period;
+}
+// Rebuilds the period <select> from the periods actually PRESENT in the
+// person's own Status Laporan items (not every calendar week/month that
+// ever existed) — so the dropdown only ever offers something that has data
+// behind it, and stays short. Newest period first.
+function populateMsPeriodOptions(){
+  const mode = document.getElementById('ms-date-mode').value;
+  const sel = document.getElementById('ms-period');
+  if(mode === 'all'){ sel.style.display = 'none'; sel.innerHTML = ''; return; }
+  sel.style.display = '';
+  const keyFn = mode === 'week' ? weekKey : monthKey;
+  const labelFn = mode === 'week' ? weekLabel : monthLabel;
+  const keys = new Set();
+  myStatusItems().forEach(a => { const k = keyFn(a.createdAt); if(k) keys.add(k); });
+  const sorted = [...keys].sort().reverse();
+  const cur = sel.value;
+  sel.innerHTML = sorted.map(k => `<option value="${k}">${escHtml(labelFn(k))}</option>`).join('');
+  sel.value = sorted.includes(cur) ? cur : (sorted[0] || '');
+}
+function onMsDateModeChange(){
+  populateMsPeriodOptions();
+  renderMyStatus();
+}
+function resetMsFilters(){
+  document.getElementById('ms-search').value = '';
+  document.getElementById('ms-date-mode').value = 'all';
+  populateMsPeriodOptions();
+  renderMyStatus();
 }
 function _msStepper(a){
   if(a.status==='returned_to_technician'){
@@ -1837,7 +1899,9 @@ function _msCard(a){
   if(a.review){
     detail += `<div><b>Review</b> oleh ${escHtml(a.review.reviewedBy||'—')} · ${fmtDate(a.review.reviewedAt)}`
       + (a.review.auto ? ' <i>(otomatis — submitter Level 2)</i>' : '')
-      + (a.review.comments ? `<br>"${escHtml(a.review.comments)}"` : '') + `</div>`;
+      + (a.review.comments ? `<br><b>Komentar:</b> "${escHtml(a.review.comments)}"` : '')
+      + (a.review.recommendations ? `<br><b>Rekomendasi/Future Work:</b> "${escHtml(a.review.recommendations)}"` : '')
+      + `</div>`;
   }
   if(a.approval){
     detail += `<div style="margin-top:5px"><b>Approval</b> oleh ${escHtml(a.approval.approvedBy||'—')} · ${fmtDate(a.approval.approvedAt)}`
@@ -1882,7 +1946,16 @@ function _msCard(a){
   </div>`;
 }
 function renderMyStatus(){
-  const secs = myStatusSections();
+  const q = (document.getElementById('ms-search').value||'').trim().toLowerCase();
+  // Search + week/month period both narrow each section's items BEFORE the
+  // summary counts and section counts are computed, so everything on
+  // screen — stat cards included — consistently reflects the active filter
+  // instead of the cards showing an unfiltered total while the list below
+  // is filtered.
+  const secs = myStatusSections().map(s => ({
+    ...s,
+    items: s.items.filter(a => _msInSelectedPeriod(a) && _msMatchesSearch(a, _checksheetCache[a.checksheetId], q)),
+  }));
   const seen = new Map();
   secs.forEach(s => s.items.forEach(a => seen.set(a.id, a)));
   const all = [...seen.values()];
@@ -2020,6 +2093,28 @@ function monthLabel(key){
   const [y,m] = key.split('-');
   const names = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   return names[parseInt(m,10)-1]+' '+y;
+}
+// Monday-start week bucketing for the Status Laporan tab's "Per Minggu"
+// filter — same key/label pattern as monthKey/monthLabel above, just at
+// week granularity. Key is the Monday's own date (YYYY-MM-DD), so two
+// dates land in the same bucket iff they're in the same Mon-Sun week.
+function weekKey(iso){
+  if(!iso) return null;
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return null;
+  const dow = (d.getDay()+6)%7; // Mon=0 .. Sun=6
+  const monday = new Date(d.getFullYear(), d.getMonth(), d.getDate()-dow);
+  return monday.getFullYear()+'-'+String(monday.getMonth()+1).padStart(2,'0')+'-'+String(monday.getDate()).padStart(2,'0');
+}
+function weekLabel(key){
+  const [y,m,d] = key.split('-').map(Number);
+  const monday = new Date(y, m-1, d);
+  const sunday = new Date(y, m-1, d+6);
+  const names = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  const sameMonth = monday.getMonth()===sunday.getMonth() && monday.getFullYear()===sunday.getFullYear();
+  const startPart = sameMonth ? String(monday.getDate())
+    : monday.getDate()+' '+names[monday.getMonth()]+(monday.getFullYear()!==sunday.getFullYear()?' '+monday.getFullYear():'');
+  return startPart+' – '+sunday.getDate()+' '+names[sunday.getMonth()]+' '+sunday.getFullYear();
 }
 // Person filter narrows the SET of approvals first (submitter: theirs only;
 // reviewer: only what they personally reviewed), then the three monthly
@@ -2710,8 +2805,10 @@ function renderActionSection(a, cs){
       </div>` : ''}
       <label class="field-lbl">Komentar</label>
       <textarea class="dinput" id="in-comments" placeholder="Catatan hasil review..."></textarea>
+      ${loggedInRole==='techop2' ? '<div class="readonly-hint">Minimal 10 karakter — isi catatan yang benar-benar substantif, bukan sekadar kata singkat.</div>' : ''}
       <label class="field-lbl" style="margin-top:10px">Rekomendasi / Future Work</label>
       <textarea class="dinput" id="in-recommendations" placeholder="Rekomendasi tindak lanjut..."></textarea>
+      ${loggedInRole==='techop2' ? '<div class="readonly-hint">Minimal 10 karakter — wajib diisi sebelum diteruskan ke Supervisor.</div>' : ''}
       <div class="sig-pad-wrap">
         <label class="field-lbl">Tanda Tangan</label>
         <canvas class="sig-canvas" id="sig-canvas-review" width="330" height="150"></canvas>
@@ -2836,6 +2933,15 @@ async function doSubmitReview(){
   const recommendations = document.getElementById('in-recommendations').value.trim();
   const signature = getSignatureDataUrl('sig-canvas-review');
   if(!comments){ alert('Isi komentar terlebih dahulu.'); return; }
+  // Level 2 (TechOp2) must give real, substantive feedback — not just a
+  // token word — before a report can move on to the Supervisor. Explicit
+  // user request, scoped to techop2 only; admin (who can also review here)
+  // keeps the looser check, same as every other role-gated admin exemption
+  // already in this file.
+  if(loggedInRole === 'techop2'){
+    if(comments.length < 10){ alert('Komentar minimal 10 karakter sebelum diteruskan ke Supervisor.'); return; }
+    if(recommendations.length < 10){ alert('Rekomendasi / Future Work minimal 10 karakter sebelum diteruskan ke Supervisor.'); return; }
+  }
   if(!signature){ alert('Tanda tangan diperlukan sebelum diteruskan ke Supervisor.'); return; }
   try{
     await Approvals.submitReview(_curApproval.id, {comments, recommendations, signature, reviewedBy: loggedInUser});
