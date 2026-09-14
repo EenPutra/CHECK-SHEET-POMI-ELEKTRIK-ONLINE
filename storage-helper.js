@@ -55,6 +55,25 @@ function storageTimeoutFor(attempt) {
   return STORAGE_TIMEOUT_SCHEDULE_MS[Math.min(attempt - 1, STORAGE_TIMEOUT_SCHEDULE_MS.length - 1)];
 }
 
+// ---- Reliability: chunked reads for large files ----
+// Even with retries and a generous timeout, a large file (a multi-page
+// scanned PDF from a manual upload — the one file type in this app with NO
+// size cap or compression applied before upload, see submitManualUpload())
+// reliably failed to download EVERY time, not just occasionally. That's the
+// signature of a hard server-side ceiling on a single Apps Script Web App
+// response, not a flaky network — no amount of client-side waiting or
+// retrying can produce a response the server can't build in one piece.
+// Fixed by never asking for more than STORAGE_CHUNK_BYTES in one request —
+// drive-proxy.gs's doGet supports an optional &offset=&length= byte range
+// (added 2026-09-14 alongside this) — and reassembling the chunks here.
+// REQUIRES drive-proxy.gs to be redeployed (paste the updated file into
+// script.google.com, Deploy -> Manage deployments -> New version) — an
+// un-redeployed proxy ignores offset/length and returns the whole file in
+// one response as before (detected via the missing `totalSize` field and
+// treated as "this one response is already the complete file"), so this
+// keeps working either way, just without the fix until redeployed.
+const STORAGE_CHUNK_BYTES = 2 * 1024 * 1024; // 2MB raw (~2.8MB base64) per request
+
 function _storageSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
 // Runs attemptFn(attemptNo) with retry + exponential backoff + jitter.
@@ -126,40 +145,55 @@ const Storage = {
   // actually serve real file bytes (Apps Script sends back a generic HTML
   // page instead), so this JSON decode is the only path that works, for
   // both pdf-lib's byte needs AND for anything meant to be displayed.
-  // onProgress (optional): called with {loaded, total} as bytes stream in
-  // (total is 0 when the server doesn't send Content-Length — the caller
-  // should then show an indeterminate/bytes-only indicator), {phase:'retry',
-  // attempt, max, error} if a transient failure is being retried, then once
-  // with {phase:'decode'} just before the base64 -> bytes step. When given,
-  // the download uses XHR (progress events); without it, a plain fetch().
+  // onProgress (optional): called with {loaded, total} as bytes accumulate
+  // across chunks (real byte counts — total is the file's true size, known
+  // from the first chunk's response), {phase:'retry', attempt, max, error}
+  // if one chunk's transient failure is being retried, then once with
+  // {phase:'decode'} just before chunks are reassembled into one buffer.
+  // Always fetches in bounded pieces — see STORAGE_CHUNK_BYTES above.
   async fetchMeta(url, onProgress) {
     const reqUrl = proxyUrlWithToken(url);
-    const json = await withStorageRetry(async (attempt) => {
-      if (typeof onProgress === 'function') {
-        return await xhrGetJson(reqUrl, onProgress, storageTimeoutFor(attempt));
-      }
-      let resp;
-      try {
-        resp = await _storageFetchTimeout(reqUrl, {}, storageTimeoutFor(attempt));
-      } catch (e) {
-        throw new Error(e && e.name === 'AbortError' ? 'Unduhan file timeout.' : 'Gagal mengambil file (jaringan).');
-      }
-      if (!resp.ok) throw new Error('Gagal mengambil file (HTTP ' + resp.status + ')');
-      let j;
-      try { j = await resp.json(); } catch (e) { throw new Error('Respon file tidak valid.'); }
-      if (j.error) throw new Error(j.error);
-      return j;
-    }, {
-      onRetry: (attempt, max, err) => {
-        if (typeof onProgress === 'function') { try { onProgress({ phase: 'retry', attempt, max, error: err && err.message }); } catch (e) {} }
-      },
-    });
+    const hasQuery = reqUrl.indexOf('?') !== -1;
+    const parts = [];
+    let offset = 0, totalSize = null, mimeType, filename;
+    for (;;) {
+      const chunkUrl = reqUrl + (hasQuery ? '&' : '?') + 'offset=' + offset + '&length=' + STORAGE_CHUNK_BYTES;
+      const json = await withStorageRetry(async (attempt) => {
+        let resp;
+        try {
+          resp = await _storageFetchTimeout(chunkUrl, {}, storageTimeoutFor(attempt));
+        } catch (e) {
+          throw new Error(e && e.name === 'AbortError' ? 'Unduhan file timeout.' : 'Gagal mengambil file (jaringan).');
+        }
+        if (!resp.ok) throw new Error('Gagal mengambil file (HTTP ' + resp.status + ')');
+        let j;
+        try { j = await resp.json(); } catch (e) { throw new Error('Respon file tidak valid.'); }
+        if (j.error) throw new Error(j.error);
+        return j;
+      }, {
+        onRetry: (attempt, max, err) => {
+          if (typeof onProgress === 'function') { try { onProgress({ phase: 'retry', attempt, max, error: err && err.message }); } catch (e) {} }
+        },
+      });
+      if (mimeType === undefined) { mimeType = json.mimeType; filename = json.filename; }
+      const chunkBytes = new Uint8Array(base64ToArrayBuffer(json.dataBase64));
+      parts.push(chunkBytes);
+      // An un-redeployed old proxy ignores offset/length and always returns
+      // the WHOLE file with no `totalSize` field — treat that single
+      // response as already complete instead of looping forever.
+      const oldStyleWholeFile = json.totalSize == null;
+      offset += chunkBytes.length;
+      totalSize = oldStyleWholeFile ? offset : json.totalSize;
+      if (typeof onProgress === 'function') { try { onProgress({ loaded: offset, total: totalSize }); } catch (e) {} }
+      if (oldStyleWholeFile || chunkBytes.length === 0 || offset >= totalSize) break;
+    }
     if (typeof onProgress === 'function') { try { onProgress({ phase: 'decode' }); } catch (e) {} }
+    const combined = parts.length === 1 ? parts[0] : concatUint8Arrays(parts, offset);
     return {
-      bytes: base64ToArrayBuffer(json.dataBase64),
-      base64: json.dataBase64,
-      mimeType: json.mimeType,
-      filename: json.filename,
+      bytes: combined.buffer,
+      base64: _bytesToBase64(combined),
+      mimeType,
+      filename,
     };
   },
 
@@ -219,34 +253,26 @@ const Storage = {
   },
 };
 
-// XHR GET returning parsed JSON, with download-progress callbacks. Used by
-// fetchMeta() when a caller passes onProgress (fetch() has no widely-usable
-// progress event). `total` is 0 unless the server sends Content-Length —
-// Apps Script often doesn't, so the caller must handle an unknown total.
-// A hard xhr.timeout turns a hung request into a normal rejectable error
-// (previously: an unresolved promise that left the caller's progress UI
-// stuck forever with no way to retry).
-function xhrGetJson(url, onProgress, timeoutMs) {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', url);
-    xhr.responseType = 'text';
-    xhr.timeout = timeoutMs || STORAGE_TIMEOUT_SCHEDULE_MS[0];
-    xhr.onprogress = e => {
-      try { onProgress({ loaded: e.loaded, total: e.lengthComputable ? e.total : 0 }); } catch (err) {}
-    };
-    xhr.onload = () => {
-      if (xhr.status < 200 || xhr.status >= 300) return reject(new Error('Gagal mengambil file (HTTP ' + xhr.status + ')'));
-      let json;
-      try { json = JSON.parse(xhr.responseText || '{}'); }
-      catch (err) { return reject(new Error('Respon file tidak valid.')); }
-      if (json.error) return reject(new Error(json.error));
-      resolve(json);
-    };
-    xhr.onerror = () => reject(new Error('Gagal mengunduh file (jaringan).'));
-    xhr.ontimeout = () => reject(new Error('Unduhan file timeout.'));
-    xhr.send();
-  });
+// Joins chunked Uint8Arrays (from fetchMeta's byte-range loop) into one
+// contiguous buffer. totalLen is passed in rather than re-summed — the
+// caller already tracked it as chunks arrived.
+function concatUint8Arrays(parts, totalLen) {
+  const out = new Uint8Array(totalLen);
+  let pos = 0;
+  for (const p of parts) { out.set(p, pos); pos += p.length; }
+  return out;
+}
+
+// bytes -> base64, chunked through String.fromCharCode so a multi-MB
+// combined buffer (a reassembled large PDF) doesn't blow the argument-count
+// limit that String.fromCharCode.apply(null, hugeArray) hits directly.
+function _bytesToBase64(bytes) {
+  let binary = '';
+  const STEP = 0x8000;
+  for (let i = 0; i < bytes.length; i += STEP) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + STEP));
+  }
+  return btoa(binary);
 }
 
 function splitPath(path) {

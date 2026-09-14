@@ -1399,6 +1399,33 @@ the current design — **do not "simplify" these away**:
   legitimate transfer gets real room to finish on a later one. Applies to both directions
   (`fetchMeta`'s xhr/fetch paths and `uploadToDrive`) since `buildFinalPdf()`'s approve flow does
   both: fetch the original (possibly large) PDF, then upload an even larger merged one.
+  **Second follow-up, same day — the timeout fix didn't work either, because the real problem
+  isn't timing at all.** User report: the SAME manual-upload final PDFs still failed to download,
+  stuck at 92%, EVERY time, no matter how long the escalated timeout allowed. That "always fails
+  identically" behaviour (not occasional/flaky) is the tell that this was never a slow-network
+  problem a client-side timeout could fix — it's a hard ceiling on how much a single Apps Script
+  Web App response can carry. A manually-uploaded PDF is the ONE file type in this whole app with
+  no size cap or compression applied before upload (every other upload path — evidence photos via
+  PhotoKit, jsPDF-generated archival PDFs — stays small by construction), so it's the one file
+  type big enough to hit that ceiling; check-sheet-originated PDFs never got big enough to expose
+  this. **Fixed at the actual root: `drive-proxy.gs`'s `doGet` now supports an optional
+  `&offset=&length=` byte range** (returns `{dataBase64, totalSize, offset, chunkSize, ...}` for
+  just that slice), and `storage-helper.js`'s `fetchMeta()` now ALWAYS requests in bounded
+  `STORAGE_CHUNK_BYTES` (2MB) pieces and reassembles them client-side (`concatUint8Arrays`,
+  `_bytesToBase64`) — no single response is ever large enough to hit the ceiling, regardless of
+  the file's total size. Backward compatible with an un-redeployed proxy: an old `doGet` ignores
+  offset/length and returns the whole file with no `totalSize` field, which `fetchMeta()` detects
+  and treats as "this one response is already the complete file" (verified with a mocked
+  old-style proxy: exactly 1 request, correct bytes, no infinite loop). Verified the new path too,
+  with a mocked chunked proxy: a simulated 5.5MB file round-trips byte-exact in 3 requests, and a
+  simulated single-chunk transient failure retries only that 2MB chunk (not the whole file) before
+  succeeding — a meaningfully cheaper retry than before this, on top of fixing the actual bug.
+  **THIS REQUIRES A MANUAL REDEPLOY THAT NO AMOUNT OF `git push` CAN DO**: `drive-proxy.gs` in
+  this repo is the source of truth, but the LIVE Apps Script Web App only runs whatever was last
+  pasted into script.google.com and deployed there — paste the updated file in, then Deploy ->
+  Manage deployments -> edit (pencil) -> New version, exactly as the file's own header always
+  says for any edit. Until that manual step happens, large-file downloads keep failing exactly as
+  before, no matter how many more client-side fixes ship.
 - **`approval-helper.js`** (`window.Approvals`) — the `approvals` Firestore collection, kept
   **deliberately separate** from `checksheets` (never a field bolted onto a checksheet doc) so
   the append-only `checksheets` collection that `dashboard.html`'s trend charts/dedupe/exports
@@ -2225,7 +2252,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260914b`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20260914c`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a

@@ -36,6 +36,13 @@
 //   8. Every time you edit this script after the first deploy, you must
 //      do Deploy -> Manage deployments -> edit (pencil) -> New version,
 //      or the live Web App keeps running the OLD code.
+//
+//   *** ACTION REQUIRED (2026-09-14): this file's doGet() gained chunked
+//   *** byte-range reads to fix large final/manual-upload PDFs failing to
+//   *** download. This does NOTHING on its own — you must paste this
+//   *** UPDATED file into script.google.com and do step 8 (New version)
+//   *** for the fix to take effect on the live site. Until you do, large
+//   *** files keep failing to download exactly as before.
 // ============================================================
 
 const ROOT_FOLDER_ID = 'PASTE_YOUR_DRIVE_FOLDER_ID_HERE';
@@ -69,10 +76,35 @@ function doGet(e) {
     // real bytes through — the client (storage-helper.js) decodes this
     // into a blob: URL for display instead of using this endpoint as a
     // direct resource URL.
+    //
+    // CHUNKED READS (2026-09): a Web App's own ContentService response has
+    // a real, fairly low ceiling — a large file (a multi-page scanned PDF
+    // from a manual upload, which unlike every other file in this app has
+    // no size cap/compression applied before upload) returned it in ONE
+    // giant base64 JSON body reliably failed every single time, not just
+    // occasionally, which is the signature of a hard server-side limit
+    // rather than a flaky network — retrying or waiting longer on the
+    // CLIENT side can never fix a response the SERVER can't produce in one
+    // piece. storage-helper.js now always requests a bounded byte range via
+    // &offset=N&length=N and reassembles the chunks client-side, so no
+    // single response is ever large enough to hit that ceiling regardless
+    // of the file's total size. offset/length are optional — omitted (or
+    // an un-redeployed older client), this still returns the WHOLE file in
+    // one response, unchanged from before.
+    const bytes = blob.getBytes();
+    const total = bytes.length;
+    const hasRange = e.parameter.offset != null || e.parameter.length != null;
+    const offset = hasRange ? Math.max(0, parseInt(e.parameter.offset, 10) || 0) : 0;
+    const length = hasRange && e.parameter.length != null ? parseInt(e.parameter.length, 10) : total;
+    const end = Math.min(total, offset + Math.max(0, length || 0));
+    const slice = (offset === 0 && end === total) ? bytes : bytes.slice(offset, Math.max(offset, end));
     return jsonOutput({
-      dataBase64: Utilities.base64Encode(blob.getBytes()),
+      dataBase64: Utilities.base64Encode(slice),
       mimeType: blob.getContentType(),
       filename: file.getName(),
+      totalSize: total,
+      offset: offset,
+      chunkSize: slice.length,
     });
   } catch (err) {
     return jsonOutput({ error: err.message });
