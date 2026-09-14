@@ -1455,6 +1455,14 @@ the current design — **do not "simplify" these away**:
   via a `getBlobCalls` counter: 0 for the fast path, 3 for every fallback path, matching the old
   per-chunk behavior exactly when the fast path can't be used). **Same redeploy requirement as
   above applies again** — this is a further edit to the same file.
+  **User-confirmed fixed in production (2026-09-14)** after redeploying this version: the
+  previously slow/stuck-at-92% manual-upload PDF now downloads quickly. The full arc worth
+  remembering for the next flaky-Drive-proxy report — retry+timeout alone (first follow-up) does
+  NOT fix a deterministic (always-fails-the-same-way) problem, only a genuinely transient one;
+  chunking fixes a hard response-size ceiling but can introduce its own O(chunks × whole-file-size)
+  slowness if each chunk naively re-reads the whole file; true byte-range reads are what actually
+  make chunking cheap. Diagnose which of these three you're looking at (transient vs. hard ceiling
+  vs. re-read cost) before reaching for the same fix that worked last time.
 - **`approval-helper.js`** (`window.Approvals`) — the `approvals` Firestore collection, kept
   **deliberately separate** from `checksheets` (never a field bolted onto a checksheet doc) so
   the append-only `checksheets` collection that `dashboard.html`'s trend charts/dedupe/exports
