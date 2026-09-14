@@ -65,7 +65,6 @@ function doGet(e) {
   if (!fileId) return jsonOutput({ error: 'Parameter id diperlukan' });
   try {
     const file = DriveApp.getFileById(fileId);
-    const blob = file.getBlob();
     // Always JSON+base64, never a raw binary passthrough. An earlier
     // version tried `return file.getBlob();` directly from doGet expecting
     // Apps Script to serve it as a real image/PDF response (a pattern
@@ -91,16 +90,61 @@ function doGet(e) {
     // of the file's total size. offset/length are optional — omitted (or
     // an un-redeployed older client), this still returns the WHOLE file in
     // one response, unchanged from before.
-    const bytes = blob.getBytes();
-    const total = bytes.length;
     const hasRange = e.parameter.offset != null || e.parameter.length != null;
     const offset = hasRange ? Math.max(0, parseInt(e.parameter.offset, 10) || 0) : 0;
+
+    // TRUE partial reads (2026-09, follow-up): the FIRST version of chunking
+    // above was correct but very slow for a large file — file.getBlob()
+    // downloads and holds the ENTIRE file in memory, so every single chunk
+    // request paid the cost of re-reading the WHOLE file again just to slice
+    // out a couple MB of it (confirmed by a real user report: chunking made
+    // a large download reliable but painfully slow, and — because the cost
+    // scales with file size on EVERY chunk, not just once — large enough
+    // files could still exhaust the retry budget). file.getSize() is Drive
+    // metadata only (no download); fetchDriveRange() below does a true HTTP
+    // Range request against Drive's own download endpoint, so each chunk
+    // costs only its OWN size, not the whole file's. Falls back to the
+    // original whole-blob-then-slice approach (still correct, just slower)
+    // if the range fetch fails for any reason — never a hard failure just
+    // because the faster path didn't work this time.
+    let total = null;
+    try { total = file.getSize(); } catch (szErr) { total = null; }
     const length = hasRange && e.parameter.length != null ? parseInt(e.parameter.length, 10) : total;
-    const end = Math.min(total, offset + Math.max(0, length || 0));
-    const slice = (offset === 0 && end === total) ? bytes : bytes.slice(offset, Math.max(offset, end));
+
+    let slice = null;
+    let mimeType = null;
+    if (hasRange && total != null) {
+      const end = Math.min(total, offset + Math.max(0, length || 0)) - 1;
+      if (end >= offset) {
+        try {
+          slice = fetchDriveRange(fileId, offset, end);
+        } catch (rangeErr) {
+          slice = null; // fall through to the full-blob path below
+        }
+      } else {
+        slice = []; // requested a zero/negative-length range — empty chunk, not an error
+      }
+    }
+
+    if (slice === null) {
+      // Fallback: whole-file read (works even for a range request — just
+      // slower), and the ONLY path when no range was requested at all.
+      const blob = file.getBlob();
+      mimeType = blob.getContentType();
+      const bytes = blob.getBytes();
+      if (total == null) total = bytes.length;
+      if (hasRange) {
+        const end = Math.min(total, offset + Math.max(0, length || 0));
+        slice = (offset === 0 && end === total) ? bytes : bytes.slice(offset, Math.max(offset, end));
+      } else {
+        slice = bytes;
+      }
+    }
+    if (!mimeType) mimeType = file.getMimeType();
+
     return jsonOutput({
       dataBase64: Utilities.base64Encode(slice),
-      mimeType: blob.getContentType(),
+      mimeType: mimeType,
       filename: file.getName(),
       totalSize: total,
       offset: offset,
@@ -109,6 +153,37 @@ function doGet(e) {
   } catch (err) {
     return jsonOutput({ error: err.message });
   }
+}
+
+// True HTTP byte-range read against Drive's own download endpoint — avoids
+// ever loading the whole file into Apps Script's memory just to return a
+// small slice of it. Google Drive's `alt=media` download supports the
+// standard Range header (206 Partial Content); ScriptApp.getOAuthToken()
+// already carries Drive read access because DriveApp is used elsewhere in
+// this file, so no extra authorization/scope is needed. Throws on any
+// unexpected response so the caller can fall back to the slower-but-always-
+// correct whole-blob read rather than silently returning wrong bytes.
+function fetchDriveRange(fileId, start, end) {
+  const url = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(fileId) + '?alt=media&supportsAllDrives=true';
+  const resp = UrlFetchApp.fetch(url, {
+    headers: {
+      Authorization: 'Bearer ' + ScriptApp.getOAuthToken(),
+      Range: 'bytes=' + start + '-' + end,
+    },
+    muteHttpExceptions: true,
+  });
+  const code = resp.getResponseCode();
+  if (code !== 206 && code !== 200) throw new Error('range fetch http ' + code);
+  const content = resp.getContent();
+  const wantLen = end - start + 1;
+  // A server that ignores Range (some proxies/edge cases do, returning the
+  // whole file with code 200 instead of a 206 partial) must be detected and
+  // sliced manually here — otherwise every "chunk" would silently contain
+  // the entire file, defeating the whole point and likely re-triggering the
+  // original giant-response failure one level down.
+  if (content.length === wantLen) return content;
+  if (content.length > wantLen) return content.slice(start, end + 1);
+  throw new Error('range fetch returned ' + content.length + ' bytes, expected ' + wantLen);
 }
 
 function doPost(e) {

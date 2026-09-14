@@ -1426,6 +1426,35 @@ the current design — **do not "simplify" these away**:
   Manage deployments -> edit (pencil) -> New version, exactly as the file's own header always
   says for any edit. Until that manual step happens, large-file downloads keep failing exactly as
   before, no matter how many more client-side fixes ship.
+  **Third follow-up, same day — chunking fixed correctness but made large downloads very slow,
+  and that slowness itself caused a THIRD failure mode.** User confirmed after redeploying: the
+  previously-failing PDF now downloaded successfully, but "lama sekali" (very slow), and some
+  other check sheets' files still occasionally stuck at 92% and failed outright. Root cause,
+  confirmed by simulation before touching any code: `doGet`'s chunked path called
+  `file.getBlob().getBytes()` — which downloads and holds the ENTIRE file — on EVERY chunk
+  request, just to slice out a couple MB of it. Cost scales with (chunk count) × (whole file
+  size), not (chunk count) × (chunk size) — a simulated 50MB file came out ~9x slower than
+  necessary, and for a big-enough check sheet the cumulative time across many chunks could still
+  exhaust the per-chunk retry budget, which looks identical to the original "stuck at 92%"
+  symptom from the outside even though the cause has now moved. **Fixed with a true HTTP byte-
+  range read**: `fetchDriveRange(fileId, start, end)` calls `UrlFetchApp.fetch()` against Drive's
+  own `alt=media` download endpoint with a `Range: bytes=start-end` header and
+  `ScriptApp.getOAuthToken()` (no new authorization needed — DriveApp usage elsewhere in this
+  file already requests full Drive scope) — each chunk now costs only its OWN size. `file.getSize()`
+  (Drive metadata, no download) replaces the old "read the whole blob just to learn its length."
+  **Falls back to the original whole-blob-then-slice approach — slower but still correct — if the
+  range fetch throws, or if the server ignores the Range header and returns the whole file with
+  HTTP 200 instead of 206 (detected by content length ≠ requested range length; a whole-file 200
+  response is then sliced client-side in the script rather than treated as the chunk itself,
+  which would otherwise silently balloon every "chunk" back into a full-file response and
+  reproduce the original ceiling failure one level down)** — a faster path that doesn't work
+  degrades to the previous CORRECT behavior, never to wrong bytes or a hard failure. Verified with
+  a mocked `UrlFetchApp`/`DriveApp` across 4 scenarios (real Range support, the range fetch
+  throwing, a Range-ignoring server, and a truncated/malformed range response) — all four
+  reassemble byte-exact, and only the ideal path actually avoids the full-file re-read (confirmed
+  via a `getBlobCalls` counter: 0 for the fast path, 3 for every fallback path, matching the old
+  per-chunk behavior exactly when the fast path can't be used). **Same redeploy requirement as
+  above applies again** — this is a further edit to the same file.
 - **`approval-helper.js`** (`window.Approvals`) — the `approvals` Firestore collection, kept
   **deliberately separate** from `checksheets` (never a field bolted onto a checksheet doc) so
   the append-only `checksheets` collection that `dashboard.html`'s trend charts/dedupe/exports
