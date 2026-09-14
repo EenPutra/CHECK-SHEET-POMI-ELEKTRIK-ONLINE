@@ -8,19 +8,19 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.6.0/jspdf.plugin.autotable.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-<script src="firebase-config.js?v=20260914c"></script>
-<script src="db-helper.js?v=20260914c"></script>
-<script src="storage-helper.js?v=20260914c"></script>
-<script src="approval-helper.js?v=20260914c"></script>
-<script src="submit-guard.js?v=20260914c"></script>
-<script src="pdf-preview.js?v=20260914c"></script>
-<script src="load-merge-modal.js?v=20260914c"></script>
-<script src="cloud-draft.js?v=20260914c"></script>
-<script src="auth-session.js?v=20260914c"></script>
-<script src="technician-auth.js?v=20260914c"></script>
-<script src="table-nav.js?v=20260914c"></script>
-<script src="img-helper.js?v=20260914c"></script>
-<script src="photo-kit.js?v=20260914c"></script>
+<script src="firebase-config.js?v=20260914d"></script>
+<script src="db-helper.js?v=20260914d"></script>
+<script src="storage-helper.js?v=20260914d"></script>
+<script src="approval-helper.js?v=20260914d"></script>
+<script src="submit-guard.js?v=20260914d"></script>
+<script src="pdf-preview.js?v=20260914d"></script>
+<script src="load-merge-modal.js?v=20260914d"></script>
+<script src="cloud-draft.js?v=20260914d"></script>
+<script src="auth-session.js?v=20260914d"></script>
+<script src="technician-auth.js?v=20260914d"></script>
+<script src="table-nav.js?v=20260914d"></script>
+<script src="img-helper.js?v=20260914d"></script>
+<script src="photo-kit.js?v=20260914d"></script>
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -867,6 +867,46 @@ function buildAllSheets(){
 // ═══════════════════════════════════════════════════════════════
 //  PDF — portrait A4, POMI/Paiton letterhead background
 // ═══════════════════════════════════════════════════════════════
+// PDF-only photo re-encode — evidence photos stay at PhotoKit's working
+// resolution (up to 1600px, now also capped under ~950KB by
+// compressUnder1MB above) on screen so crop/rotate stays sharp, but the
+// PDF only ever draws a photo inside a small fixed box (2-up, ~87x72mm) —
+// embedding photo-for-photo at working resolution is what made a report
+// with several photos balloon to many MB, which directly costs upload
+// time (and occasionally a timeout) for the archival PDF submitWithFiles()
+// uploads on every submit. Re-encodes a COPY sized for that exact box at
+// print-adequate DPI; the on-screen PHOTOS entry is never touched. Cached
+// by src+box so a re-render (preview, then the real download) doesn't
+// redo the work. Same pattern as Motor_Witness_Test_Vendor.html's
+// pdfPhotoSrc() — see CLAUDE.md's PDF-export section.
+const PDF_PHOTO_CACHE = {};
+const PDF_PHOTO_DPI = 160, PDF_PHOTO_Q = 0.7, PDF_PHOTO_MAX_BYTES = 110*1024;
+function pdfPhotoSrc(p, boxWmm, boxHmm){
+  return new Promise(resolve=>{
+    const src = p && (p.src || p.dataUrl);
+    if(!src){ resolve(src); return; }
+    const key = src.length+'~'+src.slice(0,20)+'~'+Math.round(boxWmm)+'x'+Math.round(boxHmm);
+    if(PDF_PHOTO_CACHE[key]){ resolve(PDF_PHOTO_CACHE[key]); return; }
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const nW=img.naturalWidth||1, nH=img.naturalHeight||1;
+        const targetW=Math.max(90, Math.round(boxWmm/25.4*PDF_PHOTO_DPI));
+        const targetH=Math.max(70, Math.round(boxHmm/25.4*PDF_PHOTO_DPI));
+        const scale=Math.min(targetW/nW, targetH/nH, 1);
+        const w=Math.max(1,Math.round(nW*scale)), h=Math.max(1,Math.round(nH*scale));
+        const cv=document.createElement('canvas'); cv.width=w; cv.height=h;
+        cv.getContext('2d').drawImage(img,0,0,w,h);
+        let q=PDF_PHOTO_Q, out=cv.toDataURL('image/jpeg', q);
+        while(out.length*0.75 > PDF_PHOTO_MAX_BYTES && q>0.32){ q-=0.1; out=cv.toDataURL('image/jpeg', q); }
+        PDF_PHOTO_CACHE[key]=out;
+        resolve(out);
+      }catch(e){ resolve(src); }
+    };
+    img.onerror=()=>resolve(src);
+    img.src=src;
+  });
+}
 async function generatePDF(opts){
   opts=opts||{};
   if(!window.jspdf){ showNote('❌ Library PDF belum dimuat','err'); return; }
@@ -963,7 +1003,7 @@ async function generatePDF(opts){
   y=pdf.lastAutoTable.finalY+6;
 
   // Housing bearing — identity + 4x3 measurements, per side
-  [['de','Housing Bearing — DE'],['nde','Housing Bearing — NDE']].forEach(([k,lab])=>{
+  for(const [k,lab] of [['de','Housing Bearing — DE'],['nde','Housing Bearing — NDE']]){
     secBar(lab);
     pdf.autoTable({ ...kvTheme, startY:y,
       body:[
@@ -977,8 +1017,8 @@ async function generatePDF(opts){
       body:[1,2,3,4].map(p=>Srow([String(p), iv('hb-'+k+'-p'+p+'-u'), iv('hb-'+k+'-p'+p+'-m'), iv('hb-'+k+'-p'+p+'-l')])),
       columnStyles:{0:{cellWidth:24,fontStyle:'bold',fillColor:LABEL_BG,halign:'center'}} });
     y=pdf.lastAutoTable.finalY+6;
-    drawPdfPhotos('hb_'+k);
-  });
+    await drawPdfPhotos('hb_'+k);
+  }
 
   // Pre-test measurement tables
   const S=buildAllSheets();
@@ -991,7 +1031,7 @@ async function generatePDF(opts){
   kvTable(S.protection, {columnStyles:{0:{cellWidth:70,fontStyle:'bold',fillColor:LABEL_BG}}});
   kvTable(S.vibration, {columnStyles:{0:{cellWidth:70,fontStyle:'bold',fillColor:LABEL_BG}}});
   kvTable(S.environ, {columnStyles:{0:{cellWidth:70,fontStyle:'bold',fillColor:LABEL_BG}}});
-  drawPdfPhotos('pretest','Pre-Test Photos');
+  await drawPdfPhotos('pretest','Pre-Test Photos');
 
   // Solo run log
   const sr=S.solorun;
@@ -1037,7 +1077,7 @@ async function generatePDF(opts){
   });
   y=pdf.lastAutoTable.finalY+6;
 
-  drawPdfPhotos('general','Photo Documentation');
+  await drawPdfPhotos('general','Photo Documentation');
 
   // Signature strip
   checkY(30);
@@ -1058,18 +1098,22 @@ async function generatePDF(opts){
     pdf.text(`Page ${pg}/${pages}`,W-M,H-6,{align:'right'});
   }
 
-  function drawPdfPhotos(group, title){
+  async function drawPdfPhotos(group, title){
     const list=PHOTOS[group]||[];
     if(!list.length) return;
     secBar(title || (group.replace('_',' ')+' photos'));
     const PCOLS=2, PGAP=5, PW=(CW-PGAP*(PCOLS-1))/PCOLS, PH_MAX=72;
     for(let i=0;i<list.length;i+=PCOLS){
       const row=list.slice(i,i+PCOLS);
-      const dims=row.map(p=>PhotoKit.fit(p,PW,PH_MAX));
+      // Re-encode each photo sized for the box it actually prints in —
+      // never the full PhotoKit working resolution. See pdfPhotoSrc() above.
+      const packed=await Promise.all(row.map(p=>pdfPhotoSrc(p,PW,PH_MAX)));
+      const rowPacked=row.map((p,ri)=>Object.assign({},p,{src:packed[ri],dataUrl:packed[ri]}));
+      const dims=rowPacked.map(p=>PhotoKit.fit(p,PW,PH_MAX));
       const rowH=Math.max(...dims.map(d=>d.h));
-      const hasCap=row.some(p=>p.caption);
+      const hasCap=rowPacked.some(p=>p.caption);
       checkY(rowH+(hasCap?12:6));
-      row.forEach((p,ci)=>{
+      rowPacked.forEach((p,ci)=>{
         const px=M+ci*(PW+PGAP);
         PhotoKit.draw(pdf,p,px,y,PW,rowH,{align:'center'});
         if(p.caption){ pdf.setFont('times','italic'); pdf.setFontSize(7); pdf.setTextColor(90);
@@ -1088,28 +1132,78 @@ async function generatePDF(opts){
 // ═══════════════════════════════════════════════════════════════
 //  EVIDENCE PHOTOS (PhotoKit) — grouped
 // ═══════════════════════════════════════════════════════════════
+// PhotoKit's own downscale is pixel-based (up to 1600px longest edge), not
+// byte-size based — a busy/detailed JPEG at that size can still land over
+// 1MB, and since every evidence photo here gets uploaded individually AND
+// re-embedded into the archival PDF (see pdfPhotoSrc below), an uncapped
+// photo directly costs both slower uploads AND some submissions timing out
+// entirely on Storage.uploadDataUrl. Same PHOTO_MAX_BYTES/compressUnder1MB
+// pattern as 4000_Hours_Mill_PM.html — re-encode at lower JPEG quality
+// first, only shrink pixel dimensions if quality alone isn't enough, never
+// below a still-legible 480px edge. Applied on every path that produces a
+// NEW photo blob: initial pick, recrop, and rotate.
+const PHOTO_MAX_BYTES = 950 * 1024;
+function dataUrlBytes(dataUrl){
+  const i = dataUrl.indexOf(',');
+  const b64 = i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
+  return Math.round(b64.length * 3 / 4);
+}
+function compressUnder1MB(dataUrl, w, h){
+  return new Promise(resolve => {
+    if (dataUrlBytes(dataUrl) <= PHOTO_MAX_BYTES) { resolve({ src: dataUrl, w, h }); return; }
+    const img = new Image();
+    img.onload = () => {
+      let cw = w, ch = h, out = dataUrl;
+      const QUALITIES = [0.85, 0.75, 0.65, 0.55, 0.45];
+      for (let pass = 0; pass < 4; pass++) {
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(cw)); cv.height = Math.max(1, Math.round(ch));
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        let fitted = false;
+        for (const q of QUALITIES) {
+          const candidate = cv.toDataURL('image/jpeg', q);
+          out = candidate; cw = cv.width; ch = cv.height;
+          if (dataUrlBytes(candidate) <= PHOTO_MAX_BYTES) { fitted = true; break; }
+        }
+        if (fitted || cw <= 480 || ch <= 480) break;
+        cw = Math.round(cw * 0.8); ch = Math.round(ch * 0.8);
+      }
+      resolve({ src: out, w: cw, h: ch });
+    };
+    img.onerror = () => resolve({ src: dataUrl, w, h });
+    img.src = dataUrl;
+  });
+}
 let PHOTOS = { hb_de:[], hb_nde:[], pretest:[], general:[] };
 function pickPhotos(el, group){
-  PhotoKit.upload(el,{multiple:group==='hb_de'||group==='hb_nde'?false:true},entry=>{
+  PhotoKit.upload(el,{multiple:group==='hb_de'||group==='hb_nde'?false:true}, async entry=>{
     if(!entry) return; entry.caption='';
+    const c = await compressUnder1MB(entry.src, entry.w, entry.h);
+    entry.src = c.src; entry.dataUrl = c.src; entry.w = c.w; entry.h = c.h;
     if((group==='hb_de'||group==='hb_nde')) PHOTOS[group]=[entry]; else PHOTOS[group].push(entry);
     renderPhotos(group); autoSaveNow();
   });
 }
 function recropPhotoAt(group,i){
   const cur=PHOTOS[group][i]; if(!cur) return;
-  PhotoKit.recrop(cur,e=>{ if(!e)return; e.caption=cur.caption||''; PHOTOS[group][i]=e; renderPhotos(group); autoSaveNow(); });
+  PhotoKit.recrop(cur, async e=>{
+    if(!e)return; e.caption=cur.caption||'';
+    const c = await compressUnder1MB(e.src, e.w, e.h);
+    e.src = c.src; e.dataUrl = c.src; e.w = c.w; e.h = c.h;
+    PHOTOS[group][i]=e; renderPhotos(group); autoSaveNow();
+  });
 }
 function rotatePhotoAt(group,i,deg){
   const img=new Image();
-  img.onload=()=>{
+  img.onload=async ()=>{
     const Wp=img.naturalWidth,Hp=img.naturalHeight;
     const norm=((deg%360)+360)%360, swap=norm===90||norm===270;
     const cv=document.createElement('canvas'); cv.width=swap?Hp:Wp; cv.height=swap?Wp:Hp;
     const ctx=cv.getContext('2d');
     ctx.translate(cv.width/2,cv.height/2); ctx.rotate(deg*Math.PI/180); ctx.drawImage(img,-Wp/2,-Hp/2);
     const p=PHOTOS[group][i];
-    p.src=cv.toDataURL('image/jpeg',0.92); p.dataUrl=p.src; p.w=cv.width; p.h=cv.height;
+    const c = await compressUnder1MB(cv.toDataURL('image/jpeg',0.92), cv.width, cv.height);
+    p.src=c.src; p.dataUrl=c.src; p.w=c.w; p.h=c.h;
     if(swap&&p.widthCm&&p.heightCm){ const t=p.widthCm; p.widthCm=p.heightCm; p.heightCm=t; }
     renderPhotos(group); autoSaveNow();
   };
@@ -1154,6 +1248,25 @@ function loadPhotoDraft(){
   }catch(e){}
 }
 // Load & Merge / revision restore
+// Bounded-concurrency map — used below to pull several evidence photos from
+// Drive at once instead of strictly one at a time, without firing so many
+// simultaneous requests that the free-tier Apps Script proxy chokes.
+// Results come back in the same order as `items`.
+function mapLimit(items, limit, fn){
+  return new Promise(resolve=>{
+    const results=new Array(items.length);
+    if(!items.length){ resolve(results); return; }
+    let next=0, done=0;
+    function runNext(){
+      if(next>=items.length) return;
+      const i=next++;
+      Promise.resolve(fn(items[i], i))
+        .then(r=>{ results[i]=r; }, ()=>{ results[i]=undefined; })
+        .then(()=>{ done++; if(done===items.length) resolve(results); else runNext(); });
+    }
+    for(let k=0;k<Math.min(limit,items.length);k++) runNext();
+  });
+}
 async function restorePhotosFromUrls(photoUrls,overwrite){
   if(!photoUrls) return 0;
   let restored=0;
@@ -1161,15 +1274,18 @@ async function restorePhotosFromUrls(photoUrls,overwrite){
     if(!Array.isArray(entries)||!entries.length) continue;
     const g = PHOTOS[group] ? group : 'general';
     if(!overwrite && PHOTOS[g].length) continue;
-    const arr=[];
-    for(const entry of entries){
-      if(!entry||!entry.url) continue;
+    // Fetch this group's photos concurrently (capped at 4) instead of one
+    // at a time — a "Muat Data" pull with many photos across several
+    // groups used to wait for each Storage.toDataUrl round-trip in turn.
+    const fetched = await mapLimit(entries, 4, async entry=>{
+      if(!entry||!entry.url) return null;
       try{
         const dataUrl=await Storage.toDataUrl(entry.url);
-        if(!dataUrl) continue;
-        arr.push({src:dataUrl,dataUrl:dataUrl,caption:entry.caption||'',w:entry.w,h:entry.h,widthCm:entry.widthCm,heightCm:entry.heightCm});
-      }catch(e){ console.error('restorePhotosFromUrls:',e); }
-    }
+        if(!dataUrl) return null;
+        return {src:dataUrl,dataUrl:dataUrl,caption:entry.caption||'',w:entry.w,h:entry.h,widthCm:entry.widthCm,heightCm:entry.heightCm};
+      }catch(e){ console.error('restorePhotosFromUrls:',e); return null; }
+    });
+    const arr = fetched.filter(Boolean);
     if(arr.length){ PHOTOS[g] = overwrite ? arr : PHOTOS[g].concat(arr); restored+=arr.length; renderPhotos(g); }
   }
   if(restored){ try{ savePhotoDraft(); }catch(e){} }

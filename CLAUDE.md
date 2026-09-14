@@ -1491,6 +1491,22 @@ the current design — **do not "simplify" these away**:
   something genuinely failed — `failedItems` (logged) names exactly what didn't make it, so a
   caller's "checklist tersimpan, file gagal" message stays accurate instead of overstating the
   failure.
+  **Efficiency follow-up (2026-09-14): photos within a group now upload CONCURRENTLY (capped at
+  `PHOTO_UPLOAD_CONCURRENCY = 4`), not strictly one at a time.** Companion fix to the
+  `Motor_Solo_Run_Test.html` investigation above (a real "upload lama" / some submissions missing
+  their PDF+photos report) — the per-photo loop previously `await`ed each `Storage.uploadDataUrl()`
+  in turn, so a submission with N photos always cost N sequential round-trips through the Apps
+  Script proxy even though nothing about them depends on each other. `_mapLimit(items, limit, fn)`
+  runs up to `limit` uploads in flight at once, results returned in the same input order (so
+  caption/index correspondence and `reuse[key].length === list.length` count-matching elsewhere
+  stay correct) — capped at 4, not unbounded, so a large batch doesn't fire dozens of simultaneous
+  requests at the free-tier Apps Script proxy, which is already documented elsewhere in this file
+  as having real, low quota ceilings. Verified with a mocked `Storage.uploadDataUrl` (artificial
+  80ms latency): max concurrent in-flight capped at exactly 4, a 10-photo/2-group submission
+  completed in ~300ms instead of the ~800ms+ sequential would have taken, output order matched
+  input order, and — re-run with one photo forced to fail — the other 9 still succeeded, the
+  approval record was still created, and the failure was still correctly reported via
+  `failedItems`, confirming the per-photo resilience fix above still holds under concurrency.
   **Submitter-role auto-advance (applies to every check sheet automatically — no per-file
   code):** `submitWithFiles()` reads `window.AuthSession.get()` at submit time. When the
   logged-in submitter's `role` is `techop2` (level 2), the TechOp2 review step is skipped —
@@ -2289,7 +2305,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260914c`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20260914d`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a
@@ -3168,6 +3184,38 @@ submitWithFiles`, table-nav, pdf-preview), and a portrait-A4 jsPDF export on the
   hb_de/hb_nde/pretest/general, pdfBuilder → 5-page PDF, zero real writes); real 5-page PDF
   rendered + visually checked (letterhead every page, charts embedded, no garbage glyphs);
   portal card added under `motor` (count 55→56).
+
+**Reliability/efficiency follow-up (2026-09-14): this file shipped with NEITHER of the two photo-
+size safeguards other check sheets already have, and it was the concrete example a user reported
+("PDF dan foto tidak terupload... upload lama") after the storage-helper.js retry/chunking work
+above.** Root cause, confirmed by reading the code (not guessed): (1) `pickPhotos`/`recropPhotoAt`/
+`rotatePhotoAt` never called `compressUnder1MB()` — PhotoKit's own downscale is pixel-based (up to
+1600px), not byte-size based, so a busy/detailed evidence photo could land well over 1MB with no
+cap at all; (2) `drawPdfPhotos()` embedded every photo into the archival PDF at that SAME full
+working resolution instead of re-encoding for the small print box it actually draws into (the
+exact bug already documented as fixed in `Motor_Witness_Test_Vendor.html`'s `pdfPhotoSrc()` — this
+file just never got the same treatment). Between an uncapped `hb_de`/`hb_nde`/`pretest`/`general`
+photo set and a PDF embedding each at full res, a real submission's total upload payload
+(`Approvals.submitWithFiles()`'s photo loop + the archival-PDF upload, both through the same
+Apps Script proxy already documented as fragile under load) could plausibly grow into the tens of
+MB — slow regardless, and exactly the shape of payload the byte-range chunking work above had to
+be built for in the first place. Fixed by porting BOTH established patterns into this file:
+- `compressUnder1MB()` (same as `4000_Hours_Mill_PM.html`) on every path that produces a new
+  photo blob — initial pick, recrop, rotate.
+- `pdfPhotoSrc()` (same as `Motor_Witness_Test_Vendor.html`) — `drawPdfPhotos()` is now `async`
+  and `await`s `Promise.all(row.map(p=>pdfPhotoSrc(p,PW,PH_MAX)))` per photo row before drawing,
+  re-encoding a COPY sized for the ~87×72mm 2-up box at print DPI; the on-screen `PHOTOS` entry
+  (crop/rotate state) is never touched. All three `drawPdfPhotos(...)` call sites now `await` it
+  (the housing-bearing one had to move from `.forEach` to a `for...of` loop to allow that).
+- `restorePhotosFromUrls()` — the "tarik data" side of the same complaint — now fetches a group's
+  photos concurrently (`mapLimit(entries, 4, ...)`) instead of one `Storage.toDataUrl()` at a
+  time, so a Load & Merge / revision restore with many photos is noticeably faster too.
+
+Verified with mocked data: `compressUnder1MB` correctly no-ops on an already-small photo and
+correctly shrinks a synthetic oversized one under the 950KB cap; `pdfPhotoSrc` produces a smaller
+re-encoded copy without mutating the original entry; `mapLimit` preserves input order and result
+correctness under concurrency. See `approval-helper.js`'s entry below for the companion universal
+upload-concurrency fix (every check sheet's photo UPLOAD, not just this file's photo download).
 
 ## Per-file conventions worth matching
 

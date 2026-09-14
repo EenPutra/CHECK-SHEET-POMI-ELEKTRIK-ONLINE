@@ -27,6 +27,30 @@ function _firstArea(a) {
   return null;
 }
 
+// Bounded-concurrency map — runs `fn` over `items` with at most `limit` in
+// flight at once, results returned in the same order as `items`. Used by
+// submitWithFiles() so a submission's evidence photos upload several at a
+// time instead of strictly one after another (which is what made a
+// many-photo submission take noticeably longer than it needed to), while
+// still capping concurrency so a large batch doesn't fire dozens of
+// simultaneous requests at the free-tier Apps Script proxy at once.
+function _mapLimit(items, limit, fn) {
+  return new Promise(resolve => {
+    const results = new Array(items.length);
+    if (!items.length) { resolve(results); return; }
+    let next = 0, done = 0;
+    function runNext() {
+      if (next >= items.length) return;
+      const i = next++;
+      Promise.resolve(fn(items[i], i))
+        .then(r => { results[i] = r; }, () => { results[i] = undefined; })
+        .then(() => { done++; if (done === items.length) resolve(results); else runNext(); });
+    }
+    for (let k = 0; k < Math.min(limit, items.length); k++) runNext();
+  });
+}
+const PHOTO_UPLOAD_CONCURRENCY = 4;
+
 const Approvals = {
   COLLECTION: 'approvals',
 
@@ -281,34 +305,31 @@ const Approvals = {
           if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Foto ${key} sudah tersimpan (${list.length})...`);
           continue;
         }
-        const urls = [];
-        for (let i = 0; i < list.length; i++) {
-          const p = list[i];
-          if (!p) continue;
+        // Upload/resolve every photo in this group CONCURRENTLY (capped —
+        // see _mapLimit above) instead of strictly one at a time. Each photo
+        // still tries/catches independently (storage-helper.js already
+        // retries a transient network/Apps Script failure internally with
+        // backoff, so by the time an error reaches HERE it's a real,
+        // non-transient failure) — one bad photo never blocks or drops any
+        // other, running concurrently or not.
+        const results = await _mapLimit(list, PHOTO_UPLOAD_CONCURRENCY, async (p, i) => {
+          if (!p) return null;
           // A reference to a file already on Drive with NO local data URL — e.g.
           // a photo from a session restore that was never downloaded into memory
           // (deferred load / a failed "Muat Foto"). Keep its URL; nothing to
           // upload. Without this it was silently dropped (the old `!p.src` skip).
           if (p.__cdUrl && !p.src) {
-            urls.push({
+            uploadedPhotos++;
+            if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Foto ${key} sudah tersimpan (${uploadedPhotos}/${totalPhotos})...`);
+            return {
               url: p.__cdUrl, caption: p.caption || '',
               ...(p.w != null ? { w: p.w } : {}),
               ...(p.h != null ? { h: p.h } : {}),
               ...(p.widthCm != null ? { widthCm: p.widthCm } : {}),
               ...(p.heightCm != null ? { heightCm: p.heightCm } : {}),
-            });
-            uploadedPhotos++;
-            if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Foto ${key} sudah tersimpan (${uploadedPhotos}/${totalPhotos})...`);
-            continue;
+            };
           }
-          if (!p.src) continue;
-          // Each photo is attempted independently — storage-helper.js already
-          // retries a transient network/Apps Script failure internally with
-          // backoff, so by the time an error reaches HERE it's a real,
-          // non-transient failure (bad data, quota exhausted, offline). One
-          // such photo must not cost every OTHER already-uploaded photo (or
-          // the PDF, or the approval record itself) — see the resilience note
-          // above submitWithFiles.
+          if (!p.src) return null;
           try {
             const url = (p.__cdUrl && p.__cdSig === (String(p.src).length + '~' + String(p.src).slice(0, 24) + String(p.src).slice(-24)))
               ? p.__cdUrl
@@ -324,20 +345,22 @@ const Approvals = {
             // PhotoKit's default box instead of the crop the technician
             // actually chose. Harmless if the source entry doesn't have them
             // (older photos, or a sheet not using PhotoKit) — just omitted.
-            urls.push({
+            uploadedPhotos++;
+            if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Mengunggah foto ${uploadedPhotos}/${totalPhotos}...`);
+            return {
               url, caption: p.caption || '',
               ...(p.w != null ? { w: p.w } : {}),
               ...(p.h != null ? { h: p.h } : {}),
               ...(p.widthCm != null ? { widthCm: p.widthCm } : {}),
               ...(p.heightCm != null ? { heightCm: p.heightCm } : {}),
-            });
-            uploadedPhotos++;
-            if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Mengunggah foto ${uploadedPhotos}/${totalPhotos}...`);
+            };
           } catch (photoErr) {
             console.error(`Approvals.submitWithFiles: gagal upload foto ${key}#${i}:`, photoErr);
             failedItems.push(`Foto ${key} #${i + 1}`);
+            return null;
           }
-        }
+        });
+        const urls = results.filter(Boolean);
         if (urls.length) photoUrls[key] = urls;
       }
 
