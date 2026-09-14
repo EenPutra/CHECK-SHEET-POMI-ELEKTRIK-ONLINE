@@ -1377,13 +1377,28 @@ the current design — **do not "simplify" these away**:
   timeout, so one transient Apps Script hiccup (a free-tier cold start, a momentary quota error, a
   flaky mobile connection dropping mid-request) failed the whole operation outright, and a hung
   request left the progress bar stuck forever with nothing to retry. Both are now wrapped in
-  `withStorageRetry()` (3 attempts, exponential backoff + jitter, ~0.9s/1.8s/3.6s) and a 45s
+  `withStorageRetry()` (3 attempts, exponential backoff + jitter, ~0.9s/1.8s/3.6s) and an
   `AbortController`/`xhr.timeout` hard timeout; a `{phase:'retry',attempt,max,error}` event flows
   through the existing `onProgress` callback so a caller's UI can show "mencoba lagi" instead of
   looking frozen — both dashboards' `updateFileProgress()` handle it. `uploadDataUrl`/`uploadBlob`
   gained an optional 4th `onProgress` param for this (backward compatible — every existing 3-arg
   call site is untouched). A config error (blank `DRIVE_PROXY_URL`) is marked `.noRetry` so it
   fails fast instead of retrying something a retry can never fix.
+  **Follow-up same day: the timeout must ESCALATE per attempt, not stay flat.** The first version
+  used a flat 45s timeout on every attempt. Real user report right after this shipped: an approved
+  MANUAL UPLOAD's PDF (these are user-provided files with no size cap/compression, unlike
+  check-sheet evidence photos — easily several MB, more after base64 inflation) got stuck
+  retrying at ~92% and ultimately failed to download every time — confirmed from a screenshot of
+  the retry overlay showing "percobaan 1/3" stuck at 92% (the no-Content-Length asymptotic
+  progress curve). Root cause: a large file can legitimately need more than 45s to round-trip
+  through the Apps Script proxy, and retrying that SAME transfer 3x at the SAME short timeout can
+  never succeed — it's strictly worse than before this reliability fix existed at all (previously:
+  no timeout, so a slow-but-real download just took longer and worked). Fixed with
+  `STORAGE_TIMEOUT_SCHEDULE_MS = [60000, 120000, 240000]` (`storageTimeoutFor(attempt)`) — 60s,
+  2min, 4min — so a truly dead connection still fails fast on the first attempt, while a large
+  legitimate transfer gets real room to finish on a later one. Applies to both directions
+  (`fetchMeta`'s xhr/fetch paths and `uploadToDrive`) since `buildFinalPdf()`'s approve flow does
+  both: fetch the original (possibly large) PDF, then upload an even larger merged one.
 - **`approval-helper.js`** (`window.Approvals`) — the `approvals` Firestore collection, kept
   **deliberately separate** from `checksheets` (never a field bolted onto a checksheet doc) so
   the append-only `checksheets` collection that `dashboard.html`'s trend charts/dedupe/exports
@@ -2210,7 +2225,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260914a`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20260914b`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a

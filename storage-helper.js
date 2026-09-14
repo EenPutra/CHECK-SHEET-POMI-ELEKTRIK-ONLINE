@@ -35,7 +35,25 @@ const DRIVE_PROXY_TOKEN = '';
 // gets automatic retries for free.
 const STORAGE_RETRY_ATTEMPTS = 3;
 const STORAGE_RETRY_BASE_MS = 900;      // exponential backoff: ~0.9s, 1.8s, 3.6s (+ jitter)
-const STORAGE_REQUEST_TIMEOUT_MS = 45000; // generous — Apps Script cold starts are slow, not just "big file slow"
+// Per-attempt timeout ESCALATES rather than staying flat: 60s, 2min, 4min.
+// A flat short timeout (an earlier version of this used 45s for every
+// attempt) is actively WRONG for a large file — a multi-page scanned PDF
+// (e.g. a manually-uploaded calibration certificate, easily several MB,
+// bigger again after base64 inflation) can legitimately need more than 45s
+// to round-trip through the Apps Script proxy, especially on a mobile
+// connection or during a cold start. Retrying that same transfer 3x at the
+// SAME short timeout can never succeed — it just fails 3x faster than
+// before this file had a timeout at all, and before this file had ANY
+// timeout, a slow-but-real download just took a while and worked. Confirmed
+// via a real user report: an approved manual-upload PDF stuck retrying at
+// ~92% (the no-Content-Length progress curve) and ultimately failing to
+// download. Escalating the timeout keeps the fast-fail benefit for a truly
+// dead connection (first attempt still gives up in 60s) while giving a
+// slow-but-alive large transfer real room to finish on a later attempt.
+const STORAGE_TIMEOUT_SCHEDULE_MS = [60000, 120000, 240000];
+function storageTimeoutFor(attempt) {
+  return STORAGE_TIMEOUT_SCHEDULE_MS[Math.min(attempt - 1, STORAGE_TIMEOUT_SCHEDULE_MS.length - 1)];
+}
 
 function _storageSleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
 
@@ -64,10 +82,11 @@ async function withStorageRetry(attemptFn, { attempts = STORAGE_RETRY_ATTEMPTS, 
 // fetch() with a hard timeout via AbortController — a hung Apps Script
 // request used to leave the UI stuck on "Mengunggah..." forever with no
 // error and nothing to retry; this turns that into a normal, retryable
-// failure after STORAGE_REQUEST_TIMEOUT_MS.
+// failure after timeoutMs (see STORAGE_TIMEOUT_SCHEDULE_MS — callers pass
+// an escalating value per attempt, not a flat constant).
 function _storageFetchTimeout(url, opts, timeoutMs) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), timeoutMs || STORAGE_REQUEST_TIMEOUT_MS);
+  const t = setTimeout(() => ctrl.abort(), timeoutMs || STORAGE_TIMEOUT_SCHEDULE_MS[0]);
   return fetch(url, { ...opts, signal: ctrl.signal }).finally(() => clearTimeout(t));
 }
 
@@ -115,13 +134,13 @@ const Storage = {
   // the download uses XHR (progress events); without it, a plain fetch().
   async fetchMeta(url, onProgress) {
     const reqUrl = proxyUrlWithToken(url);
-    const json = await withStorageRetry(async () => {
+    const json = await withStorageRetry(async (attempt) => {
       if (typeof onProgress === 'function') {
-        return await xhrGetJson(reqUrl, onProgress);
+        return await xhrGetJson(reqUrl, onProgress, storageTimeoutFor(attempt));
       }
       let resp;
       try {
-        resp = await _storageFetchTimeout(reqUrl, {}, STORAGE_REQUEST_TIMEOUT_MS);
+        resp = await _storageFetchTimeout(reqUrl, {}, storageTimeoutFor(attempt));
       } catch (e) {
         throw new Error(e && e.name === 'AbortError' ? 'Unduhan file timeout.' : 'Gagal mengambil file (jaringan).');
       }
@@ -207,12 +226,12 @@ const Storage = {
 // A hard xhr.timeout turns a hung request into a normal rejectable error
 // (previously: an unresolved promise that left the caller's progress UI
 // stuck forever with no way to retry).
-function xhrGetJson(url, onProgress) {
+function xhrGetJson(url, onProgress, timeoutMs) {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest();
     xhr.open('GET', url);
     xhr.responseType = 'text';
-    xhr.timeout = STORAGE_REQUEST_TIMEOUT_MS;
+    xhr.timeout = timeoutMs || STORAGE_TIMEOUT_SCHEDULE_MS[0];
     xhr.onprogress = e => {
       try { onProgress({ loaded: e.loaded, total: e.lengthComputable ? e.total : 0 }); } catch (err) {}
     };
@@ -265,14 +284,14 @@ async function uploadToDrive(filename, mimeType, dataBase64, subfolder, onProgre
     err.noRetry = true;
     throw err;
   }
-  return withStorageRetry(async () => {
+  return withStorageRetry(async (attempt) => {
     let resp;
     try {
       resp = await _storageFetchTimeout(DRIVE_PROXY_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'text/plain;charset=utf-8' },
         body: JSON.stringify({ filename, mimeType, dataBase64, subfolder, token: DRIVE_PROXY_TOKEN }),
-      }, STORAGE_REQUEST_TIMEOUT_MS);
+      }, storageTimeoutFor(attempt));
     } catch (e) {
       throw new Error(e && e.name === 'AbortError' ? 'Upload ke Drive timeout.' : 'Upload ke Drive gagal (jaringan).');
     }
