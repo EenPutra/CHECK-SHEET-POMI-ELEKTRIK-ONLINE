@@ -181,10 +181,12 @@ this, `tag-desc`/`m-v`/`m-a`/`m-pwr`/`m-rpm`/`m-sf`/`location`/`compartment` wer
 `ol-setting` were plain `<span>`s with no input at all — a motor missing from the bundled master
 list had no way to get a real submission beyond the free-typed Plant Tag No. itself. Fix: a
 **"✏️ Motor Tidak Ada di List" toggle** (`toggleManualMotor()` / `setManualMode(on)`) next to the
-tag search that unlocks those `readonly` fields for direct typing AND flips the three OL spans to
-`contentEditable` — chosen specifically because a `<span contenteditable>` keeps `.textContent`
-working exactly as every existing read/write site (`selectTag()`, `refreshOLTable()`,
-`submitToDb()`, `generatePDF()`) already expects, so none of them needed touching. Selecting a
+tag search that unlocks those `readonly` fields for direct typing — chosen specifically because a
+`<span contenteditable>` keeps `.textContent` working exactly as every existing read/write site
+(`selectTag()`, `refreshOLTable()`, `submitToDb()`, `generatePDF()`) already expects, so none of
+them needed touching. (The three OL spans themselves are no longer gated by this toggle at all —
+see the "OL box is always editable" bullet further down; they used to flip `contentEditable` only
+in manual mode, but that's since been superseded.) Selecting a
 real motor from the dropdown (`selectTag()` finding a match) always force-exits manual mode
 first, re-locking everything — picking from the list is never ambiguous with manual entry.
 `resetForm()` also exits it. The dropdown's empty state ("no results") now points at the button.
@@ -211,6 +213,103 @@ first, re-locking everything — picking from the list is never ambiguous with m
   afterward correctly force-exits manual mode and re-locks, a mocked `submitToDb()` shows
   `motorManualEntry:true` + the correct `sMotor` Data Source row, and a real PDF renders both the
   manual Basic Motor Data and Overload Heater Data sections with the typed values.
+
+**`LV_Motor_MCC.html` — the whole OL box is always editable now, and its PDF section was
+restructured to mirror the on-screen layout.** User report with a screenshot: the Contactor Size
+(breaker/starter capacity) was getting flattened into one of 8 columns in a single wide PDF table
+row alongside the heater code and its 4 numeric ranges, so the printed report didn't read the same
+as the on-screen box (identity fields, then Contactor Size buttons, then its own Heater Code
+range table, then Result/Remark) — and separately, `OL Type/Heater`/`Rating Plug`/`OL Setting`
+were only ever editable while "Motor Tidak Ada di List" mode was on, and the Heater Code/Std/Amb
+Comp range table was only ever editable as a Size-5 fallback (see the bullet above) — so a real
+motor auto-filled from `MCC_MOTORS`/the bundled `OL_HEATERS` table had no way to be hand-corrected
+when the field's actual OL/heater setting differs from the master data, which happens in practice.
+- **All three OL identity spans (`ol-code`/`ol-plug`/`ol-setting`) are now permanently
+  `contenteditable="true"` in the markup**, independent of `manualMotorMode` — `setManualMode()`
+  no longer touches them at all (the `MANUAL_OL_SPANS` toggle loop and const are gone). A hint
+  line under the identity row (`.ol-hint`) tells the technician auto-fill is a starting point, not
+  a lock.
+- **The Heater Code / Std Min-Max / Amb Comp Min-Max row is now ALWAYS the editable `<input
+  class="ol-m">` row**, not just the old Size-5-or-unlisted-code fallback — `refreshOLTable()` no
+  longer branches into a read-only `<td>` row when `getHeaterRow()` finds a match; it always
+  renders the inputs, pre-filled from the matched row (or left blank when there's no bundled
+  reference) via a new `seedOlManualForSize(n)`. Seeding only happens the FIRST time a given
+  `(code, size)` combo is selected — tracked by a module-level `olManualSeedKey` — so re-rendering
+  the table (a draft restore, or any other redraw) never silently overwrites a value the
+  technician already hand-corrected for that same combo; picking a genuinely different size (or a
+  different motor, which resets the key) re-seeds fresh. `loadDraft()` sets `olManualSeedKey`
+  to match the restored `(code, size)` **before** calling `selectSize()`, otherwise the restore
+  would immediately re-seed over the draft's own saved (possibly hand-edited) `olManual` values —
+  this is the same class of ordering bug the Size-5 `olManual` restore above already had to get
+  right once.
+- **`olManual` is now the single source of truth for the range table's 5 values everywhere** —
+  `submitToDb()`'s `base.olData` and `generatePDF()` both read straight from it instead of
+  branching between a matched `OL_HEATERS` row and `olManual` depending on match status (the old
+  `_olRow`/`hlRow`/`manualOL` dance); `manualEntry` is kept as a purely informational flag (no
+  bundled-table reference exists for this code+size) since editability itself no longer depends on
+  it.
+- **PDF `OVERLOAD HEATER DATA (Point 6)` section rebuilt to mirror the on-screen box exactly**:
+  a 4-cell identity row (OL Type/Heater · Rating Plug · OL Setting · **Contactor Size — its own
+  field, no longer merged into the range table's columns**), then a separate 5-column `autoTable`
+  for the Heater Range (same `Heater Code`/`Std. Min (A)`/`Std. Max (A)`/`Amb. Comp. Min (A)`/
+  `Amb. Comp. Max (A)` headers as the on-screen table), then the item's own Result/Remark line —
+  replacing the old single flattened 8-column table row.
+  Verified via headless Chrome (CDP): the spans report `isContentEditable:true` regardless of
+  manual-motor mode; picking a bundled-matched size seeds `olManual` from the real row; hand-
+  editing a seeded value and re-clicking the SAME size preserves the edit, while switching to a
+  genuinely different size re-seeds; a hand-edited value survives a real `saveDraft()` →
+  page-reload → `loadDraft()` round trip; and a real generated PDF (`pdftotext -layout`) shows
+  Contactor Size as its own field and the corrected Std. Max value in its own Heater Range table,
+  not folded into one wide row. (Caught and fixed one bug along the way: the new Result/Remark PDF
+  line passed a `[r,g,b]` array straight to `pdf.setTextColor()` without spreading it, which threw
+  `Invalid argument passed to jsPDF.f3` — jsPDF's `setTextColor()` takes `(r,g,b)` arguments, not
+  an array, unlike an autoTable `cell.styles.textColor` assignment.)
+
+**Same file, same day — "Breaker Capacity" needed its OWN field, distinct from Contactor Size.**
+Follow-up user report with a screenshot of the PDF's `CHECK ITEMS` table: item 6's Result showed
+`OK` but its Remark showed `12,5 A` — the technician had been typing the installed breaker's rated
+current into the generic Remark box (the placeholder used to literally suggest this: `"e.g. Bkr
+capacity checked"`) because there was no dedicated field for it. This is a genuinely different
+value from Contactor Size (a NEMA frame-size class 0–5, not an amperage) and has **no source in
+`MCC_MOTORS` at all** — unlike OL Type/Heater/Rating Plug/OL Setting, which at least start from
+master data, Breaker Capacity is 100% manual, read off the physical breaker in the field.
+- Added a 4th field to the `.ol-info` row, `<input id="ol-bcap" class="ol-bcap">` (a plain input,
+  not a `contenteditable span`, since there's nothing to auto-fill — `.ol-field input.ol-bcap` CSS
+  matches the dashed-blue-border editable look the other 3 fields already have).
+  `selectTag()` explicitly blanks it on every motor pick (`document.getElementById('ol-bcap')
+  .value=''`) so a value typed for one motor never silently carries over to the next — the other
+  3 OL fields don't need this since they're always freshly overwritten from `m.olHeater`/etc.,
+  but this one has no such overwrite to rely on. Draft save/restore needed no special handling —
+  it's a real `<input>` with an `id`, so `saveDraft()`/`loadDraft()`'s existing generic
+  `querySelectorAll('input,select,textarea')` sweep already covers it, unlike the three
+  `contenteditable` spans which needed the dedicated `_olSpans` handling documented above.
+  Freed up the Remark placeholder to `"Catatan tambahan (opsional)"` now that it's not the only
+  place to record this.
+- `base.olData.breakerCapacity` (from `gv('ol-bcap')`) and a matching `sOL` sheet row (`'Breaker
+  Capacity (A)'`, placed between OL Setting and Contactor Size — same order as the on-screen row)
+  so the dashboard detail view shows it too, not just the PDF.
+- PDF identity row grew from 4 to 5 columns (`CW/5` instead of `CW/4`, label font dropped to
+  5.5pt to keep `"BREAKER CAP. (A)"` — abbreviated for column width, full "Breaker Capacity (A)"
+  stays on-screen — from crowding the narrower cells) with Breaker Capacity inserted between OL
+  Setting and Contactor Size, matching the on-screen field order.
+  Verified via headless Chrome: the field blanks correctly on a fresh `selectTag()`, a typed value
+  (`'12,5 A'`) flows into the simulated `base.olData.breakerCapacity`, and a real generated PDF
+  (`pdftotext -layout`) shows `BREAKER CAP. (A)` as its own column reading `12,5 A`, separate from
+  `CONTACTOR SIZE` reading `Size 1` — and the Remark column for item 6 is empty again instead of
+  holding the breaker value.
+
+**Same file, same day — the PDF's Work Info header box had a pre-existing text-overlap bug,
+unrelated to the OL work above, caught from a user screenshot of a real generated PDF.** The
+Compartment value ("BAC") visually overlapped with the tail of the "WO NO." label sitting almost
+on top of it. Root cause: `ib('WO No.', gv('wo-no'), M+100, y+24)` placed WO No. at x=M+100, while
+the Location/Compartment column started at `x=M+CW/2+4` (=M+96 with `CW=184`) — only 4mm apart
+horizontally — and WO No.'s label row (`y+24`) landed almost exactly on Compartment's value
+baseline (`y+25`), so the two blocks of text printed on top of each other regardless of value
+length. Fixed by giving Date/Done By/WO No. their own full-width row **below** both columns
+instead of sharing horizontal space with Location/Compartment: the box height grew 32→42mm, and
+the three fields are now spaced in even thirds (`CW/3` apart) across the full box width. Verified
+by regenerating a real PDF and rendering it to an image (`pdftoppm`) — Compartment ("BAC") and
+WO No. ("WO-2026-00123") now sit in clearly separate rows with no overlap at any zoom level.
 
 ## Submit Guard: `submit-guard.js` — insert-vs-overwrite prompt + real upload progress bar
 

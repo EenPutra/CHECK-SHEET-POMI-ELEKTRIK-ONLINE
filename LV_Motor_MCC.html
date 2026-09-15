@@ -139,6 +139,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .ol-field span[contenteditable="true"]{background:#fff;border:1.5px dashed var(--blue);border-radius:4px;
   padding:2px 7px;outline:none;cursor:text;min-width:60px;display:inline-block}
 .ol-field span[contenteditable="true"]:focus{border-style:solid}
+.ol-field input.ol-bcap{font-family:var(--mono);font-size:13px;color:var(--navy);font-weight:700;
+  background:#fff;border:1.5px dashed var(--blue);border-radius:4px;padding:2px 7px;outline:none;
+  min-width:70px;width:90px}
+.ol-field input.ol-bcap:focus{border-style:solid}
+.ol-hint{font-size:9.5px;color:var(--txt4);font-style:italic;margin:-4px 0 10px;line-height:1.4}
 .btn-manual{background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr);border-radius:5px;padding:7px 14px;
   font-family:var(--raj);font-weight:600;font-size:12px;letter-spacing:.5px;cursor:pointer;white-space:nowrap;width:100%}
 .btn-manual:hover{background:var(--bdr2)}
@@ -503,13 +508,19 @@ let manualMotorMode = false;
 // Fields normally auto-filled (and locked) from MCC_MOTORS — unlocked for
 // direct typing when the plant tag isn't in the bundled master list.
 const MANUAL_MOTOR_FIELDS = ['tag-desc','m-v','m-a','m-pwr','m-rpm','m-sf','location','compartment'];
-const MANUAL_OL_SPANS = ['ol-code','ol-plug','ol-setting'];
 let olSize = null;
-// Manual overload-heater range entry — used when the built-in OL_HEATERS table
-// has no row for the chosen (code, size), e.g. NEMA Contactor Size 5, which the
-// bundled Cutler-Hammer heater table (Sizes 0–4 only) doesn't cover.
+// Overload-heater range — OL Type/Heater · Rating Plug · OL Setting (the three
+// <span contenteditable> fields in the OL box) and the Heater Code / Std / Amb
+// Comp range table are ALWAYS editable, auto-filled only as a starting point:
+// field settings sometimes differ from the motor master data / bundled
+// Cutler-Hammer heater table (Sizes 0–4 only — Size 5 has no bundled row at
+// all), so a technician must be able to correct any of them by hand.
 let olManual = { code:'', stdMin:'', stdMax:'', ambMin:'', ambMax:'' };
 const OL_MANUAL_EMPTY = () => ({ code:'', stdMin:'', stdMax:'', ambMin:'', ambMax:'' });
+// Tracks which (code|size) combo olManual was last auto-filled from, so a
+// re-render (e.g. after a draft restore) never silently overwrites a
+// technician's own hand-edited heater-range values.
+let olManualSeedKey = null;
 const resultState = {};
 
 // ═══════════════════════════════════════════════════
@@ -567,20 +578,17 @@ function closeDrop(){
 //  MANUAL MOTOR ENTRY — plant tag not in MCC_MOTORS
 // ═══════════════════════════════════════════════════
 // Unlocks the otherwise auto-fill-only fields (Tag Description, Basic
-// Motor Data, Location, Compartment) plus the OL box's three identity
-// spans (they're <span>, not <input> — made contenteditable so every
-// existing .textContent read/write elsewhere in this file keeps working
-// unchanged) so a motor missing from the bundled master list can still
-// get a full submission instead of a form full of locked blanks.
+// Motor Data, Location, Compartment) so a motor missing from the bundled
+// master list can still get a full submission instead of a form full of
+// locked blanks. The OL box's three identity spans (ol-code/ol-plug/
+// ol-setting) are permanently contenteditable regardless of this mode —
+// see their declaration in buildTable() — since field OL settings can
+// differ from the master data even for a motor that IS in the list.
 function setManualMode(on){
   manualMotorMode = on;
   MANUAL_MOTOR_FIELDS.forEach(id => {
     const el = document.getElementById(id);
     if(el) el.readOnly = !on;
-  });
-  MANUAL_OL_SPANS.forEach(id => {
-    const el = document.getElementById(id);
-    if(el) el.contentEditable = on ? 'true' : 'false';
   });
   const ph = on ? 'Isi manual' : 'Auto-fill';
   ['m-v','m-a','m-pwr','m-rpm','m-sf'].forEach(id => { const el=document.getElementById(id); if(el) el.placeholder = ph; });
@@ -645,14 +653,20 @@ function selectTag(tag){
   document.getElementById('m-rpm').value = validNum(m.rpm) ? m.rpm        : '';
   document.getElementById('m-sf').value  = validNum(m.sf)  ? m.sf         : '';
 
-  // OL display
+  // OL display — auto-filled starting point only, all three spans stay
+  // contenteditable so the technician can correct any of them by hand.
   document.getElementById('ol-code').textContent    = m.olHeater   || '—';
   document.getElementById('ol-plug').textContent    = validNum(m.ratingPlug) ? m.ratingPlug : '—';
   document.getElementById('ol-setting').textContent = validNum(m.olSetting)  ? m.olSetting + '%' : '—';
+  // Breaker Capacity has no source in MCC_MOTORS at all (it's the actual
+  // installed breaker's rated current, read off-panel) — always blank on a
+  // fresh tag pick so it never carries over from a previously selected motor.
+  document.getElementById('ol-bcap').value = '';
 
   // Reset size selection and range table
   olSize = null;
   olManual = OL_MANUAL_EMPTY();
+  olManualSeedKey = null;
   document.querySelectorAll('.sz-btn').forEach(b => b.classList.remove('active'));
   refreshOLTable();
 }
@@ -670,7 +684,29 @@ function getHeaterRow(code, sz){
 function selectSize(n){
   olSize = n;
   document.querySelectorAll('.sz-btn').forEach((b,i) => b.classList.toggle('active', i === n));
+  seedOlManualForSize(n);
   refreshOLTable();
+}
+
+// Auto-fills the editable heater-range fields from the bundled OL_HEATERS
+// table (or clears them to blank) the FIRST time a given (code, size) combo
+// is selected — recorded via olManualSeedKey so a later re-render (draft
+// restore, unrelated redraw) never clobbers a value the technician already
+// hand-edited for this exact combo. Picking a different size, or a different
+// motor (which resets olManualSeedKey), always re-seeds fresh.
+function seedOlManualForSize(n){
+  const code = document.getElementById('ol-code').textContent;
+  const key = (code||'')+'|'+n;
+  if(olManualSeedKey === key) return;
+  olManualSeedKey = key;
+  const row = getHeaterRow(code, n);
+  olManual = row
+    ? { code: row.code,
+        stdMin: row.stdMin != null ? row.stdMin : '',
+        stdMax: row.stdMax != null ? row.stdMax : '',
+        ambMin: row.ambMin != null ? row.ambMin : '',
+        ambMax: row.ambMax != null ? row.ambMax : '' }
+    : { code: (code && code !== '—') ? code : '', stdMin:'', stdMax:'', ambMin:'', ambMax:'' };
 }
 
 function refreshOLTable(){
@@ -681,30 +717,26 @@ function refreshOLTable(){
     tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--txt4);font-style:italic;padding:8px">Select contactor size to see heater ranges</td></tr>';
     return;
   }
+  // Heater Code / Std Min-Max / Amb Comp Min-Max are ALWAYS editable inputs —
+  // pre-filled from the bundled OL_HEATERS table when a row matches this
+  // (code, size), left blank otherwise (Size 5, or a code not listed at this
+  // size) — either way the technician can correct any value from the actual
+  // OL relay / nameplate, since field settings sometimes differ from the
+  // reference table (olManual is the single source of truth either way).
   const row = getHeaterRow(code, olSize);
-  if(row){
-    const f = v => (v != null) ? v : '—';
-    tbody.innerHTML = `<tr>
-      <td>${row.code}</td><td>${f(row.stdMin)}</td><td>${f(row.stdMax)}</td>
-      <td>${f(row.ambMin)}</td><td>${f(row.ambMax)}</td>
-    </tr>`;
-    return;
-  }
-  // No row in the bundled table (Size 5, or an OL code not listed for this size) —
-  // fall back to manual entry so the technician can key the ranges from the OL
-  // relay / manufacturer heater sheet instead of hitting a dead "no data" wall.
   const ev = s => String(s == null ? '' : s).replace(/"/g,'&quot;');
-  const preCode = olManual.code || (code && code !== '—' ? code : '');
   tbody.innerHTML = `
     <tr>
-      <td><input class="ol-m" id="ol-m-code"   value="${ev(preCode)}"       placeholder="code" oninput="olManual.code=this.value"></td>
+      <td><input class="ol-m" id="ol-m-code"   value="${ev(olManual.code)}"   placeholder="code" oninput="olManual.code=this.value"></td>
       <td><input class="ol-m" id="ol-m-stdmin" value="${ev(olManual.stdMin)}" placeholder="A" oninput="olManual.stdMin=this.value"></td>
       <td><input class="ol-m" id="ol-m-stdmax" value="${ev(olManual.stdMax)}" placeholder="A" oninput="olManual.stdMax=this.value"></td>
       <td><input class="ol-m" id="ol-m-ambmin" value="${ev(olManual.ambMin)}" placeholder="A" oninput="olManual.ambMin=this.value"></td>
       <td><input class="ol-m" id="ol-m-ambmax" value="${ev(olManual.ambMax)}" placeholder="A" oninput="olManual.ambMax=this.value"></td>
     </tr>
-    <tr><td colspan="5" style="text-align:center;color:#b45309;font-size:10px;font-style:italic;padding:4px 8px">
-      Size ${olSize}: tidak ada di tabel heater bawaan (tabel hanya Size 0–4) — isi rentang heater manual dari data OL relay / nameplate.
+    <tr><td colspan="5" style="text-align:center;color:${row?'var(--txt4)':'#b45309'};font-size:10px;font-style:italic;padding:4px 8px">
+      ${row
+        ? 'Nilai di atas dari tabel heater bawaan — edit langsung di kolom jika setting di lapangan berbeda.'
+        : `Size ${olSize}: tidak ada di tabel heater bawaan (tabel hanya Size 0–4 dengan kode terdaftar) — isi rentang heater manual dari data OL relay / nameplate.`}
     </td></tr>`;
 }
 
@@ -761,10 +793,12 @@ function buildTable(){
           <div style="font-size:11px;color:var(--txt);line-height:1.5;margin-bottom:8px">${chk.task}</div>
           <div class="ol-box">
             <div class="ol-info">
-              <div class="ol-field"><label>OL Type / Heater</label><span id="ol-code">—</span></div>
-              <div class="ol-field"><label>Rating Plug (A)</label><span id="ol-plug">—</span></div>
-              <div class="ol-field"><label>OL Setting (%)</label><span id="ol-setting">—</span></div>
+              <div class="ol-field"><label>OL Type / Heater</label><span id="ol-code" contenteditable="true" title="Auto-terisi dari data motor — klik untuk edit manual jika berbeda di lapangan">—</span></div>
+              <div class="ol-field"><label>Rating Plug (A)</label><span id="ol-plug" contenteditable="true" title="Auto-terisi dari data motor — klik untuk edit manual jika berbeda di lapangan">—</span></div>
+              <div class="ol-field"><label>OL Setting (%)</label><span id="ol-setting" contenteditable="true" title="Auto-terisi dari data motor — klik untuk edit manual jika berbeda di lapangan">—</span></div>
+              <div class="ol-field"><label>Breaker Capacity (A)</label><input class="ol-bcap" id="ol-bcap" type="text" placeholder="e.g. 12.5" title="Kapasitas breaker terpasang di lapangan — tidak ada di data motor, isi manual"></div>
             </div>
+            <div class="ol-hint">✎ Field di atas &amp; tabel heater di bawah selalu bisa diedit manual — auto-fill hanya rekomendasi awal, setting aktual di lapangan yang menentukan.</div>
             <div class="ol-size-row">
               <span class="ol-size-lbl">Contactor Size :</span>
               ${[0,1,2,3,4,5].map(n=>`<button class="sz-btn" onclick="selectSize(${n})">${n}</button>`).join('')}
@@ -782,7 +816,7 @@ function buildTable(){
               <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Result:</span>
               ${mkSel('c6')}
               <span style="font-size:10px;color:var(--txt4);text-transform:uppercase;letter-spacing:1px">Remark:</span>
-              <input class="rmk-inp" id="rmk-c6" type="text" placeholder="e.g. Bkr capacity checked" style="max-width:240px">
+              <input class="rmk-inp" id="rmk-c6" type="text" placeholder="Catatan tambahan (opsional)" style="max-width:240px">
             </div>
           </div>
         </td>
@@ -930,7 +964,14 @@ function loadDraft(){
       if(sel){ sel.value = val; onResChange(sel, id); }
     });
     if(d._olManual && typeof d._olManual === 'object') olManual = Object.assign(OL_MANUAL_EMPTY(), d._olManual);
-    if(d._olSize !== null && d._olSize !== undefined) selectSize(d._olSize);
+    if(d._olSize !== null && d._olSize !== undefined){
+      // The draft already carries the technician's own heater-range values
+      // (possibly hand-edited away from the bundled table) — mark them as
+      // already "seeded" for this exact combo so selectSize() below renders
+      // them as-is instead of re-seeding from OL_HEATERS and wiping the edit.
+      olManualSeedKey = (document.getElementById('ol-code').textContent||'')+'|'+d._olSize;
+      selectSize(d._olSize);
+    }
     // Restore photos
     try{
       const rawP = localStorage.getItem('lv_motor_mcc_photos');
@@ -945,7 +986,7 @@ function resetForm(){
   document.querySelectorAll('input,select,textarea').forEach(el => { if(el.type !== 'file') el.value = ''; });
   Object.keys(resultState).forEach(k => delete resultState[k]);
   document.querySelectorAll('.r-sel').forEach(s => { s.value=''; s.className='r-sel'; });
-  olSize = null; selectedMotor = null; olManual = OL_MANUAL_EMPTY();
+  olSize = null; selectedMotor = null; olManual = OL_MANUAL_EMPTY(); olManualSeedKey = null;
   PHOTOS = []; renderPhotos();
   document.querySelectorAll('.sz-btn').forEach(b => b.classList.remove('active'));
   setManualMode(false);
@@ -973,18 +1014,25 @@ async function submitToDb(){
   base.compartment = gv('compartment'); base.ackDate = gv('ack-date'); base.ackBy = gv('ack-by');
   base.motorManualEntry = manualMotorMode; // true when the tag wasn't in MCC_MOTORS and data was typed in by hand
   base.photoCount = PHOTOS.length; base.photoCaptions = PHOTOS.map(p=>p.caption);
-  const _olRow = olSize !== null ? getHeaterRow(document.getElementById('ol-code').textContent, olSize) : null;
+  // olManual is now the single source of truth for the heater-range table —
+  // it's seeded from the bundled OL_HEATERS row (if any) when a contactor
+  // size is picked, but always rendered as editable inputs so a technician's
+  // hand-correction (field settings sometimes differ from the reference
+  // table) is what actually gets saved.
+  const _olHasBundledRow = olSize !== null && !!getHeaterRow(document.getElementById('ol-code').textContent, olSize);
+  const _olNum = v => (v !== '' && v != null) ? v : null;
   base.olData = {
     heaterCode: document.getElementById('ol-code').textContent,
     ratingPlug: document.getElementById('ol-plug').textContent,
     olSetting:  document.getElementById('ol-setting').textContent,
+    breakerCapacity: gv('ol-bcap'), // installed breaker's rated current — no master-data source, manual only
     size: olSize,
-    manualEntry: olSize !== null && !_olRow,
-    heaterCodeUsed: _olRow ? _olRow.code : (olManual.code || document.getElementById('ol-code').textContent),
-    stdMin: _olRow ? _olRow.stdMin : (olManual.stdMin || null),
-    stdMax: _olRow ? _olRow.stdMax : (olManual.stdMax || null),
-    ambMin: _olRow ? _olRow.ambMin : (olManual.ambMin || null),
-    ambMax: _olRow ? _olRow.ambMax : (olManual.ambMax || null),
+    manualEntry: olSize !== null && !_olHasBundledRow,
+    heaterCodeUsed: olManual.code || document.getElementById('ol-code').textContent,
+    stdMin: _olNum(olManual.stdMin),
+    stdMax: _olNum(olManual.stdMax),
+    ambMin: _olNum(olManual.ambMin),
+    ambMax: _olNum(olManual.ambMax),
   };
 
   const sels = [...document.querySelectorAll('.r-sel')];
@@ -1008,6 +1056,7 @@ async function submitToDb(){
       {no:'6',desc:'OL Heater Code',values:{Value:_olV(base.olData.heaterCode)}},
       {no:'',desc:'Rating Plug (A)',values:{Value:_olV(base.olData.ratingPlug)}},
       {no:'',desc:'OL Setting (%)',values:{Value:_olV(base.olData.olSetting)}},
+      {no:'',desc:'Breaker Capacity (A)',values:{Value:_olV(base.olData.breakerCapacity)}},
       {no:'',desc:'Contactor Size',values:{Value:base.olData.size!=null?('Size '+base.olData.size):'—'}},
       {no:'',desc:'Std. Min / Max (A)',values:{Value:_olV(base.olData.stdMin)+' / '+_olV(base.olData.stdMax)}},
       {no:'',desc:'Amb. Comp. Min / Max (A)',values:{Value:_olV(base.olData.ambMin)+' / '+_olV(base.olData.ambMax)}},
@@ -1133,8 +1182,18 @@ async function generatePDF(opts){
   y = 50;
 
   // ── Work info box ──
+  // Height raised 32→42mm and the Date/Done By/WO No. row moved to its own
+  // full-width strip BELOW the Tag Desc / Location / Compartment row — the
+  // old layout put WO No. at x=M+100 while Location/Compartment's column
+  // started at x=M+CW/2+4 (=M+96), only 4mm to its left, so WO No.'s label
+  // sat almost exactly on top of Compartment's value line and the two
+  // printed on top of each other (confirmed from a real rendered PDF: the
+  // Compartment value and the tail of "WO NO." visibly overlapped). Splitting
+  // the two rows into their own vertical bands, with the bottom row spanning
+  // the FULL box width in three even thirds, removes the collision
+  // regardless of how long any of these values are.
   pdf.setFillColor(...LT); pdf.setDrawColor(...SKY); pdf.setLineWidth(0.3);
-  pdf.roundedRect(M, y, CW, 32, 2, 2, 'FD');
+  pdf.roundedRect(M, y, CW, 42, 2, 2, 'FD');
   pdf.setFont('helvetica','bold'); pdf.setFontSize(13); pdf.setTextColor(...NAVY);
   pdf.text(tag||'—', M+4, y+9);
   pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...GR);
@@ -1143,10 +1202,11 @@ async function generatePDF(opts){
     pdf.setFont('helvetica','bold'); pdf.setFontSize(6); pdf.setTextColor(...GR); pdf.text(lbl.toUpperCase(),x,yy);
     pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...NAVY); pdf.text(String(val||'—').slice(0,28),x,yy+5);
   }
-  ib('Date',gv('wo-date'),M+4,y+24); ib('Done By',gv('done-by'),M+44,y+24);
-  ib('WO No.',gv('wo-no'),M+100,y+24);
   ib('Location',gv('location'),M+CW/2+4,y+9); ib('Compartment',gv('compartment'),M+CW/2+4,y+20);
-  y += 38;
+  const cw3i = CW/3;
+  ib('Date',gv('wo-date'),M+4,y+33); ib('Done By',gv('done-by'),M+4+cw3i,y+33);
+  ib('WO No.',gv('wo-no'),M+4+cw3i*2,y+33);
+  y += 48;
 
   // ── Basic Motor Data ──
   ckY(28);
@@ -1169,36 +1229,63 @@ async function generatePDF(opts){
   });
   y += Math.ceil(mdF.length/3)*rh + 6;
 
-  // ── OL Data ──
-  ckY(28);
+  // ── OL Data — mirrors the on-screen OL box layout: an identity row (OL
+  // Type/Heater · Rating Plug · OL Setting · Contactor Size — the contactor/
+  // breaker capacity gets its own field here, not merged into the heater
+  // range table's columns like the old single 8-column row did), then the
+  // Heater Range table on its own (same 5 columns as on screen), then the
+  // item's own Result/Remark — instead of one flattened wide table row.
+  ckY(60);
   const olCode    = document.getElementById('ol-code').textContent;
   const olPlug    = document.getElementById('ol-plug').textContent;
   const olSetTxt  = document.getElementById('ol-setting').textContent;
+  const olBcap    = gv('ol-bcap');
   const szLabel   = olSize !== null ? 'Size '+olSize : '—';
   const hlRow     = olSize !== null ? getHeaterRow(olCode, olSize) : null;
-  // Size 5 (or an unlisted code) has no bundled row — use the manual entry.
+  // Size 5 (or an unlisted code) has no bundled row — olManual (always the
+  // current editable values, whether auto-seeded or hand-typed) covers both.
   const manualOL  = olSize !== null && !hlRow;
   const olF       = v => (v != null && v !== '') ? v : '—';
-  const olNum     = k => hlRow ? hlRow[k] : (manualOL ? olManual[k] : null);
 
   pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,8,'F');
   pdf.setFont('helvetica','bold'); pdf.setFontSize(9); pdf.setTextColor(...WH);
   pdf.text('OVERLOAD HEATER DATA (Point 6)'+(manualOL?' — manual entry':''), M+3, y+5.5);
   y += 10;
 
+  // Breaker Capacity is its own field here — the technician's actual installed
+  // breaker rating (no master-data source, unlike the other 3 fields), kept
+  // distinct from Contactor Size (the NEMA frame size class); previously this
+  // value had no home and ended up hand-typed into the item's Remark instead.
+  const olInfo = [['OL Type / Heater',olCode],['Rating Plug (A)',olPlug],['OL Setting (%)',olSetTxt],
+                  ['Breaker Cap. (A)',olBcap],['Contactor Size',szLabel]];
+  const cw5 = CW/5, rhInfo = 12;
+  olInfo.forEach((f,i) => {
+    const x = M + i*cw5;
+    pdf.setFillColor(248,250,255); pdf.rect(x,y,cw5,rhInfo,'F');
+    pdf.setDrawColor(...SKY); pdf.setLineWidth(0.1); pdf.rect(x,y,cw5,rhInfo,'D');
+    pdf.setFont('helvetica','bold'); pdf.setFontSize(5.5); pdf.setTextColor(...GR); pdf.text(f[0].toUpperCase(), x+2, y+4);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(9); pdf.setTextColor(...NAVY); pdf.text(String(f[1]||'—').slice(0,14), x+2, y+9.5);
+  });
+  y += rhInfo + 3;
+
   pdf.autoTable({
     startY:y,
-    head:[['OL Heater Code','Rating Plug (A)','OL Setting (%)','Contactor Size',
-           'Std. Min (A)','Std. Max (A)','Amb. Min (A)','Amb. Max (A)']],
-    body:[[ (manualOL && olManual.code) ? olManual.code : olCode, olPlug, olSetTxt, szLabel,
-           olF(olNum('stdMin')), olF(olNum('stdMax')),
-           olF(olNum('ambMin')), olF(olNum('ambMax'))]],
+    head:[['Heater Code','Std. Min (A)','Std. Max (A)','Amb. Comp. Min (A)','Amb. Comp. Max (A)']],
+    body:[[ olF(olManual.code || olCode), olF(olManual.stdMin), olF(olManual.stdMax), olF(olManual.ambMin), olF(olManual.ambMax) ]],
     styles:{fontSize:8,cellPadding:3},
     headStyles:{fillColor:BLUE,textColor:WH,fontStyle:'bold'},
     alternateRowStyles:{fillColor:LT},
     margin:{left:M,right:M}
   });
-  y = pdf.lastAutoTable.finalY + 6;
+  y = pdf.lastAutoTable.finalY + 3;
+
+  const olRes = document.getElementById('res-c6')?.value || '—';
+  const olRmk = document.getElementById('rmk-c6')?.value.trim() || '—';
+  pdf.setFont('helvetica','bold'); pdf.setFontSize(8); pdf.setTextColor(...GR); pdf.text('Result:', M+2, y+4);
+  pdf.setTextColor(...(olRes==='OK'?OKC:olRes==='NG'?NGC:GR)); pdf.text(olRes, M+17, y+4);
+  pdf.setTextColor(...GR); pdf.text('Remark:', M+40, y+4);
+  pdf.setFont('helvetica','normal'); pdf.setTextColor(...NAVY); pdf.text(olRmk.slice(0,75), M+56, y+4);
+  y += 10;
 
   // ── Check Items ──
   ckY(16);
