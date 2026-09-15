@@ -78,6 +78,10 @@ const Approvals = {
       review: meta.autoReview || null,   // {comments, recommendations, signature, reviewedBy, reviewedAt, auto}
       approval: null,     // {notes, signature, approvedBy, approvedAt}
       returnedNote: null, // {note, by, stage, returnedAt}
+      // {reason:'slow_connection', count, skippedAt} when submitted with
+      // submit-guard.js's "Mode Hemat Data" active and this checksheet
+      // actually had photos to upload — null otherwise. See submitWithFiles().
+      photosSkipped: meta.photosSkipped || null,
       finalPdfUrl: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -218,6 +222,15 @@ const Approvals = {
   //     photos upload (proportional to count), then the PDF, then the
   //     approvals record — lets the caller drive a real progress bar
   //     instead of a guessed animation. Never called if omitted.
+  //   (No opts field for this — it's a global, persistent technician toggle,
+  //   not a per-call choice.) When submit-guard.js's SubmitGuard.isPdfOnlyMode()
+  //   is true ("Mode Hemat Data"), a fresh evidence-photo upload is skipped
+  //   entirely and only the archival PDF still uploads — see the
+  //   `pdfOnlyMode`/`skippedPhotos` block below. The resulting approval doc
+  //   gets `photosSkipped:{reason,count,skippedAt}` so the review dashboard
+  //   can tell a reviewer why a report has no photos yet; nothing is lost,
+  //   since the check sheet's own local PHOTOS[]/draft still has them for a
+  //   later revision resubmit to upload normally.
   //   autoReview: pass false to force the normal review path even when the
   //     submitter is a TechOp2. Otherwise this is decided automatically from
   //     window.AuthSession.get(): a logged-in TechOp2 (role 'techop2')
@@ -279,6 +292,20 @@ const Approvals = {
       }
     } catch (e) { /* session lookup is best-effort */ }
     const failedItems = [];
+    // "Mode Hemat Data" — a persistent, technician-controlled toggle owned by
+    // submit-guard.js (see that file's header). When on, a FRESH photo upload
+    // is skipped entirely (only the archival PDF still uploads below);
+    // photos already on Drive from an earlier CloudDraft save are still
+    // attached for free (the `reuse` branch below runs regardless of this
+    // flag — nothing new is uploaded either way, so there's no bandwidth
+    // reason to withhold them). Skipped photos are never lost: they stay in
+    // the check sheet's own local PHOTOS[]/draft, and a later revision
+    // resubmit (`?reviseOf=`) uploads them normally once the connection is
+    // better. `skippedPhotos` becomes the `photosSkipped` field recorded on
+    // the approval doc further below, so Review_Approval_Dashboard.html can
+    // tell a reviewer why a report has no evidence photos yet.
+    const pdfOnlyMode = (typeof SubmitGuard !== 'undefined' && SubmitGuard.isPdfOnlyMode && SubmitGuard.isPdfOnlyMode());
+    let skippedPhotos = 0;
     try {
       const photoUrls = {};
       const groups = Object.keys(photos || {});
@@ -293,7 +320,7 @@ const Approvals = {
         if (opts.reusePhotoUrls) reuse = opts.reusePhotoUrls;
         else if (typeof window !== 'undefined' && window.CloudDraft && CloudDraft.getReusePhotoUrls) reuse = CloudDraft.getReusePhotoUrls();
       } catch (e) {}
-      if (totalPhotos) report(0, 'Mengunggah foto...');
+      if (totalPhotos) report(0, pdfOnlyMode ? `Mode Hemat Data aktif — ${totalPhotos} foto akan dilewati...` : 'Mengunggah foto...');
       for (const key of groups) {
         const list = photos[key] || [];
         if (!list.length) continue;
@@ -303,6 +330,12 @@ const Approvals = {
             ...(u.widthCm != null ? { widthCm: u.widthCm } : {}), ...(u.heightCm != null ? { heightCm: u.heightCm } : {}) }));
           uploadedPhotos += list.length;
           if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Foto ${key} sudah tersimpan (${list.length})...`);
+          continue;
+        }
+        if (pdfOnlyMode) {
+          skippedPhotos += list.length;
+          uploadedPhotos += list.length;
+          if (totalPhotos) report(Math.round((uploadedPhotos / totalPhotos) * 70), `Mode Hemat Data aktif — foto ${key} dilewati (${skippedPhotos} total)...`);
           continue;
         }
         // Upload/resolve every photo in this group CONCURRENTLY (capped —
@@ -403,6 +436,10 @@ const Approvals = {
           assetTag: assetTag || '', assetName: assetName || '', checksheetFile: checksheetFile || '',
           submittedBy: submittedBy || '',
           ...(team ? { team } : {}), ...(area ? { area } : {}),
+          // Always assigned (never spread-conditional) so a revision that DID
+          // manage to upload its photos correctly clears a stale flag left
+          // over from the original slow-connection submission.
+          photosSkipped: skippedPhotos > 0 ? { reason: 'slow_connection', count: skippedPhotos, skippedAt: new Date().toISOString() } : null,
           updatedAt: new Date().toISOString(),
         };
         if (wasReturned) {
@@ -420,7 +457,8 @@ const Approvals = {
         }
         await db.collection(this.COLLECTION).doc(existingApprovalId).set(patch, { merge: true });
       } else {
-        await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf, team, area, src, autoReview });
+        const photosSkipped = skippedPhotos > 0 ? { reason: 'slow_connection', count: skippedPhotos, skippedAt: new Date().toISOString() } : null;
+        await this.create(checksheetId, { assetTag, assetName, checksheetFile, submittedBy, revisionOf, team, area, src, autoReview, photosSkipped });
       }
       if (failedItems.length) {
         ok = false;

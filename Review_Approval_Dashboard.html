@@ -12,14 +12,14 @@
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=20260914d"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=20260915a"></script>
 <!-- ?v bumped on every change to a shared lib so GitHub Pages' 10-min asset
      cache doesn't serve a stale copy (symptom: "Approvals.xxx is not a function"). -->
-<script src="db-helper.js?v=20260914d"></script>
-<script src="storage-helper.js?v=20260914d"></script>
-<script src="approval-helper.js?v=20260914d"></script>
-<script src="auth-session.js?v=20260914d"></script>
-<script src="team-routing.js?v=20260914d"></script>
+<script src="db-helper.js?v=20260915a"></script>
+<script src="storage-helper.js?v=20260915a"></script>
+<script src="approval-helper.js?v=20260915a"></script>
+<script src="auth-session.js?v=20260915a"></script>
+<script src="team-routing.js?v=20260915a"></script>
 <style>
 :root{
   --bg:#f4f7fb; --bg-2:#eaf0f7; --surf:#ffffff; --surf-2:#f8fafc;
@@ -273,11 +273,16 @@ select.login-field:disabled{opacity:.55;cursor:not-allowed}
 .info-cell .v{font-size:13px;font-weight:700;word-break:break-word}
 .file-links{display:flex;gap:10px;flex-wrap:wrap}
 .photo-groups{display:flex;flex-direction:column;gap:10px}
-.photo-group-lbl{font-size:11.5px;font-weight:700;color:var(--txt-2);font-family:var(--mono)}
+.photo-group-lbl{font-size:11.5px;font-weight:700;color:var(--txt-2);font-family:var(--mono);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.photo-group-count{font-weight:500;color:var(--txt-3)}
+.photo-load-btn{font-family:var(--sans)}
 .photo-thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
 .photo-thumbs img{width:78px;height:78px;object-fit:cover;border-radius:8px;border:1px solid var(--bdr)}
+.photo-thumbs img.loading{opacity:.35;background:var(--surf-2)}
+.photo-thumbs img.load-error{opacity:.5;border-color:var(--danger-btn-bdr);filter:grayscale(1)}
 .note-box{background:var(--surf-2);border:1px solid var(--bdr);border-radius:10px;padding:12px 14px;font-size:13px;line-height:1.6;white-space:pre-wrap}
 .note-box.returned{background:var(--ng-soft);border-color:var(--danger-btn-bdr);color:var(--rose-ink)}
+.note-box.warn{background:var(--acc-soft);border-color:var(--warn-bdr);color:var(--amber-ink)}
 .sig-preview{margin-top:8px}
 .sig-preview img{max-width:220px;max-height:100px;border:1px solid var(--bdr);border-radius:8px;background:#fff}
 textarea.dinput{width:100%;border:1px solid var(--bdr);border-radius:10px;padding:10px 12px;font-size:13px;resize:vertical;min-height:70px;outline:none}
@@ -2513,17 +2518,34 @@ function renderDetail(a, cs){
   const photoUrls = cs?.photoUrls || {};
   const groups = Object.keys(photoUrls).filter(k => (photoUrls[k]||[]).length);
   html += `<div class="dsec"><div class="dsec-title">Foto Evidence</div>`;
+  // Set by approval-helper.js's submitWithFiles() when the technician had
+  // submit-guard.js's "Mode Hemat Data" toggle on and this report actually
+  // had photos to upload — they were deliberately skipped, not lost or
+  // failed, and are still sitting in the technician's own local draft until
+  // a revision resubmit uploads them for real.
+  if(a.photosSkipped && a.photosSkipped.count){
+    html += `<div class="note-box warn" style="margin-bottom:10px">&#128034; <b>${a.photosSkipped.count} foto belum diunggah</b> — teknisi mengaktifkan Mode Hemat Data saat submit (koneksi lambat), jadi hanya PDF yang diunggah. Foto masih tersimpan di perangkat teknisi dan akan terunggah saat laporan ini direvisi &amp; dikirim ulang di koneksi yang lebih baik.</div>`;
+  }
   if(!groups.length){
     html += `<span class="readonly-hint">Tidak ada foto, atau belum berhasil diunggah.</span>`;
   }else{
-    // Thumbnails start on a blank placeholder — drive-proxy.gs's endpoint
-    // is a JSON API, not a directly displayable image URL (see
-    // storage-helper.js's fetchMeta), so each real src is resolved
-    // asynchronously below via Storage.toObjectUrl() once this HTML is in
-    // the DOM.
+    // Photos are NOT fetched when this detail view opens — each group only
+    // downloads (through the same fragile free-tier Apps Script Drive proxy
+    // every other Storage.* call goes through) when the technician/reviewer
+    // explicitly clicks "Muat Foto" for that group. Opening a report used to
+    // eagerly fire one uncapped, concurrent Storage.toObjectUrl() request per
+    // photo the instant its detail rendered — for a report with dozens of
+    // evidence photos this both made opening a report needlessly heavy AND
+    // was a real contributor to "upload/download sering gagal" reports,
+    // since it could burst far more simultaneous requests at the proxy than
+    // the capped-concurrency upload path (PHOTO_UPLOAD_CONCURRENCY=4 in
+    // approval-helper.js) ever does. See loadPhotoGroup() below.
     html += `<div class="photo-groups">` + groups.map(g => `
-      <div><div class="photo-group-lbl">${escHtml(g)}</div>
-        <div class="photo-thumbs">${photoUrls[g].map(p => `<a href="#" onclick="openRemoteFile('${p.url}');return false;"><img class="pk-thumb" data-remote-url="${p.url}" src="${BLANK_PIXEL}" title="${escHtml(p.caption||'')}"></a>`).join('')}</div>
+      <div class="photo-group" data-group="${escHtml(g)}">
+        <div class="photo-group-lbl">${escHtml(g)} <span class="photo-group-count">(${photoUrls[g].length} foto)</span>
+          <button class="btn btn-sm photo-load-btn" onclick="loadPhotoGroup(this)">&#128247; Muat Foto</button>
+        </div>
+        <div class="photo-thumbs" data-urls='${escHtml(JSON.stringify(photoUrls[g]))}'></div>
       </div>`).join('') + `</div>`;
   }
   html += `</div>`;
@@ -2657,15 +2679,85 @@ function renderDetail(a, cs){
   }
   if(document.getElementById('sig-canvas-review')){ attachSignaturePad('sig-canvas-review'); prefillSignatureCanvas('sig-canvas-review'); }
   if(document.getElementById('sig-canvas-approval')){ attachSignaturePad('sig-canvas-approval'); prefillSignatureCanvas('sig-canvas-approval'); }
-
-  document.querySelectorAll('.pk-thumb[data-remote-url]').forEach(img => {
-    Storage.toObjectUrl(img.dataset.remoteUrl)
-      .then(objUrl => { img.src = objUrl; })
-      .catch(() => { img.title = 'Gagal memuat foto'; });
-  });
+  // Photo thumbnails are intentionally NOT fetched here — see loadPhotoGroup()
+  // below, triggered only by the "Muat Foto" button per group.
 }
 
 const BLANK_PIXEL = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+const PHOTO_LOAD_CONCURRENCY = 3;
+
+// Runs up to `limit` calls of fn(item) concurrently, same capped-concurrency
+// shape as approval-helper.js's own _mapLimit (upload side) — kept as a
+// separate small copy here since that one is private to that module and this
+// is the download side of the same "never fire an uncapped burst of requests
+// at the free-tier Drive proxy" rule.
+function _mapLimitDl(items, limit, fn){
+  return new Promise(resolve => {
+    if(!items.length) return resolve();
+    let next = 0, done = 0;
+    const runOne = () => {
+      const i = next++;
+      if(i >= items.length) return;
+      fn(items[i], i).finally(() => {
+        done++;
+        if(done === items.length) resolve();
+        else runOne();
+      });
+    };
+    for(let k = 0; k < Math.min(limit, items.length); k++) runOne();
+  });
+}
+
+// Only fetches a group's photos when the technician/reviewer explicitly asks
+// for them — clicking "Muat Foto" replaces the button with a live progress
+// count, fetches at PHOTO_LOAD_CONCURRENCY at a time (never an uncapped
+// burst), renders each thumbnail as soon as ITS OWN fetch lands (not all-or-
+// nothing at the end), and leaves a "Muat Ulang" retry affordance for
+// whichever photos failed rather than silently giving up on the whole group.
+function loadPhotoGroup(btn){
+  const wrap = btn.closest('.photo-group');
+  const thumbsEl = wrap.querySelector('.photo-thumbs');
+  let list;
+  try{ list = JSON.parse(thumbsEl.dataset.urls || '[]'); }catch(e){ list = []; }
+  if(!list.length) return;
+
+  // First click builds the placeholder grid once; a "Muat Ulang" retry click
+  // (shown only when something failed) reuses the SAME <img> elements and
+  // only re-fetches the ones still marked .load-error — an already-loaded
+  // thumbnail is never re-fetched or wiped by a retry.
+  if(!thumbsEl.children.length){
+    thumbsEl.innerHTML = list.map((p,i) => `<a href="#" onclick="openRemoteFile('${p.url}');return false;"><img class="pk-thumb loading" data-idx="${i}" src="${BLANK_PIXEL}" title="${escHtml(p.caption||'')}"></a>`).join('');
+  }
+  const imgs = [...thumbsEl.querySelectorAll('.pk-thumb[data-idx]')];
+  const pending = imgs.filter(img => img.src === BLANK_PIXEL || img.classList.contains('load-error'));
+  pending.forEach(img => { img.classList.remove('load-error'); img.classList.add('loading'); });
+  if(!pending.length){ btn.remove(); return; }
+
+  btn.disabled = true;
+  let done = 0, failed = 0;
+  const total = pending.length;
+  const setLabel = () => { btn.textContent = 'Memuat foto… (' + done + '/' + total + ')'; };
+  setLabel();
+
+  _mapLimitDl(pending, PHOTO_LOAD_CONCURRENCY, (img) => {
+    const url = list[+img.dataset.idx].url;
+    return Storage.toObjectUrl(url).then(objUrl => {
+      img.src = objUrl; img.classList.remove('loading');
+      done++; setLabel();
+    }).catch(() => {
+      img.classList.remove('loading'); img.classList.add('load-error');
+      img.title = 'Gagal memuat foto — klik untuk coba buka langsung';
+      done++; failed++; setLabel();
+    });
+  }).then(() => {
+    if(failed){
+      btn.disabled = false;
+      btn.textContent = '↻ Muat Ulang (' + failed + ' gagal)';
+    } else {
+      btn.remove();
+    }
+  });
+}
 
 // ── FILE DOWNLOAD PROGRESS OVERLAY (always a real 0–100%) ──
 function _fpBytes(n){

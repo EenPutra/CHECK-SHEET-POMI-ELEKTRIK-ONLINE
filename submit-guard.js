@@ -15,6 +15,12 @@
 //    2. During the (sometimes slow — photo/PDF uploads to Drive) submit
 //       process, show a real, honest progress bar instead of a spinner or
 //       nothing at all, so nobody re-clicks Submit out of impatience.
+//    3. A persistent "Mode Hemat Data" badge (bottom-right, self-injected —
+//       see isPdfOnlyMode()/_togglePdfOnlyMode()) a technician flips on ONCE
+//       when they know they're on a bad connection; approval-helper.js's
+//       submitWithFiles() reads it and skips uploading fresh evidence
+//       photos (archival PDF still uploads), so a weak-signal site doesn't
+//       turn "submit a report" into a string of failed photo uploads.
 //
 //  resolveSubmitTarget() itself locks the submit button(s) and shows the
 //  progress overlay SYNCHRONOUSLY, in the same tick as the click, before its
@@ -70,6 +76,39 @@ const SubmitGuard = (function () {
   let _pendingApprovalId = null;
   let _busy = false; // true from the instant resolveSubmitTarget() is called until hideProgress() (or a cancel) — see the reentrancy note below
 
+  // ── "Mode Hemat Data" (data-saver / PDF-only) ──
+  // A PERSISTENT setting (localStorage, not a per-submit prompt) the
+  // technician flips on once when they know they're on a bad connection —
+  // the same pattern real low-bandwidth-friendly apps use (YouTube's Data
+  // Saver, WhatsApp's low-data mode): a sticky toggle beats a per-action
+  // prompt because there's no reliable window to ask "slow connection?"
+  // between a Submit click and the upload actually starting. While ON,
+  // Approvals.submitWithFiles() (approval-helper.js) skips uploading fresh
+  // evidence photos and only uploads the archival PDF — see that file's
+  // pdfOnlyMode check. Nothing is lost: the technician's PHOTOS[] stays in
+  // the check sheet's own local draft, and a later revision resubmit (once
+  // back on a good connection) uploads them normally.
+  const PDF_ONLY_KEY = 'sg_pdf_only_mode';
+  let _pdfOnlyMode = false;
+  try { _pdfOnlyMode = localStorage.getItem(PDF_ONLY_KEY) === '1'; } catch (e) {}
+
+  function isPdfOnlyMode() { return _pdfOnlyMode; }
+  function _setPdfOnlyMode(on) {
+    _pdfOnlyMode = !!on;
+    try { localStorage.setItem(PDF_ONLY_KEY, _pdfOnlyMode ? '1' : '0'); } catch (e) {}
+    _renderPdfOnlyBadge();
+  }
+  function _togglePdfOnlyMode() { _setPdfOnlyMode(!_pdfOnlyMode); }
+  function _renderPdfOnlyBadge() {
+    const el = document.getElementById('sg-datasaver-badge');
+    if (!el) return;
+    el.classList.toggle('on', _pdfOnlyMode);
+    el.querySelector('.sg-ds-label').textContent = _pdfOnlyMode ? 'Mode Hemat Data: ON' : 'Mode Hemat Data: OFF';
+    el.title = _pdfOnlyMode
+      ? 'Foto TIDAK diunggah saat submit — hanya PDF. Foto akan diunggah nanti saat direvisi di koneksi yang lebih baik. Klik untuk matikan.'
+      : 'Koneksi lambat? Aktifkan supaya submit hanya mengunggah PDF (foto menyusul saat direvisi nanti).';
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
@@ -113,8 +152,24 @@ const SubmitGuard = (function () {
   transition:width .25s ease}
 .sg-progress-pct{font-family:'Share Tech Mono',monospace;font-size:13px;font-weight:700;color:#1e3a5f}
 .sg-progress-hint{font-size:11px;color:#94a3b8;margin-top:10px}
+.sg-progress-pdfonly{display:none;font-size:11.5px;color:#92400e;background:#fffbeb;border:1px solid #fde68a;
+  border-radius:8px;padding:6px 10px;margin-top:10px;text-align:left;line-height:1.5}
+.sg-progress-pdfonly.show{display:block}
+#sg-datasaver-badge{position:fixed;right:14px;bottom:14px;z-index:24000;background:#1e293b;color:#cbd5e1;
+  font-family:'Barlow',system-ui,sans-serif;font-size:11.5px;font-weight:600;padding:8px 13px;border-radius:999px;
+  cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.25);display:flex;align-items:center;gap:6px;
+  border:1.5px solid #334155;user-select:none;transition:background .15s,border-color .15s}
+#sg-datasaver-badge:hover{border-color:#7dd3fc}
+#sg-datasaver-badge.on{background:#78350f;border-color:#f59e0b;color:#fef3c7}
     `;
     document.head.appendChild(style);
+
+    const dsBadge = document.createElement('div');
+    dsBadge.id = 'sg-datasaver-badge';
+    dsBadge.onclick = _togglePdfOnlyMode;
+    dsBadge.innerHTML = '&#128034;<span class="sg-ds-label">Mode Hemat Data: OFF</span>';
+    document.body.appendChild(dsBadge);
+    _renderPdfOnlyBadge();
 
     const choiceOverlay = document.createElement('div');
     choiceOverlay.id = 'sg-choice-overlay';
@@ -148,6 +203,7 @@ const SubmitGuard = (function () {
           <div class="sg-progress-label" id="sg-progress-label">Memulai...</div>
           <div class="sg-progress-track"><div class="sg-progress-bar" id="sg-progress-bar"></div></div>
           <div class="sg-progress-pct" id="sg-progress-pct">0%</div>
+          <div class="sg-progress-pdfonly" id="sg-progress-pdfonly">&#128034; Mode Hemat Data aktif — foto TIDAK diunggah sekarang, hanya PDF. Foto tetap tersimpan di perangkat ini dan bisa diunggah nanti lewat "Perbaiki &amp; kirim ulang" saat koneksi lebih baik.</div>
           <div class="sg-progress-hint">Jangan tutup atau refresh halaman ini sampai selesai.</div>
         </div>
       </div>`;
@@ -342,6 +398,8 @@ const SubmitGuard = (function () {
   function showProgress() {
     injectDom();
     document.getElementById('sg-progress-overlay').classList.add('show');
+    const note = document.getElementById('sg-progress-pdfonly');
+    if (note) note.classList.toggle('show', _pdfOnlyMode);
     setProgress(0, 'Memulai...');
   }
   function setProgress(pct, label) {
@@ -370,6 +428,7 @@ const SubmitGuard = (function () {
   return {
     init, resolveSubmitTarget, markSubmitted,
     showProgress, setProgress, hideProgress,
+    isPdfOnlyMode, _togglePdfOnlyMode,
     _chooseInsert, _chooseOverwrite, _chooseCancel,
   };
 })();

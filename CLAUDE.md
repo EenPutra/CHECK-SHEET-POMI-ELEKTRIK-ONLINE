@@ -2311,6 +2311,117 @@ file deleted; there is no standalone status page.
   the role's sections). `showApp()` calls `switchTab(_activeTab)` once so the default tab's
   panel visibility is synced on load.
 
+## Upload/download reliability audit + lazy photo loading + "Mode Hemat Data" (2026-09-15)
+
+User report: uploads/downloads in the Review & Approval flow fail often, evidence photos
+shouldn't auto-load when opening a report (make them load only on an explicit button), and
+there should be a way to submit PDF-only when the connection is bad. Investigated and fixed
+the front-end pieces; the server-side (`drive-proxy.gs`) side has a real, STILL-UNRESOLVED
+open question — see the last bullet, don't assume it's fixed.
+
+- **Root cause found for "opening a report is heavy / photos load automatically": `renderDetail()`
+  in `Review_Approval_Dashboard.html` used to fire ONE `Storage.toObjectUrl()` call per evidence
+  photo, for EVERY photo, the instant a report's detail view rendered — no button, no concurrency
+  cap, nothing to opt out of.** For a report with dozens of photos this is a genuinely uncapped
+  burst of simultaneous requests at the same fragile free-tier Apps Script Drive proxy that
+  `approval-helper.js`'s own upload path deliberately caps at `PHOTO_UPLOAD_CONCURRENCY=4` — so
+  simply *opening* a report to check its status could burst far more concurrent load at the proxy
+  than an actual upload ever does, and this happens every time anyone reviews anything, which is
+  far more often than photos are actually uploaded. This is very likely a real contributor to the
+  "upload/download sering gagal" pattern, independent of anything server-side.
+  Fixed by making photo loading fully on-demand: each photo group now renders a
+  "📷 Muat Foto" button (`loadPhotoGroup()`) instead of auto-fetching; clicking it fetches that
+  group's photos at `PHOTO_LOAD_CONCURRENCY=3` at a time (a local `_mapLimitDl()`, same
+  capped-concurrency shape as approval-helper.js's private `_mapLimit`, kept as a separate copy
+  since that one isn't exported), rendering each thumbnail as its own fetch resolves rather than
+  all-or-nothing. A partial failure leaves the button as "↻ Muat Ulang (N gagal)" and a **retry
+  only re-fetches the photos still marked `.load-error`** — the placeholder grid is built ONCE
+  (guarded by `thumbsEl.children.length`) and reused across retries so an already-loaded thumbnail
+  is never re-fetched or wiped. Verified via headless Chrome with a mocked `Storage.toObjectUrl`
+  (2 of 8 photos forced to fail): 0 fetches before any click, exactly 8 after clicking "Muat Foto"
+  with max 3 concurrent in flight, and exactly 2 (not 8) new fetches on the retry click.
+  **Gotcha hit while writing the test**: `storage-helper.js` declares `const Storage = {...}` as
+  a lexical top-level binding, not a `window.Storage` property (same class of gotcha CLAUDE.md
+  already documents for a plain `let PHOTOS` in a check sheet) — a test mock that does
+  `window.Storage = {...}` silently creates an unrelated property while every real call site's
+  bare `Storage.toObjectUrl(...)` keeps resolving to the real module-level `const`. The fix for a
+  test mock is to mutate the existing object's method in place (`Storage.toObjectUrl = mockFn`),
+  which IS allowed — `const` only blocks rebinding the name, not changing what the object holds.
+  PDF opening/downloading (`openRemoteFile()`/`downloadRemoteFile()`) was already correctly
+  on-demand (button-triggered) before this — only the photo thumbnails had the eager-fetch bug.
+
+- **"Mode Hemat Data" — a persistent, technician-controlled toggle for submitting on a bad
+  connection, PDF-only.** Deliberately built as a STICKY setting (`submit-guard.js`, localStorage
+  key `sg_pdf_only_mode`), not a per-submit prompt — there's no reliable window to ask "slow
+  connection?" between a Submit click and the upload actually starting (resolveSubmitTarget()
+  already locks buttons and shows the progress overlay synchronously in the same tick as the
+  click), so a one-shot prompt can't fit anywhere useful. This mirrors how real low-bandwidth-
+  friendly apps handle the same problem — YouTube's Data Saver, WhatsApp's low-data mode — a
+  toggle flipped on ONCE when the technician knows they're at a weak-signal site, not re-asked
+  every time.
+  - A small self-injected floating badge (bottom-right, `#sg-datasaver-badge` — same
+    self-injecting-DOM philosophy as `load-merge-modal.js`/`technician-auth.js`) shows
+    "🐢 Mode Hemat Data: OFF/ON", toggled by a click, persisted across reloads and check sheets
+    (it's one shared localStorage key read by every page that loads `submit-guard.js`, i.e. all 25
+    portal check sheets). `SubmitGuard.isPdfOnlyMode()` is the public getter.
+  - `Approvals.submitWithFiles()` (approval-helper.js) reads it at the top and, when true, skips
+    a FRESH evidence-photo upload for each group (the `_mapLimit` upload loop) — the archival PDF
+    still uploads normally. **Photos already on Drive from an earlier "Simpan ke Database"
+    (CloudDraft) save are still attached for free regardless of the flag** — the `reuse` branch
+    runs unconditionally before the pdfOnlyMode check, since attaching an already-uploaded URL
+    costs no new bandwidth either way. Nothing is ever lost: skipped photos stay in the check
+    sheet's own local `PHOTOS[]`/draft, and a later revision resubmit (`?reviseOf=`) uploads them
+    normally once back on a better connection.
+  - The resulting approval doc gets `photosSkipped:{reason:'slow_connection', count, skippedAt}`
+    (added to both `Approvals.create()`'s meta and the `existingApprovalId` patch path) — **always
+    explicitly assigned (never a conditional spread)** so a later revision that DID manage to
+    upload its photos correctly clears a stale flag left over from the original slow-connection
+    submission, rather than leaving a permanently-wrong "photos skipped" note on a since-fixed
+    report. `Review_Approval_Dashboard.html`'s `renderDetail()` shows an amber note-box
+    ("🐢 N foto belum diunggah...") when this flag is set, so a reviewer isn't left wondering why
+    a report has no evidence photos. The progress overlay itself also shows a small note when the
+    mode is active, so the technician submitting sees why the bar isn't uploading photos.
+    Verified via a mocked `db`/`Storage` harness across 5 scenarios: pdfOnly=true skips fresh
+    uploads but still uploads the PDF and sets the flag; pdfOnly=false is unchanged from before
+    this feature (regression check); pdfOnly=true with already-reused Drive URLs still attaches
+    them with zero new uploads and no flag set; a revision resubmit (`existingApprovalId`) with
+    pdfOnly=true sets the flag on the patch; and a revision resubmit with pdfOnly=false correctly
+    CLEARS a stale flag that was on the previous (returned) submission.
+
+- **Audited every check sheet currently wired into `Approvals.submitWithFiles()` (51 files,
+  including all 26 generated from the 3 template families) for the "bare array passed as `photos`"
+  bug class** documented above under `cloud-draft.js` (the one that silently produced 0 uploads
+  across 27 files at once) — re-checked because the user asked specifically whether upload
+  problems exist across other check sheets too. Every current `photos:`/`photos` argument
+  (whether inline, a bare variable, or a `collectPhotosForUpload()`-style builder function) was
+  traced to its actual construction and confirmed to build a proper `{groupKey:[...]}` dict — no
+  regressions found. `PLTS_AshDisposal_PM.html` still correctly predates `submitWithFiles()`
+  entirely (calls `Approvals.create()` directly, per its own documented exception above); the
+  earlier grep match there was only a comment referencing the function name, not a call.
+
+- **NOT resolved — a real, still-open server-side investigation from a PRIOR session.** Git
+  history (`f532c33`, 2026-09-14) shows a user report that Drive-proxy downloads were "still very
+  slow" even after the byte-range chunking fix earlier documented above, with Apps Script's own
+  Executions log showing every call as "Completed" (no server-side error) — which points at
+  `fetchDriveRange()` silently throwing and falling back to the slow whole-file-read path on
+  *every* call, without that ever surfacing as a logged failure. Temporary `_debugMs`/
+  `_debugUsedRange`/`_debugRangeError` fields were added to `doGet()`'s JSON response specifically
+  to make this visible in the Network tab — but **no follow-up commit exists analyzing what those
+  fields actually showed**, so the real cause is still unconfirmed as of this writing. This
+  session could not investigate further: `drive-proxy.gs` runs on Google Apps Script, any fix to
+  it needs the SAME manual redeploy every other entry in this section already stresses (`git push`
+  alone changes nothing live), and reproducing the failure needs a real slow-network conditions
+  test against the live deployed proxy, not something this session has credentials or a safe way
+  to simulate. **Next step for whoever picks this up**: open a real (ideally large) file through
+  the live dashboard, check the Network tab response for that `doGet` call, and read off
+  `_debugUsedRange`/`_debugRangeError` — `true`/`null` means the range path IS running and the
+  slowness is elsewhere (likely just genuine client-side network conditions, which nothing
+  server-side can fix — reducing round-trips, like this session's photo-lazy-loading fix, is the
+  actual lever there); `false`/some message means the range path is failing for a reason the
+  message will likely name outright (a wrong OAuth scope, a Shared-Drive permission issue, etc.).
+  Remove the temporary diagnostic fields only once the real cause is confirmed, per the original
+  commit's own note — don't remove them speculatively.
+
 ## `cloud-draft.js` — "Simpan ke Database (Lanjut Nanti)", unified with Load & Merge
 
 "Save a not-yet-finished report to the database and continue it later, from any device" — built
@@ -2427,7 +2538,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260914d`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20260915a`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a
