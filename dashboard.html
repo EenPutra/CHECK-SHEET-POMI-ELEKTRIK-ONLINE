@@ -301,7 +301,14 @@ body.role-technician .scope-note,body.role-techop2 .scope-note{display:flex}
 .trend-bulk-result{border:1px solid var(--bdr);border-radius:10px;padding:14px;min-width:0}
 .trend-bulk-result h4{font-size:13px;margin:0 0 6px;line-height:1.5}
 .trend-bulk-result p{font-size:12px;color:var(--txt-3);margin-bottom:10px}
-.trend-bulk-canvas{height:320px;position:relative}
+.trend-bulk-canvas{height:360px;position:relative}
+.trend-series-tags button:hover,.trend-series-tags button:focus-visible,.trend-chip:focus-visible{background:var(--pri-soft);outline:2px solid var(--pri);outline-offset:2px}
+.trend-axis-controls{display:flex;flex-wrap:wrap;gap:10px 18px;padding:12px;background:var(--surf-2);border:1px solid var(--bdr);border-radius:9px;margin-top:14px;align-items:end}
+.trend-axis-pair{display:flex;flex-wrap:wrap;align-items:center;gap:7px;font-size:12px;min-width:0}
+.trend-axis-pair label{display:flex;align-items:center;gap:5px}
+.trend-axis-pair input,.trend-axis-pair select{border:1px solid var(--bdr);border-radius:6px;padding:7px;background:var(--surf);color:var(--txt);min-width:0;width:112px;font-size:12px}
+.trend-axis-pair input[type=date]{width:140px}
+.trend-axis-message{width:100%;font-size:12px;color:var(--rose)}
 .trend-picker-grid{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,2fr);gap:16px;margin:16px 0}
 .trend-picker-grid h4{font-size:13px;color:var(--txt-2)}
 .trend-picker-grid input[type=search]{width:100%;padding:9px 12px;border:1px solid var(--bdr);border-radius:6px;margin:8px 0;background:var(--surf);color:var(--txt)}
@@ -1015,19 +1022,7 @@ table.dtbl tr:last-child td{border-bottom:none}
     <div id="trend-content" style="display:none">
       <div class="trend-compare" id="trend-compare"></div>
       <div class="chart-body tall"><canvas id="chartParamTrend"></canvas></div>
-      <div class="trend-scale-row" id="trend-scale-row" style="display:none">
-        <span class="trend-scale-lbl">Skala Y<span id="trend-scale-unit-lbl"></span></span>
-        <input type="number" id="trend-ymin" class="trend-scale-input" placeholder="Min" step="any" oninput="applyTrendScale()">
-        <span class="trend-scale-sep">–</span>
-        <input type="number" id="trend-ymax" class="trend-scale-input" placeholder="Max" step="any" oninput="applyTrendScale()">
-        <span class="trend-scale-r" id="trend-scale-r">
-          <span class="trend-scale-lbl">Sumbu kanan</span>
-          <input type="number" id="trend-y1min" class="trend-scale-input" placeholder="Min" step="any" oninput="applyTrendScale()">
-          <span class="trend-scale-sep">–</span>
-          <input type="number" id="trend-y1max" class="trend-scale-input" placeholder="Max" step="any" oninput="applyTrendScale()">
-        </span>
-        <button type="button" class="trend-scale-reset" onclick="resetTrendScale()">Auto</button>
-      </div>
+      <div id="trend-scale-row"></div>
       <div class="trend-mixed-note" id="trend-mixed-note" style="display:none"></div>
       <div class="trend-crit" id="trend-crit" style="display:none"></div>
       <div class="trend-table-wrap">
@@ -2105,7 +2100,7 @@ function renderSeriesChips() {
   if (!TREND_SERIES.length) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
   wrap.style.display = 'flex';
   wrap.innerHTML = TREND_SERIES.map((s, i) => `
-    <span class="trend-chip">
+    <span class="trend-chip" tabindex="0" onmouseenter="highlightTrend(chartParamTrend,${i})" onmouseleave="highlightTrend(chartParamTrend,null)" onfocusin="highlightTrend(chartParamTrend,${i})" onfocusout="highlightTrend(chartParamTrend,null)">
       <span class="trend-chip-dot" style="background:${TREND_PALETTE[i % TREND_PALETTE.length]}"></span>
       ${esc(trendSeriesLabel(s))}
       <button type="button" class="trend-chip-x" onclick="removeTrendSeries(${i})" title="Hapus dari chart">&times;</button>
@@ -2128,7 +2123,7 @@ function syncBulkTargets(selected){
   BULK_GRAPHS.forEach(g=>target.add(new Option('Grafik '+g.id+' ('+g.series.length+' tren)',String(g.id))));
   target.value=[...target.options].some(o=>o.value===String(prev))?String(prev):'new';
 }
-function newBulkGraph(){const graph={id:++bulkGraphSeq,series:[]};BULK_GRAPHS.push(graph);return graph;}
+function newBulkGraph(){const graph={id:++bulkGraphSeq,series:[],view:{}};BULK_GRAPHS.push(graph);return graph;}
 function addBulkGraph(){if(!TR.tag)return;const graph=newBulkGraph();syncBulkTargets(graph.id);renderBulkGraphs();}
 function removeBulkGraph(id){BULK_GRAPHS=BULK_GRAPHS.filter(g=>g.id!==id);syncBulkTargets();renderBulkGraphs();}
 function removeBulkGraphSeries(id,index){
@@ -2243,11 +2238,18 @@ function renderBulkGraphs(){
     BULK_CHARTS.push(new Chart(canvas.getContext('2d'),{
       type:'line',data:{labels:dates,datasets:series.map((s,index)=>({label:trendSeriesLabel({...s.param,equip:s.equip}),yAxisID:s.axis.id,
         data:dates.map(date=>{const p=s.byDate.get(date);return p?(s.status?p.raw:p.numeric):null;}),
-        borderColor:palette(index),backgroundColor:palette(index),borderWidth:2,pointRadius:3,spanGaps:false,stepped:s.status}))},
-      options:{responsive:true,maintainAspectRatio:false,animation:false,
+        borderColor:palette(index),backgroundColor:palette(index),borderWidth:2.5,pointRadius:dates.length>35?2:3.5,pointHoverRadius:6,pointBorderColor:'#fff',pointBorderWidth:1.5,spanGaps:false,tension:.3,cubicInterpolationMode:'monotone',stepped:s.status}))},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,interaction:{mode:'nearest',intersect:false},
         plugins:{legend:{display:false},tooltip:{callbacks:{label:item=>{const s=series[item.datasetIndex],p=s.byDate.get(dates[item.dataIndex]);return p?[trendSeriesLabel({...s.param,equip:s.equip})+': '+p.raw,'WO: '+p.wo]:'';}}}},scales}
     }));
-    [...tags.children].forEach((tag,i)=>{tag.style.borderLeft='4px solid '+palette(i);});
+    const chart=BULK_CHARTS[BULK_CHARTS.length-1];
+    [...tags.children].forEach((tag,i)=>{
+      tag.style.borderLeft='4px solid '+palette(i);
+      tag.addEventListener('mouseenter',()=>highlightTrend(chart,i));tag.addEventListener('mouseleave',()=>highlightTrend(chart,null));
+      tag.addEventListener('focus',()=>highlightTrend(chart,i));tag.addEventListener('blur',()=>highlightTrend(chart,null));
+    });
+    const controls=document.createElement('div');card.appendChild(controls);
+    mountTrendControls(controls,chart,axisGroups,graph.view||(graph.view={}));
     if(axisGroups.length>1){const note=document.createElement('p');note.textContent='Setiap satuan dan status memakai sumbu tersendiri.'+(axisGroups.length>2?' Geser grafik ke samping untuk melihat seluruh sumbu.':'');card.appendChild(note);}
     const detail=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Lihat nilai dan riwayat';detail.appendChild(summary);
     const table=document.createElement('table');table.className='dtbl';const thead=table.createTHead(),hr=thead.insertRow();
@@ -2309,8 +2311,7 @@ function renderParamTrend() {
 
   // A genuine change of what's being charted invalidates any manually-typed Y
   // range from before (a 40-70 range picked for °C makes no sense once the
-  // parameter switches to kV) — only applyTrendScale()'s own re-render, called
-  // directly from the scale inputs, is allowed to keep them.
+  // parameter switches to kV). Scale controls update their own chart in place.
   resetTrendScaleInputs();
   TREND_LAST_RENDER = { seriesData, soloStatus };
 
@@ -2401,31 +2402,73 @@ function renderTrendCrit(seriesData) {
     : withCrit.map(w => `<div><b>${esc(w.label)}:</b> ${esc(w.crit)}</div>`).join('');
 }
 
-// Reads whatever's currently typed into the Min/Max inputs for one axis and
-// returns a Chart.js scale-option fragment — {} (i.e. auto) when a field is
-// empty or not a number, so an untouched input never overrides Chart.js's own
-// scaling. axisId is 'y' (left) or 'y1' (right).
-function trendScaleOverride(axisId) {
-  const minEl = document.getElementById(axisId === 'y1' ? 'trend-y1min' : 'trend-ymin');
-  const maxEl = document.getElementById(axisId === 'y1' ? 'trend-y1max' : 'trend-ymax');
-  const out = {};
-  if (minEl && minEl.value !== '') { const v = parseFloat(minEl.value); if (isFinite(v)) out.min = v; }
-  if (maxEl && maxEl.value !== '') { const v = parseFloat(maxEl.value); if (isFinite(v)) out.max = v; }
-  return out;
+// Each graph owns its ranges. Changing presentation never modifies stored readings.
+let TREND_VIEW = {};
+function resetTrendScaleInputs(){TREND_VIEW={};}
+function highlightTrend(chart,index){
+  if(!chart||!chart.canvas||!chart.ctx)return;
+  const props=['borderColor','backgroundColor','borderWidth','pointRadius','pointBackgroundColor','pointBorderColor','order'];
+  chart.data.datasets.forEach((dataset,i)=>{
+    if(!dataset._highlightBase)dataset._highlightBase=Object.fromEntries(props.map(key=>[key,dataset[key]]));
+    Object.assign(dataset,dataset._highlightBase);
+    if(index!==null){
+      const active=i===index;
+      dataset.borderColor=active?dataset._highlightBase.borderColor:'rgba(148,163,184,0.18)';
+      dataset.backgroundColor=active?dataset._highlightBase.backgroundColor:'rgba(148,163,184,0.08)';
+      dataset.pointBackgroundColor=active?dataset._highlightBase.borderColor:'rgba(148,163,184,0.18)';
+      dataset.pointBorderColor=active?'#fff':'transparent';
+      dataset.borderWidth=active?4:1;dataset.pointRadius=active?5:1;dataset.order=active?-1:1;
+    }
+  });chart.update('none');
 }
-function resetTrendScaleInputs() {
-  ['trend-ymin', 'trend-ymax', 'trend-y1min', 'trend-y1max'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-}
-// Wired to the scale inputs' oninput — re-draws the chart from what was last
-// rendered without touching TREND_SERIES or re-fetching/deduping any data, so
-// every keystroke stays cheap.
-function applyTrendScale() {
-  if (!TREND_LAST_RENDER) return;
-  renderTrendChart(TREND_LAST_RENDER.seriesData, TREND_LAST_RENDER.soloStatus);
-}
-function resetTrendScale() {
-  resetTrendScaleInputs();
-  applyTrendScale();
+function mountTrendControls(container,chart,axes,state){
+  container.replaceChildren();container.style.display='';container.className='trend-axis-controls';
+  const controls=[];const dates=chart.data.labels;
+  const makePair=(title,key,id,type,values=[])=>{
+    const row=document.createElement('div');row.className='trend-axis-pair';
+    const name=document.createElement('strong');name.textContent=title;row.appendChild(name);
+    const fields={};
+    ['min','max'].forEach(bound=>{
+      const label=document.createElement('label');label.appendChild(document.createTextNode(bound==='min'?'Min':'Max'));
+      const input=document.createElement(type==='category'?'select':'input');input.setAttribute('aria-label',title+' '+bound);
+      if(type==='category'){input.add(new Option('Auto',''));values.forEach((v,i)=>input.add(new Option(v,String(i))));}
+      else {input.type=type;input.step='any';input.placeholder='Auto';}
+      input.value=state[key]?.[bound]??'';label.appendChild(input);row.appendChild(label);fields[bound]=input;
+      input.addEventListener('input',apply);input.addEventListener('change',apply);
+    });
+    container.appendChild(row);controls.push({key,id,type,values,fields});
+  };
+  makePair('Sumbu X (tanggal)','x','x','date');
+  axes.forEach(a=>makePair('Sumbu Y · '+a.title,a.key,a.id,a.status?'category':'number',a.values));
+  const reset=document.createElement('button');reset.type='button';reset.className='trend-scale-reset';reset.textContent='Auto';reset.setAttribute('aria-label','Reset semua sumbu ke Auto');
+  reset.onclick=()=>{controls.forEach(c=>Object.values(c.fields).forEach(input=>input.value=''));apply();};container.appendChild(reset);
+  const message=document.createElement('div');message.className='trend-axis-message';message.setAttribute('role','status');container.appendChild(message);
+  function apply(){
+    if(!chart.canvas||!chart.ctx)return;
+    const pending=[];let error='';
+    controls.forEach(c=>{
+      const min=c.fields.min.value,max=c.fields.max.value;let low,high;
+      Object.values(c.fields).forEach(input=>input.removeAttribute('aria-invalid'));
+      if(c.type==='date'){
+        low=min?dates.findIndex(d=>d>=min):0;
+        high=max?dates.findLastIndex(d=>d<=max):dates.length-1;
+        if((min&&max&&min>max)||low<0||high<0||low>high)error='Rentang tanggal tidak valid atau tidak memiliki data.';
+      }else{
+        low=min===''?undefined:Number(min);high=max===''?undefined:Number(max);
+        if((low!==undefined&&!Number.isFinite(low))||(high!==undefined&&!Number.isFinite(high))||(low!==undefined&&high!==undefined&&(c.type==='category'?low>high:low>=high)))error='Min sumbu Y harus lebih kecil dari Max.';
+      }
+      pending.push({c,min,max,low,high});
+    });
+    message.textContent=error;
+    if(error){controls.forEach(c=>Object.values(c.fields).forEach(input=>input.setAttribute('aria-invalid','true')));return;}
+    pending.forEach(({c,min,max,low,high})=>{
+      state[c.key]={min,max};const scale=chart.options.scales[c.id];delete scale.min;delete scale.max;
+      if(c.type==='date'){if(min)scale.min=low;if(max)scale.max=high;}
+      else if(c.type==='category'){if(min!=='')scale.min=c.values[low];if(max!=='')scale.max=c.values[high];}
+      else {if(low!==undefined)scale.min=low;if(high!==undefined)scale.max=high;}
+    });chart.update('none');
+  }
+  apply();
 }
 
 function renderTrendChart(seriesData, soloStatus) {
@@ -2437,7 +2480,7 @@ function renderTrendChart(seriesData, soloStatus) {
   const scaleRow = document.getElementById('trend-scale-row');
 
   if (soloStatus) {
-    scaleRow.style.display = 'none';   // OK/NG has no magnitude — nothing to scale
+    scaleRow.style.display = ''; // Dates remain adjustable for status history.
     const s = seriesData[0], points = s.points;
     const labels = points.map(p => p.date);
     const colorOf = v => { const g = trendGoodness(v); return g === 1 ? '#10b981' : g === -1 ? '#f43f5e' : '#94a3b8'; };
@@ -2463,6 +2506,7 @@ function renderTrendChart(seriesData, soloStatus) {
         }
       }
     });
+    mountTrendControls(scaleRow,chartParamTrend,[],TREND_VIEW);
     return;
   }
 
@@ -2477,9 +2521,7 @@ function renderTrendChart(seriesData, soloStatus) {
   }
   const axisOf = s => useDualAxis ? (s.unit === units[0] ? 'y' : (s.unit === units[1] ? 'y1' : 'y')) : 'y';
 
-  scaleRow.style.display = 'flex';
-  document.getElementById('trend-scale-unit-lbl').textContent = units.length === 1 && units[0] ? ` (${units[0]})` : '';
-  document.getElementById('trend-scale-r').style.display = useDualAxis ? 'inline-flex' : 'none';
+
 
   const datasets = seriesData.map((s, i) => {
     const byDate = new Map(s.points.map(p => [p.date, p]));
@@ -2487,11 +2529,11 @@ function renderTrendChart(seriesData, soloStatus) {
     return {
       label: trendSeriesLabel(s) + (s.unit ? ' (' + s.unit + ')' : ''),
       data: allDates.map(d => { const p = byDate.get(d); return p ? p.numeric : null; }),
-      spanGaps: true,
+      spanGaps: false,
       borderColor: color, borderWidth: 2.5,
       backgroundColor: seriesData.length === 1 ? trendGradient(ctx, color, 340) : 'transparent',
       fill: seriesData.length === 1,
-      tension: 0.3,
+      tension: 0.3, cubicInterpolationMode: 'monotone',
       pointRadius: 4, pointHoverRadius: 6,
       pointBackgroundColor: color, pointBorderColor: '#fff', pointBorderWidth: 2,
       yAxisID: axisOf(s),
@@ -2501,9 +2543,9 @@ function renderTrendChart(seriesData, soloStatus) {
 
   const scales = {
     x: { grid: { display: false }, ticks: { font: { size: 10.5 } } },
-    y: { position: 'left', title: { display: units.length === 1 && !!units[0], text: units[0] || '' }, grid: { color: '#eef1f6' }, ...trendScaleOverride('y') }
+    y: { position: 'left', title: { display: units.length === 1 && !!units[0], text: units[0] || '' }, grid: { color: '#eef1f6' },  }
   };
-  if (useDualAxis) scales.y1 = { position: 'right', title: { display: true, text: units[1] }, grid: { drawOnChartArea: false }, ...trendScaleOverride('y1') };
+  if (useDualAxis) scales.y1 = { position: 'right', title: { display: true, text: units[1] }, grid: { drawOnChartArea: false },  };
 
   chartParamTrend = new Chart(ctx, {
     type: 'line',
@@ -2511,7 +2553,7 @@ function renderTrendChart(seriesData, soloStatus) {
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
-        legend: { display: seriesData.length > 1, position: 'bottom', labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, usePointStyle: true } },
+        legend: { display: seriesData.length > 1, position: 'bottom', onHover:(event,item,legend)=>highlightTrend(legend.chart,item.datasetIndex), onLeave:(event,item,legend)=>highlightTrend(legend.chart,null), labels: { boxWidth: 10, boxHeight: 10, font: { size: 11 }, usePointStyle: true } },
         tooltip: { callbacks: {
           label: item => {
             const meta = item.dataset.trendMeta, v = item.parsed.y;
@@ -2519,9 +2561,13 @@ function renderTrendChart(seriesData, soloStatus) {
           }
         } }
       },
-      scales
+      scales,
+      interaction:{mode:'nearest',intersect:false}
     }
   });
+  const axes=[{key:'y',id:'y',title:units[0]||'Nilai',status:false}];
+  if(useDualAxis)axes.push({key:'y1',id:'y1',title:units[1],status:false});
+  mountTrendControls(scaleRow,chartParamTrend,axes,TREND_VIEW);
 }
 
 function renderTrendTable(seriesData, soloStatus) {
