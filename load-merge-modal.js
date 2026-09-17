@@ -254,9 +254,10 @@ const LoadMergeModal = (function () {
   // generic id-sweep in applyMergedBundleToForm() actually has targets. Same
   // reasoning as restorePhotosFromUrls(): the module can't know a page's
   // dynamic-DOM shape, so the page supplies the reconstruction step.
-  function _runBeforeApply(docs) {
+  // The optional second argument lets hosts discard stale rows on overwrite.
+  function _runBeforeApply(docs, overwrite = false) {
     if (_config && typeof _config.beforeApply === 'function') {
-      try { _config.beforeApply(docs || []); }
+      try { _config.beforeApply(docs || [], { overwrite }); }
       catch (e) { console.warn('LoadMergeModal.beforeApply gagal:', e); }
     }
   }
@@ -451,7 +452,7 @@ const LoadMergeModal = (function () {
       // structure into _cloudNB) is in place before restorePhotosFromUrls()
       // runs, letting it slice photos into the right blocks.
       if (soleDraft && window.CloudDraft && CloudDraft.adopt) CloudDraft.adopt(soleDraft.id, soleDraft);
-      _runBeforeApply(chosen);
+      _runBeforeApply(chosen, overwrite);
       const bundle = buildMergedBundle(chosen, _config.headerMap);
       _pSet(10, 'Mengisi field form...');
       const filled = applyMergedBundleToForm(bundle, overwrite);
@@ -525,7 +526,7 @@ const LoadMergeModal = (function () {
       _pSet(5, 'Mengambil data submission sebelumnya...');
       const doc = await DB.getById(_reviseOfChecksheetId);
       if (!doc) { if (typeof showNote === 'function') showNote('❌ Submission sebelumnya tidak ditemukan.', 'err'); return; }
-      _runBeforeApply([doc]);
+      _runBeforeApply([doc], true);
       const bundle = buildMergedBundle([doc], _config.headerMap);
       _pSet(12, 'Mengisi field form...');
       const filled = applyMergedBundleToForm(bundle, true); // overwrite: restore the flagged submission in full, not a partial merge

@@ -14,7 +14,7 @@
 <script src="approval-helper.js?v=20260915a"></script>
 <script src="submit-guard.js?v=20260915a"></script>
 <script src="pdf-preview.js?v=20260915a"></script>
-<script src="load-merge-modal.js?v=20260915a"></script>
+<script src="load-merge-modal.js?v=20260916a"></script>
 <script src="cloud-draft.js?v=20260915a"></script>
 <script src="auth-session.js?v=20260915a"></script>
 <script src="technician-auth.js?v=20260915a"></script>
@@ -337,7 +337,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 </div>
 
 <!-- SOLO RUN -->
-<div class="panel">
+<div class="panel" id="solo-panel">
   <div class="sec-hdr open" onclick="toggleSec(this)">
     <div class="sec-hdr-icon">🌡️</div>
     <div><div class="sec-hdr-title">Solo Run Test — Temperature &amp; Current Log</div><span class="sec-hdr-sub">Add a time entry each reading</span></div>
@@ -389,6 +389,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     </div>
     <div class="note" style="padding:0 16px 10px">Solid = Thermal Imager, dashed = Infrared. Acceptance: bearing &lt; 80°C normal, 80–90 caution, 90–100 alarm, &gt; 100 trip.</div>
   </div>
+</div>
+
+<div id="running-tests"></div>
+<input type="hidden" id="running-test-structure">
+<div style="margin-bottom:16px">
+  <button class="btn btn-pdf" type="button" onclick="addRunningTest()">+ Add Running Test</button>
+  <p class="note" style="padding:8px 0 0">Tambahkan pengujian ulang dalam check sheet ini. Setiap pengujian memiliki judul, baris waktu, dan grafik sendiri.</p>
 </div>
 
 <!-- GENERAL PHOTOS -->
@@ -563,7 +570,7 @@ function mkTog(id){
 const v  = id => { const e=document.getElementById(id); return e?e.value.trim():''; };
 const iv = id => { const e=document.getElementById(id); return e&&e.value.trim()?e.value.trim():'—'; };
 const tv = id => ST[id]||'—';
-const esc = s => String(s==null?'':s).replace(/"/g,'&quot;');
+const esc = s => String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const numOf = s => { const n=parseFloat(s); return isFinite(n)?n:null; };
 
 // ── BUILD: housing bearing blocks ──
@@ -615,36 +622,85 @@ function buildMeasTables(){
 
 // ── BUILD: solo run table ──
 let srSeq = 0;
-function addSoloRow(vals){
-  const body=document.getElementById('sr-body');
-  srSeq++;
-  const i=srSeq;
-  const tr=document.createElement('tr');
-  tr.dataset.i=i;
-  tr.innerHTML = SR_COLS.map(c=>{
-    const id=`sr-${i}-${c.k}`;
-    const val = vals && vals[c.k]!=null ? esc(vals[c.k]) : '';
-    return `<td><input class="mi${c.type==='time'?'':''}" type="${c.type||'text'}" id="${id}" value="${val}"></td>`;
-  }).join('') + `<td><button class="rowdel" onclick="delSoloRow(this)">✕</button></td>`;
-  body.appendChild(tr);
-  refreshSolo();
-  return i;
+const runningTests = [];
+function runBody(run='sr'){ return document.getElementById(run==='sr'?'sr-body':run+'-body'); }
+function runTitle(run='sr'){ return run==='sr'?'Solo Run Test — Temperature & Current Log':v(run+'-title')||'Running Test'; }
+function runIds(){ return ['sr',...runningTests]; }
+function syncRunStructure(){
+  document.getElementById('running-test-structure').value=JSON.stringify(runIds().map(id=>({id, rows:[...runBody(id).rows].map(tr=>Number(tr.dataset.i))})));
+}
+function addRunningTest(id, empty=false){
+  if(!id) id='run-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,8);
+  if(!/^run-[a-z0-9-]+$/.test(id)||runningTests.includes(id)) return;
+  const panel=document.createElement('div'); panel.className='panel'; panel.id=id;
+  panel.innerHTML=`<div class="sec-hdr open" onclick="toggleSec(this)"><div class="sec-hdr-icon">🌡️</div><div class="sec-hdr-title">Running Test</div><span class="sec-hdr-cnt" id="${id}-count">0 rows</span><span class="sec-hdr-arrow">▼</span></div>
+    <div class="sec-body"><div class="wo-grid"><div class="mf" style="grid-column:1/-1"><label for="${id}-title">Judul Pengujian (bisa diedit)</label><input type="text" id="${id}-title"></div></div>
+    <div class="toolbar"><button class="btn2" onclick="addSoloRow(null,'${id}')">+ Tambah Baris Waktu</button><button class="rowdel" onclick="removeRunningTest('${id}')">Hapus Pengujian</button></div>
+    <div class="tbl-wrap"><table class="ct" id="${id}-table" style="min-width:1000px">${document.querySelector('#tbl-sr thead').outerHTML}<tbody id="${id}-body"></tbody></table></div>
+    <div class="chart-grid">${SR_CHARTS.map((c,i)=>`<div class="chart-box"><h4>${['DE Bearing','NDE Bearing','Shaft'][i]} Temperature</h4><canvas id="${id}-${c.canvas}" width="360" height="180"></canvas></div>`).join('')}</div>
+    <div class="note" style="padding-bottom:12px">Solid = Thermal Imager, dashed = Infrared.</div></div>`;
+  document.getElementById('running-tests').appendChild(panel);
+  runningTests.push(id);
+  document.getElementById(id+'-title').value=empty?'':'Running Test '+(runningTests.length+1);
+  if(!empty){ addSoloRow(null,id); document.getElementById(id+'-title').focus(); }
+  return id;
+}
+function removeRunningTest(id){
+  if(!confirm('Hapus pengujian ini beserta semua baris dan grafiknya?')) return;
+  document.getElementById(id).remove(); runningTests.splice(runningTests.indexOf(id),1);
+  refreshSolo(); scheduleAutoSave();
+}
+function addSoloRow(vals, run='sr', rowId){
+  const body=runBody(run);
+  const i=rowId||Math.max(0,...[...body.rows].map(tr=>Number(tr.dataset.i)))+1;
+  if(run==='sr') srSeq=Math.max(srSeq,i);
+  const tr=document.createElement('tr'); tr.dataset.i=i;
+  tr.innerHTML=SR_COLS.map(c=>`<td><input class="mi" type="${c.type||'text'}" id="${run}-${i}-${c.k}" aria-label="${c.label}" value="${esc(vals?.[c.k]??'')}"></td>`).join('')+`<td><button class="rowdel" onclick="delSoloRow(this)" aria-label="Hapus baris">✕</button></td>`;
+  body.appendChild(tr); refreshSolo(); scheduleAutoSave(); return i;
 }
 function delSoloRow(btn){ btn.closest('tr').remove(); refreshSolo(); scheduleAutoSave(); }
 function refreshSolo(){
-  const rows=[...document.querySelectorAll('#sr-body tr')];
-  document.getElementById('cnt-sr').textContent=rows.length+' rows';
-  document.getElementById('h-rows').textContent=rows.length;
-  // max bearing temp across DE/NDE thermal+infrared
-  let tmax=null;
-  rows.forEach(tr=>{
-    const i=tr.dataset.i;
-    ['deTI','deIR','ndeTI','ndeIR','hbTI','hbIR'].forEach(k=>{
-      const n=numOf(v(`sr-${i}-${k}`)); if(n!=null && (tmax==null||n>tmax)) tmax=n;
+  let total=0, tmax=null;
+  runIds().forEach(run=>{
+    const rows=[...runBody(run).rows]; total+=rows.length;
+    document.getElementById(run==='sr'?'cnt-sr':run+'-count').textContent=rows.length+' rows';
+    rows.forEach(tr=>['deTI','deIR','ndeTI','ndeIR','hbTI','hbIR'].forEach(k=>{
+      const n=numOf(v(`${run}-${tr.dataset.i}-${k}`)); if(n!=null&&(tmax==null||n>tmax)) tmax=n;
+    }));
+  });
+  document.getElementById('h-rows').textContent=total;
+  document.getElementById('h-tmax').textContent=tmax!=null?tmax.toFixed(0):'—';
+  syncRunStructure(); drawCharts();
+}
+// Rebuild exact row IDs before the shared draft/database field restoration.
+function prepareRunningTests(docs, options={}){
+  if(options.overwrite){
+    runBody().replaceChildren();
+    runningTests.splice(0).forEach(id=>document.getElementById(id).remove());
+  }
+  docs.forEach(doc=>{
+    const values=doc.inputValues||doc;
+    let shape;
+    try{ shape=JSON.parse(values['running-test-structure']); }catch(e){}
+    if(!Array.isArray(shape)){
+      const rows=Object.keys(values).map(k=>/^sr-(\d+)-/.exec(k)).filter(Boolean).map(m=>Number(m[1]));
+      shape=[{id:'sr',rows:[...new Set(rows)]}];
+    }
+    shape.forEach(({id,rows})=>{
+      if(id!=='sr'&&!/^run-[a-z0-9-]+$/.test(id)) return;
+      if(!runBody(id)) addRunningTest(id,true);
+      (rows||[]).forEach(i=>{ if(Number.isSafeInteger(i)&&i>0&&![...runBody(id).rows].some(tr=>Number(tr.dataset.i)===i)) addSoloRow(null,id,i); });
     });
   });
-  document.getElementById('h-tmax').textContent = tmax!=null ? tmax.toFixed(0) : '—';
-  drawCharts();
+  setTimeout(()=>{ refreshSolo(); scheduleAutoSave(); },0);
+}
+function restoreRunningSubmission(doc){
+  if(!doc) return;
+  runIds().forEach(id=>runBody(id).replaceChildren());
+  runningTests.splice(0).forEach(id=>document.getElementById(id).remove());
+  prepareRunningTests([doc]);
+  Object.entries(doc.inputValues||{}).forEach(([id,value])=>{ const el=document.getElementById(id); if(el&&el.type!=='file') el.value=value; });
+  refreshSolo();
 }
 
 // ── HAND-ROLLED LINE CHART (repo convention — no Chart.js) ──
@@ -693,22 +749,22 @@ function drawChart(canvas, labels, series, opts){
     s.data.forEach((val,i)=>{ if(val==null||!isFinite(val))return; ctx.beginPath(); ctx.arc(padL+stepX*i,yOf(val),2,0,Math.PI*2); ctx.fill(); });
   });
 }
-function chartData(cfg){
-  const rows=[...document.querySelectorAll('#sr-body tr')];
-  const labels=rows.map(tr=>v(`sr-${tr.dataset.i}-time`));
+function chartData(cfg, run='sr'){
+  const rows=[...runBody(run).rows];
+  const labels=rows.map(tr=>v(`${run}-${tr.dataset.i}-time`));
   const series=cfg.series.map(s=>({ label:s.label, dash:s.dash,
-    data: rows.map(tr=>numOf(v(`sr-${tr.dataset.i}-${s.k}`))) }));
+    data: rows.map(tr=>numOf(v(`${run}-${tr.dataset.i}-${s.k}`))) }));
   return {labels,series};
 }
 let _chT=null;
 function drawCharts(){
   clearTimeout(_chT);
   _chT=setTimeout(()=>{
-    SR_CHARTS.forEach(cfg=>{
-      const cv=document.getElementById(cfg.canvas); if(!cv) return;
-      const {labels,series}=chartData(cfg);
+    runIds().forEach(run=>SR_CHARTS.forEach(cfg=>{
+      const cv=document.getElementById(run==='sr'?cfg.canvas:run+'-'+cfg.canvas); if(!cv) return;
+      const {labels,series}=chartData(cfg,run);
       drawChart(cv, labels, series);
-    });
+    }));
   },200);
 }
 
@@ -717,6 +773,7 @@ let _autoT=null;
 function scheduleAutoSave(){ clearTimeout(_autoT); _autoT=setTimeout(()=>persistDraft(true),800); }
 function autoSaveNow(){ persistDraft(true); }
 function persistDraft(silent){
+  syncRunStructure();
   const d={};
   document.querySelectorAll('input,select,textarea').forEach(el=>{ if(el.id && el.type!=='file') d[el.id]=el.value; });
   d._st=Object.assign({},ST);
@@ -734,11 +791,7 @@ function loadDraft(){
     const raw=localStorage.getItem(DRAFT_KEY);
     if(!raw){ addSoloRow(); return; }
     const d=JSON.parse(raw);
-    const n = Math.max(1, parseInt(d._srN||0,10) || 0);
-    // pre-create solo run rows so the generic id-sweep below can fill them
-    const want = Object.keys(d).filter(k=>/^sr-\d+-/.test(k)).map(k=>parseInt(k.split('-')[1],10));
-    const maxI = want.length ? Math.max(...want) : n;
-    for(let i=0;i<Math.max(n,maxI);i++) addSoloRow();
+    prepareRunningTests([d]);
     Object.entries(d).forEach(([k,val])=>{
       if(k==='_st'||k==='_srN') return;
       const el=document.getElementById(k);
@@ -760,7 +813,9 @@ function resetForm(){
   Object.keys(ST).forEach(k=>delete ST[k]);
   document.querySelectorAll('.rb').forEach(b=>b.className='rb '+(b.dataset.v==='OK'?'ok-idle':'ng-idle'));
   PHOTOS={hb_de:[],hb_nde:[],pretest:[],general:[]}; renderAllPhotos();
+  runningTests.splice(0).forEach(id=>document.getElementById(id).remove());
   document.getElementById('sr-body').innerHTML=''; srSeq=0; addSoloRow();
+  clearTimeout(_autoT);
   try{ localStorage.removeItem(DRAFT_KEY); localStorage.removeItem(PHOTO_KEY); }catch(e){}
   refreshSolo();
   showNote('🔄 Form direset.','ok');
@@ -770,20 +825,20 @@ function showNote(msg,t){
   n.textContent=msg; n.className='notice '+t;
   setTimeout(()=>n.className='notice',4000);
 }
-document.addEventListener('input',e=>{ if(e.target.matches('input,select,textarea')){ if(e.target.closest('#tbl-sr')) refreshSolo(); scheduleAutoSave(); } });
+document.addEventListener('input',e=>{ if(e.target.matches('input,select,textarea')){ if(e.target.closest('#tbl-sr, #running-tests')) refreshSolo(); scheduleAutoSave(); } });
 document.addEventListener('change',e=>{ if(e.target.matches('input,select,textarea')) scheduleAutoSave(); });
 
 // ── LOAD / MERGE ──
-function openLoadMerge(){ LoadMergeModal.init({ assetTag: currentTag() }); LoadMergeModal.open(); }
+function openLoadMerge(){ LoadMergeModal.init({ assetTag: currentTag(), beforeApply:prepareRunningTests }); LoadMergeModal.open(); }
 async function pullLast(){
   const tag=currentTag();
   if(tag===FALLBACK_TAG){ showNote('⚠️ Isi Motor Tag dulu.','err'); return; }
-  const dirty = Object.keys(ST).length>0 || v('checked-by') || v('wo-no') || [...document.querySelectorAll('#sr-body input')].some(el=>el.value.trim());
+  const dirty = runningTests.length>0 || Object.keys(ST).length>0 || v('checked-by') || v('wo-no') || [...document.querySelectorAll('#sr-body input')].some(el=>el.value.trim());
   if(dirty && !confirm('Tarik submission terakhir untuk '+tag+'? Data yang belum tersimpan bisa tertimpa.')) return;
   try{
     const d=await DB.loadLastSubmission(tag);
     showNote(d ? '📂 Data terakhir untuk '+tag+' dimuat.' : 'ℹ️ Belum ada submission untuk '+tag+'.', d?'ok':'info');
-    if(d) refreshSolo();
+    if(d) restoreRunningSubmission(d);
   }catch(e){ showNote('❌ Gagal memuat: '+e.message,'err'); }
 }
 
@@ -837,13 +892,13 @@ function sheetEnviron(){
     {no:'',desc:'Relative Humidity (%)',values:{Value:iv('env-rh')}},
   ]};
 }
-function sheetSoloRun(){
-  const rows=[...document.querySelectorAll('#sr-body tr')].map((tr,idx)=>{
+function sheetSoloRun(run='sr'){
+  const rows=[...runBody(run).rows].map((tr,idx)=>{
     const i=tr.dataset.i; const vals={};
-    SR_COLS.forEach(c=>{ if(c.k==='time') return; vals[c.label]=iv('sr-'+i+'-'+c.k); });
-    return { no:String(idx+1), desc:iv('sr-'+i+'-time'), values:vals };
+    SR_COLS.forEach(c=>{ if(c.k==='time') return; vals[c.label]=iv(run+'-'+i+'-'+c.k); });
+    return { no:String(idx+1), desc:iv(run+'-'+i+'-time'), values:vals };
   });
-  return { title:'Solo Run Test — Temperature & Current Log',
+  return { title:runTitle(run),
     columns:SR_COLS.filter(c=>c.k!=='time').map(c=>c.label), rows };
 }
 function buildAllSheets(){
@@ -861,6 +916,7 @@ function buildAllSheets(){
     vibration:  sheetVibration(),
     environ:    sheetEnviron(),
     solorun:    sheetSoloRun(),
+    ...Object.fromEntries(runningTests.map(id=>[id,sheetSoloRun(id)])),
   };
 }
 
@@ -915,16 +971,16 @@ async function generatePDF(opts){
   const pdf=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   const W=210,H=297,M=12,CW=186;
   const TOP_START=28, BOTTOM_LIMIT=264;
-  const BLACK=[0,0,0], DARK=[15,23,42], NAVY=[30,58,95], LINE=[120,120,120],
-        LABEL_BG=[214,224,240], OKC=[22,120,55], NGC=[190,30,30];
+  const BLACK=[0,0,0], DARK=[15,23,42], NAVY=[30,58,95], LINE=[191,219,254],
+        LABEL_BG=[240,247,255], OKC=[22,120,55], NGC=[190,30,30];
   let y=TOP_START;
 
   function Sx(x){
     return String(x==null?'':x)
       .replace(/Ω|Ω/g,'ohm').replace(/µ/g,'u').replace(/[–—−]/g,'-').replace(/·/g,'-')
-      .replace(/×/g,'x').replace(/°/g,' deg').replace(/≥/g,'>=').replace(/≤/g,'<=')
+      .replace(/×/g,'x').replace(/≥/g,'>=').replace(/≤/g,'<=')
       .replace(/→/g,'->').replace(/±/g,'+/-').replace(/[‘’]/g,"'").replace(/[“”]/g,'"')
-      .replace(/[✅⚠️\u{1F527}\u{1F6D1}]/gu,'').replace(/\s+/g,' ').trim();
+      .replace(/[✅⚠️\u{1F527}\u{1F6D1}]/gu,'').replace(/[^\S\n]+/g,' ').trim();
   }
   const Srow = a => a.map(Sx);
 
@@ -940,37 +996,21 @@ async function generatePDF(opts){
 
   const kvTheme={
     theme:'grid',
-    styles:{font:'times',fontSize:8.4,cellPadding:1.9,textColor:DARK,lineColor:LINE,lineWidth:0.2,valign:'middle',overflow:'linebreak'},
-    headStyles:{fillColor:LABEL_BG,textColor:BLACK,fontStyle:'bold',lineColor:LINE,lineWidth:0.2,halign:'center'},
+    styles:{font:'helvetica',fontSize:8.4,cellPadding:1.9,textColor:DARK,lineColor:LINE,lineWidth:0.2,valign:'middle',overflow:'linebreak'},
+    headStyles:{fillColor:NAVY,textColor:[191,219,254],fontStyle:'bold',lineColor:LINE,lineWidth:0.2,halign:'center'},
     margin:{top:TOP_START,bottom:H-BOTTOM_LIMIT,left:M,right:M},
     willDrawPage:()=>ensureBg(),
   };
   function secBar(txt){
-    checkY(12);
-    pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,7,'F');
-    pdf.setTextColor(255,255,255); pdf.setFont('times','bold'); pdf.setFontSize(9);
-    pdf.text(Sx(txt),M+3,y+4.9);
-    y+=10;
+    pdf.setFont('times','bold'); pdf.setFontSize(9);
+    const lines=pdf.splitTextToSize(Sx(txt),CW-6);
+    const height=7+Math.max(0,lines.length-1)*4;
+    checkY(height+22);
+    pdf.setFillColor(...NAVY); pdf.rect(M,y,CW,height,'F');
+    pdf.setTextColor(255,255,255);
+    pdf.text(lines,M+3,y+4.9);
+    y+=height+3;
   }
-  function kvTable(sheet, opt){
-    opt=opt||{};
-    secBar(sheet.title);
-    pdf.autoTable({
-      ...kvTheme, startY:y,
-      head: opt.noHead ? undefined : [Srow([opt.firstCol||'Item', ...sheet.columns])],
-      body: sheet.rows.map(r=>Srow([r.desc, ...sheet.columns.map(c=>r.values[c]||'—')])),
-      columnStyles: opt.columnStyles || {0:{cellWidth:70,fontStyle:'bold',fillColor:LABEL_BG}},
-      didParseCell:d=>{
-        const t=d.cell.text[0];
-        if(d.section==='body' && d.column.index>0){
-          if(/^YES\b|^OK\b/.test(t)){ d.cell.styles.textColor=OKC; d.cell.styles.fontStyle='bold'; }
-          if(/^NO\b|^NG\b/.test(t)){ d.cell.styles.textColor=NGC; d.cell.styles.fontStyle='bold'; }
-        }
-      },
-    });
-    y=pdf.lastAutoTable.finalY+5;
-  }
-
   // Title
   pdf.setTextColor(...NAVY); pdf.setFont('times','bold'); pdf.setFontSize(14);
   pdf.text('MOTOR SOLO RUN TEST', W/2, y+2, {align:'center'});
@@ -979,112 +1019,146 @@ async function generatePDF(opts){
   pdf.text(Sx('Mechanical & thermal verification test  -  POMI Unit 7/8  -  Generated '+new Date().toLocaleString('en-GB')), W/2, y, {align:'center'});
   y+=7;
 
-  // Work info
-  pdf.autoTable({
-    ...kvTheme, startY:y,
-    body:[
-      ['WO No.', v('wo-no')||'-', 'Test Date', v('wo-date')||'-'],
-      ['Time', (v('time-start')||'-')+' - '+(v('time-end')||'-'), 'Shift', v('shift')||'-'],
-      ['Performed / Checked By', v('checked-by')||'-', 'NIK', v('nik')||'-'],
-      ['Reviewed By', v('reviewed-by')||'-', 'Purpose', v('purpose')||'-'],
-      ['Site / Location', v('site')||'-', 'Overall Result', v('overall').replace(/[✅⚠️🔧🛑]/g,'').trim()||'-'],
-    ].map(Srow),
-    columnStyles:{0:{cellWidth:38,fontStyle:'bold',fillColor:LABEL_BG},1:{cellWidth:55},2:{cellWidth:30,fontStyle:'bold',fillColor:LABEL_BG},3:{cellWidth:63}},
-  });
-  y=pdf.lastAutoTable.finalY+6;
+  // Read the same labels, fields, headers and row order displayed online.
+  function fieldGrid(fields, cols=3, left=M, width=CW){
+    const entries=[...fields].map(field=>{
+      const input=field.querySelector('input,select,textarea');
+      const value=input?input.value:(field.querySelector('#tog-rot')?(ST.rot==='OK'?'YES':ST.rot==='NG'?'NO':''):'');
+      return {label:Sx(field.querySelector('label')?.textContent||''),value:Sx(value)};
+    });
+    for(let i=0;i<entries.length;i+=cols){
+      const group=entries.slice(i,i+cols);
+      while(group.length<cols) group.push({label:'',value:''});
+      const cellWidth=width/cols;
+      pdf.setFont('helvetica','normal'); pdf.setFontSize(8.4);
+      const lines=Math.max(...group.map(f=>pdf.splitTextToSize(f.value||' ',cellWidth-5).length));
+      checkY(16+lines*4);
+      pdf.autoTable({...kvTheme,startY:y,tableWidth:width,
+        margin:{...kvTheme.margin,left,right:W-left-width},
+        body:[group.map(f=>({content:f.label,styles:{fontSize:7,textColor:[100,116,139],fillColor:LABEL_BG}})),
+              group.map(f=>({content:f.value,styles:{minCellHeight:8}}))],
+        columnStyles:Object.fromEntries(group.map((_,j)=>[j,{cellWidth}])),
+        pageBreak:'avoid',rowPageBreak:'avoid'});
+      y=pdf.lastAutoTable.finalY+3;
+    }
+    y+=2;
+  }
+  function domTable(table, {left=M,width=CW,omitLast=false}={}){
+    const cells=row=>[...row.cells].filter((cell,index)=>!(omitLast&&index===row.cells.length-1&&(cell.querySelector('button')||!cell.textContent.trim())&&!cell.querySelector('input'))).map(cell=>({
+      content:Sx(cell.querySelector('input,select,textarea')?.value??cell.textContent),
+      colSpan:cell.colSpan,rowSpan:cell.rowSpan
+    }));
+    pdf.autoTable({...kvTheme,startY:y,tableWidth:width,
+      margin:{...kvTheme.margin,left,right:W-left-width},
+      head:[...table.tHead?.rows||[]].map(cells),
+      body:[...table.tBodies].flatMap(body=>[...body.rows].map(cells)),
+      styles:{...kvTheme.styles,fontSize:table.id==='tbl-sr'||table.id.endsWith('-table')?7:8,
+        cellPadding:1.5,halign:'center'},
+      rowPageBreak:'avoid',showHead:'everyPage'});
+    y=pdf.lastAutoTable.finalY+5;
+  }
+  function pdfNote(text){
+    if(!text.trim()) return;
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(7);
+    const lines=pdf.splitTextToSize(Sx(text),CW);
+    checkY(lines.length*3.2+3);
+    pdf.setTextColor(100,116,139); pdf.text(lines,M,y+2.5); y+=lines.length*3.2+3;
+  }
+  function subTitle(text){
+    checkY(22); pdf.setFont('helvetica','bold'); pdf.setFontSize(8.5); pdf.setTextColor(...NAVY);
+    const lines=pdf.splitTextToSize(Sx(text),CW);
+    pdf.text(lines,M,y+3); y+=lines.length*3.5+3;
+  }
+  const panels=[...document.querySelectorAll('.wrap > .panel')];
+  const work=panels[0], motor=panels[1], housing=panels[2], pretest=panels[3];
+  secBar(work.querySelector('.sec-hdr-title').textContent);
+  fieldGrid(work.querySelectorAll('.mf'));
+  secBar(motor.querySelector('.sec-hdr-title').textContent);
+  fieldGrid(motor.querySelectorAll('.tag-row .mf'),2);
+  fieldGrid(motor.querySelectorAll('.wo-grid .mf'));
 
-  // Motor Data (2-col pairs)
-  const md=sheetMotorData().rows;
-  const pairs=[];
-  for(let i=0;i<md.length;i+=2) pairs.push([md[i].desc, md[i].values.Value, md[i+1]?md[i+1].desc:'', md[i+1]?md[i+1].values.Value:'']);
-  secBar('Motor Data');
-  pdf.autoTable({ ...kvTheme, startY:y, body:pairs.map(Srow),
-    columnStyles:{0:{cellWidth:38,fontStyle:'bold',fillColor:LABEL_BG},1:{cellWidth:55},2:{cellWidth:38,fontStyle:'bold',fillColor:LABEL_BG},3:{cellWidth:55}} });
-  y=pdf.lastAutoTable.finalY+6;
+  // DE / NDE remain side by side, as in the online housing panel.
+  checkY(125); secBar(housing.querySelector('.sec-hdr-title').textContent);
+  const housingY=y, sideWidth=(CW-6)/2;
+  let housingEnd=y;
+  for(const [index,block] of [...document.querySelectorAll('.hb-block')].entries()){
+    y=housingY;
+    const left=M+index*(sideWidth+6);
+    pdf.setFont('helvetica','bold');pdf.setFontSize(9);pdf.setTextColor(...NAVY);
+    pdf.text(Sx(block.querySelector('h4').textContent),left,y+3);y+=6;
+    fieldGrid(block.querySelectorAll(':scope > .mf'),1,left,sideWidth);
+    domTable(block.querySelector('table'),{left,width:sideWidth});
+    housingEnd=Math.max(housingEnd,y);
+  }
+  y=housingEnd;
+  await drawPdfPhotos('hb_de','Housing Bearing - DE Photo');
+  await drawPdfPhotos('hb_nde','Housing Bearing - NDE Photo');
 
-  // Housing bearing — identity + 4x3 measurements, per side
-  for(const [k,lab] of [['de','Housing Bearing — DE'],['nde','Housing Bearing — NDE']]){
-    secBar(lab);
-    pdf.autoTable({ ...kvTheme, startY:y,
-      body:[
-        ['Bearing Number', iv('hb-'+k+'-num'), 'Nominal Ø (mm)', iv('hb-'+k+'-dia')],
-        ['Specified Tolerance (mm)', iv('hb-'+k+'-tol'), '', ''],
-      ].map(Srow),
-      columnStyles:{0:{cellWidth:42,fontStyle:'bold',fillColor:LABEL_BG},1:{cellWidth:51},2:{cellWidth:38,fontStyle:'bold',fillColor:LABEL_BG},3:{cellWidth:55}} });
-    y=pdf.lastAutoTable.finalY+2;
-    pdf.autoTable({ ...kvTheme, startY:y,
-      head:[['Point','Upper (mm)','Mid (mm)','Lower (mm)'].map(Sx)],
-      body:[1,2,3,4].map(p=>Srow([String(p), iv('hb-'+k+'-p'+p+'-u'), iv('hb-'+k+'-p'+p+'-m'), iv('hb-'+k+'-p'+p+'-l')])),
-      columnStyles:{0:{cellWidth:24,fontStyle:'bold',fillColor:LABEL_BG,halign:'center'}} });
-    y=pdf.lastAutoTable.finalY+6;
-    await drawPdfPhotos('hb_'+k);
+  secBar(pretest.querySelector('.sec-hdr-title').textContent);
+  for(const element of pretest.querySelector('.sec-body').children){
+    if(element.classList.contains('mm-sub')){
+      let next=element.nextElementSibling;
+      while(next&&!next.classList.contains('mm-sub')){
+        const table=next.querySelector('table');
+        if(table){checkY(table.rows.length*8+24);break;}
+        next=next.nextElementSibling;
+      }
+      subTitle(element.textContent);
+    }
+    else if(element.classList.contains('note')) pdfNote(element.textContent);
+    else if(element.classList.contains('tbl-wrap')) domTable(element.querySelector('table'));
+    else if(element.classList.contains('wo-grid')) fieldGrid(element.querySelectorAll('.mf'));
+  }
+  await drawPdfPhotos('pretest','Photo Evidence - Pre-Test');
+
+  for(const run of runIds()){
+    checkY(38);secBar(runTitle(run));
+    domTable(document.getElementById(run==='sr'?'tbl-sr':run+'-table'),{omitLast:true});
+    // Three charts in one row, matching the desktop check sheet.
+    checkY(56);subTitle('Trend Charts');
+    const gap=4,chW=(CW-gap*2)/3,chH=33;
+    SR_CHARTS.forEach((cfg,index)=>{
+      const left=M+index*(chW+gap);
+      const {labels,series}=chartData(cfg,run);
+      const off=document.createElement('canvas');off.width=360;off.height=180;
+      drawChart(off,labels,series);
+      pdf.setDrawColor(...LINE);pdf.roundedRect(left,y,chW,chH+9,2,2,'S');
+      pdf.setFont('helvetica','bold');pdf.setFontSize(7.2);pdf.setTextColor(...NAVY);
+      pdf.text(['DE Bearing Temperature','NDE Bearing Temperature','Shaft Temperature'][index],left+2,y+4);
+      pdf.addImage(off.toDataURL('image/png'),'PNG',left+1,y+7,chW-2,chH);
+    });
+    y+=chH+12;
+    pdfNote('Solid = Thermal Imager, dashed = Infrared.');
   }
 
-  // Pre-test measurement tables
-  const S=buildAllSheets();
-  [['wres_motor',{0:{cellWidth:44,fontStyle:'bold',fillColor:LABEL_BG}}],
-   ['wres_term',{0:{cellWidth:44,fontStyle:'bold',fillColor:LABEL_BG}}],
-   ['ir_motor',{0:{cellWidth:56,fontStyle:'bold',fillColor:LABEL_BG}}],
-   ['ir_cable',{0:{cellWidth:56,fontStyle:'bold',fillColor:LABEL_BG}}]].forEach(([key,cs])=>{
-    kvTable(S[key], {firstCol:'Test Point', columnStyles:cs});
-  });
-  kvTable(S.protection, {columnStyles:{0:{cellWidth:70,fontStyle:'bold',fillColor:LABEL_BG}}});
-  kvTable(S.vibration, {columnStyles:{0:{cellWidth:70,fontStyle:'bold',fillColor:LABEL_BG}}});
-  kvTable(S.environ, {columnStyles:{0:{cellWidth:70,fontStyle:'bold',fillColor:LABEL_BG}}});
-  await drawPdfPhotos('pretest','Pre-Test Photos');
-
-  // Solo run log
-  const sr=S.solorun;
-  secBar('Solo Run Test — Temperature & Current Log');
-  pdf.autoTable({
-    ...kvTheme, startY:y,
-    styles:{...kvTheme.styles,fontSize:6.6,cellPadding:1.3,halign:'center'},
-    head:[Srow(['#','Time',...sr.columns])],
-    body: sr.rows.length ? sr.rows.map(r=>Srow([r.no,r.desc,...sr.columns.map(c=>r.values[c]||'—')]))
-                         : [['—','No time entries recorded', ...sr.columns.map(()=>'—')].map(Sx)],
-    columnStyles:{0:{cellWidth:7},1:{cellWidth:16,fontStyle:'bold'}},
-  });
-  y=pdf.lastAutoTable.finalY+6;
-
-  // Trend charts — redraw fresh at higher res, embed as PNG
-  secBar('Trend Charts');
-  const chW=CW, chH=48, gap=4;
-  const titles={'ch-de':'DE Bearing Temperature (deg C)','ch-nde':'NDE Bearing Temperature (deg C)','ch-shaft':'Shaft Temperature (deg C)'};
-  SR_CHARTS.forEach(cfg=>{
-    checkY(chH+8);
-    const {labels,series}=chartData(cfg);
-    const off=document.createElement('canvas'); off.width=1000; off.height=260;
-    drawChart(off, labels, series);
-    pdf.setFont('times','bold'); pdf.setFontSize(8); pdf.setTextColor(...NAVY);
-    pdf.text(titles[cfg.canvas]||cfg.canvas, M, y+3);
-    try{ pdf.addImage(off.toDataURL('image/png'),'PNG', M, y+5, chW, chH); }catch(e){}
-    y+=chH+8;
-  });
-  pdf.setFont('times','italic'); pdf.setFontSize(6.6); pdf.setTextColor(110);
-  pdf.text('Solid line = Thermal Imager, dashed = Infrared.', M, y+1); y+=5;
-
-  // Notes / Findings
-  secBar('Findings & Conclusion');
-  pdf.autoTable({
-    ...kvTheme, startY:y,
-    body:[
-      ['Overall Result', v('overall').replace(/[✅⚠️🔧🛑]/g,'').trim()||'-'],
-      ['Findings / Observations', v('findings')||'-'],
-      ['Corrective Actions / Recommendations', v('recommendations')||'-'],
-      ['Completion Date', v('completion-date')||'-'],
-    ].map(Srow),
-    columnStyles:{0:{cellWidth:52,fontStyle:'bold',fillColor:LABEL_BG},1:{cellWidth:CW-52}},
-  });
-  y=pdf.lastAutoTable.finalY+6;
-
+  // Keep photos, reference tables, then findings in the online section order.
   await drawPdfPhotos('general','Photo Documentation');
+  const criteria=document.querySelector('.crit-grid').closest('.panel');
+  checkY(criteria.querySelector('table').rows.length*11+24);
+  secBar(criteria.querySelector('.sec-hdr-title').textContent);
+  for(const block of criteria.querySelectorAll('.crit-grid > div')){
+    const table=block.querySelector('table');
+    checkY(table.rows.length*11+12);
+    subTitle(block.querySelector('h4').textContent);
+    const rows=[...table.rows];
+    pdf.autoTable({...kvTheme,startY:y,
+      head:[Srow([...rows[0].cells].map(c=>c.textContent))],
+      body:rows.slice(1).map(row=>Srow([...row.cells].map(c=>c.textContent))),
+      styles:{...kvTheme.styles,fontSize:7.5},rowPageBreak:'avoid'});
+    y=pdf.lastAutoTable.finalY+5;
+  }
+  const findings=document.getElementById('findings').closest('.panel');
+  secBar(findings.querySelector('.sec-hdr-title').textContent);
+  fieldGrid(findings.querySelectorAll('.wo-grid .mf'),2);
+  fieldGrid(findings.querySelectorAll('.findings-grid .mf'),2);
 
   // Signature strip
   checkY(30);
   pdf.autoTable({
     ...kvTheme, startY:y,
     head:[['Performed / Checked By','Reviewed By (TechOp2)','Approved By (Supervisor)']],
-    body:[[ Sx(v('checked-by'))+'\n\n\n', '\n\n\n', '\n\n\n' ]],
+    headStyles:{...kvTheme.headStyles,minCellHeight:7},
+    body:[[ Sx(v('checked-by'))+'\n\n\n', Sx(v('reviewed-by'))+'\n\n\n', '\n\n\n' ]],
     styles:{...kvTheme.styles,minCellHeight:22,valign:'top'},
   });
   y=pdf.lastAutoTable.finalY+2;
@@ -1355,7 +1429,7 @@ renderAllPhotos();
 loadDraft();
 refreshSolo();
 
-LoadMergeModal.init({ assetTag: currentTag() });
+LoadMergeModal.init({ assetTag: currentTag(), beforeApply:prepareRunningTests });
 LoadMergeModal.initRevisionBanner();
 SubmitGuard.init({ assetTag: currentTag() });
 TechnicianAuth.init({ checkedByFieldId: 'checked-by' });
@@ -1367,7 +1441,7 @@ setTimeout(async()=>{
     const tag=currentTag();
     if(tag===FALLBACK_TAG) return;
     const d=await DB.loadLastSubmission(tag);
-    if(d){ refreshSolo(); showNote('📂 Data terakhir untuk '+tag+' dimuat.','ok'); }
+    if(d){ restoreRunningSubmission(d); showNote('📂 Data terakhir untuk '+tag+' dimuat.','ok'); }
   }catch(e){}
 },900);
 </script>
