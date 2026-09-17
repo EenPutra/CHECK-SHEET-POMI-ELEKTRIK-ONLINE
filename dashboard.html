@@ -6,7 +6,7 @@
 <title>Dashboard — ELECTRIC 7 POMI</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
@@ -42,9 +42,9 @@
   --ok-soft:#d1fae5;
   --ng:#f43f5e;
   --ng-soft:#ffe4e6;
-  --display:'Space Grotesk',system-ui,sans-serif;
+  --display:var(--body);
   --body:'Manrope',system-ui,sans-serif;
-  --mono:'JetBrains Mono',ui-monospace,monospace;
+  --mono:var(--body);
   --shadow-sm:0 1px 2px rgba(15,23,42,0.04);
   --shadow:0 2px 8px rgba(15,23,42,0.06),0 1px 2px rgba(15,23,42,0.04);
   --shadow-lg:0 14px 40px -10px rgba(37,99,235,0.18),0 4px 12px rgba(15,23,42,0.06);
@@ -53,6 +53,7 @@
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
+button,input,select,textarea{font-family:var(--body)}
 body{
   font-family:var(--body);
   background:var(--bg);
@@ -296,11 +297,20 @@ body.role-technician .scope-note,body.role-techop2 .scope-note{display:flex}
 .trend-bulk-option{display:flex;gap:9px;align-items:center;padding:8px;cursor:pointer;font-size:13px}
 .trend-bulk-option:has(input:disabled){opacity:.5;cursor:not-allowed}
 .trend-bulk-option input{accent-color:var(--pri);width:16px;height:16px;flex-shrink:0}
-.trend-bulk-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:18px}
+.trend-bulk-grid{display:grid;grid-template-columns:1fr;gap:16px;margin-bottom:18px}
 .trend-bulk-result{border:1px solid var(--bdr);border-radius:10px;padding:14px;min-width:0}
 .trend-bulk-result h4{font-size:13px;margin:0 0 6px;line-height:1.5}
 .trend-bulk-result p{font-size:12px;color:var(--txt-3);margin-bottom:10px}
-.trend-bulk-canvas{height:230px;position:relative}
+.trend-bulk-canvas{height:320px;position:relative}
+.trend-picker-grid{display:grid;grid-template-columns:minmax(220px,1fr) minmax(0,2fr);gap:16px;margin:16px 0}
+.trend-picker-grid h4{font-size:13px;color:var(--txt-2)}
+.trend-picker-grid input[type=search]{width:100%;padding:9px 12px;border:1px solid var(--bdr);border-radius:6px;margin:8px 0;background:var(--surf);color:var(--txt)}
+.trend-picker-grid .trend-bulk-tools{font-size:12px;gap:8px;margin:8px 0}
+.trend-graph-header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.trend-series-tags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.trend-series-tags button{font-size:12px;text-align:left;white-space:normal}
+.trend-graph-scroll{overflow-x:auto}
+@media(max-width:860px){.trend-picker-grid{grid-template-columns:1fr}}
 .trend-bulk-result details{font-size:12px;margin-top:10px;overflow:auto;max-height:220px}
 @media(max-width:860px){.trend-bulk-grid{grid-template-columns:1fr}}
 .trend-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px}
@@ -955,24 +965,43 @@ table.dtbl tr:last-child td{border-bottom:none}
       </div>
     </div>
 
-    <details class="trend-bulk" id="trend-bulk">
-      <summary>Pilih Banyak Tren — centang parameter sekaligus</summary>
-      <p class="trend-add-hint" style="margin-top:10px">Pilih check sheet di atas, lalu equipment dan parameter di sini. Setiap parameter tampil dalam grafik tersendiri.</p>
-      <div class="trend-bulk-tools">
-        <label for="tr-bulk-equip">Equipment</label>
-        <select id="tr-bulk-equip" onchange="onBulkEquipmentChange()" disabled><option value="">Pilih equipment…</option></select>
-        <input type="search" id="tr-bulk-search" placeholder="Cari parameter…" aria-label="Cari parameter tren" oninput="renderBulkOptions()">
+    <details class="trend-bulk" id="trend-bulk" open>
+      <summary>Atur Grafik — pilih parameter dan equipment</summary>
+      <p class="trend-add-hint" style="margin-top:10px">Centang equipment dan parameter, lalu pilih tujuan grafik. Anda bisa menambahkan pilihan berikutnya ke grafik yang sama atau membuat grafik terpisah.</p>
+      <div class="trend-picker-grid">
+        <div>
+          <h4>1. Equipment</h4>
+          <input type="search" id="tr-bulk-equip-search" placeholder="Cari equipment…" aria-label="Cari equipment tren" oninput="renderBulkEquips()">
+          <div class="trend-bulk-tools">
+            <label><input type="checkbox" id="tr-bulk-equip-all" onchange="toggleAllBulkEquips(this.checked)" disabled> Pilih semua hasil pencarian</label>
+            <button type="button" class="btn btn-outline" onclick="clearBulkEquips()">Batal pilih</button>
+          </div>
+          <div class="trend-bulk-list" id="tr-bulk-equips">Pilih check sheet terlebih dahulu.</div>
+        </div>
+        <div>
+          <h4>2. Parameter</h4>
+          <input type="search" id="tr-bulk-search" placeholder="Cari parameter…" aria-label="Cari parameter tren" oninput="renderBulkOptions()">
+          <div class="trend-bulk-tools">
+            <label><input type="checkbox" id="tr-bulk-all" onchange="toggleAllBulk(this.checked)" disabled> Pilih semua hasil pencarian</label>
+            <button type="button" class="btn btn-outline" onclick="clearBulkSelection()">Batal pilih</button>
+          </div>
+          <div class="trend-bulk-list" id="tr-bulk-list">Pilih check sheet dan equipment terlebih dahulu.</div>
+        </div>
       </div>
       <div class="trend-bulk-tools">
-        <label><input type="checkbox" id="tr-bulk-all" onchange="toggleAllBulk(this.checked)" disabled> Pilih semua hasil pencarian</label>
-        <button type="button" class="btn btn-outline" onclick="clearBulkSelection()">Batal pilih semua</button>
-        <span id="tr-bulk-count" role="status" aria-live="polite">0 dipilih</span>
+        <label for="tr-bulk-target">3. Tampilkan di</label>
+        <select id="tr-bulk-target">
+          <option value="new">Satu grafik baru (gabungkan pilihan)</option>
+          <option value="separate">Grafik terpisah per parameter &amp; equipment</option>
+        </select>
+        <button type="button" class="btn btn-outline" id="tr-bulk-add-graph" onclick="addBulkGraph()">+ Add Grafik</button>
       </div>
-      <div class="trend-bulk-list" id="tr-bulk-list">Pilih check sheet dan equipment terlebih dahulu.</div>
       <div class="trend-bulk-tools">
         <button type="button" class="btn btn-primary" id="tr-bulk-show" onclick="showBulkTrends()" disabled>Tampilkan Tren Terpilih</button>
-        <button type="button" class="btn btn-outline" onclick="clearBulkCharts()">Tutup hasil tren</button>
+        <button type="button" class="btn btn-outline" onclick="clearBulkCharts()">Hapus semua grafik</button>
+        <span id="tr-bulk-count" role="status" aria-live="polite">0 equipment · 0 parameter</span>
       </div>
+      <p class="trend-add-hint" id="tr-bulk-feedback" role="status" aria-live="polite"></p>
     </details>
     <div id="trend-bulk-results" class="trend-bulk-grid"></div>
     <div class="trend-add-row">
@@ -1125,6 +1154,7 @@ table.dtbl tr:last-child td{border-bottom:none}
 </div>
 
 <script>
+if(typeof Chart !== 'undefined') Chart.defaults.font.family = getComputedStyle(document.documentElement).getPropertyValue('--body').trim();
 let allData = [];       // what the table/stats/charts/export actually use — deduped by default
 let allDataRaw = [];    // exactly what Firestore returned, duplicates included
 let filteredData = [];
@@ -1877,7 +1907,7 @@ function resetTrendDownstream() {
 
 function onTrendSheetChange(keepSelection) {
   const tag = document.getElementById('tr-sheet').value;
-  if(!keepSelection){ BULK_SELECTED.clear(); BULK_SHOWN=[]; clearBulkCharts(); }
+  if(!keepSelection){ BULK_SELECTED.clear(); BULK_EQUIPS.clear(); clearBulkCharts(); }
   const prevParam = keepSelection ? document.getElementById('tr-param').value : '';
   const prevEquip = keepSelection ? document.getElementById('tr-equip').value : '';
   // A pinned comparison set only survives a refresh that keeps the SAME check
@@ -2083,86 +2113,147 @@ function renderSeriesChips() {
     (TREND_SERIES.length > 1 ? `<button type="button" class="trend-chips-clear" onclick="clearTrendSeries()">Hapus semua</button>` : '');
 }
 
-// Batch selection uses independent charts so status and different units never share an axis.
-const BULK_SELECTED = new Set();
-let BULK_CHARTS = [], BULK_SHOWN = [];
+// Batch selections are staging only. Applied series live in numbered graphs.
+const BULK_SELECTED = new Set(), BULK_EQUIPS = new Set();
+let BULK_CHARTS = [], BULK_GRAPHS = [], bulkGraphSeq = 0;
+function destroyBulkCharts(){BULK_CHARTS.forEach(chart=>chart.destroy());BULK_CHARTS=[];}
 function clearBulkCharts(){
-  BULK_CHARTS.forEach(chart=>chart.destroy()); BULK_CHARTS=[]; BULK_SHOWN=[];
+  destroyBulkCharts();BULK_GRAPHS=[];bulkGraphSeq=0;
   document.getElementById('trend-bulk-results').replaceChildren();
+  document.getElementById('tr-bulk-feedback').textContent='';syncBulkTargets();
+}
+function syncBulkTargets(selected){
+  const target=document.getElementById('tr-bulk-target'),prev=selected??target.value;
+  target.replaceChildren(new Option('Satu grafik baru (gabungkan pilihan)','new'),new Option('Grafik terpisah per parameter & equipment','separate'));
+  BULK_GRAPHS.forEach(g=>target.add(new Option('Grafik '+g.id+' ('+g.series.length+' tren)',String(g.id))));
+  target.value=[...target.options].some(o=>o.value===String(prev))?String(prev):'new';
+}
+function newBulkGraph(){const graph={id:++bulkGraphSeq,series:[]};BULK_GRAPHS.push(graph);return graph;}
+function addBulkGraph(){if(!TR.tag)return;const graph=newBulkGraph();syncBulkTargets(graph.id);renderBulkGraphs();}
+function removeBulkGraph(id){BULK_GRAPHS=BULK_GRAPHS.filter(g=>g.id!==id);syncBulkTargets();renderBulkGraphs();}
+function removeBulkGraphSeries(id,index){
+  const graph=BULK_GRAPHS.find(g=>g.id===id);if(!graph)return;
+  graph.series.splice(index,1);syncBulkTargets();renderBulkGraphs();
 }
 function initBulkTrends(keep=false){
-  const select=document.getElementById('tr-bulk-equip'), prev=keep?select.value:'';
-  select.replaceChildren(new Option('Pilih equipment…',''));
-  TR.equips.forEach(eq=>select.add(new Option(eq,eq)));
-  select.disabled=!TR.equips.length;
-  if(TR.equips.includes(prev)) select.value=prev;
-  if(!keep){BULK_SELECTED.clear();clearBulkCharts();document.getElementById('tr-bulk-search').value='';}
-  for(const key of BULK_SELECTED) if(!TR.params.some(p=>p.key===key)||!buildSeriesPoints(key,select.value).length) BULK_SELECTED.delete(key);
-  renderBulkOptions();
-  if(keep&&BULK_SHOWN.length) showBulkTrends(BULK_SHOWN);
+  if(!keep){
+    BULK_SELECTED.clear();BULK_EQUIPS.clear();clearBulkCharts();
+    document.getElementById('tr-bulk-search').value='';document.getElementById('tr-bulk-equip-search').value='';
+  }
+  for(const eq of BULK_EQUIPS)if(!TR.equips.includes(eq))BULK_EQUIPS.delete(eq);
+  for(const key of BULK_SELECTED)if(!bulkParamAvailable(key))BULK_SELECTED.delete(key);
+  BULK_GRAPHS.forEach(g=>{g.series=g.series.filter(s=>TR.params.some(p=>p.key===s.key)&&TR.equips.includes(s.equip)&&buildSeriesPoints(s.key,s.equip).length);});
+  renderBulkEquips();renderBulkOptions();syncBulkTargets();renderBulkGraphs();
 }
+function bulkVisibleEquips(){const q=document.getElementById('tr-bulk-equip-search').value.trim().toLocaleLowerCase();return TR.equips.filter(eq=>eq.toLocaleLowerCase().includes(q));}
+function renderBulkEquips(){
+  const list=document.getElementById('tr-bulk-equips');list.replaceChildren();
+  const equips=bulkVisibleEquips();if(!equips.length)list.textContent=TR.tag?'Tidak ada equipment yang cocok.':'Pilih check sheet terlebih dahulu.';
+  equips.forEach(eq=>{
+    const label=document.createElement('label');label.className='trend-bulk-option';
+    const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=BULK_EQUIPS.has(eq);
+    checkbox.addEventListener('change',()=>{checkbox.checked?BULK_EQUIPS.add(eq):BULK_EQUIPS.delete(eq);onBulkEquipmentChange();});
+    label.append(checkbox,document.createTextNode(eq));list.appendChild(label);
+  });updateBulkState();
+}
+function toggleAllBulkEquips(checked){bulkVisibleEquips().forEach(eq=>checked?BULK_EQUIPS.add(eq):BULK_EQUIPS.delete(eq));renderBulkEquips();onBulkEquipmentChange();}
+function clearBulkEquips(){BULK_EQUIPS.clear();renderBulkEquips();onBulkEquipmentChange();}
 function onBulkEquipmentChange(){
-  const eq=document.getElementById('tr-bulk-equip').value;
-  for(const key of BULK_SELECTED) if(!buildSeriesPoints(key,eq).length) BULK_SELECTED.delete(key);
-  clearBulkCharts();renderBulkOptions();
+  for(const key of BULK_SELECTED)if(!bulkParamAvailable(key))BULK_SELECTED.delete(key);
+  document.getElementById('tr-bulk-feedback').textContent='';renderBulkOptions();
 }
+function bulkParamAvailable(key){return [...BULK_EQUIPS].some(eq=>buildSeriesPoints(key,eq).length);}
 function bulkVisibleParams(){
   const query=document.getElementById('tr-bulk-search').value.trim().toLocaleLowerCase();
   return TR.params.filter(p=>(p.section+' '+p.no+' '+p.desc).toLocaleLowerCase().includes(query));
 }
 function renderBulkOptions(){
-  const list=document.getElementById('tr-bulk-list'),eq=document.getElementById('tr-bulk-equip').value;
-  list.replaceChildren();let section=null;
+  const list=document.getElementById('tr-bulk-list');list.replaceChildren();let section=null;
   const params=bulkVisibleParams();
-  if(!eq){list.textContent='Pilih check sheet dan equipment terlebih dahulu.';updateBulkState();return;}
+  if(!BULK_EQUIPS.size){list.textContent='Centang equipment terlebih dahulu.';updateBulkState();return;}
   if(!params.length)list.textContent='Tidak ada parameter yang cocok.';
   params.forEach(p=>{
     if(p.section!==section){const heading=document.createElement('div');heading.className='trend-bulk-group';heading.textContent=p.section||'Parameter';list.appendChild(heading);section=p.section;}
     const label=document.createElement('label');label.className='trend-bulk-option';
-    const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=BULK_SELECTED.has(p.key);
-    checkbox.disabled=!buildSeriesPoints(p.key,eq).length;
-    checkbox.addEventListener('change',()=>{if(checkbox.checked)BULK_SELECTED.add(p.key);else BULK_SELECTED.delete(p.key);updateBulkState();});
+    const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=BULK_SELECTED.has(p.key);checkbox.disabled=!bulkParamAvailable(p.key);
+    checkbox.addEventListener('change',()=>{checkbox.checked?BULK_SELECTED.add(p.key):BULK_SELECTED.delete(p.key);updateBulkState();});
     label.append(checkbox,document.createTextNode((p.no?p.no+' — ':'')+p.desc+(checkbox.disabled?' (belum ada data)':'')));list.appendChild(label);
   });updateBulkState();
 }
 function updateBulkState(){
-  const eq=document.getElementById('tr-bulk-equip').value;
-  const visible=bulkVisibleParams().filter(p=>eq&&buildSeriesPoints(p.key,eq).length);
-  const chosen=visible.filter(p=>BULK_SELECTED.has(p.key)).length;
-  const all=document.getElementById('tr-bulk-all');all.disabled=!visible.length;
-  all.checked=visible.length>0&&chosen===visible.length;all.indeterminate=chosen>0&&chosen<visible.length;
-  document.getElementById('tr-bulk-count').textContent=BULK_SELECTED.size+' dipilih';
-  document.getElementById('tr-bulk-show').disabled=!eq||!BULK_SELECTED.size;
+  const setAll=(id,items,selected)=>{const all=document.getElementById(id);const count=items.filter(x=>selected.has(x)).length;all.disabled=!items.length;all.checked=items.length>0&&count===items.length;all.indeterminate=count>0&&count<items.length;};
+  setAll('tr-bulk-all',bulkVisibleParams().filter(p=>bulkParamAvailable(p.key)).map(p=>p.key),BULK_SELECTED);
+  setAll('tr-bulk-equip-all',bulkVisibleEquips(),BULK_EQUIPS);
+  document.getElementById('tr-bulk-count').textContent=BULK_EQUIPS.size+' equipment · '+BULK_SELECTED.size+' parameter';
+  document.getElementById('tr-bulk-show').disabled=!BULK_EQUIPS.size||!BULK_SELECTED.size;
+  document.getElementById('tr-bulk-add-graph').disabled=!TR.tag;
 }
-function toggleAllBulk(checked){
-  const eq=document.getElementById('tr-bulk-equip').value;
-  bulkVisibleParams().filter(p=>buildSeriesPoints(p.key,eq).length).forEach(p=>checked?BULK_SELECTED.add(p.key):BULK_SELECTED.delete(p.key));renderBulkOptions();
-}
+function toggleAllBulk(checked){bulkVisibleParams().filter(p=>bulkParamAvailable(p.key)).forEach(p=>checked?BULK_SELECTED.add(p.key):BULK_SELECTED.delete(p.key));renderBulkOptions();}
 function clearBulkSelection(){BULK_SELECTED.clear();renderBulkOptions();}
-function showBulkTrends(keys=[...BULK_SELECTED]){
-  const equip=document.getElementById('tr-bulk-equip').value;
-  clearBulkCharts();if(!equip)return;
-  const results=document.getElementById('trend-bulk-results');
-  TR.params.filter(p=>keys.includes(p.key)).forEach(param=>{
-    const points=buildSeriesPoints(param.key,equip);if(!points.length)return;
-    BULK_SHOWN.push(param.key);
-    const unit=trendUnitFor(TR.tag,param.no,param.desc);
-    const status=computeIsStatus(points)||points.every(p=>p.numeric===null);
+function showBulkTrends(){
+  const candidates=[];let skipped=0,added=0;
+  TR.params.filter(p=>BULK_SELECTED.has(p.key)).forEach(p=>BULK_EQUIPS.forEach(equip=>{
+    if(buildSeriesPoints(p.key,equip).length)candidates.push({key:p.key,equip});else skipped++;
+  }));
+  if(!candidates.length)return;
+  const target=document.getElementById('tr-bulk-target').value;
+  if(target==='separate'){
+    candidates.forEach(s=>{
+      if(BULK_GRAPHS.some(g=>g.series.length===1&&g.series[0].key===s.key&&g.series[0].equip===s.equip))return;
+      newBulkGraph().series.push(s);added++;
+    });syncBulkTargets('separate');
+  }else{
+    const graph=target==='new'?newBulkGraph():BULK_GRAPHS.find(g=>String(g.id)===target);if(!graph)return;
+    candidates.forEach(s=>{if(!graph.series.some(old=>old.key===s.key&&old.equip===s.equip)){graph.series.push(s);added++;}});
+    syncBulkTargets(graph.id);
+  }
+  renderBulkGraphs();
+  document.getElementById('tr-bulk-feedback').textContent=added+' tren ditambahkan.'+(skipped?' '+skipped+' kombinasi tanpa data dilewati.':'')+(candidates.length>added?' Pilihan yang sudah ada tidak diduplikasi.':'');
+}
+function renderBulkGraphs(){
+  destroyBulkCharts();const results=document.getElementById('trend-bulk-results');results.replaceChildren();
+  BULK_GRAPHS.forEach(graph=>{
     const card=document.createElement('section');card.className='trend-bulk-result';
-    const heading=document.createElement('h4');heading.textContent=(param.section?param.section+' · ':'')+(param.no?param.no+' — ':'')+param.desc;
-    const info=document.createElement('p');info.textContent=equip+' · '+points.length+' pembacaan · Terakhir: '+points.at(-1).raw;
-    const box=document.createElement('div');box.className='trend-bulk-canvas';const canvas=document.createElement('canvas');canvas.setAttribute('role','img');canvas.setAttribute('aria-label',heading.textContent+' — '+equip);box.appendChild(canvas);
-    card.append(heading,info,box);results.appendChild(card);
-    const color=v=>trendGoodness(v)===1?'#10b981':trendGoodness(v)===-1?'#f43f5e':'#94a3b8';
+    const header=document.createElement('div');header.className='trend-graph-header';
+    const title=document.createElement('h4');title.textContent='Grafik '+graph.id+' · '+graph.series.length+' tren';
+    const remove=document.createElement('button');remove.type='button';remove.className='btn btn-outline';remove.textContent='Hapus Grafik '+graph.id;remove.onclick=()=>removeBulkGraph(graph.id);header.append(title,remove);card.appendChild(header);results.appendChild(card);
+    if(!graph.series.length){const note=document.createElement('p');note.textContent='Centang equipment dan parameter, pilih Grafik '+graph.id+', lalu klik Tampilkan Tren Terpilih.';card.appendChild(note);return;}
+    const series=graph.series.map(s=>{
+      const param=TR.params.find(p=>p.key===s.key);const points=buildSeriesPoints(s.key,s.equip);
+      const unit=trendUnitFor(TR.tag,param.no,param.desc)||(param.desc.match(/\(([^()]*)\)\s*$/)||[])[1]||'';
+      return {...s,param,points,unit,status:computeIsStatus(points)||points.every(p=>p.numeric===null)};
+    });
+    const tags=document.createElement('div');tags.className='trend-series-tags';
+    series.forEach((s,index)=>{const button=document.createElement('button');button.type='button';button.className='btn btn-outline';button.textContent=(s.param.section?s.param.section+' · ':'')+trendSeriesLabel({...s.param,equip:s.equip})+' ×';button.setAttribute('aria-label','Hapus tren '+button.textContent.slice(0,-2)+' dari Grafik '+graph.id);button.onclick=()=>removeBulkGraphSeries(graph.id,index);tags.appendChild(button);});card.appendChild(tags);
+    const dates=[...new Set(series.flatMap(s=>s.points.map(p=>p.date)))].sort();
+    const axisGroups=[];
+    series.forEach(s=>{
+      const key=s.status?'status':s.unit?'unit:'+s.unit:'param:'+s.key;
+      let axis=axisGroups.find(a=>a.key===key);
+      if(!axis){axis={key,id:'y'+axisGroups.length,title:s.status?'Status':s.unit||s.param.desc,status:s.status,values:[]};axisGroups.push(axis);}
+      s.axis=axis;s.byDate=new Map(s.points.map(p=>[p.date,p]));
+      if(s.status)s.points.forEach(p=>{if(!axis.values.includes(p.raw))axis.values.push(p.raw);});
+    });
+    const scroll=document.createElement('div');scroll.className='trend-graph-scroll';const box=document.createElement('div');box.className='trend-bulk-canvas';
+    if(axisGroups.length>2)box.style.minWidth=(420+axisGroups.length*85)+'px';
+    const canvas=document.createElement('canvas');canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Grafik '+graph.id);box.appendChild(canvas);scroll.appendChild(box);card.appendChild(scroll);
+    const scales={x:{ticks:{maxTicksLimit:6}}};
+    axisGroups.forEach((a,index)=>{scales[a.id]={axis:'y',position:index%2?'right':'left',title:{display:true,text:a.title},grid:{drawOnChartArea:index===0},...(a.status?{type:'category',labels:a.values,offset:true}:{})};});
+    const palette=index=>`hsl(${(index*137.508+220)%360}, 68%, 43%)`;
     BULK_CHARTS.push(new Chart(canvas.getContext('2d'),{
-      type:status?'bar':'line',data:{labels:points.map(p=>p.date),datasets:[{label:param.desc,
-        data:points.map(p=>status?1:p.numeric),borderColor:'#2563eb',backgroundColor:status?points.map(p=>color(p.raw)):'#2563eb',borderWidth:2,pointRadius:3,spanGaps:false}]},
+      type:'line',data:{labels:dates,datasets:series.map((s,index)=>({label:trendSeriesLabel({...s.param,equip:s.equip}),yAxisID:s.axis.id,
+        data:dates.map(date=>{const p=s.byDate.get(date);return p?(s.status?p.raw:p.numeric):null;}),
+        borderColor:palette(index),backgroundColor:palette(index),borderWidth:2,pointRadius:3,spanGaps:false,stepped:s.status}))},
       options:{responsive:true,maintainAspectRatio:false,animation:false,
-        plugins:{legend:{display:false},tooltip:{callbacks:{label:item=>['Nilai: '+points[item.dataIndex].raw,'WO: '+points[item.dataIndex].wo]}}},
-        scales:{x:{ticks:{maxTicksLimit:6}},y:status?{display:false,min:0,max:1.3}:{title:{display:!!unit,text:unit}}}}
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:item=>{const s=series[item.datasetIndex],p=s.byDate.get(dates[item.dataIndex]);return p?[trendSeriesLabel({...s.param,equip:s.equip})+': '+p.raw,'WO: '+p.wo]:'';}}}},scales}
     }));
+    [...tags.children].forEach((tag,i)=>{tag.style.borderLeft='4px solid '+palette(i);});
+    if(axisGroups.length>1){const note=document.createElement('p');note.textContent='Setiap satuan dan status memakai sumbu tersendiri.'+(axisGroups.length>2?' Geser grafik ke samping untuk melihat seluruh sumbu.':'');card.appendChild(note);}
     const detail=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Lihat nilai dan riwayat';detail.appendChild(summary);
-    const table=document.createElement('table');table.className='dtbl';table.innerHTML='<thead><tr><th>Tanggal</th><th>WO</th><th>Nilai</th></tr></thead><tbody>'+points.map(p=>'<tr><td>'+esc(p.date)+'</td><td>'+esc(p.wo)+'</td><td>'+esc(p.raw)+'</td></tr>').join('')+'</tbody>';detail.appendChild(table);card.appendChild(detail);
+    const table=document.createElement('table');table.className='dtbl';const thead=table.createTHead(),hr=thead.insertRow();
+    ['Tanggal','Parameter','Equipment','WO','Nilai'].forEach(text=>{const th=document.createElement('th');th.textContent=text;hr.appendChild(th);});const tbody=table.createTBody();
+    series.forEach(s=>s.points.forEach(p=>{const row=tbody.insertRow();[p.date,(s.param.no?s.param.no+' — ':'')+s.param.desc,s.equip,p.wo,p.raw].forEach(text=>row.insertCell().textContent=text);}));
+    detail.appendChild(table);card.appendChild(detail);
   });
 }
 
