@@ -287,6 +287,22 @@ body.role-technician .scope-note,body.role-techop2 .scope-note{display:flex}
 .trend-add-hint{font-size:11.5px;color:var(--txt-3);min-height:15px}
 .trend-add-btn{font-size:12.5px;padding:8px 14px}
 .trend-add-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important}
+.trend-bulk{border:1px solid var(--bdr);border-radius:10px;padding:14px;margin-bottom:16px}
+.trend-bulk summary{cursor:pointer;font-weight:600;color:var(--pri)}
+.trend-bulk-tools{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:14px 0}
+.trend-bulk-tools input[type=search],.trend-bulk-tools select{padding:9px;border:1px solid var(--bdr);border-radius:6px;max-width:100%;background:var(--surf);color:var(--txt)}
+.trend-bulk-list{max-height:300px;overflow:auto;border:1px solid var(--bdr);border-radius:6px;padding:10px}
+.trend-bulk-group{font-size:12px;font-weight:700;color:var(--txt-2);padding:10px 0 5px}
+.trend-bulk-option{display:flex;gap:9px;align-items:center;padding:8px;cursor:pointer;font-size:13px}
+.trend-bulk-option:has(input:disabled){opacity:.5;cursor:not-allowed}
+.trend-bulk-option input{accent-color:var(--pri);width:16px;height:16px;flex-shrink:0}
+.trend-bulk-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:18px}
+.trend-bulk-result{border:1px solid var(--bdr);border-radius:10px;padding:14px;min-width:0}
+.trend-bulk-result h4{font-size:13px;margin:0 0 6px;line-height:1.5}
+.trend-bulk-result p{font-size:12px;color:var(--txt-3);margin-bottom:10px}
+.trend-bulk-canvas{height:230px;position:relative}
+.trend-bulk-result details{font-size:12px;margin-top:10px;overflow:auto;max-height:220px}
+@media(max-width:860px){.trend-bulk-grid{grid-template-columns:1fr}}
 .trend-chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px}
 .trend-chip{
   display:inline-flex;align-items:center;gap:7px;background:var(--surf-2);border:1px solid var(--bdr);
@@ -939,6 +955,26 @@ table.dtbl tr:last-child td{border-bottom:none}
       </div>
     </div>
 
+    <details class="trend-bulk" id="trend-bulk">
+      <summary>Pilih Banyak Tren — centang parameter sekaligus</summary>
+      <p class="trend-add-hint" style="margin-top:10px">Pilih check sheet di atas, lalu equipment dan parameter di sini. Setiap parameter tampil dalam grafik tersendiri.</p>
+      <div class="trend-bulk-tools">
+        <label for="tr-bulk-equip">Equipment</label>
+        <select id="tr-bulk-equip" onchange="onBulkEquipmentChange()" disabled><option value="">Pilih equipment…</option></select>
+        <input type="search" id="tr-bulk-search" placeholder="Cari parameter…" aria-label="Cari parameter tren" oninput="renderBulkOptions()">
+      </div>
+      <div class="trend-bulk-tools">
+        <label><input type="checkbox" id="tr-bulk-all" onchange="toggleAllBulk(this.checked)" disabled> Pilih semua hasil pencarian</label>
+        <button type="button" class="btn btn-outline" onclick="clearBulkSelection()">Batal pilih semua</button>
+        <span id="tr-bulk-count" role="status" aria-live="polite">0 dipilih</span>
+      </div>
+      <div class="trend-bulk-list" id="tr-bulk-list">Pilih check sheet dan equipment terlebih dahulu.</div>
+      <div class="trend-bulk-tools">
+        <button type="button" class="btn btn-primary" id="tr-bulk-show" onclick="showBulkTrends()" disabled>Tampilkan Tren Terpilih</button>
+        <button type="button" class="btn btn-outline" onclick="clearBulkCharts()">Tutup hasil tren</button>
+      </div>
+    </details>
+    <div id="trend-bulk-results" class="trend-bulk-grid"></div>
     <div class="trend-add-row">
       <span class="trend-add-hint" id="trend-add-hint"></span>
       <button type="button" class="btn btn-outline trend-add-btn" id="trend-add-btn" onclick="addTrendSeries()" disabled>+ Tambah ke Perbandingan</button>
@@ -1821,6 +1857,8 @@ function initParamTrend() {
   } else {
     TREND_SERIES = [];
     resetTrendDownstream();
+    TR = { tag: '', submissions: [], params: [], equips: [] };
+    initBulkTrends();
     renderSeriesChips();
     updateAddState();
   }
@@ -1839,6 +1877,7 @@ function resetTrendDownstream() {
 
 function onTrendSheetChange(keepSelection) {
   const tag = document.getElementById('tr-sheet').value;
+  if(!keepSelection){ BULK_SELECTED.clear(); BULK_SHOWN=[]; clearBulkCharts(); }
   const prevParam = keepSelection ? document.getElementById('tr-param').value : '';
   const prevEquip = keepSelection ? document.getElementById('tr-equip').value : '';
   // A pinned comparison set only survives a refresh that keeps the SAME check
@@ -1850,7 +1889,7 @@ function onTrendSheetChange(keepSelection) {
   resetTrendDownstream();
   renderSeriesChips();
 
-  if (!tag) { TR = { tag: '', submissions: [], params: [], equips: [] }; updateAddState(); return; }
+  if (!tag) { TR = { tag: '', submissions: [], params: [], equips: [] }; initBulkTrends(); updateAddState(); return; }
 
   const sheetKeys = trendSheetKeysFor(tag);
   const ownSubs = allData
@@ -1905,6 +1944,7 @@ function onTrendSheetChange(keepSelection) {
   submissions.forEach(s => s.columns.forEach(addEquip));
 
   TR = { tag, submissions, params, equips };
+  initBulkTrends(keepSelection);
 
   const pSel = document.getElementById('tr-param');
   let curSection = null; let html = '<option value="">Pilih parameter…</option>';
@@ -2041,6 +2081,89 @@ function renderSeriesChips() {
       <button type="button" class="trend-chip-x" onclick="removeTrendSeries(${i})" title="Hapus dari chart">&times;</button>
     </span>`).join('') +
     (TREND_SERIES.length > 1 ? `<button type="button" class="trend-chips-clear" onclick="clearTrendSeries()">Hapus semua</button>` : '');
+}
+
+// Batch selection uses independent charts so status and different units never share an axis.
+const BULK_SELECTED = new Set();
+let BULK_CHARTS = [], BULK_SHOWN = [];
+function clearBulkCharts(){
+  BULK_CHARTS.forEach(chart=>chart.destroy()); BULK_CHARTS=[]; BULK_SHOWN=[];
+  document.getElementById('trend-bulk-results').replaceChildren();
+}
+function initBulkTrends(keep=false){
+  const select=document.getElementById('tr-bulk-equip'), prev=keep?select.value:'';
+  select.replaceChildren(new Option('Pilih equipment…',''));
+  TR.equips.forEach(eq=>select.add(new Option(eq,eq)));
+  select.disabled=!TR.equips.length;
+  if(TR.equips.includes(prev)) select.value=prev;
+  if(!keep){BULK_SELECTED.clear();clearBulkCharts();document.getElementById('tr-bulk-search').value='';}
+  for(const key of BULK_SELECTED) if(!TR.params.some(p=>p.key===key)||!buildSeriesPoints(key,select.value).length) BULK_SELECTED.delete(key);
+  renderBulkOptions();
+  if(keep&&BULK_SHOWN.length) showBulkTrends(BULK_SHOWN);
+}
+function onBulkEquipmentChange(){
+  const eq=document.getElementById('tr-bulk-equip').value;
+  for(const key of BULK_SELECTED) if(!buildSeriesPoints(key,eq).length) BULK_SELECTED.delete(key);
+  clearBulkCharts();renderBulkOptions();
+}
+function bulkVisibleParams(){
+  const query=document.getElementById('tr-bulk-search').value.trim().toLocaleLowerCase();
+  return TR.params.filter(p=>(p.section+' '+p.no+' '+p.desc).toLocaleLowerCase().includes(query));
+}
+function renderBulkOptions(){
+  const list=document.getElementById('tr-bulk-list'),eq=document.getElementById('tr-bulk-equip').value;
+  list.replaceChildren();let section=null;
+  const params=bulkVisibleParams();
+  if(!eq){list.textContent='Pilih check sheet dan equipment terlebih dahulu.';updateBulkState();return;}
+  if(!params.length)list.textContent='Tidak ada parameter yang cocok.';
+  params.forEach(p=>{
+    if(p.section!==section){const heading=document.createElement('div');heading.className='trend-bulk-group';heading.textContent=p.section||'Parameter';list.appendChild(heading);section=p.section;}
+    const label=document.createElement('label');label.className='trend-bulk-option';
+    const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=BULK_SELECTED.has(p.key);
+    checkbox.disabled=!buildSeriesPoints(p.key,eq).length;
+    checkbox.addEventListener('change',()=>{if(checkbox.checked)BULK_SELECTED.add(p.key);else BULK_SELECTED.delete(p.key);updateBulkState();});
+    label.append(checkbox,document.createTextNode((p.no?p.no+' — ':'')+p.desc+(checkbox.disabled?' (belum ada data)':'')));list.appendChild(label);
+  });updateBulkState();
+}
+function updateBulkState(){
+  const eq=document.getElementById('tr-bulk-equip').value;
+  const visible=bulkVisibleParams().filter(p=>eq&&buildSeriesPoints(p.key,eq).length);
+  const chosen=visible.filter(p=>BULK_SELECTED.has(p.key)).length;
+  const all=document.getElementById('tr-bulk-all');all.disabled=!visible.length;
+  all.checked=visible.length>0&&chosen===visible.length;all.indeterminate=chosen>0&&chosen<visible.length;
+  document.getElementById('tr-bulk-count').textContent=BULK_SELECTED.size+' dipilih';
+  document.getElementById('tr-bulk-show').disabled=!eq||!BULK_SELECTED.size;
+}
+function toggleAllBulk(checked){
+  const eq=document.getElementById('tr-bulk-equip').value;
+  bulkVisibleParams().filter(p=>buildSeriesPoints(p.key,eq).length).forEach(p=>checked?BULK_SELECTED.add(p.key):BULK_SELECTED.delete(p.key));renderBulkOptions();
+}
+function clearBulkSelection(){BULK_SELECTED.clear();renderBulkOptions();}
+function showBulkTrends(keys=[...BULK_SELECTED]){
+  const equip=document.getElementById('tr-bulk-equip').value;
+  clearBulkCharts();if(!equip)return;
+  const results=document.getElementById('trend-bulk-results');
+  TR.params.filter(p=>keys.includes(p.key)).forEach(param=>{
+    const points=buildSeriesPoints(param.key,equip);if(!points.length)return;
+    BULK_SHOWN.push(param.key);
+    const unit=trendUnitFor(TR.tag,param.no,param.desc);
+    const status=computeIsStatus(points)||points.every(p=>p.numeric===null);
+    const card=document.createElement('section');card.className='trend-bulk-result';
+    const heading=document.createElement('h4');heading.textContent=(param.section?param.section+' · ':'')+(param.no?param.no+' — ':'')+param.desc;
+    const info=document.createElement('p');info.textContent=equip+' · '+points.length+' pembacaan · Terakhir: '+points.at(-1).raw;
+    const box=document.createElement('div');box.className='trend-bulk-canvas';const canvas=document.createElement('canvas');canvas.setAttribute('role','img');canvas.setAttribute('aria-label',heading.textContent+' — '+equip);box.appendChild(canvas);
+    card.append(heading,info,box);results.appendChild(card);
+    const color=v=>trendGoodness(v)===1?'#10b981':trendGoodness(v)===-1?'#f43f5e':'#94a3b8';
+    BULK_CHARTS.push(new Chart(canvas.getContext('2d'),{
+      type:status?'bar':'line',data:{labels:points.map(p=>p.date),datasets:[{label:param.desc,
+        data:points.map(p=>status?1:p.numeric),borderColor:'#2563eb',backgroundColor:status?points.map(p=>color(p.raw)):'#2563eb',borderWidth:2,pointRadius:3,spanGaps:false}]},
+      options:{responsive:true,maintainAspectRatio:false,animation:false,
+        plugins:{legend:{display:false},tooltip:{callbacks:{label:item=>['Nilai: '+points[item.dataIndex].raw,'WO: '+points[item.dataIndex].wo]}}},
+        scales:{x:{ticks:{maxTicksLimit:6}},y:status?{display:false,min:0,max:1.3}:{title:{display:!!unit,text:unit}}}}
+    }));
+    const detail=document.createElement('details');const summary=document.createElement('summary');summary.textContent='Lihat nilai dan riwayat';detail.appendChild(summary);
+    const table=document.createElement('table');table.className='dtbl';table.innerHTML='<thead><tr><th>Tanggal</th><th>WO</th><th>Nilai</th></tr></thead><tbody>'+points.map(p=>'<tr><td>'+esc(p.date)+'</td><td>'+esc(p.wo)+'</td><td>'+esc(p.raw)+'</td></tr>').join('')+'</tbody>';detail.appendChild(table);card.appendChild(detail);
+  });
 }
 
 function trendGradient(ctx, hex, h) {
