@@ -1894,12 +1894,32 @@ function _msStepper(a){
 }
 function _msStep(n,label,cls){ return `<div class="ms-step ${cls}"><span class="d">${n}</span>${escHtml(label)}</div>`; }
 function _msLn(cls){ return `<span class="ms-ln ${cls}"></span>`; }
+// Maintenance_Corrective_Action.html saves under one FIXED synthetic
+// assetName ("Maintenance Corrective Action Report") for every submission
+// — the real per-job identity lives in free-typed form fields instead (see
+// _msExtraLine below). That made every card/detail title identical
+// regardless of which job/asset it actually was. Mirrors the PDF's own
+// filename convention exactly (see generatePDF() in that file):
+// "<Work Order Type> Report <WO No.> <Asset Tag> <Failure Desc>" — keep the
+// two in sync if either changes.
+function _mcaTitleText(cs){
+  const iv = (cs && cs.inputValues) || {};
+  const woType = (iv['wo-type'] || 'CM').trim() || 'CM';
+  const woNo = ((cs && cs.woNumber) || iv['wo-no'] || 'NoWO').trim() || 'NoWO';
+  const assetTag = (iv['asset-tag'] || '').trim();
+  let failureDesc = (iv['failure-desc'] || '').trim();
+  if(failureDesc.length > 60) failureDesc = failureDesc.slice(0, 60).trim() + '...';
+  return [woType, 'Report', woNo, assetTag, failureDesc].filter(Boolean).join(' ');
+}
 // Report title = asset name + a mono chip with the asset TAG for quick
 // identification. The tag is hidden when it's just a slug of the name or a
 // synthetic per-visit placeholder (MANUAL-UPLOAD, etc.) — no value there.
 function _assetTitleParts(a, cs){
   let name = ((cs && cs.assetName) || (a && a.assetName) || '').toString().trim();
   let tag = ((cs && cs.assetTag) || (a && a.assetTag) || '').toString().trim();
+  if(/^maintenance-corrective-action$/i.test(tag)){
+    return { name: _mcaTitleText(cs) || name || 'Laporan', tag: '' };
+  }
   if(!name){ return { name: tag || 'Laporan', tag: '' }; }  // tag-only → it IS the name
   if(tag){
     const norm = s => s.toLowerCase().replace(/[^a-z0-9]+/g,' ').replace(/\s+/g,' ').trim();
