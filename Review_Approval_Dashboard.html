@@ -1476,6 +1476,28 @@ function inMyReviewScope(a){
   return s.team === loggedInTeam && loggedInAreas.includes(s.area);
 }
 
+// Renders whatever is currently in _allApprovals into the active tab. Split
+// out of loadAll() so the page can paint TWICE per load: once right after the
+// main approvals fetch (fast, single round-trip), and again after the slower
+// duplicate/orphan cleanup housekeeping below finishes. Before this split,
+// every render was gated behind that housekeeping — on a normal connection
+// that's invisible, but cleanupDuplicateApprovals() does a chain of
+// sequential Firestore reads/deletes (one per approval needing a
+// revisionOf/orphan check) that can take several seconds on a slow
+// connection, or, per a real prior bug class in this codebase, occasionally
+// hang outright. The symptom looked exactly like "data doesn't show until I
+// click a tab": the data was already fetched and sitting in _allApprovals,
+// nothing had actually failed — the render call was just still waiting
+// behind housekeeping that hadn't finished yet, and clicking any tab called
+// switchTab(), which renders from _allApprovals directly and doesn't wait on
+// housekeeping at all.
+function renderActiveTab(){
+  updateTabCounts();
+  populateHistoryAreaOptions();
+  if(_activeTab === 'recap'){ populateRecapPersonOptions(); renderRecapChart(); }
+  else if(_activeTab === 'mystatus'){ populateMsPeriodOptions(); renderMyStatus(); }
+  else renderList();
+}
 async function loadAll(){
   document.getElementById('list-area').innerHTML = '<div class="list-loading"><div class="msg">Memuat...</div></div>';
   document.getElementById('dedupe-note').style.display = 'none';
@@ -1485,45 +1507,42 @@ async function loadAll(){
     document.getElementById('list-area').innerHTML = '<div class="list-empty"><div class="msg">Gagal memuat data</div><div>'+e.message+'</div></div>';
     return;
   }
-  await loadUserDir(true);
-  // Self-heal: an older submit path stored `area` as a JSON-stringified array
-  // ('["Powerblock"]'), which broke scope matching (the PIC couldn't review).
-  // Rewrite just that one field on the approvals doc when it's detectably
-  // malformed — idempotent, only touches the workflow collection.
-  await Promise.all(_allApprovals.map(async a => {
-    if(typeof a.area === 'string' && a.area.trim().charAt(0) === '['){
-      const clean = toAreaList(a.area)[0] || null;
-      if(clean && clean !== a.area){
-        try{ await db.collection('approvals').doc(a.id).update({ area: clean }); a.area = clean; }
-        catch(e){ console.warn('area self-heal gagal untuk', a.id, e && e.message); }
-      }
-    }
-  }));
+  try{ await loadUserDir(true); }catch(e){ console.error('loadUserDir gagal:', e); }
   _allApprovals.forEach(a => {
     const s = scopeOfApproval(a);
     a._team = s.team; a._area = s.area; a._src = s.src || null;
   });
+  renderActiveTab(); // first paint — see renderActiveTab()'s own comment above
+  maybeOpenFromUrl();
   try{
+    // Self-heal: an older submit path stored `area` as a JSON-stringified array
+    // ('["Powerblock"]'), which broke scope matching (the PIC couldn't review).
+    // Rewrite just that one field on the approvals doc when it's detectably
+    // malformed — idempotent, only touches the workflow collection.
+    await Promise.all(_allApprovals.map(async a => {
+      if(typeof a.area === 'string' && a.area.trim().charAt(0) === '['){
+        const clean = toAreaList(a.area)[0] || null;
+        if(clean && clean !== a.area){
+          try{ await db.collection('approvals').doc(a.id).update({ area: clean }); a.area = clean; }
+          catch(e){ console.warn('area self-heal gagal untuk', a.id, e && e.message); }
+        }
+      }
+    }));
     const removed = await cleanupDuplicateApprovals(_allApprovals);
     if(removed.length){
       const removedIds = new Set(removed.map(a=>a.id));
       _allApprovals = _allApprovals.filter(a => !removedIds.has(a.id));
       showDedupeNote(removed.length);
     }
+    // cleanupDuplicateApprovals() populated _checksheetCache for every approval —
+    // fold WO number + execution date onto the approval for history search/sort.
+    _allApprovals.forEach(a => {
+      const cs = _checksheetCache[a.checksheetId];
+      a._wo = (cs && cs.woNumber) || '';
+      a._date = (cs && cs.executionDate) || '';
+    });
   }catch(e){ console.error('Cleanup duplikat approval gagal:', e); }
-  // cleanupDuplicateApprovals() populated _checksheetCache for every approval —
-  // fold WO number + execution date onto the approval for history search/sort.
-  _allApprovals.forEach(a => {
-    const cs = _checksheetCache[a.checksheetId];
-    a._wo = (cs && cs.woNumber) || '';
-    a._date = (cs && cs.executionDate) || '';
-  });
-  updateTabCounts();
-  populateHistoryAreaOptions();
-  if(_activeTab === 'recap'){ populateRecapPersonOptions(); renderRecapChart(); }
-  else if(_activeTab === 'mystatus'){ populateMsPeriodOptions(); renderMyStatus(); }
-  else renderList();
-  maybeOpenFromUrl();
+  renderActiveTab(); // second paint, with dedup + WO/date now folded in
 }
 function showDedupeNote(n){
   const note = document.getElementById('dedupe-note');
@@ -2937,8 +2956,8 @@ function renderActionSection(a, cs){
         </div>
       </div>
       <div class="action-row">
-        <button class="btn btn-danger" onclick="doReturnToTechnician('review')">&#8617; Kembalikan ke Teknisi</button>
-        <button class="btn btn-pri" onclick="doSubmitReview()">Teruskan ke Supervisor &rarr;</button>
+        <button class="btn btn-danger" id="btn-return-review" onclick="doReturnToTechnician('review')">&#8617; Kembalikan ke Teknisi</button>
+        <button class="btn btn-pri" id="btn-submit-review" onclick="doSubmitReview()">Teruskan ke Supervisor &rarr;</button>
       </div>
     </div>`;
   }
@@ -2956,7 +2975,7 @@ function renderActionSection(a, cs){
         </div>
       </div>
       <div class="action-row">
-        <button class="btn btn-danger" onclick="doReturnToTechnician('approval')">&#8617; Kembalikan ke Teknisi</button>
+        <button class="btn btn-danger" id="btn-return-approval" onclick="doReturnToTechnician('approval')">&#8617; Kembalikan ke Teknisi</button>
         <button class="btn btn-ok" id="btn-approve" onclick="doApprove()">&#9989; Approve &amp; Buat PDF Final</button>
       </div>
     </div>`;
@@ -3030,11 +3049,36 @@ function drawImageFitted(canvasId, img){
   _sigState[canvasId].hasInk = true;
 }
 
-/* ── ACTIONS ── */
+/* ── ACTIONS ──
+   All three action functions below share one reentrancy guard (_actionBusy)
+   and lock BOTH buttons in their action-row (not just the one clicked) for
+   the duration of the async work — before this, clicking "Teruskan ke
+   Supervisor" or "Approve" gave no visible feedback until the alert() at the
+   end, so a technician unsure whether the click registered would click again,
+   firing a second Approvals.submitReview()/approve() call (or a second
+   buildFinalPdf()+upload) against the same doc while the first was still in
+   flight. _actionBusy is checked FIRST, before prompt()/alert() dialogs or
+   any validation, so a double-click can't slip in between. */
+let _actionBusy = false;
+function _lockActionButtons(activeId, otherId, busyLabel){
+  const active = document.getElementById(activeId), other = otherId && document.getElementById(otherId);
+  if(active){ active.dataset.origLabel = active.innerHTML; active.disabled = true; active.innerHTML = busyLabel; }
+  if(other) other.disabled = true;
+  return { active, other };
+}
+function _unlockActionButtons({active, other}, restoreLabel){
+  if(active){ active.disabled = false; active.innerHTML = restoreLabel != null ? restoreLabel : (active.dataset.origLabel || active.innerHTML); }
+  if(other) other.disabled = false;
+}
+
 async function doReturnToTechnician(stage){
-  if(!_curApproval) return;
+  if(!_curApproval || _actionBusy) return;
   const note = prompt('Alasan pengembalian ke teknisi:');
   if(note==null || !note.trim()){ return; }
+  _actionBusy = true;
+  const activeId = stage==='approval' ? 'btn-return-approval' : 'btn-return-review';
+  const otherId = stage==='approval' ? 'btn-approve' : 'btn-submit-review';
+  const btns = _lockActionButtons(activeId, otherId, '⏳ Mengirim...');
   try{
     await Approvals.returnToTechnician(_curApproval.id, {note:note.trim(), by:loggedInUser, stage});
     alert('Submission dikembalikan ke teknisi.');
@@ -3042,11 +3086,14 @@ async function doReturnToTechnician(stage){
     await loadAll();
   }catch(e){
     alert('Gagal mengembalikan: '+e.message);
+  }finally{
+    _actionBusy = false;
+    _unlockActionButtons(btns);
   }
 }
 
 async function doSubmitReview(){
-  if(!_curApproval) return;
+  if(!_curApproval || _actionBusy) return;
   const comments = document.getElementById('in-comments').value.trim();
   const recommendations = document.getElementById('in-recommendations').value.trim();
   const signature = getSignatureDataUrl('sig-canvas-review');
@@ -3061,23 +3108,28 @@ async function doSubmitReview(){
     if(recommendations.length < 10){ alert('Rekomendasi / Future Work minimal 10 karakter sebelum diteruskan ke Supervisor.'); return; }
   }
   if(!signature){ alert('Tanda tangan diperlukan sebelum diteruskan ke Supervisor.'); return; }
+  _actionBusy = true;
+  const btns = _lockActionButtons('btn-submit-review', 'btn-return-review', '⏳ Mengirim ke Supervisor...');
   try{
     await Approvals.submitReview(_curApproval.id, {comments, recommendations, signature, reviewedBy: loggedInUser});
     alert('Review terkirim, diteruskan ke Supervisor.');
     closeDetail();
     await loadAll();
   }catch(e){
-    alert('Gagal mengirim review: '+e.message);
+    alert('Gagal mengirim review: '+e.message+' — koneksi mungkin bermasalah, silakan coba lagi.');
+  }finally{
+    _actionBusy = false;
+    _unlockActionButtons(btns);
   }
 }
 
 async function doApprove(){
-  if(!_curApproval || !_curChecksheet) return;
+  if(!_curApproval || !_curChecksheet || _actionBusy) return;
   const notes = document.getElementById('in-notes').value.trim();
   const signature = getSignatureDataUrl('sig-canvas-approval');
   if(!signature){ alert('Tanda tangan diperlukan sebelum approve.'); return; }
-  const btn = document.getElementById('btn-approve');
-  btn.disabled = true; btn.textContent = '⏳ Membuat PDF final...';
+  _actionBusy = true;
+  const btns = _lockActionButtons('btn-approve', 'btn-return-approval', '⏳ Membuat PDF final...');
   showFileProgress('Mengambil PDF asli…');
   try{
     const approvedBy = loggedInUser;
@@ -3105,7 +3157,8 @@ async function doApprove(){
     // (fetch original, merge, upload final PDF) is always safe.
     alert('Gagal approve: '+e.message+' — koneksi mungkin bermasalah, silakan coba lagi.');
   }finally{
-    btn.disabled = false; btn.textContent = '✅ Approve & Buat PDF Final';
+    _actionBusy = false;
+    _unlockActionButtons(btns, '✅ Approve & Buat PDF Final');
   }
 }
 
