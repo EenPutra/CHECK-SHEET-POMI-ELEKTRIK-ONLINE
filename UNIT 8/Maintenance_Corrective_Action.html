@@ -2584,9 +2584,16 @@ async function generatePDF(opts){
   y += 8;
 
   // ── SAVE / SILENT ──
-  const wo = (gv('wo-no') || 'MCA').replace(/[^A-Za-z0-9_-]/g,'_');
-  const dt = gv('wo-date') || new Date().toISOString().split('T')[0];
-  const filename = `MCA_${wo}_${dt}.pdf`;
+  // Filename mirrors the report itself so each download is distinct even when
+  // WO No./date happen to repeat: <Work Order Type> Report <WO No.> <Asset Tag> <Failure Desc>
+  const fnPart = s => (s || '').toString().trim().replace(/[\\/:*?"<>|]+/g, '-').replace(/\s+/g, ' ').trim();
+  const woType = gv('wo-type') || 'CM';
+  const woNo = gv('wo-no') || 'NoWO';
+  const assetTagFn = gv('asset-tag') || MCA_ASSET_TAG;
+  let failureDesc = gv('failure-desc') || '';
+  if (failureDesc.length > 60) failureDesc = failureDesc.slice(0, 60).trim() + '...';
+  const filename = [woType, 'Report', woNo, assetTagFn, failureDesc]
+    .map(fnPart).filter(Boolean).join(' ') + '.pdf';
   if(opts.silent){
     // no-op: caller reads the returned pdf object directly
   }else{
