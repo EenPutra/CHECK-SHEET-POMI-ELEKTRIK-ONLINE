@@ -12,14 +12,14 @@
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=20260915a"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=20260923a"></script>
 <!-- ?v bumped on every change to a shared lib so GitHub Pages' 10-min asset
      cache doesn't serve a stale copy (symptom: "Approvals.xxx is not a function"). -->
-<script src="db-helper.js?v=20260915a"></script>
-<script src="storage-helper.js?v=20260915a"></script>
-<script src="approval-helper.js?v=20260915a"></script>
-<script src="auth-session.js?v=20260915a"></script>
-<script src="team-routing.js?v=20260915a"></script>
+<script src="db-helper.js?v=20260923a"></script>
+<script src="storage-helper.js?v=20260923a"></script>
+<script src="approval-helper.js?v=20260923a"></script>
+<script src="auth-session.js?v=20260923a"></script>
+<script src="team-routing.js?v=20260923a"></script>
 <style>
 :root{
   --bg:#f4f7fb; --bg-2:#eaf0f7; --surf:#ffffff; --surf-2:#f8fafc;
@@ -2387,6 +2387,23 @@ async function doCancelReview(){
     await loadAll();
   }catch(e){ alert('Gagal: '+e.message); }
 }
+async function doCancelApproval(){
+  if(loggedInRole !== 'admin' || !_curApproval) return;
+  const a = _curApproval;
+  if(!confirm('Batalkan approval laporan ini?\n\nStatus kembali ke SUBMITTED agar check sheet bisa diedit & ditambah datanya. Setelah dikirim ulang, laporan harus direview dan di-approve ULANG.\n\nReview, approval & PDF final sebelumnya diarsipkan di Riwayat (tidak dihapus).')) return;
+  const reason = (document.getElementById('adm-reopen-reason')?.value || '').trim();
+  try{
+    await Approvals.cancelApproval(a.id, { by: loggedInUser, reason });
+    const canOpen = a.checksheetFile && !a._src;
+    if(canOpen && confirm('Approval dibatalkan. Buka check sheet sekarang untuk diedit?\n(Saat submit ulang, data akan menimpa laporan yang sama.)')){
+      window.open(a.checksheetFile.replace(/ /g,'%20') + '?reviseOf=' + encodeURIComponent(a.id), '_blank', 'noopener');
+    } else if(!canOpen){
+      alert('Approval dibatalkan. Laporan ini berasal dari upload manual / aplikasi lain, jadi perbaikan dilakukan di sumbernya lalu dikirim ulang.');
+    }
+    closeDetail();
+    await loadAll();
+  }catch(e){ alert('Gagal: '+e.message); }
+}
 
 function _afterApprovalRemoved(id){
   _allApprovals = _allApprovals.filter(a => a.id !== id);
@@ -2605,6 +2622,16 @@ function renderDetail(a, cs){
     });
     html += `</div>`;
   }
+  if(Array.isArray(a.reopenedHistory) && a.reopenedHistory.length){
+    html += `<div class="dsec"><div class="dsec-title">&#128275; Riwayat Approval yang Dibuka Kembali</div>`;
+    a.reopenedHistory.forEach((h,i) => {
+      const ap = h.approval || {}, rv = h.review || {};
+      html += `<div class="note-box" style="margin-top:8px">Dibuka kembali #${i+1} oleh <b>${escHtml(h.reopenedBy||'—')}</b> (${fmtDate(h.reopenedAt)})${h.reason?`: "${escHtml(h.reason)}"`:''}.<br>
+        Sebelumnya di-approve oleh <b>${escHtml(ap.approvedBy||'—')}</b> (${fmtDate(ap.approvedAt)})${rv.reviewedBy?`, direview oleh <b>${escHtml(rv.reviewedBy)}</b> (${fmtDate(rv.reviewedAt)})`:''}.
+        ${h.finalPdfUrl?`<div style="margin-top:6px"><button class="btn btn-sm" onclick="downloadRemoteFile(${escHtml(JSON.stringify(h.finalPdfUrl))}, pdfDownloadName(_curApproval, null, 'FINAL-lama-${i+1}'))">&#11015;&#65039; Unduh PDF Final lama</button></div>`:''}</div>`;
+    });
+    html += `</div>`;
+  }
 
   if(a.review){
     html += `<div class="dsec"><div class="dsec-title">Review — TechOp2</div>
@@ -2699,6 +2726,13 @@ function renderDetail(a, cs){
       <div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
       <div class="readonly-hint" style="margin-bottom:8px">Membatalkan review: hasil review dihapus dan submission kembali ke antrean Review TechOp2.</div>
       <button class="btn btn-sm" onclick="doCancelReview()">&#8617;&#65039; Batalkan Review</button>
+      ` : ''}
+
+      ${a.status==='approved' ? `
+      <div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>
+      <div class="readonly-hint" style="margin-bottom:8px">Membuka kembali laporan yang sudah disetujui: status kembali ke <b>Submitted</b> sehingga check sheet bisa diedit &amp; ditambah datanya, lalu direview &amp; di-approve ulang. Review, approval, dan PDF final sebelumnya <b>diarsipkan</b> di Riwayat (tidak dihapus).</div>
+      <input class="dinput" id="adm-reopen-reason" placeholder="Alasan dibuka kembali (opsional), mis. tambah data megger" style="margin-bottom:8px">
+      <button class="btn btn-sm" onclick="doCancelApproval()">&#8617;&#65039; Batalkan Approval → kembali ke Submit</button>
       ` : ''}
 
       <div style="border-top:1px solid var(--bdr);margin:14px 0 10px"></div>

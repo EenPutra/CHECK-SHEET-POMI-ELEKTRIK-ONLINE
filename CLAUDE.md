@@ -1894,6 +1894,16 @@ touch a report belonging to another account. Admin keeps its own fuller toolset 
   - **Batalkan Review** (shown only when `status==='reviewed'`; `doCancelReview()` →
     `Approvals.cancelReview()`): `review` discarded, status → `'submitted'` (back to the TechOp2
     review queue).
+  - **Batalkan Approval → kembali ke Submit** (shown only when `status==='approved'`;
+    `doCancelApproval()` → `Approvals.cancelApproval(id, {by, reason})`): reopens an approved
+    report so data can be added. Status → `'submitted'` (TechOp2 queue), `review`/`approval`/
+    `finalPdfUrl` cleared — but **archived, not discarded**, into `reopenedHistory[]`
+    (`{reopenedBy, reopenedAt, reason, review, approval, finalPdfUrl}`), rendered in the detail
+    view as "Riwayat Approval yang Dibuka Kembali" with a download for each old final PDF. After
+    confirming, the admin is offered to open `<checksheetFile>?reviseOf=<id>` directly; the
+    resubmit overwrites the same checksheet/approval (SubmitGuard's reviseOf path), and
+    `submitWithFiles()`'s `set(..., {merge:true})` preserves `reopenedHistory`. The owner's own
+    "Perbaiki" button also reappears since `_canOwnerEdit()` only blocks `approved`.
   Each writes an `adminNote: {action, by, at}` marker on the doc. `_firstArea()` lives in
   `approval-helper.js` (global, since team-routing.js isn't loaded on check sheets).
 - **"Rekap Bulanan" is a 4th tab, not a panel bolted above the existing list** — `switchTab()`
@@ -2538,7 +2548,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260915a`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20260923a`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a

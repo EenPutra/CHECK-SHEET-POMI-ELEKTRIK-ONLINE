@@ -170,6 +170,32 @@ const Approvals = {
     });
   },
 
+  // Reopen an approved report so it can be edited and resubmitted. Status goes
+  // back to 'submitted' (TechOp2 queue); the old review/approval/finalPdfUrl are
+  // archived into reopenedHistory[] rather than discarded, so the signed record
+  // of the earlier approval survives.
+  async cancelApproval(id, { by, reason } = {}) {
+    const cur = await this.getById(id);
+    if (!cur) throw new Error('Approval tidak ditemukan.');
+    if (cur.status !== 'approved') throw new Error('Item ini tidak berstatus approved.');
+    const now = new Date().toISOString();
+    const hist = Array.isArray(cur.reopenedHistory) ? cur.reopenedHistory.slice() : [];
+    hist.push({
+      reopenedBy: by || '', reopenedAt: now, reason: reason || '',
+      review: cur.review || null, approval: cur.approval || null,
+      finalPdfUrl: cur.finalPdfUrl || null,
+    });
+    await db.collection(this.COLLECTION).doc(id).update({
+      status: 'submitted',
+      review: null,
+      approval: null,
+      finalPdfUrl: null,
+      reopenedHistory: hist,
+      adminNote: { action: 'cancel-approval', by: by || '', at: now },
+      updatedAt: now,
+    });
+  },
+
   // Edit routing / display fields on the approval doc (name, team, area).
   // area is normalized to a single plain string (see _firstArea).
   async adminEditRouting(id, { submittedBy, team, area, by } = {}) {
