@@ -3494,6 +3494,24 @@ approvals — its data model is a whole project, not a submission.
   **This is app-level enforcement, same trust model as the rest of the repo** — Firestore rules
   cannot see the logged-in user until Level 2 (Firebase Auth); they only require
   owner/team/area on create, freeze `owner.user` + `createdAt`, and require `rev` to increase.
+- **Project picker ("📂 Pilih Proyek").** Replaced the tiny topbar `<select>` (users found
+  "how do I open the project to update" confusing, and it rendered empty on the blank-page
+  bug). `projectIndex()` merges local `STORE` projects with `CLOUD.remote` metadata;
+  `pkCard()` shows owner, team·area, last update, an edit/view badge (`canEdit(meta)` works on
+  the metadata object), "only on this device"/"not synced" flags, and a progress bar from
+  `summary` — `{ev,pv,spi,status,…}` stamped onto the doc by `stampSummary()` on every
+  `cloudSave()` so the list shows progress without loading every project. Buttons call
+  `openProject(id, tab)` (`'progress'` / `'tasks'` only offered when editable), which reuses
+  the local copy unless the cloud rev is newer. Same cards are the empty-state dashboard.
+- **Startup-order bug (fixed, was live for a day):** `switchTab()` must not render a tab before
+  the first `compute()` — `if((P&&C)||t==='help')`. A returning user whose last tab was not
+  Dashboard got a completely blank page (no login button, empty project list) because the tab
+  render threw and aborted the boot script.
+- **Test-harness warning:** a headless Chrome left running on the debug port gets silently
+  reused by the next test run — WITHOUT that run's `Network.setBlockedURLs` Firestore block if
+  the stale instance came from an un-blocked live check. That leaked one fake test project
+  (owner `budi`) into production `project_schedules` (found and deleted). The drivers now
+  `pkill -f remote-debugging-port=9333` before spawning.
 - **Hover tooltips (desktop only) + "📖 Panduan" tab.** One delegated `mouseover` handler
   (`initTips()`, gated on `matchMedia('(hover: hover) and (pointer: fine)')`, so touch devices
   never see them) resolves each button's text at hover time via `tipFor(el)`: `data-tip` →

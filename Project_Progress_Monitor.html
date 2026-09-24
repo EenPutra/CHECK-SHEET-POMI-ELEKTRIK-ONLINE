@@ -38,6 +38,7 @@ a{color:var(--pri)}
 .topbar .ttl{font-weight:800;font-size:15px;letter-spacing:.2px;white-space:nowrap}
 .topbar .ttl small{display:block;font-weight:500;font-size:11px;color:#bfdbfe;letter-spacing:.3px}
 .topbar .grow{flex:1}
+.proj-btn{max-width:320px;overflow:hidden;text-overflow:ellipsis;font-weight:700;background:rgba(255,255,255,.2)!important}
 .topbar select{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:8px;padding:6px 8px;max-width:260px}
 .topbar select option{color:#0f172a}
 .tb-btn{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);color:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;font-size:13px;white-space:nowrap}
@@ -197,6 +198,20 @@ details.std summary{cursor:pointer;font-weight:700;color:var(--navy)}
 .pcard{border:1px solid var(--bdr);border-radius:12px;padding:12px 14px;background:#fff;cursor:pointer}
 .pcard:hover{border-color:var(--pri);box-shadow:var(--shadow)}
 .pcard b{display:block;color:var(--navy);font-size:14px}
+.pk-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.pk-tools .inp{flex:1;min-width:180px}
+.seg{display:inline-flex;border:1px solid var(--bdr-2);border-radius:8px;overflow:hidden}
+.seg button{border:none;background:#fff;padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--txt-2)}
+.seg button.on{background:var(--pri);color:#fff}
+.pk-list{display:flex;flex-direction:column;gap:8px;max-height:62vh;overflow:auto;padding:2px}
+.pk-card{display:grid;grid-template-columns:minmax(0,1fr) 190px auto;gap:12px;align-items:center;border:1px solid var(--bdr);border-radius:12px;padding:10px 12px;background:#fff}
+.pk-card.cur{border-color:var(--pri);box-shadow:0 0 0 2px var(--pri-soft)}
+.pk-card b.nm{color:var(--navy);font-size:14px}
+.pk-card .meta{font-size:12px;color:var(--txt-3);margin-top:2px}
+.pk-card .acts{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pk-prog .mini-bar{height:10px}
+.pk-prog .lbl{font-size:11.5px;color:var(--txt-2);margin-top:3px}
+@media(max-width:700px){.pk-card{grid-template-columns:minmax(0,1fr)}.pk-card .acts{justify-content:flex-start}}
 </style>
 </head>
 <body>
@@ -205,7 +220,7 @@ details.std summary{cursor:pointer;font-weight:700;color:var(--navy)}
   <a class="back" href="index.html">&#8592; Portal</a>
   <div class="ttl">&#128200; Project Progress Monitor<small>WBS · CPM · S-Curve · Earned Value / Earned Schedule</small></div>
   <div class="grow"></div>
-  <select id="proj-sel" onchange="switchProject(this.value)" title="Pilih proyek"></select>
+  <button class="tb-btn proj-btn" id="proj-btn" onclick="openPicker()">📂 <span id="proj-btn-name">Pilih Proyek</span> ▾</button>
   <button class="tb-btn" onclick="openNewProject()">&#10133; Proyek</button>
   <button class="tb-btn" onclick="$('#file-import').click()">&#128229; Import</button>
   <button class="tb-btn" onclick="exportExcel()">&#128202; Excel</button>
@@ -456,7 +471,7 @@ async function cloudSave(force,manual){
       const snap=await tx.get(ref);
       const rrev=snap.exists?(snap.data().rev||0):0;
       if(!force&&snap.exists&&rrev>(P._baseRev||0)){remote=snap.data();throw Object.assign(new Error('conflict'),{code:'conflict'});}
-      const data=forCloud(P);data.rev=rrev+1;data.updatedAt=new Date().toISOString();
+      stampSummary();const data=forCloud(P);data.rev=rrev+1;data.updatedAt=new Date().toISOString();
       tx.set(ref,data);P.rev=data.rev;P._baseRev=data.rev;
     }).catch(e=>{if(e.code==='conflict')e.remote=remote;throw e;});
     P._dirty=false;saveLocal();CLOUD.remote[P.id]=remoteMeta(P);
@@ -477,7 +492,8 @@ function showConflict(remote){
   <button class="btn" onclick="adoptCloud()">&#11015;&#65039; Pakai versi cloud</button>
   <button class="btn btn-ng" onclick="closeModal();cloudSave(true,true)">&#11014;&#65039; Timpa cloud dengan versi saya</button></div>`);
 }
-function remoteMeta(d){return {rev:d.rev||0,name:d.name,updatedAt:d.updatedAt,updatedBy:d.updatedBy,team:d.team||'',area:d.area||'',owner:d.owner||null,location:d.location||'',nTasks:(d.tasks||[]).length};}
+function stampSummary(){if(!C||!P||!C.cnt)return;P.summary={ev:+C.EV.toFixed(2),pv:+C.PV.toFixed(2),spi:isFinite(C.SPI)?+C.SPI.toFixed(3):null,status:C.status.t,statusK:C.status.k,done:C.cnt.done,total:C.cnt.total,at:new Date().toISOString()};}
+function remoteMeta(d){return {summary:d.summary||null,rev:d.rev||0,name:d.name,updatedAt:d.updatedAt,updatedBy:d.updatedBy,team:d.team||'',area:d.area||'',owner:d.owner||null,location:d.location||'',nTasks:(d.tasks||[]).length};}
 async function adoptCloud(id,quiet){
   id=id||(P&&P.id);if(!id||!cloudReady())return false;
   try{const snap=await db.collection(CLOUD_COL).doc(id).get();if(!snap.exists){if(!quiet)toast('Proyek tidak ditemukan di cloud (mungkin sudah dihapus).',4500);return false;}
@@ -734,18 +750,55 @@ function curveData(granOverride){
 // ---------------------------------------------------------------------
 //  Rendering — header / strip
 // ---------------------------------------------------------------------
+let PK={q:'',f:'all'};
+function projectIndex(){
+  const m={};
+  Object.values(STORE.projects).forEach(p=>{m[p.id]={id:p.id,name:p.name,team:p.team||'',area:p.area||'',owner:p.owner||null,location:p.location||'',nTasks:(p.tasks||[]).length,
+    updatedAt:p.updatedAt,updatedBy:p.updatedBy,summary:p.summary||null,local:true,dirty:!!p._dirty,cloud:false};});
+  Object.entries(CLOUD.remote).forEach(([id,r])=>{const l=m[id];if(l&&l.dirty){l.cloud=true;return;}m[id]=Object.assign({},r,{id,local:!!l,dirty:false,cloud:true});});
+  return Object.values(m).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
+}
+function pkCard(r){
+  const ed=canEdit(r),cur=P&&P.id===r.id,sm=r.summary;
+  const st=sm?`<span class="status-badge st-${sm.statusK||'na'}" style="font-size:10.5px;padding:2px 8px">${esc(sm.status)}</span>`:'';
+  return `<div class="pk-card${cur?' cur':''}">
+    <div><b class="nm">${esc(r.name||'(tanpa nama)')}</b>${cur?' <span class="chip prog">sedang dibuka</span>':''}
+      <div class="meta">${esc([r.team&&r.area?r.team+' · '+r.area:'',r.location].filter(Boolean).join(' · ')||'—')}</div>
+      <div class="meta">Pemilik ${esc(r.owner?r.owner.name||r.owner.user:'—')} · ${r.nTasks} task · diperbarui ${r.updatedAt?fmtDT(Date.parse(r.updatedAt)):'—'}${r.updatedBy?' oleh '+esc(r.updatedBy):''}</div>
+      <div class="meta">${ed?'<span class="chip prog">✏️ Bisa edit</span>':'<span class="chip ns">👁 Lihat saja</span>'} ${r.cloud?'':'<span class="chip behind" data-tip="Belum pernah tersimpan ke cloud — hanya ada di browser ini.">💾 hanya di perangkat ini</span>'}${r.dirty?' <span class="chip lateDone" data-tip="Ada perubahan di perangkat ini yang belum terkirim ke cloud.">belum tersinkron</span>':''}</div></div>
+    <div class="pk-prog">${sm?`<div class="mini-bar"><div class="p" style="width:${clamp(sm.pv,0,100)}%"></div><div class="a" style="width:${clamp(sm.ev,0,100)}%;top:2px;height:6px"></div></div>
+      <div class="lbl">Aktual <b>${fp(sm.ev)}</b> · Renc. ${fp(sm.pv)} ${st}</div>`:'<div class="lbl hint">Progress tampil setelah proyek disimpan ke cloud</div>'}</div>
+    <div class="acts"><button class="btn btn-sm${ed?'':' btn-pri'}" onclick="openProject('${esc(r.id)}','dash')">${cur?'Ke Dashboard':'Buka'}</button>
+      ${ed?`<button class="btn btn-sm btn-pri" onclick="openProject('${esc(r.id)}','progress')">📈 Update Progress</button><button class="btn btn-sm" onclick="openProject('${esc(r.id)}','tasks')">🗂 Jadwal</button>`:''}</div></div>`;
+}
+function pkRows(){const q=PK.q.trim().toLowerCase();return projectIndex().filter(r=>(PK.f!=='mine'||canEdit(r))&&(!q||[r.name,r.location,r.team,r.area,r.owner&&r.owner.name,r.owner&&r.owner.user].join(' ').toLowerCase().includes(q)));}
+function openPicker(){
+  const s=sess();
+  openModal(`<div class="mh"><b>📂 Pilih Proyek</b><button class="x" onclick="closeModal()">×</button></div>
+  <div class="mb"><div class="pk-tools"><input class="inp" id="pk-q" placeholder="Cari nama proyek, lokasi, pemilik, area…" value="${esc(PK.q)}" oninput="PK.q=this.value;renderPickerList()">
+    <div class="seg"><button class="${PK.f==='all'?'on':''}" data-tip="Tampilkan semua proyek yang ada." onclick="PK.f='all';openPicker()">Semua</button><button class="${PK.f==='mine'?'on':''}" data-tip="Hanya proyek yang bisa Anda edit (milik Anda atau tim/area Anda)." onclick="PK.f='mine';openPicker()">Bisa saya edit</button></div></div>
+    ${s?'':'<div class="note">Anda belum login — semua proyek bisa dibuka untuk dilihat. <a href="#" onclick="closeModal();openLogin();return false">Login</a> untuk mengupdate proyek milik Anda / tim Anda.</div>'}
+    <div class="pk-list" id="pk-list"></div>
+    ${cloudReady()&&CLOUD.state!=='denied'?'':'<p class="hint">Cloud tidak terjangkau — hanya proyek di perangkat ini yang tampil.</p>'}</div>
+  <div class="mf"><button class="btn" onclick="$('#file-import').click()">📥 Import</button><button class="btn btn-pri" onclick="closeModal();openNewProject()">➕ Proyek baru</button></div>`);
+  renderPickerList();setTimeout(()=>{const e=$('#pk-q');if(e&&matchMedia('(pointer: fine)').matches)e.focus();},60);
+}
+function renderPickerList(){const el=$('#pk-list');if(!el)return;const L=pkRows();
+  el.innerHTML=L.length?L.map(pkCard).join(''):`<div class="empty"><b>${PK.q||PK.f==='mine'?'Tidak ada proyek yang cocok':'Belum ada proyek'}</b>${PK.f==='mine'?'Belum ada proyek milik Anda / tim Anda. Coba filter "Semua", atau buat proyek baru.':'Buat proyek baru atau import dari Excel.'}</div>`;}
+async function openProject(id,tab){
+  closeModal();
+  const local=STORE.projects[id],r=CLOUD.remote[id];
+  if(local&&(!r||local._dirty||!(r.rev>(local._baseRev||0)))){if(!P||P.id!==id)switchProject(id);}
+  else{toast('Memuat proyek…',1500);const ok=await adoptCloud(id,true);if(!ok){if(local)switchProject(id);else return;}}
+  if(tab){switchTab(tab);if(tab!=='dash'&&!canEdit())toast('🔒 '+denyReason(),4500);}
+}
 function renderProjSelect(){
-  const sel=$('#proj-sel');const loc=Object.values(STORE.projects).sort((a,b)=>(a.name||'').localeCompare(b.name||''));
-  let h=loc.map(p=>`<option value="${esc(p.id)}"${P&&p.id===P.id?' selected':''}>${esc(p.name||'(tanpa nama)')}</option>`).join('');
-  const cloudOnly=Object.entries(CLOUD.remote).filter(([id])=>!STORE.projects[id]);
-  if(cloudOnly.length)h+=`<optgroup label="Di cloud (belum dibuka di perangkat ini)">`+cloudOnly.map(([id,r])=>`<option value="cloud:${esc(id)}">☁ ${esc(r.name||id)}</option>`).join('')+`</optgroup>`;
-  if(!loc.length&&!cloudOnly.length)h='<option value="">— belum ada proyek —</option>';
-  sel.innerHTML=h;
+  const b=$('#proj-btn-name');if(b)b.textContent=P?P.name:'Pilih Proyek';
 }
 function renderStrip(){
   const el=$('#pstrip');if(!P){el.innerHTML='';return;}
   const c=C,st=c.status;
-  el.innerHTML=`<div><div class="pname">${esc(P.name)}</div>
+  el.innerHTML=`<div><div class="pname">${esc(P.name)} <button class="btn btn-sm" style="vertical-align:3px" onclick="openPicker()">📂 Ganti proyek</button></div>
     <div class="pmeta">${[P.code,P.location,P.client,P.manager?'PM: '+P.manager:''].filter(Boolean).map(esc).join(' · ')||'Lengkapi info proyek di tab Pengaturan'}</div></div>
     <span class="status-badge st-${st.k}">${esc(st.t)}</span>
     <div class="dd-chip" title="Data Date / Status Date — titik waktu acuan perhitungan progress (PMI)">&#128337; <b>Data Date</b>
@@ -762,10 +815,10 @@ function setDD(v){if(!canEdit()){VIEW.ddMode='fixed';VIEW.dd=v;renderAll();retur
 function renderAll(){
   renderAuth();document.body.classList.toggle('ro',!P||!canEdit());
   if(!P){renderProjSelect();$('#pstrip').innerHTML='';$$('.panel').forEach(p=>{if(p.id!=='p-help')p.innerHTML='';});if(TAB==='help'){renderHelp();}else if(TAB!=='dash')switchTab('dash');
-    const cl=Object.entries(CLOUD.remote).sort((a,b)=>String(b[1].updatedAt||'').localeCompare(String(a[1].updatedAt||'')));
+    const cl=projectIndex();
     $('#p-dash').innerHTML=`<div class="card empty"><b>${cl.length?'Pilih proyek':'Belum ada proyek'}</b>${sess()?'Buat proyek baru atau import dari Excel template.':'Login untuk membuat proyek. Proyek yang sudah ada bisa dilihat tanpa login.'}<br><br>
       <button class="btn btn-pri" onclick="openNewProject()">➕ Buat Proyek</button> <button class="btn" onclick="$('#file-import').click()">📥 Import Excel / JSON</button>${sess()?'':' <button class="btn" onclick="openLogin()">🔑 Login</button>'}
-      ${cl.length?`<div class="plist">${cl.map(([id,r])=>`<div class="pcard" onclick="adoptCloud('${esc(id)}')"><b>${esc(r.name||id)}</b><div class="hint">${esc([r.team,r.area].filter(Boolean).join(' · ')||'—')}${r.location?' · '+esc(r.location):''}</div><div class="hint">Pemilik ${esc(r.owner?r.owner.name||r.owner.user:'—')} · ${r.nTasks} task · diperbarui ${r.updatedAt?fmtDT(Date.parse(r.updatedAt)):'—'}</div></div>`).join('')}</div>`:(CLOUD.state==='busy'||CLOUD.state==='off'&&cloudReady()?'<p class="hint">Memuat daftar proyek dari cloud…</p>':'')}</div>`;return;}
+      ${cl.length?`<div class="pk-list" style="max-height:none;margin-top:16px;text-align:left">${projectIndex().map(pkCard).join('')}</div>`:(CLOUD.state==='busy'||CLOUD.state==='off'&&cloudReady()?'<p class="hint">Memuat daftar proyek dari cloud…</p>':'')}</div>`;return;}
   compute();renderProjSelect();renderStrip();renderCloudPill();renderTab();updateHealthBadge();
 }
 function switchTab(t){TAB=t;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));$$('.panel').forEach(p=>p.classList.toggle('active',p.id==='p-'+t));try{localStorage.setItem('ppm_tab',t);}catch(e){}if((P&&C)||t==='help')renderTab();}
@@ -1729,6 +1782,11 @@ const TIP_RULES=[
   [/autoSchedule\('asap'\)/,['Rapatkan ASAP','Tarik task yang belum mulai ke tanggal paling awal yang diizinkan predecessor-nya (mis. pekerjaan sebelumnya selesai lebih cepat).']],
   [/autoSchedule\(\)/,['Jadwalkan ulang otomatis','Geser task yang belum mulai agar tidak mendahului predecessor-nya. Semua turunan ikut bergeser; durasi tetap.']],
   [/normalizeWeights/,['Normalisasi bobot','Skalakan bobot input semua task agar totalnya tepat 100 (proporsi tidak berubah).']],
+  [/openPicker/,['Ganti proyek','Buka daftar proyek dan pilih proyek lain untuk dilihat atau diupdate.']],
+  [/openProject\('[^']*','progress'\)/,['Update Progress','Buka proyek ini langsung di tab Update Progress untuk mencatat progress lapangan.']],
+  [/openProject\('[^']*','tasks'\)/,['Jadwal','Buka proyek ini di tab Jadwal & Task untuk mengubah task, tanggal, atau bobot.']],
+  [/openProject/,['Buka proyek','Tampilkan dashboard proyek ini.']],
+  [/PK\.f=/,null],
   [/COLLAPSED\.clear/,['Buka semua','Tampilkan semua sub-task yang sedang dilipat.']],
   [/openNewProject/,['Proyek baru','Buat proyek baru (wajib login). Anda menjadi pemilik; tim/area yang dipilih ikut bisa mengedit.']],
   [/file-import/,['Import','Muat proyek dari Excel template "PM System S-Curve", file Excel hasil export aplikasi ini, Excel lain berkolom task/tanggal/bobot, atau backup JSON.']],
@@ -1774,7 +1832,7 @@ const TIP_RULES=[
 function tipFor(el){
   if(el.dataset.tip)return ['',el.dataset.tip];
   if(el.classList.contains('tab'))return [el.textContent.trim(),TAB_TIPS[el.dataset.tab]||''];
-  if(el.id==='proj-sel')return ['Pilih proyek','Ganti proyek yang dibuka. Tanda ☁ = ada di cloud tapi belum pernah dibuka di perangkat ini.'];
+  if(el.id==='proj-btn')return ['Pilih proyek','Buka daftar semua proyek untuk dilihat atau diupdate. Cari, filter proyek yang bisa Anda edit, lalu Buka / Update Progress.'];
   if(el.id==='cloud-pill')return ['Status cloud',(CLOUD.msg?CLOUD.msg+'. ':'')+'Klik untuk menyimpan ke database online sekarang.'];
   if(el.closest('.dd-chip'))return ['Data Date','Titik waktu acuan perhitungan. "Sekarang" = waktu saat ini; "Tetap" = pilih tanggal (mis. untuk laporan per cut-off). Pengunjung baca-saja bisa mengubahnya tanpa tersimpan.'];
   const oc=el.getAttribute('onclick')||'';
@@ -1785,7 +1843,7 @@ function tipFor(el){
 (function initTips(){
   let mq;try{mq=window.matchMedia('(hover: hover) and (pointer: fine)');}catch(e){return;}
   const tip=document.getElementById('tip');let timer=null,cur=null;
-  const SEL='button, .tab, #proj-sel, #cloud-pill, .dd-chip select, [data-tip]';
+  const SEL='button, .tab, #cloud-pill, .dd-chip select, [data-tip]';
   const hide=()=>{clearTimeout(timer);cur=null;tip.classList.remove('show');tip.style.display='none';};
   const show=el=>{const t=tipFor(el);if(!t||!t[1])return;
     tip.innerHTML=(t[0]?`<b>${esc(t[0])}</b>`:'')+esc(t[1]);tip.style.display='block';tip.className='';
@@ -1814,6 +1872,7 @@ function renderHelp(){
     <p>Aplikasi ini memantau progress proyek: daftar pekerjaan (task), penanggung jawab (PIC), target mulai–selesai, bobot tiap task, dan % penyelesaian — lalu menghitung <b>progress keseluruhan</b>, <b>kurva S rencana vs aktual</b>, keterlambatan, dan perkiraan tanggal selesai.</p>
     <ol class="steps">
       <li><b>Login</b> (tombol 🔑 kanan atas) dengan akun Review &amp; Approval Dashboard.</li>
+      <li>Klik <b>📂 Pilih Proyek</b> (kiri tombol ➕ Proyek) untuk melihat semua proyek. Tiap proyek menunjukkan pemilik, Team · Area, progress terakhir, dan apakah Anda <b>bisa edit</b> atau <b>lihat saja</b>. Klik <b>📈 Update Progress</b> untuk langsung mengisi progress, atau <b>Buka</b> untuk melihat dashboard.</li>
       <li><b>➕ Proyek</b> untuk membuat proyek baru, atau <b>📥 Import</b> Excel template "PM System S-Curve" yang sudah ada.</li>
       <li>Di tab <b>Jadwal &amp; Task</b>: isi task, PIC, tanggal mulai–selesai, dan bobot. Hubungkan urutan kerja lewat kolom <b>Predecessor</b>.</li>
       <li>Setelah jadwal disetujui: tab <b>Baseline &amp; Scope</b> → <b>📌 Tetapkan Baseline</b>.</li>
