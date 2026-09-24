@@ -3553,7 +3553,12 @@ approvals — its data model is a whole project, not a submission.
   gap as a 3-hour interval; the app uses real work hours, so Rencana differs slightly at a few
   checkpoints while Aktual matches the workbook exactly.)
 - **Weights**: only leaf tasks carry weight (WBS summaries roll up). `weightMode` manual /
-  duration / cost; effective weight = raw ÷ Σraw, so adding a "Pekerjaan Tambahan"
+  duration / cost / **wbs** (user request: "⚖ Bobot otomatis per WBS" — 100 split equally
+  across level-0 main tasks, each node's share split equally across its direct children down to
+  the leaves; milestones get 0 unless a group has nothing else; computed inside `compute()` so
+  it re-balances on every add/move/indent; `t.weight` is left untouched so switching back to
+  manual restores the old values, and `freezeWeights()` copies the computed shares into
+  `t.weight` for hand-tuning); effective weight = raw ÷ Σraw, so adding a "Pekerjaan Tambahan"
   (`scope:'added'`) renormalizes everything to 100% — mirrors the workbook's "Bobot
   Tersesuaikan". Progress entries are cumulative `{t, pct}` with carry-forward; rules of credit
   per task (`pct`, `0/100`, `50/50`, `20/80`).

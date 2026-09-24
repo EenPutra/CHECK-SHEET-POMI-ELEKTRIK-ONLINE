@@ -621,7 +621,16 @@ function compute(){
     return {i,id:t.id,sm,fm,s,f,dur:valid?Math.max(0,f-s):0,valid,prog,leaf:!isSum[i],lvl:lvl[i],parent:parent[i]};
   });
   // weights (only leaves carry weight; summaries roll up)
+  // 'wbs' mode: 100 split equally across top-level (main) tasks, each node's share split equally
+  // across its direct children, down to the leaves. Milestones take no share unless a group has
+  // nothing else. Recomputed every compute(), so adding/moving/indenting tasks re-balances.
+  let wbsShare=null;
+  if(P.weightMode==='wbs'){wbsShare=new Array(n).fill(0);const kids={};T.forEach((t,i)=>{(kids[parent[i]]=kids[parent[i]]||[]).push(i);});
+    const assign=(p,share)=>{const k=kids[p]||[];if(!k.length)return;const main=k.filter(i=>isSum[i]||T[i].type!=='milestone');const use=main.length?main:k;
+      const each=share/use.length;use.forEach(i=>{if(isSum[i])assign(i,each);else wbsShare[i]=each;});};
+    assign(-1,100);}
   let raw=X.map((x,i)=>{if(!x.leaf)return 0;const t=T[i];
+    if(wbsShare)return wbsShare[i];
     if(P.weightMode==='duration')return t.type==='milestone'?0:x.dur;
     if(P.weightMode==='cost')return Math.max(0,+t.cost||0);
     return Math.max(0,+t.weight||0);});
@@ -918,9 +927,10 @@ function renderTasks(){
     <span class="sep ed"></span>
     <button class="ed btn btn-sm" onclick="autoSchedule()" ${c.cnt.conflicts?'':'disabled'} title="Geser task yang melanggar logika predecessor (yang belum mulai)">⚙ Jadwalkan Ulang Otomatis${c.cnt.conflicts?' ('+c.cnt.conflicts+')':''}</button>
     <button class="ed btn btn-sm" onclick="autoSchedule('asap')" ${c.cnt.gaps?'':'disabled'} title="Tarik task yang belum mulai ke tanggal paling awal yang diizinkan predecessor (mis. pekerjaan sebelumnya selesai lebih cepat)">⇤ Rapatkan ASAP${c.cnt.gaps?' ('+c.cnt.gaps+')':''}</button>
+    ${wm==='wbs'?`<button class="ed btn btn-sm btn-pri" onclick="freezeWeights()">⚖ Bobot otomatis AKTIF · ubah ke manual</button>`:`<button class="ed btn btn-sm" onclick="autoWeights()">⚖ Bobot otomatis per WBS</button>`}
     <button class="ed btn btn-sm" onclick="normalizeWeights()" ${wm==='manual'?'':'disabled'} title="Skalakan bobot input agar totalnya 100">Σ Normalisasi bobot → 100</button>
     <button class="btn btn-sm" onclick="COLLAPSED.clear();renderTasks()">Buka semua</button>
-    <span class="hint" style="margin-left:auto">Total bobot input: <b>${Math.round(c.tot*100)/100}</b>${wm==='manual'?'':' ('+{duration:'dari durasi',cost:'dari biaya'}[wm]+')'} · efektif selalu 100%</span>
+    <span class="hint" style="margin-left:auto">Total bobot input: <b>${Math.round(c.tot*100)/100}</b>${wm==='manual'?'':' ('+{duration:'dari durasi',cost:'dari biaya',wbs:'otomatis rata per WBS'}[wm]+')'} · efektif selalu 100%</span>
   </div>
   <div class="note ed" style="margin-bottom:10px">Isi langsung di tabel. <b>Predecessor</b>: nomor baris + tipe + lag, mis. <span class="mono">3</span>, <span class="mono">3SS</span>, <span class="mono">4FS+2</span> (${dayMode?'hari':'jam'}), <span class="mono">5FF-1d</span>. Mengubah <b>Mulai</b> menggeser task dengan durasi tetap; mengubah <b>Selesai</b>/<b>Durasi</b> mengubah panjang task. Kolom <b>Aktual %</b> dicatat pada Data Date (${fmtDT(c.dd)}).</div>
   ${!rows.length?`<div class="empty"><b>Belum ada task</b>Klik ➕ Task untuk mulai menyusun WBS.</div>`:`
@@ -951,7 +961,7 @@ function taskRow(i,dayMode){
   <td>${dIn(t.start,'start')}</td><td>${dIn(t.finish,'finish')}</td>
   <td class="num">${leaf?`<input class="ci num" type="number" min="0" step="${dayMode?0.5:0.5}" data-k="${t.id}:dur" value="${durV}" style="width:64px" onchange="editTask('${t.id}','dur',this.value)">`:`<span class="mono">${x.valid?durV:''}</span>`}</td>
   <td>${leaf?`<input class="ci mono" data-k="${t.id}:preds" value="${esc(predText(t))}" style="width:96px" placeholder="—" onchange="editTask('${t.id}','preds',this.value)">`:''}</td>
-  <td class="num">${leaf?(P.weightMode==='manual'?`<input class="ci num" type="number" min="0" step="any" data-k="${t.id}:weight" value="${+t.weight||0}" style="width:64px" onchange="editTask('${t.id}','weight',this.value)">`:P.weightMode==='cost'?`<input class="ci num" type="number" min="0" step="any" data-k="${t.id}:cost" value="${+t.cost||0}" style="width:84px" title="Biaya" onchange="editTask('${t.id}','cost',this.value)">`:`<span class="mono">${Math.round(x.raw*10)/10}</span>`):''}</td>
+  <td class="num">${leaf?(P.weightMode==='manual'?`<input class="ci num" type="number" min="0" step="any" data-k="${t.id}:weight" value="${+t.weight||0}" style="width:64px" onchange="editTask('${t.id}','weight',this.value)">`:P.weightMode==='cost'?`<input class="ci num" type="number" min="0" step="any" data-k="${t.id}:cost" value="${+t.cost||0}" style="width:84px" title="Biaya" onchange="editTask('${t.id}','cost',this.value)">`:`<span class="mono">${Math.round(x.raw*100)/100}</span>`):''}</td>
   <td class="num mono">${fp(x.eff*100,2)}</td>
   <td class="num mono">${fp(x.plan,1)}</td>
   <td class="num">${leaf?`<input class="ci num" type="number" min="0" max="100" step="any" data-k="${t.id}:act" value="${Math.round(x.rawAct*100)/100}" style="width:62px" onchange="editTask('${t.id}','act',this.value)">`:`<b class="mono">${fp(x.act,1)}</b>`}</td>
@@ -1074,6 +1084,19 @@ function delSel(){
   if(!confirm(`Hapus "${t.name||'(tanpa nama)'}"${n>1?' beserta '+(n-1)+' sub-task':''}?${hasProg?'\n\nPERHATIAN: ada riwayat progress yang ikut terhapus.':''}\n\nBobot semua task lain otomatis dinormalisasi ulang. Bisa di-undo (Ctrl+Z).`))return;
   mutate(()=>{const ids=new Set(P.tasks.slice(i,e).map(x=>x.id));P.tasks.splice(i,n);P.tasks.forEach(x=>{x.preds=(x.preds||[]).filter(p=>!ids.has(p.id));});
     logChange(t.scope==='added'?'scope-remove':'remove',`Dihapus: "${t.name}"${n>1?' (+'+(n-1)+' sub-task)':''}`,'');});SEL=null;
+}
+function autoWeights(){
+  if(!guard())return;const top=C.T.filter((t,i)=>C.lvl[i]===0).length;if(!top){toast('Belum ada task');return;}
+  const ex=C.T.map((t,i)=>i).filter(i=>C.lvl[i]===0&&C.isSum[i]).slice(0,1).map(i=>{const k=C.X[i].leaves.length;return `\n  contoh: "${C.T[i].name}" ${(100/top).toFixed(2)}% ÷ ${k} sub-task`;}).join('');
+  if(!confirm(`Bobot otomatis per WBS:\n• 100% dibagi rata ke ${top} main task (${(100/top).toFixed(2)}% masing-masing)\n• Bobot tiap main task dibagi rata ke sub-task di bawahnya${ex}\n• Menyesuaikan sendiri saat task ditambah, dihapus, dipindah, atau di-indent\n\nBobot manual yang sekarang tetap disimpan dan kembali bila mode diubah ke Manual.`))return;
+  mutate(()=>{P.weightMode='wbs';logChange('weight','Mode bobot → otomatis rata per WBS (100% ÷ '+top+' main task)');});
+  toast('⚖ Bobot otomatis aktif: '+(100/top).toFixed(2)+'% per main task');
+}
+function freezeWeights(){
+  if(!guard())return;
+  if(!confirm('Salin bobot otomatis saat ini ke kolom "Bobot input", lalu ubah ke mode Manual?\n\nSetelah itu bobot tiap task bisa disetel sendiri (tidak lagi menyesuaikan otomatis).'))return;
+  mutate(()=>{C.X.forEach((x,i)=>{if(x.leaf)P.tasks[i].weight=Math.round(x.raw*10000)/10000;});P.weightMode='manual';logChange('weight','Bobot otomatis per WBS disalin ke bobot manual');});
+  toast('Bobot disalin — mode Manual');
 }
 function normalizeWeights(){const lv=C.X.filter(x=>x.leaf);const tot=sum(lv.map(x=>+P.tasks[x.i].weight||0));if(tot<=0){toast('Bobot masih kosong');return;}
   mutate(()=>{lv.forEach(x=>{const t=P.tasks[x.i];t.weight=Math.round((+t.weight||0)/tot*100*10000)/10000;});logChange('weight','Bobot input dinormalisasi ke total 100');});}
@@ -1490,7 +1513,7 @@ function renderSettings(){
     <div class="hint" style="grid-column:1/-1">= ${Math.round(hpd()*100)/100} jam kerja per hari. Mengubah kalender menghitung ulang semua durasi, kurva, dan float; tanggal task tidak berubah.</div></div></div>
   <div class="card"><h3>Metode Perhitungan</h3><div class="fgrid">
     <div class="field"><label>Presisi jadwal</label><select class="inp" onchange="setP('precision',this.value)"><option value="day"${P.precision!=='hour'?' selected':''}>Harian (tanggal)</option><option value="hour"${P.precision==='hour'?' selected':''}>Per jam (tanggal + jam)</option></select></div>
-    <div class="field"><label>Pembobotan task</label><select class="inp" onchange="setP('weightMode',this.value)"><option value="manual"${P.weightMode==='manual'?' selected':''}>Manual (input bobot)</option><option value="duration"${P.weightMode==='duration'?' selected':''}>Otomatis dari durasi</option><option value="cost"${P.weightMode==='cost'?' selected':''}>Otomatis dari biaya (cost-loaded)</option></select></div>
+    <div class="field"><label>Pembobotan task</label><select class="inp" onchange="setP('weightMode',this.value)"><option value="manual"${P.weightMode==='manual'?' selected':''}>Manual (input bobot)</option><option value="duration"${P.weightMode==='duration'?' selected':''}>Otomatis dari durasi</option><option value="cost"${P.weightMode==='cost'?' selected':''}>Otomatis dari biaya (cost-loaded)</option><option value="wbs"${P.weightMode==='wbs'?' selected':''}>Otomatis rata per WBS (main task → sub-task)</option></select></div>
     <div class="field"><label>Ambang SPI "perlu perhatian"</label><input class="inp" type="number" step="0.01" min="0" max="1" value="${P.thresholds.warn}" onchange="setTh('warn',this.value)"></div>
     <div class="field"><label>Ambang SPI "kritis"</label><input class="inp" type="number" step="0.01" min="0" max="1" value="${P.thresholds.crit}" onchange="setTh('crit',this.value)"></div>
     <div class="field"><label>Interval S-Curve default</label><select class="inp" onchange="setP('curveGran',this.value)">${[['auto','Otomatis'],['cp','Checkpoint'],['day','Harian'],['week','Mingguan']].map(([v,l])=>`<option value="${v}"${P.curveGran===v?' selected':''}>${l}</option>`).join('')}</select></div>
@@ -1811,6 +1834,8 @@ const TIP_RULES=[
   [/delSel/,['Hapus task','Hapus baris terpilih beserta sub-task-nya. Bobot lain dinormalisasi ulang. Bisa di-undo (Ctrl+Z).']],
   [/autoSchedule\('asap'\)/,['Rapatkan ASAP','Tarik task yang belum mulai ke tanggal paling awal yang diizinkan predecessor-nya (mis. pekerjaan sebelumnya selesai lebih cepat).']],
   [/autoSchedule\(\)/,['Jadwalkan ulang otomatis','Geser task yang belum mulai agar tidak mendahului predecessor-nya. Semua turunan ikut bergeser; durasi tetap.']],
+  [/autoWeights/,['Bobot otomatis per WBS','Bagi 100% rata ke semua main task, lalu bobot tiap main task dibagi rata ke sub-task-nya. Otomatis menyesuaikan saat task ditambah/dihapus/dipindah.']],
+  [/freezeWeights/,['Ubah ke bobot manual','Salin bobot otomatis saat ini ke kolom Bobot input dan kembali ke mode Manual, supaya bobot task tertentu bisa disetel sendiri.']],
   [/normalizeWeights/,['Normalisasi bobot','Skalakan bobot input semua task agar totalnya tepat 100 (proporsi tidak berubah).']],
   [/openPicker/,['Ganti proyek','Buka daftar proyek dan pilih proyek lain untuk dilihat atau diupdate.']],
   [/openProject\('[^']*','progress'\)/,['Update Progress','Buka proyek ini langsung di tab Update Progress untuk mencatat progress lapangan.']],
@@ -1950,7 +1975,7 @@ function renderHelp(){
     <p>Dengan predecessor, aplikasi menghitung <b>critical path</b> (tanda <span class="chip crit">CP</span>, bar merah) dan <b>float</b> (kelonggaran waktu). Bila sebuah task molor, <b>⚙ Jadwalkan Ulang Otomatis</b> menggeser semua turunannya; bila selesai lebih cepat, <b>⇤ Rapatkan ASAP</b> menarik turunannya maju. Keduanya hanya menggeser task yang belum mulai.</p></div>
 
   <div class="card" id="g-bobot"><h2>5. Bobot &amp; pekerjaan tambahan</h2>
-    <p><b>Bobot</b> menentukan seberapa besar sumbangan tiap task ke progress keseluruhan. Isi angka bebas di kolom <b>Bobot input</b> (mis. persen); kolom <b>Bobot efektif</b> selalu dinormalisasi sehingga totalnya 100%. Tombol <b>Σ Normalisasi</b> merapikan input menjadi total 100. Mode lain (Pengaturan): bobot otomatis dari <b>durasi</b> atau dari <b>biaya</b>.</p>
+    <p><b>Bobot</b> menentukan seberapa besar sumbangan tiap task ke progress keseluruhan. Isi angka bebas di kolom <b>Bobot input</b> (mis. persen); kolom <b>Bobot efektif</b> selalu dinormalisasi sehingga totalnya 100%. Tombol <b>Σ Normalisasi</b> merapikan input menjadi total 100. Tombol <b>⚖ Bobot otomatis per WBS</b> membagi 100% rata ke semua <b>main task</b> (tingkat teratas), lalu bobot tiap main task dibagi rata ke sub-task di bawahnya — mis. 4 main task = 25% masing-masing; main task dengan 5 sub-task = 5% per sub-task. Mode ini menyesuaikan sendiri saat task ditambah/dihapus/dipindah; klik tombolnya lagi untuk menyalin hasilnya ke bobot manual bila ingin menyetel task tertentu. Mode lain (Pengaturan): bobot otomatis dari <b>durasi</b> atau dari <b>biaya</b>.</p>
     <p><b>Pekerjaan tambahan</b> (temuan lapangan / variation order): gunakan <b>➕ Pekerjaan Tambahan</b> atau ubah kategori scope di detail task (⋯), isi tanggal ditemukan dan justifikasinya. Bobotnya menambah total scope, lalu <b>semua bobot dinormalisasi ulang</b> — sama seperti kolom "Bobot Tersesuaikan" di Excel. Karena itu progress keseluruhan bisa turun saat scope bertambah (contoh: aktual 32,5% + tambahan 8% → 32,5 ÷ 1,08 = 30,1%). Pertumbuhan scope terlihat di Dashboard dan tab Baseline &amp; Scope.</p></div>
 
   <div class="card" id="g-progress"><h2>6. Update progress lapangan</h2>
