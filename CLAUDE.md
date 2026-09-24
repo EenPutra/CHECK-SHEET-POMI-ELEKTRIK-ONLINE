@@ -3503,6 +3503,14 @@ approvals — its data model is a whole project, not a submission.
   `cloudSave()` so the list shows progress without loading every project. Buttons call
   `openProject(id, tab)` (`'progress'` / `'tasks'` only offered when editable), which reuses
   the local copy unless the cloud rev is newer. Same cards are the empty-state dashboard.
+- **Long task names wrap everywhere.** The task-table name cell is a `<textarea class="ci
+  nm-ta" rows=1>` auto-sized by `autoH()` (after every render, on input, and on window resize)
+  — an `<input>` cannot wrap. A name is still ONE logical line: `oneLine()` strips newlines on
+  save and `nmKey()` turns Enter into "commit + move to the next row's name" (`table-nav.js`
+  deliberately leaves Enter alone in textareas). The screen Gantt renders the label column
+  first, measures each `.gr` row's real height, then builds the SVG from those heights
+  (`svgFor(hs)`), so bars stay vertically centred on multi-line labels. The PDF Gantt sizes each
+  row from `splitTextToSize()` line count instead of printing only line `[0]`.
 - **Startup-order bug (fixed, was live for a day):** `switchTab()` must not render a tab before
   the first `compute()` — `if((P&&C)||t==='help')`. A returning user whose last tab was not
   Dashboard got a completely blank page (no login button, empty project list) because the tab

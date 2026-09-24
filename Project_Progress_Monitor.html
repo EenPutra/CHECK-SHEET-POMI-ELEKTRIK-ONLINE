@@ -119,6 +119,9 @@ table.t td{padding:5px 8px;border-bottom:1px solid #f1f5f9;vertical-align:middle
 table.t tr:hover td{background:#fafcff}
 table.t td.num,table.t th.num{text-align:right;font-variant-numeric:tabular-nums}
 table.t td.c,table.t th.c{text-align:center}
+table.t textarea.ci{border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 5px;width:100%;min-width:0;resize:none;overflow:hidden;line-height:1.35;white-space:pre-wrap;overflow-wrap:anywhere;display:block;font:inherit}
+table.t textarea.ci:hover{border-color:var(--bdr-2);background:#fff}
+table.t textarea.ci:focus{border-color:var(--pri);background:#fff;outline:none}
 table.t input.ci,table.t select.ci{border:1px solid transparent;background:transparent;border-radius:6px;padding:4px 5px;width:100%;min-width:0}
 table.t input.ci:hover,table.t select.ci:hover{border-color:var(--bdr-2);background:#fff}
 table.t input.ci:focus,table.t select.ci:focus{border-color:var(--pri);background:#fff;outline:none}
@@ -128,7 +131,9 @@ table.t input.ci.num{text-align:right}
 #task-table tr.sum.l0 td{background:#eef2f7}
 #task-table tr.crit td:first-child{box-shadow:inset 3px 0 0 var(--crit)}
 #task-table tr.added td.nm{box-shadow:inset 3px 0 0 var(--add)}
-.nmcell{display:flex;align-items:center;gap:4px;min-width:240px}
+.nmcell{display:flex;align-items:flex-start;gap:4px;min-width:260px;max-width:460px}
+.nmcell .tg,.nmcell .chip,.nmcell .warn-ico{margin-top:5px;flex:none}
+.nmcell textarea{flex:1}
 .nmcell .tg{width:16px;cursor:pointer;color:var(--txt-3);flex:none;text-align:center;user-select:none}
 .mini-bar{position:relative;height:14px;min-width:70px;background:#eef2f7;border-radius:4px;overflow:hidden}
 .mini-bar .p{position:absolute;left:0;top:0;bottom:0;background:rgba(37,99,235,.28)}
@@ -140,7 +145,8 @@ table.t input.ci.num{text-align:right}
 .gantt{display:flex;border:1px solid var(--bdr);border-radius:10px;overflow:hidden;background:#fff}
 .g-left{flex:none;width:300px;border-right:1px solid var(--bdr);overflow:hidden}
 .g-left .gh{height:44px;background:#f8fafc;border-bottom:1px solid var(--bdr);font-size:11px;font-weight:700;color:var(--txt-2);display:flex;align-items:flex-end;padding:0 8px 6px;text-transform:uppercase}
-.g-left .gr{height:26px;display:flex;align-items:center;gap:4px;padding:0 8px;border-bottom:1px solid #f1f5f9;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.g-left .gr{min-height:26px;display:flex;align-items:center;gap:4px;padding:4px 8px;border-bottom:1px solid #f1f5f9;font-size:12px;line-height:1.3;white-space:normal;overflow-wrap:anywhere}
+.g-left .gr .gn{min-width:0}
 .g-left .gr.sum{font-weight:700;background:#f8fafc}
 .g-right{flex:1;overflow:auto;position:relative}
 .g-right svg{display:block}
@@ -919,6 +925,7 @@ function renderTasks(){
   ${rows.map(i=>taskRow(i,dayMode)).join('')}
   </tbody></table></div>`}
   </div>`;
+  autoHAll(el);
 }
 function taskRow(i,dayMode){
   const c=C,t=c.T[i],x=c.X[i],leaf=x.leaf,ms=t.type==='milestone';
@@ -933,7 +940,7 @@ function taskRow(i,dayMode){
   return `<tr class="${cls}" data-id="${t.id}" onclick="selRow('${t.id}',event)">
   <td class="c mono">${i+1}</td><td class="mono" style="color:var(--txt-3)">${c.wbs[i]}</td>
   <td class="nm"><div class="nmcell" style="padding-left:${c.lvl[i]*16}px">${leaf?`<span class="tg">${ms?'◆':'·'}</span>`:`<span class="tg" onclick="event.stopPropagation();toggleCollapse('${t.id}')">${COLLAPSED.has(t.id)?'▸':'▾'}</span>`}
-    <input class="ci" data-k="${t.id}:name" value="${esc(t.name)}" placeholder="${leaf?'Nama task':'Nama grup / fase'}" onchange="editTask('${t.id}','name',this.value)" style="${leaf?'':'font-weight:700'}">
+    <textarea class="ci nm-ta" rows="1" data-k="${t.id}:name" placeholder="${leaf?'Nama task':'Nama grup / fase'}" onchange="editTask('${t.id}','name',oneLine(this.value))" oninput="autoH(this)" onkeydown="nmKey(event,this)" style="${leaf?'':'font-weight:700'}">${esc(t.name)}</textarea>
     ${t.scope==='added'?'<span class="chip add" title="Pekerjaan tambahan">+VO</span>':''}${x.crit&&leaf?'<span class="chip crit" title="Critical path">CP</span>':''}${warn.length?`<span class="warn-ico" title="${esc(warn.join(' · '))}">⚠</span>`:''}</div></td>
   <td><input class="ci" data-k="${t.id}:pic" value="${esc(t.pic)}" list="pic-list" style="width:110px" onchange="editTask('${t.id}','pic',this.value)"></td>
   <td>${dIn(t.start,'start')}</td><td>${dIn(t.finish,'finish')}</td>
@@ -949,6 +956,12 @@ function taskRow(i,dayMode){
   <td>${flagChip(x.flag)}</td>
   <td><button class="btn btn-xs" onclick="event.stopPropagation();openTaskEditor('${t.id}')" title="Detail, riwayat progress, justifikasi">⋯</button></td></tr>`;
 }
+function oneLine(v){return String(v||'').replace(/\s*\n\s*/g,' ').trim();}
+function autoH(el){if(!el)return;el.style.height='auto';el.style.height=(el.scrollHeight+2)+'px';}
+function autoHAll(root){$$('textarea.nm-ta,textarea.te-auto',root||document).forEach(autoH);}
+// Enter commits the name and moves down a row (a task name is one logical line, it only wraps visually)
+function nmKey(e,el){if(e.key!=='Enter'||e.shiftKey||e.isComposing)return;e.preventDefault();const tr=el.closest('tr');let n=tr&&tr.nextElementSibling;
+  while(n&&!n.querySelector('textarea.nm-ta'))n=n.nextElementSibling;el.blur();if(n){const t=n.querySelector('textarea.nm-ta');t.focus();}}
 function selRow(id,ev){if(SEL===id)return;SEL=id;$$('#task-table tr.sel').forEach(r=>r.classList.remove('sel'));const r=$(`#task-table tr[data-id="${id}"]`);if(r)r.classList.add('sel');}
 function toggleCollapse(id){COLLAPSED.has(id)?COLLAPSED.delete(id):COLLAPSED.add(id);renderTab();}
 function rerenderKeepFocus(){
@@ -1079,7 +1092,7 @@ function openTaskEditor(id){
   openModal(`<div class="mh"><b>${esc(C.wbs[i])} · ${esc(t.name||'(tanpa nama)')}</b>${t.scope==='added'?'<span class="chip add">Pekerjaan tambahan</span>':''}${x.crit&&x.leaf?'<span class="chip crit">Critical path</span>':''}<button class="x" onclick="closeModal()">×</button></div>
   <div class="mb">
     <div class="fgrid">
-      <div class="field" style="grid-column:1/-1"><label>Nama task</label><input class="inp" id="te-name" value="${esc(t.name)}"></div>
+      <div class="field" style="grid-column:1/-1"><label>Nama task</label><textarea class="inp te-auto" id="te-name" rows="1" style="min-height:0;resize:none;overflow:hidden" oninput="autoH(this)" onkeydown="if(event.key==='Enter')event.preventDefault()">${esc(t.name)}</textarea></div>
       <div class="field"><label>PIC</label><input class="inp" id="te-pic" list="pic-list" value="${esc(t.pic)}"></div>
       ${x.leaf?`<div class="field"><label>Tipe</label><select class="inp" id="te-type"><option value="task"${t.type!=='milestone'?' selected':''}>Task</option><option value="milestone"${t.type==='milestone'?' selected':''}>Milestone (durasi 0)</option></select></div>
       <div class="field"><label>Metode pengukuran progress</label><select class="inp" id="te-method">${Object.entries(METHODS).map(([k,v])=>`<option value="${k}"${t.method===k?' selected':''}>${v}</option>`).join('')}</select></div>
@@ -1102,6 +1115,7 @@ function openTaskEditor(id){
   </div>
   <div class="mf"><button class="btn" onclick="closeModal()">${canEdit()?'Batal':'Tutup'}</button><button class="ed btn btn-pri" onclick="saveTaskEditor('${id}')">💾 Simpan</button></div>`);
   if(!canEdit())lockPanel($('#modal'));
+  setTimeout(()=>autoHAll($('#modal')),0);
 }
 function addProgRow(){const tb=$('#te-prog tbody');const k=tb.children.length+1000;const tr=document.createElement('tr');
   tr.innerHTML=`<td><input class="ci" type="datetime-local" value="${toLocal(C.dd)}" data-pi="${k}" data-f="t"></td><td class="num"><input class="ci num" type="number" min="0" max="100" step="any" value="" data-pi="${k}" data-f="pct" style="width:70px"></td><td><input class="ci" data-pi="${k}" data-f="note"></td><td style="font-size:11px;color:var(--txt-3)">${esc(who())}</td><td><button class="btn btn-xs btn-ng" onclick="this.closest('tr').remove()">✕</button></td>`;tb.appendChild(tr);}
@@ -1110,7 +1124,7 @@ function saveTaskEditor(id){
   const t=taskById(id);if(!t)return;const i=P.tasks.indexOf(t);const leaf=C.X[i].leaf;
   pushUndo();
   const oldScope=t.scope;
-  t.name=$('#te-name').value.trim();t.pic=$('#te-pic').value.trim();t.notes=$('#te-notes').value;
+  t.name=oneLine($('#te-name').value);t.pic=$('#te-pic').value.trim();t.notes=$('#te-notes').value;
   t.scope=$('#te-scope').value;t.addedDate=$('#te-added')?$('#te-added').value:'';t.justification=$('#te-just')?$('#te-just').value:'';
   if(t.scope==='added'&&!t.addedDate)t.addedDate=dayKey(Date.now());
   if(oldScope!==t.scope)logChange(t.scope==='added'?'scope-add':'scope',`"${t.name}" ${t.scope==='added'?'ditandai sebagai pekerjaan tambahan':'dikembalikan ke scope awal'}${t.justification?' — '+t.justification:''}`,t.id);
@@ -1234,8 +1248,10 @@ function renderGantt(){
   let t0=Math.min(c.projS,isFinite(c.blS)?c.blS:Infinity,c.dd),t1=Math.max(c.projF,isFinite(c.blF)?c.blF:-Infinity,c.dd,isFinite(c.fcMs)?c.fcMs:-Infinity);
   if(!isFinite(t0)||!isFinite(t1)){el.innerHTML='<div class="card empty"><b>Tanggal belum lengkap</b></div>';return;}
   const d0=new Date(t0);t0=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate()-1).getTime();const d1=new Date(t1);t1=new Date(d1.getFullYear(),d1.getMonth(),d1.getDate()+2).getTime();
-  const nd=Math.round((t1-t0)/DAY);const gw=Math.max(500,(($('#p-gantt')&&$('#p-gantt').clientWidth)||1200)-340);const px=GZ.px||clamp(Math.floor(gw/nd),6,140);const RH=26,HH=44;const W=Math.max(400,nd*px),H=HH+rows.length*RH;
+  const nd=Math.round((t1-t0)/DAY);const gw=Math.max(500,(($('#p-gantt')&&$('#p-gantt').clientWidth)||1200)-340);const px=GZ.px||clamp(Math.floor(gw/nd),6,140);const RH=26,HH=44;const W=Math.max(400,nd*px);
   const X=m=>(m-t0)/DAY*px;
+  // Rows are laid out by the (wrapping) label column first, then the SVG reuses those heights.
+  const svgFor=hs=>{const tops=[];let acc=HH;hs.forEach(h=>{tops.push(acc);acc+=h;});const H=acc;
   let s=`<svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg" font-family="Inter,sans-serif">`;
   // background days
   const hol=new Set(P.calendar.holidays||[]);const wds=P.calendar.workDays||[1,2,3,4,5];
@@ -1249,8 +1265,8 @@ function renderGantt(){
     if(px>=14||dm.getDay()===1)s+=`<line x1="${x}" y1="${HH}" x2="${x}" y2="${H}" stroke="#f1f5f9"/>`;}
   s+=`<line x1="0" y1="${HH}" x2="${W}" y2="${HH}" stroke="#e2e8f0"/>`;
   const pos={};
-  rows.forEach((i,r)=>{const x=c.X[i],t=c.T[i],y=HH+r*RH;pos[t.id]={r,y};
-    s+=`<line x1="0" y1="${y+RH}" x2="${W}" y2="${y+RH}" stroke="#f1f5f9"/>`;
+  rows.forEach((i,r)=>{const x=c.X[i],t=c.T[i],rh=hs[r],y=tops[r]+(rh-RH)/2;pos[t.id]={r,y};
+    s+=`<line x1="0" y1="${tops[r]+rh}" x2="${W}" y2="${tops[r]+rh}" stroke="#f1f5f9"/>`;
     if(GZ.base&&c.bl){const b=c.BX.find(b=>b.id===t.id);if(b&&b.valid){s+=`<rect x="${X(b.sm)}" y="${y+RH-7}" width="${Math.max(2,X(b.fm)-X(b.sm))}" height="4" rx="2" fill="#cbd5e1"><title>Baseline ${fmtWhen(b.sm)} → ${fmtWhen(b.fm)}</title></rect>`;}}
     if(!x.valid)return;
     const xa=X(x.sm),xb=X(x.fm),w=Math.max(2,xb-xa);
@@ -1271,13 +1287,15 @@ function renderGantt(){
     s=s.replace('<svg ','<svg ')+'';s=s.replace(/(<svg[^>]*>)/,'$1<defs><marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"><path d="M0,0L6,3L0,6Z" fill="#64748b"/></marker></defs>');}
   const xd=X(c.dd);s+=`<line x1="${xd}" y1="${HH-6}" x2="${xd}" y2="${H}" stroke="#dc2626" stroke-width="1.5" stroke-dasharray="4,3"/><text x="${xd+3}" y="${H-4}" font-size="9" fill="#dc2626" font-weight="700">Data Date</text>`;
   if(P.deadline){const xl=X(parseLocal(P.deadline));s+=`<line x1="${xl}" y1="${HH}" x2="${xl}" y2="${H}" stroke="#7c3aed" stroke-width="1.5"/><text x="${xl+3}" y="${H-4}" font-size="9" fill="#7c3aed" font-weight="700">Deadline</text>`;}
-  s+='</svg>';
+  s+='</svg>';return {s,xd};};
   el.innerHTML=`<div class="card"><h3>Gantt Chart <span class="sub">biru = rencana · hijau = aktual · merah = critical path · oranye = pekerjaan tambahan · abu = baseline · garis putus = float</span>
     <span class="right view-ok"><select class="inp" style="width:auto" onchange="GZ.px=+this.value;renderGantt()">${[[0,'Otomatis'],[140,'Jam'],[60,'Hari'],[40,'Hari (rapat)'],[18,'Minggu'],[6,'Bulan']].map(([v,l])=>`<option value="${v}"${GZ.px===v?' selected':''}>Zoom: ${l}</option>`).join('')}</select>
     <label style="display:flex;gap:5px;align-items:center;font-size:12px"><input type="checkbox" ${GZ.arrows?'checked':''} onchange="GZ.arrows=this.checked;renderGantt()"> Relasi</label>
     <label style="display:flex;gap:5px;align-items:center;font-size:12px"><input type="checkbox" ${GZ.base?'checked':''} onchange="GZ.base=this.checked;renderGantt()"> Baseline</label></span></h3>
-    <div class="gantt"><div class="g-left"><div class="gh">Task</div>${rows.map(i=>{const t=c.T[i],x=c.X[i];return `<div class="gr ${x.leaf?'':'sum'}" style="padding-left:${8+c.lvl[i]*12}px" title="${esc(t.name)}">${x.leaf?'':`<span style="cursor:pointer" onclick="toggleCollapse('${t.id}')">${COLLAPSED.has(t.id)?'▸':'▾'}</span>`}<span class="mono" style="color:var(--txt-3);font-size:10px">${c.wbs[i]}</span> ${esc(t.name||'(tanpa nama)')}</div>`;}).join('')}</div>
-    <div class="g-right" id="g-right">${s}</div></div></div>`;
+    <div class="gantt"><div class="g-left"><div class="gh">Task</div>${rows.map(i=>{const t=c.T[i],x=c.X[i];return `<div class="gr ${x.leaf?'':'sum'}" style="padding-left:${8+c.lvl[i]*12}px">${x.leaf?'':`<span style="cursor:pointer" onclick="toggleCollapse('${t.id}')">${COLLAPSED.has(t.id)?'▸':'▾'}</span>`}<span class="gn"><span class="mono" style="color:var(--txt-3);font-size:10px">${c.wbs[i]}</span> ${esc(t.name||'(tanpa nama)')}</span></div>`;}).join('')}</div>
+    <div class="g-right" id="g-right"></div></div></div>`;
+  const hs=$$('#p-gantt .g-left .gr').map(e=>e.getBoundingClientRect().height);const gh=$('#p-gantt .g-left .gh');if(gh)gh.style.height=HH+'px';
+  const {s,xd}=svgFor(hs.map(h=>Math.max(RH,h)));$('#g-right').innerHTML=s;
   const gr=$('#g-right');if(gr){gr.scrollLeft=Math.max(0,xd-gr.clientWidth/3);const gl=$('.g-left');gr.addEventListener('scroll',()=>{gl.scrollTop=gr.scrollTop;});}
 }
 
@@ -1739,15 +1757,17 @@ function pdfGantt(pdf,o){
     pdf.setDrawColor(203,213,225);pdf.line(M,y+4.5,M+CW,y+4.5);o.setY(y+5.5);};
   o.checkY(20+Math.min(rows.length,12)*RH);o.sec('GANTT CHART');header();
   let pageTop=o.getY();
-  rows.forEach(i=>{let y=o.getY();if(y+RH>BOT){pdf.addPage();ensureBg();o.setY(TOP);header();y=o.getY();pageTop=y;}
-    const x=c.X[i],t=c.T[i];pdf.setFontSize(6.2);pdf.setTextColor(15,23,42);pdf.setFont('helvetica',x.leaf?'normal':'bold');
-    const lbl=pdf.splitTextToSize(Sx(' '.repeat(c.lvl[i]*2)+c.wbs[i]+' '+(t.name||'')),LW-2)[0];pdf.text(lbl,M,y+3.2);
+  rows.forEach(i=>{const x=c.X[i],t=c.T[i];pdf.setFontSize(6.2);pdf.setFont('helvetica',x.leaf?'normal':'bold');
+    const ind=c.lvl[i]*1.6,lines=pdf.splitTextToSize(Sx(c.wbs[i]+' '+(t.name||'')),LW-2-ind),rh=Math.max(RH,lines.length*2.5+1.6);
+    let y0=o.getY();if(y0+rh>BOT){pdf.addPage();ensureBg();o.setY(TOP);header();y0=o.getY();pageTop=y0;}
+    pdf.setTextColor(15,23,42);lines.forEach((ln,k)=>pdf.text(ln,M+ind,y0+2.9+k*2.5));
+    const y=y0+(rh-RH)/2;
     if(c.bl){const b=c.BX.find(b=>b.id===t.id);if(b&&b.valid){pdf.setFillColor(203,213,225);pdf.rect(X(b.sm),y+3.4,Math.max(.4,X(b.fm)-X(b.sm)),.8,'F');}}
     const xa=X(x.sm),w=Math.max(.5,X(x.fm)-xa);
     if(!x.leaf){pdf.setFillColor(51,65,85);pdf.rect(xa,y+1.3,w,1.4,'F');pdf.setFillColor(22,163,74);pdf.rect(xa,y+1.3,w*clamp(x.act,0,100)/100,1.4,'F');}
     else if(t.type==='milestone'||x.dur<=1e-9){const cx=X(x.fm),cy=y+2.3;pdf.setFillColor(...(x.state==='done'?[22,163,74]:[124,58,237]));pdf.triangle(cx,cy-1.6,cx+1.6,cy,cx,cy+1.6,'F');pdf.triangle(cx,cy-1.6,cx-1.6,cy,cx,cy+1.6,'F');}
     else{pdf.setFillColor(...(x.crit?[252,165,165]:t.scope==='added'?[253,186,116]:[147,197,253]));pdf.rect(xa,y+.9,w,2.8,'F');if(x.act>0){pdf.setFillColor(22,163,74);pdf.rect(xa,y+1.6,w*clamp(x.act,0,100)/100,1.4,'F');}}
-    pdf.setDrawColor(241,245,249);pdf.line(M,y+RH,M+CW,y+RH);o.setY(y+RH);
+    pdf.setDrawColor(241,245,249);pdf.line(M,y0+rh,M+CW,y0+rh);o.setY(y0+rh);
     if(i===rows[rows.length-1]||o.getY()+RH>BOT){const xd=X(c.dd);pdf.setDrawColor(220,38,38);pdf.setLineDashPattern([1,1],0);pdf.line(xd,pageTop-1,xd,o.getY());pdf.setLineDashPattern([],0);}
   });
   pdf.setFontSize(6.2);pdf.setTextColor(100,116,139);o.setY(o.getY()+1);o.checkY(5);pdf.text('Biru = rencana, hijau = aktual, merah = critical path, oranye = pekerjaan tambahan, abu tipis = baseline, garis merah putus = data date.',M,o.getY()+2.5);o.setY(o.getY()+6);
@@ -1995,6 +2015,7 @@ else if(URL_PROJECT){P=null;}
 else if(STORE.activeId&&STORE.projects[STORE.activeId])P=STORE.projects[STORE.activeId];else{const ids=Object.keys(STORE.projects);if(ids.length){P=STORE.projects[ids[0]];STORE.activeId=P.id;}}
 try{AuthSession.onExpire(()=>{renderAll();toast('Sesi login berakhir (1 jam tidak aktif) — mode baca saja',5000);});}catch(e){}
 window.addEventListener('storage',e=>{if(e.key==='dashboard_user')renderAll();});
+window.addEventListener('resize',()=>{clearTimeout(window.__rz);window.__rz=setTimeout(()=>{if(TAB==='tasks')autoHAll($('#p-tasks'));if(TAB==='gantt'&&P)renderGantt();},150);});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshFromCloud();});
 setInterval(refreshFromCloud,2*60000);
 try{const t=localStorage.getItem('ppm_tab');if(t&&$(`.tab[data-tab="${t}"]`))TAB=t;}catch(e){}
