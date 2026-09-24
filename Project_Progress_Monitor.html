@@ -319,17 +319,18 @@ function areaList(a){if(window.TeamRouting)return TeamRouting.toAreaList(a);if(A
 function sess(){try{const s=window.AuthSession&&AuthSession.get();if(!s||!s.user)return null;return {user:s.user,name:s.name||s.user,role:s.role||'',team:s.team||'',areas:areaList(s.area)};}catch(e){return null;}}
 function who(){const s=sess();return s?s.name:'';}
 const ROLE_LBL={technician:'Teknisi',techop2:'TechOp2',supervisor:'Supervisor',admin:'Admin'};
-// Edit rights: admin -> everything; the creator -> own project; anyone logged in whose team
+// Edit rights: admin & supervisor -> every project; the creator -> own project; anyone logged in whose team
 // matches the project's team and whose area list contains the project's area. Everyone else,
 // including anyone who only has the link, is read-only. NOTE: enforced in the app, not by
 // Firestore (no Firebase Auth yet) — see SECURITY.md "Level 2".
-function canEdit(p){p=p||P;const s=sess();if(!s||!p)return false;if(s.role==='admin')return true;
+const EDIT_ALL_ROLES=['admin','supervisor'];
+function canEdit(p){p=p||P;const s=sess();if(!s||!p)return false;if(EDIT_ALL_ROLES.includes(s.role))return true;
   if(!p.owner||!p.owner.user)return false;if(p.owner.user===s.user)return true;
   return !!(p.team&&p.area&&s.team===p.team&&s.areas.includes(p.area));}
 function canManage(p){p=p||P;const s=sess();return !!(s&&p&&(s.role==='admin'||(p.owner&&p.owner.user===s.user)));}
 function denyReason(){const s=sess();if(!P)return '';if(!s)return 'Mode baca saja — login untuk mengedit.';
   if(!P.owner||!P.owner.user)return 'Proyek belum punya pemilik — klaim di tab Pengaturan.';
-  return `Mode baca saja — hanya pembuat (${P.owner.name||P.owner.user}) dan tim ${P.team||'?'} · ${P.area||'?'} yang bisa mengedit.`;}
+  return `Mode baca saja — hanya pembuat (${P.owner.name||P.owner.user}), tim ${P.team||'?'} · ${P.area||'?'}, Supervisor, dan Admin yang bisa mengedit.`;}
 function guard(){if(P&&canEdit())return true;toast('🔒 '+denyReason(),4500);return false;}
 async function hashPass(str){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 function openLogin(msg){
@@ -370,7 +371,7 @@ function shareLink(){
   const inCloud=!!CLOUD.remote[P.id];
   const done=()=>openModal(`<div class="mh"><b>🔗 Bagikan proyek</b><button class="x" onclick="closeModal()">×</button></div><div class="mb">
     <div class="field"><label>Link</label><input class="inp mono" value="${esc(url)}" onclick="this.select()" readonly></div>
-    <div class="note" style="margin-top:10px">Siapa pun yang membuka link ini bisa <b>melihat</b> proyek (dashboard, S-curve, Gantt, export PDF/Excel) tanpa login. Yang bisa <b>mengedit</b> hanya pembuat proyek (${esc(P.owner?P.owner.name||P.owner.user:'—')}) dan akun tim <b>${esc(P.team||'—')} · ${esc(P.area||'—')}</b>${' '}yang login.</div>
+    <div class="note" style="margin-top:10px">Siapa pun yang membuka link ini bisa <b>melihat</b> proyek (dashboard, S-curve, Gantt, export PDF/Excel) tanpa login. Yang bisa <b>mengedit</b> hanya pembuat proyek (${esc(P.owner?P.owner.name||P.owner.user:'—')}), akun tim <b>${esc(P.team||'—')} · ${esc(P.area||'—')}</b>, Supervisor, dan Admin yang login.</div>
     ${inCloud?'':'<div class="note warn">Proyek ini belum tersimpan di cloud, jadi link belum bisa dibuka di perangkat lain. '+(canEdit()?'Klik ☁ untuk menyimpan.':'Minta pemilik proyek menyimpannya ke cloud.')+'</div>'}</div>
     <div class="mf"><button class="btn btn-pri" onclick="closeModal()">Selesai</button></div>`);
   try{navigator.clipboard.writeText(url).then(()=>{toast('Link disalin');done();},done);}catch(e){done();}
@@ -1463,7 +1464,7 @@ function accessCard(){const s=sess();const o=P.owner;const mg=canManage();
   ${o&&o.user?`<div class="fgrid view-ok" style="margin-top:10px">${mg&&Object.keys(scopeOptions()).length?scopeSelects(P.team,P.area,'ac-team','ac-area')+`<div class="field"><label>&nbsp;</label><button class="btn btn-pri" onclick="saveScope()">Simpan Team/Area</button></div>`
      :`<div class="field"><label>Team · Area yang bisa mengedit</label><div><b>${esc(P.team||'—')} · ${esc(P.area||'—')}</b></div></div>`}</div>`
    :(s&&Object.keys(scopeOptions()).length?`<div class="note warn" style="margin-top:10px">Proyek ini dibuat sebelum ada kepemilikan. Klaim untuk menjadikan Anda pemilik; setelah itu hanya Anda dan tim Anda yang bisa mengedit.</div><div class="fgrid view-ok">${scopeSelects(s.team,s.areas[0],'ac-team','ac-area')}<div class="field"><label>&nbsp;</label><button class="btn btn-pri" onclick="claimProject()">Klaim proyek ini</button></div></div>`:'')}
-  <p class="hint" style="margin-top:10px">Aturan akses: siapa pun dengan link bisa melihat. Mengedit hanya pemilik, akun dengan Team &amp; Area yang sama, dan Admin. Menghapus proyek hanya pemilik atau Admin. Login memakai akun Review &amp; Approval Dashboard.</p></div>`;}
+  <p class="hint" style="margin-top:10px">Aturan akses: siapa pun dengan link bisa melihat. Mengedit hanya pemilik, akun dengan Team &amp; Area yang sama, Supervisor, dan Admin. Menghapus proyek hanya pemilik atau Admin. Login memakai akun Review &amp; Approval Dashboard.</p></div>`;}
 function saveScope(){if(!canManage())return;const t=$('#ac-team').value,a=$('#ac-area').value;if(t===P.team&&a===P.area)return;pushUndo();logChange('project',`Team/Area proyek ${P.team||'—'} · ${P.area||'—'} → ${t} · ${a}`);P.team=t;P.area=a;commit(true);toast('Team/Area disimpan');}
 function claimProject(){const s=sess();if(!s||(P.owner&&P.owner.user))return;pushUndo();setOwner(P,$('#ac-team').value,$('#ac-area').value);logChange('project',`Proyek diklaim oleh ${s.name} (${P.team} · ${P.area})`);commit(true);toast('Proyek sekarang milik Anda');}
 function renderSettings(){
@@ -1530,7 +1531,7 @@ function openNewProject(){
   <div class="field"><label>Presisi jadwal</label><select class="inp" id="np-prec"><option value="day">Harian</option><option value="hour">Per jam (shutdown / pekerjaan singkat)</option></select></div>
   <div class="field"><label>Lokasi / Unit</label><input class="inp" id="np-loc"></div>
   ${scopeSelects(s.team,s.areas[0],'np-team','np-area')}</div>
-  <div class="note" style="margin-top:10px">Pemilik: <b>${esc(s.name)}</b>. Yang bisa mengedit: Anda + semua akun tim yang dipilih. Pihak lain dengan link hanya bisa melihat.</div>
+  <div class="note" style="margin-top:10px">Pemilik: <b>${esc(s.name)}</b>. Yang bisa mengedit: Anda, semua akun tim yang dipilih, Supervisor, dan Admin. Pihak lain dengan link hanya bisa melihat.</div>
   <p class="hint">Atau gunakan <b>📥 Import</b> untuk memuat dari Excel template "PM System Step Estimasi S-Curve Progress" / file Excel hasil export aplikasi ini / backup JSON.</p></div>
   <div class="mf"><button class="btn" onclick="closeModal()">Batal</button><button class="btn btn-pri" onclick="createProject()">Buat</button></div>`);
   setTimeout(()=>{const e=$('#np-name');if(e)e.focus();},50);
@@ -1823,7 +1824,7 @@ const TIP_RULES=[
   [/generatePDF/,['Download PDF','Laporan progress A4 berkop POMI: KPI, S-curve, daftar task, Gantt, look-ahead, pekerjaan tambahan, kendala.']],
   [/backupJSON/,['Backup JSON','Unduh salinan lengkap proyek (semua data & riwayat) sebagai file JSON — bisa dipulihkan lewat Import.']],
   [/undo\(\)/,['Undo','Batalkan perubahan terakhir (juga Ctrl+Z). Menyimpan hingga 40 langkah selama halaman terbuka.']],
-  [/shareLink/,['Bagikan','Salin link langsung ke proyek ini. Siapa pun dengan link bisa melihat; mengedit tetap butuh login pemilik/tim.']],
+  [/shareLink/,['Bagikan','Salin link langsung ke proyek ini. Siapa pun dengan link bisa melihat; mengedit tetap butuh login pemilik/tim, Supervisor, atau Admin.']],
   [/cloudSave\(true/,['Timpa cloud','Tulis versi di perangkat ini ke cloud, menggantikan versi yang diubah orang lain. Backup dulu bila ragu.']],
   [/cloudSave/,['Simpan ke cloud','Simpan proyek ke database online sekarang (normalnya otomatis beberapa detik setelah perubahan).']],
   [/adoptCloud\('/,['Buka proyek','Buka proyek ini dari cloud (mode baca, atau edit bila Anda pemilik/tim).']],
@@ -1916,8 +1917,9 @@ function renderHelp(){
       <tr><td>Siapa pun yang punya link (tanpa login)</td><td>✅</td><td>—</td><td>—</td></tr>
       <tr><td>Pembuat proyek</td><td>✅</td><td>✅</td><td>✅</td></tr>
       <tr><td>Akun dengan Team <b>dan</b> Area sama dengan proyek (mis. E7 · Powerblock)</td><td>✅</td><td>✅</td><td>—</td></tr>
-      <tr><td>Akun tim/area lain, Supervisor bukan pembuat</td><td>✅</td><td>—</td><td>—</td></tr>
-      <tr><td>Admin</td><td>✅</td><td>✅</td><td>✅</td></tr></table></div>
+      <tr><td>Akun tim/area lain (Teknisi, TechOp2)</td><td>✅</td><td>—</td><td>—</td></tr>
+      <tr><td>Supervisor</td><td>✅</td><td>✅ semua proyek</td><td>—</td></tr>
+      <tr><td>Admin</td><td>✅</td><td>✅ semua proyek</td><td>✅</td></tr></table></div>
     <p>Status Anda sekarang: ${s?`<b>${esc(s.name)}</b> (${esc(ROLE_LBL[s.role]||s.role)}${s.team?' · '+esc(s.team+' '+s.areas.join('/')):''})${P?' — '+(canEdit()?'<b>bisa mengedit</b> proyek yang terbuka':'<b>baca saja</b> untuk proyek yang terbuka'):''}`:'belum login (baca saja)'}.</p>
     <p>Jika tidak bisa mengedit, banner oranye di bawah nama proyek menjelaskan alasannya. Akun TechOp2 dengan beberapa area bisa mengedit proyek di semua area tersebut.</p></div>
 

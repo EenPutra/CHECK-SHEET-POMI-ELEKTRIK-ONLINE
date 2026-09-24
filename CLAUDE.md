@@ -3481,8 +3481,8 @@ approvals — its data model is a whole project, not a submission.
   device, and with no param and no local project it shows a picker of every cloud project.
   **Editing requires login** with the shared `dashboard_users` account (same `hashPass` +
   `AuthSession` session as `Review_Approval_Dashboard.html` — one login works across both, and
-  register / forgot-password / Team & Area setup stay in that dashboard). `canEdit()`: admin →
-  all; creator (`owner.user`) → own project; any account with `team === project.team` and
+  register / forgot-password / Team & Area setup stay in that dashboard). `canEdit()`: admin and
+  supervisor (`EDIT_ALL_ROLES`) → all; creator (`owner.user`) → own project; any account with `team === project.team` and
   `project.area ∈ its areas` (TechOp2 multi-area via `TeamRouting.toAreaList`). `canManage()`
   (delete, change team/area) = creator or admin. Creating/importing a project requires login and
   stamps `owner{user,name,role}` + `team` + `area` (`setOwner()`; non-admin/supervisor can only

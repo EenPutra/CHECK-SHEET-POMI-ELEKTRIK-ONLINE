@@ -137,7 +137,7 @@ service cloud.firestore {
     //  Access model (enforced IN THE APP, from the shared dashboard_users
     //  login): anyone with the link reads; only the creator (`owner.user`),
     //  accounts whose team+area match the project's `team`/`area`, and
-    //  admins edit; only creator/admin delete. Rules cannot see who is
+    //  supervisors and admins edit; only creator/admin delete. Rules cannot see who is
     //  logged in until Level 2 (Firebase Auth), so what they CAN enforce:
     //   - a project must be created with an owner + team + area
     //   - ownership and createdAt can never be rewritten by an update

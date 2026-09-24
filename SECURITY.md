@@ -167,7 +167,7 @@ being reused from other origins; combined with App Check it's meaningful.
 | `dashboard_users` | register + Settings | role create-allowlist ≠ admin; role frozen on update; no client delete |
 | `dashboard_config` | *(admin, Console only)* | client read-only |
 | `weekly_dashboard` + `/workOrders` | Weekly Report Dashboard EIC7 | separate mini-app, own client-side password; permissive until Level 2 |
-| `project_schedules` | `Project_Progress_Monitor.html` | one doc per project; public read (share link); edit = creator / same team+area / admin, delete = creator / admin — **app-gated only**; rules require `owner.user`+`team`+`area` on create, freeze `owner.user`/`createdAt`, and require `rev` to strictly increase (optimistic lock); client deletes allowed until Level 2 |
+| `project_schedules` | `Project_Progress_Monitor.html` | one doc per project; public read (share link); edit = creator / same team+area / supervisor / admin, delete = creator / admin — **app-gated only**; rules require `owner.user`+`team`+`area` on create, freeze `owner.user`/`createdAt`, and require `rev` to strictly increase (optimistic lock); client deletes allowed until Level 2 |
 
 ## Deferred to Level 2 (Firebase Authentication)
 
