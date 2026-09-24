@@ -62,7 +62,8 @@ a{color:var(--pri)}
 .tab:hover{color:var(--txt)}
 .tab.active{color:var(--pri);border-bottom-color:var(--pri)}
 .tab .cnt{background:var(--ng);color:#fff;border-radius:999px;font-size:10px;padding:1px 6px;margin-left:4px}
-main{padding:16px 18px 60px;max-width:1700px;margin:0 auto}
+main{padding:16px 18px 60px;width:100%}
+.fill-h{max-height:max(420px,calc(100vh - 290px))}
 .panel{display:none}.panel.active{display:block}
 
 /* ---------- cards ---------- */
@@ -131,7 +132,7 @@ table.t input.ci.num{text-align:right}
 #task-table tr.sum.l0 td{background:#eef2f7}
 #task-table tr.crit td:first-child{box-shadow:inset 3px 0 0 var(--crit)}
 #task-table tr.added td.nm{box-shadow:inset 3px 0 0 var(--add)}
-.nmcell{display:flex;align-items:flex-start;gap:4px;min-width:260px;max-width:460px}
+.nmcell{display:flex;align-items:flex-start;gap:4px;min-width:260px;max-width:560px}
 .nmcell .tg,.nmcell .chip,.nmcell .warn-ico{margin-top:5px;flex:none}
 .nmcell textarea{flex:1}
 .nmcell .tg{width:16px;cursor:pointer;color:var(--txt-3);flex:none;text-align:center;user-select:none}
@@ -845,7 +846,7 @@ function renderDash(){
   const c=C,el=$('#p-dash');
   if(!c.cnt.total){el.innerHTML=`<div class="card empty"><b>Proyek masih kosong</b>Tambahkan task di tab <b>Jadwal &amp; Task</b>, atau import dari Excel.<br><br><button class="btn btn-pri" onclick="switchTab('tasks')">➕ Tambah Task</button> <button class="btn" onclick="$('#file-import').click()">📥 Import</button></div>`;return;}
   const growth=c.baseRaw>0?c.addRaw/c.baseRaw*100:0;
-  const late=c.X.filter(x=>x.leaf&&(x.flag==='overdue'||x.flag==='behind')).sort((a,b)=>(a.act-a.plan)*a.eff-(b.act-b.plan)*b.eff).slice(0,8);
+  const late=c.X.filter(x=>x.leaf&&(x.flag==='overdue'||x.flag==='behind')).sort((a,b)=>(a.act-a.plan)*a.eff-(b.act-b.plan)*b.eff);
   const fcTxt=c.doneAll?'Selesai '+fmtWhen(c.fcMs):isFinite(c.fcMs)?fmtWhen(c.fcMs)+(c.fcCapped?' (≥)':''):'—';
   const dly=c.doneAll?((toW(c.fcMs)-c.WF)/CAL.H):c.delayDays;
   el.innerHTML=`
@@ -863,9 +864,9 @@ function renderDash(){
   ${c.weightFallback?`<div class="note warn">Semua bobot manual masih 0 — sementara bobot dihitung dari durasi. Isi kolom Bobot di tab Jadwal, atau ganti mode bobot di Pengaturan.</div>`:''}
   ${c.cnt.conflicts?`<div class="note warn">&#9888;&#65039; ${c.cnt.conflicts} task mulai lebih awal dari yang diizinkan predecessor-nya. Lihat tab <a href="#" onclick="switchTab('tasks');return false">Jadwal</a> → tombol <b>Jadwalkan Ulang Otomatis</b>.</div>`:''}
   <div class="grid2">
-    <div class="card"><h3>S-Curve — Rencana vs Aktual <span class="sub">klik tab S-Curve untuk detail</span></h3><div style="height:320px"><canvas id="ch-dash"></canvas></div></div>
-    <div class="card"><h3>Task terlambat / tertinggal <span class="sub">diurutkan berdasar dampak bobot</span></h3>
-      ${late.length?`<div class="tbl-wrap"><table class="t"><tr><th>Task</th><th>PIC</th><th class="num">Renc.</th><th class="num">Akt.</th><th>Status</th></tr>
+    <div class="card"><h3>S-Curve — Rencana vs Aktual <span class="sub">klik tab S-Curve untuk detail</span></h3><div style="height:clamp(300px,42vh,900px)"><canvas id="ch-dash"></canvas></div></div>
+    <div class="card"><h3>Task terlambat / tertinggal <span class="sub">${late.length} task · diurutkan berdasar dampak bobot</span></h3>
+      ${late.length?`<div class="tbl-wrap" style="max-height:clamp(300px,42vh,900px)"><table class="t"><tr><th>Task</th><th>PIC</th><th class="num">Renc.</th><th class="num">Akt.</th><th>Status</th></tr>
       ${late.map(x=>`<tr><td><a href="#" onclick="openTaskEditor('${x.id}');return false">${esc(c.T[x.i].name||'(tanpa nama)')}</a>${x.crit?' <span class="chip crit">kritis</span>':''}</td><td>${esc(c.T[x.i].pic)}</td><td class="num">${fp(x.plan,0)}</td><td class="num">${fp(x.act,0)}</td><td>${flagChip(x.flag)}</td></tr>`).join('')}</table></div>`:'<div class="empty" style="padding:24px"><b>&#9989; Tidak ada task tertinggal</b></div>'}
     </div>
   </div>
@@ -919,7 +920,7 @@ function renderTasks(){
   </div>
   <div class="note ed" style="margin-bottom:10px">Isi langsung di tabel. <b>Predecessor</b>: nomor baris + tipe + lag, mis. <span class="mono">3</span>, <span class="mono">3SS</span>, <span class="mono">4FS+2</span> (${dayMode?'hari':'jam'}), <span class="mono">5FF-1d</span>. Mengubah <b>Mulai</b> menggeser task dengan durasi tetap; mengubah <b>Selesai</b>/<b>Durasi</b> mengubah panjang task. Kolom <b>Aktual %</b> dicatat pada Data Date (${fmtDT(c.dd)}).</div>
   ${!rows.length?`<div class="empty"><b>Belum ada task</b>Klik ➕ Task untuk mulai menyusun WBS.</div>`:`
-  <div class="tbl-wrap" style="max-height:70vh"><table class="t" id="task-table">
+  <div class="tbl-wrap fill-h"><table class="t" id="task-table">
   <thead><tr><th>No</th><th>WBS</th><th style="min-width:250px">Task / Pekerjaan</th><th>PIC</th><th>Mulai</th><th>Selesai</th><th class="num">Durasi<br>(${dayMode?'hari':'jam'})</th><th>Predecessor</th>
   <th class="num">Bobot<br>input</th><th class="num">Bobot<br>efektif</th><th class="num">Renc.<br>%</th><th class="num">Aktual<br>%</th><th>Progress</th><th class="num">Float<br>(${dayMode?'hari':'jam'})</th><th>Status</th><th></th></tr></thead><tbody>
   ${rows.map(i=>taskRow(i,dayMode)).join('')}
@@ -1160,7 +1161,7 @@ function renderProgress(){
     <label class="ed" style="display:flex;align-items:center;gap:6px;margin-left:auto;font-size:12px"><input type="checkbox" id="upd-setdd"${P.dataDateMode==='fixed'?' checked':''}> Jadikan Data Date</label>
     <button class="ed btn btn-ok" onclick="saveProgressSession()">💾 Simpan Update</button>
   </div>
-  ${rows.length?`<div class="tbl-wrap" style="max-height:66vh"><table class="t"><thead><tr><th>No</th><th>Task</th><th>PIC</th><th>Jadwal</th><th class="num">Renc. %</th><th class="num">Terakhir %</th><th style="min-width:230px">% Kumulatif baru</th><th>Catatan</th></tr></thead><tbody>
+  ${rows.length?`<div class="tbl-wrap fill-h"><table class="t"><thead><tr><th>No</th><th>Task</th><th>PIC</th><th>Jadwal</th><th class="num">Renc. %</th><th class="num">Terakhir %</th><th style="min-width:230px">% Kumulatif baru</th><th>Catatan</th></tr></thead><tbody>
   ${rows.map(x=>{const t=c.T[x.i];const cur=rawAt(x,tms);const pl=planFracW(x,wt)*100;return `<tr class="upd-row" data-id="${t.id}">
     <td class="c mono">${x.i+1}</td><td>${esc(t.name)}${t.scope==='added'?' <span class="chip add">+VO</span>':''}${x.crit?' <span class="chip crit">CP</span>':''}${t.method!=='pct'?` <span class="chip" title="Metode progress">${t.method}</span>`:''}</td><td>${esc(t.pic)}</td>
     <td style="font-size:11.5px;white-space:nowrap">${fmtWhen(x.sm)} → ${fmtWhen(x.fm)}</td><td class="num mono">${fp(pl,0)}</td><td class="num mono">${fp(cur,0)}</td>
@@ -1225,7 +1226,7 @@ function renderSCurve(){
       <select class="inp" style="width:auto" onchange="SC.gran=this.value;renderSCurve()"><option value="">Interval: otomatis</option><option value="cp"${SC.gran==='cp'?' selected':''}>Checkpoint (${P.calendar.cpHours} jam kerja)</option><option value="day"${SC.gran==='day'?' selected':''}>Harian</option><option value="week"${SC.gran==='week'?' selected':''}>Mingguan</option></select>
       <label style="display:flex;gap:5px;align-items:center;font-size:12px;font-weight:600"><input type="checkbox" ${SC.periodic?'checked':''} onchange="SC.periodic=this.checked;renderSCurve()"> Batang periodik</label>
     </span></h3>
-    <div style="height:440px"><canvas id="ch-sc"></canvas></div>
+    <div style="height:clamp(380px,calc(100vh - 380px),1400px)"><canvas id="ch-sc"></canvas></div>
     <div class="fgrid" style="margin-top:12px">
       <div class="note">📘 <b>Rencana</b> = distribusi linier bobot tiap task selama jam kerja antara Mulai–Selesai (jadwal saat ini, termasuk pekerjaan tambahan). <b>Baseline</b> = rencana awal yang dibekukan. <b>Aktual</b> = Σ bobot × % kumulatif (carry-forward). <b>Forecast</b> = proyeksi Earned Schedule: sisa pekerjaan mengikuti bentuk rencana dengan laju SPI(t) = ${fn(c.SPIt)}.</div>
       <div class="note">PV ${fp(c.PV)} · EV ${fp(c.EV)} · SV ${c.SV>=0?'+':''}${fp(c.SV)} · SPI ${fn(c.SPI)}<br>ES ${isFinite(c.ES)?durLabel(c.ES):'—'} dari AT ${isFinite(c.AT)?durLabel(Math.max(0,c.AT)):'—'} → SPI(t) ${fn(c.SPIt)} · SV(t) ${isFinite(c.svtDays)?c.svtDays.toFixed(1)+' hari kerja':'—'}<br>Forecast selesai: <b>${fmtWhen(c.fcMs)}</b> vs rencana ${fmtWhen(c.projF)}</div>
@@ -1233,7 +1234,7 @@ function renderSCurve(){
     <button class="btn btn-sm" style="margin-top:10px" onclick="SC.table=!SC.table;renderSCurve()">${SC.table?'Sembunyikan':'Tampilkan'} tabel data</button>
     <div id="sc-table"></div></div>`;
   const cd=drawSCurve('ch-sc',{gran:SC.gran||undefined,periodic:SC.periodic});
-  if(SC.table&&cd){$('#sc-table').innerHTML=`<div class="tbl-wrap" style="max-height:400px;margin-top:8px"><table class="t"><thead><tr><th>#</th><th>Waktu</th><th class="num">Baseline %</th><th class="num">Rencana %</th><th class="num">Aktual %</th><th class="num">Deviasi</th><th class="num">Forecast %</th></tr></thead><tbody>
+  if(SC.table&&cd){$('#sc-table').innerHTML=`<div class="tbl-wrap" style="max-height:max(320px,55vh);margin-top:8px"><table class="t"><thead><tr><th>#</th><th>Waktu</th><th class="num">Baseline %</th><th class="num">Rencana %</th><th class="num">Aktual %</th><th class="num">Deviasi</th><th class="num">Forecast %</th></tr></thead><tbody>
     ${cd.pts.map((m,k)=>{const dv=cd.act[k]!=null?cd.act[k]-cd.plan[k]:null;return `<tr><td class="mono">${k+1}</td><td>${fmtDT(m)}</td><td class="num mono">${cd.base[k]!=null?cd.base[k].toFixed(2):''}</td><td class="num mono">${cd.plan[k].toFixed(2)}</td><td class="num mono">${cd.act[k]!=null?cd.act[k].toFixed(2):''}</td><td class="num mono ${dv<0?'dev-neg':dv>0?'dev-pos':''}">${dv!=null?(dv>0?'+':'')+dv.toFixed(2):''}</td><td class="num mono">${cd.fc[k]!=null?cd.fc[k].toFixed(2):''}</td></tr>`;}).join('')}</tbody></table></div>`;}
 }
 
@@ -1357,7 +1358,7 @@ function renderBase(){
     ${P.baselines.map(b=>`<tr><td class="c"><input type="radio" name="blact" ${c.bl&&c.bl.id===b.id?'checked':''} onchange="mutate(()=>{P.activeBaselineId='${b.id}'})"></td><td><b>${esc(b.name)}</b></td><td>${fmtDT(Date.parse(b.at))}</td><td>${esc(b.by||'')}</td><td class="num">${b.tasks.length}</td><td>${esc(b.reason||'')}</td><td><button class="ed btn btn-xs btn-ng" onclick="delBaseline('${b.id}')">✕</button></td></tr>`).join('')}</table></div>`:''}
   </div>
   ${bl?`<div class="card"><h3>Varian terhadap baseline "${esc(bl.name)}" <span class="sub">dalam hari kerja · positif = mundur dari baseline</span></h3>
-    <div class="tbl-wrap" style="max-height:60vh"><table class="t"><thead><tr><th>Task</th><th>Mulai BL</th><th>Mulai kini</th><th class="num">Δ mulai</th><th>Selesai BL</th><th>Selesai kini</th><th class="num">Δ selesai</th><th class="num">Bobot BL</th><th class="num">Bobot kini</th></tr></thead><tbody>${varRows}</tbody></table></div></div>`:''}
+    <div class="tbl-wrap fill-h"><table class="t"><thead><tr><th>Task</th><th>Mulai BL</th><th>Mulai kini</th><th class="num">Δ mulai</th><th>Selesai BL</th><th>Selesai kini</th><th class="num">Δ selesai</th><th class="num">Bobot BL</th><th class="num">Bobot kini</th></tr></thead><tbody>${varRows}</tbody></table></div></div>`:''}
   <div class="card"><h3>Register Pekerjaan Tambahan (Variation / Change Order) <span class="right"><button class="ed btn btn-add btn-sm" onclick="switchTab('tasks');setTimeout(()=>addTask('added'),50)">➕ Pekerjaan Tambahan</button></span></h3>
     <div class="note">Scope rencana awal: bobot input <b>${Math.round(c.baseRaw*100)/100}</b> · tambahan: <b>${Math.round(c.addRaw*100)/100}</b> → pertumbuhan scope <b>${c.baseRaw>0?fp(c.addRaw/c.baseRaw*100):'—'}</b>. Semua bobot otomatis dinormalisasi ulang sehingga total tetap 100% (sama seperti "Bobot Tersesuaikan" di Excel).</div>
     ${added.length?`<div class="tbl-wrap"><table class="t"><tr><th>No</th><th>Pekerjaan</th><th>PIC</th><th>Ditemukan</th><th>Justifikasi</th><th>Jadwal</th><th class="num">Bobot input</th><th class="num">Bobot efektif</th><th class="num">Aktual</th><th></th></tr>
@@ -1398,7 +1399,7 @@ function renderLog(){
   </div>
   <div class="card"><h3>Change Log <span class="sub">jejak audit setiap perubahan jadwal, bobot, scope, progress, baseline</span>
     <span class="right view-ok"><select class="inp" style="width:auto" onchange="LOGF=this.value;renderLog()"><option value="">Semua jenis</option>${types.map(t=>`<option${LOGF===t?' selected':''}>${t}</option>`).join('')}</select></span></h3>
-    ${ch.length?`<div class="tbl-wrap" style="max-height:60vh"><table class="t"><thead><tr><th>Waktu</th><th>Oleh</th><th>Jenis</th><th>Perubahan</th></tr></thead><tbody>${ch.map(c=>`<tr><td style="white-space:nowrap">${fmtDT(Date.parse(c.at))}</td><td>${esc(c.by||'—')}</td><td><span class="chip ${/scope-add/.test(c.type)?'add':''}">${esc(c.type)}</span></td><td>${esc(c.desc)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Belum ada perubahan</div>'}
+    ${ch.length?`<div class="tbl-wrap fill-h"><table class="t"><thead><tr><th>Waktu</th><th>Oleh</th><th>Jenis</th><th>Perubahan</th></tr></thead><tbody>${ch.map(c=>`<tr><td style="white-space:nowrap">${fmtDT(Date.parse(c.at))}</td><td>${esc(c.by||'—')}</td><td><span class="chip ${/scope-add/.test(c.type)?'add':''}">${esc(c.type)}</span></td><td>${esc(c.desc)}</td></tr>`).join('')}</tbody></table></div>`:'<div class="empty">Belum ada perubahan</div>'}
   </div>`;
 }
 
