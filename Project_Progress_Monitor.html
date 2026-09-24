@@ -659,6 +659,7 @@ function compute(){
   for(let k=order.length-1;k>=0;k--){const i=order[k],x=X[i];let lf=target;succ[i].forEach(s=>{const z=X[s.i];let c;
     if(s.type==='SS')c=z.LS-s.lag+x.dur;else if(s.type==='FF')c=z.LF-s.lag;else if(s.type==='SF')c=z.LF-s.lag+x.dur;else c=z.LS-s.lag;if(c<lf)lf=c;});
     x.LF=lf;x.LS=lf-x.dur;x.TF=x.LF-x.EF;}
+  const pastDl=isFinite(dl)?X.filter(x=>x.leaf&&x.valid&&x.fm>dl+60000).map(x=>x.i):[];
   let minTF=Infinity;order.forEach(i=>{if(X[i].TF<minTF)minTF=X[i].TF;});
   order.forEach(i=>{X[i].crit=X[i].TF-minTF<=0.01;});
   // ---- rollups for summary rows ----
@@ -716,7 +717,7 @@ function compute(){
     else status={k:'ng',t:'KRITIS / DELAY'};}
   C={T,X,n,lvl,isSum,wbs,dd,wdd,W0,WF,projS,projF,PVw,EVms,PV,EV,SV:EV-PV,AT,ES,SPI,SPIt,PD,fcW,fcMs,fcCapped,doneAll,
      delayDays:isFinite(fcW)?(fcW-WF)/CAL.H:NaN,svtDays:(ES-AT)/CAL.H,
-     bl,BX,BLw,blF,blS,BL:bl?BLw(wdd):NaN,cnt,status,weightFallback,baseRaw,addRaw,tot,cycle,badLinks,order,minTF,target,idx};
+     pastDl,deadlineMs:dl,bl,BX,BLw,blF,blS,BL:bl?BLw(wdd):NaN,cnt,status,weightFallback,baseRaw,addRaw,tot,cycle,badLinks,order,minTF,target,idx};
   return C;
 }
 
@@ -726,7 +727,8 @@ function compute(){
 function curveData(granOverride){
   const c=C;if(!c.cnt.total)return null;
   let t0=Math.min(c.projS,isFinite(c.blS)?c.blS:Infinity);
-  let t1=Math.max(c.projF,isFinite(c.blF)?c.blF:-Infinity,c.dd<c.projF*2?Math.min(c.dd,c.projF+(c.projF-c.projS)*6):-Infinity,isFinite(c.fcMs)?c.fcMs:-Infinity);
+  const dlc=parseLocal(P.deadline);
+  let t1=Math.max(isFinite(dlc)?dlc:-Infinity,c.projF,isFinite(c.blF)?c.blF:-Infinity,c.dd<c.projF*2?Math.min(c.dd,c.projF+(c.projF-c.projS)*6):-Infinity,isFinite(c.fcMs)?c.fcMs:-Infinity);
   if(!isFinite(t0)||!isFinite(t1)||t1<=t0)return null;
   let gran=granOverride||P.curveGran||'auto';
   const spanD=(t1-t0)/DAY;
@@ -856,12 +858,13 @@ function renderDash(){
     <div class="kpi"><div class="k">Deviasi (SV %)</div><div class="v ${c.SV<0?'neg':'pos'}">${c.SV>=0?'+':''}${fp(c.SV)}</div><div class="s">Aktual − Rencana</div></div>
     <div class="kpi"><div class="k">SPI (EV/PV)</div><div class="v ${c.SPI<P.thresholds.warn?'neg':c.SPI<1?'warn':'pos'}">${fn(c.SPI)}</div><div class="s">&gt;1 lebih cepat · &lt;1 terlambat</div></div>
     <div class="kpi"><div class="k">SPI(t) · Earned Schedule</div><div class="v ${c.SPIt<P.thresholds.warn?'neg':c.SPIt<1?'warn':'pos'}">${fn(c.SPIt)}</div><div class="s">SV(t) ${isFinite(c.svtDays)?(c.svtDays>=0?'+':'')+c.svtDays.toFixed(1)+' hari kerja':'—'}</div></div>
-    <div class="kpi"><div class="k">Rencana Selesai</div><div class="v" style="font-size:18px">${fmtWhen(c.projF)}</div><div class="s">${c.bl?'Baseline: '+fmtWhen(c.blF):'—'}${P.deadline?' · Deadline '+fmtWhen(parseLocal(P.deadline)):''}</div></div>
+    <div class="kpi"><div class="k">Rencana Selesai</div><div class="v${c.pastDl.length?' neg':''}" style="font-size:18px">${fmtWhen(c.projF)}</div><div class="s">${c.bl?'Baseline: '+fmtWhen(c.blF):'—'}${P.deadline?' · Deadline '+fmtWhen(parseLocal(P.deadline)):''}</div></div>
     <div class="kpi"><div class="k">Forecast Selesai (IEAC(t))</div><div class="v ${dly>0.05?'neg':'pos'}" style="font-size:18px">${fcTxt}</div><div class="s">${isFinite(dly)?(dly>0.05?'Terlambat ≈ '+dly.toFixed(1)+' hari kerja':dly<-0.05?'Lebih cepat ≈ '+(-dly).toFixed(1)+' hari kerja':'Sesuai rencana'):'butuh progress aktual'}</div></div>
     <div class="kpi"><div class="k">Task</div><div class="v">${c.cnt.done}/${c.cnt.total}</div><div class="s">${c.cnt.prog} berjalan · ${c.cnt.ns} belum mulai · <span class="neg">${c.cnt.overdue} overdue</span></div></div>
     <div class="kpi"><div class="k">Scope Tambahan</div><div class="v ${growth>0?'warn':''}">${growth>0?'+':''}${fp(growth)}</div><div class="s">${c.cnt.added} task tambahan (bobot dinormalisasi ulang)</div></div>
   </div>
   ${c.weightFallback?`<div class="note warn">Semua bobot manual masih 0 — sementara bobot dihitung dari durasi. Isi kolom Bobot di tab Jadwal, atau ganti mode bobot di Pengaturan.</div>`:''}
+  ${c.pastDl.length?`<div class="note ng">⛔ Rencana selesai <b>${fmtWhen(c.projF)}</b> melewati deadline <b>${fmtWhen(c.deadlineMs)}</b> karena ${c.pastDl.length} task selesai setelah deadline: ${c.pastDl.slice(0,8).map(i=>`<a href="#" onclick="openTaskEditor('${c.T[i].id}');return false">${i+1}. ${esc(c.T[i].name||'(tanpa nama)')}</a> (${fmtWhen(c.X[i].fm)})`).join(', ')}${c.pastDl.length>8?' …':''}. Periksa tanggalnya (salah ketik?) atau sesuaikan deadline di Pengaturan.</div>`:''}
   ${c.cnt.conflicts?`<div class="note warn">&#9888;&#65039; ${c.cnt.conflicts} task mulai lebih awal dari yang diizinkan predecessor-nya. Lihat tab <a href="#" onclick="switchTab('tasks');return false">Jadwal</a> → tombol <b>Jadwalkan Ulang Otomatis</b>.</div>`:''}
   <div class="grid2">
     <div class="card"><h3>S-Curve — Rencana vs Aktual <span class="sub">klik tab S-Curve untuk detail</span></h3><div style="height:clamp(300px,42vh,900px)"><canvas id="ch-dash"></canvas></div></div>
@@ -937,7 +940,7 @@ function taskRow(i,dayMode){
   const durV=x.valid?Math.round(durToUnit(x.dur)*100)/100:'';
   const tf=isFinite(x.TF)?Math.round(durToUnit(x.TF)*10)/10:'';
   const dev=x.act-x.plan;
-  const warn=[];if(x.conflict)warn.push('Mulai lebih awal dari logika predecessor ('+durLabel(x.conflict)+')');if(x.gap&&x.state==='ns')warn.push('Bisa mulai '+durLabel(x.gap)+' lebih awal menurut logika (⇤ Rapatkan ASAP)');if(leaf&&!x.valid)warn.push('Tanggal belum lengkap / selesai sebelum mulai');if(x.future)warn.push('Ada entri progress setelah Data Date');
+  const warn=[];if(x.conflict)warn.push('Mulai lebih awal dari logika predecessor ('+durLabel(x.conflict)+')');if(x.gap&&x.state==='ns')warn.push('Bisa mulai '+durLabel(x.gap)+' lebih awal menurut logika (⇤ Rapatkan ASAP)');if(leaf&&!x.valid)warn.push('Tanggal belum lengkap / selesai sebelum mulai');if(leaf&&isFinite(c.deadlineMs)&&x.valid&&x.fm>c.deadlineMs+60000)warn.push('Selesai setelah deadline proyek ('+fmtWhen(c.deadlineMs)+')');if(x.future)warn.push('Ada entri progress setelah Data Date');
   return `<tr class="${cls}" data-id="${t.id}" onclick="selRow('${t.id}',event)">
   <td class="c mono">${i+1}</td><td class="mono" style="color:var(--txt-3)">${c.wbs[i]}</td>
   <td class="nm"><div class="nmcell" style="padding-left:${c.lvl[i]*16}px">${leaf?`<span class="tg">${ms?'◆':'·'}</span>`:`<span class="tg" onclick="event.stopPropagation();toggleCollapse('${t.id}')">${COLLAPSED.has(t.id)?'▸':'▾'}</span>`}
@@ -1191,10 +1194,11 @@ function saveProgressSession(){
 // ---------------------------------------------------------------------
 //  S-Curve
 // ---------------------------------------------------------------------
-const ddLinePlugin={id:'ddline',afterDatasetsDraw(ch,args,o){const d=ch.$dd;if(d==null)return;const x=ch.scales.x;if(!x)return;
-  const i0=Math.floor(d),f=d-i0;const px=x.getPixelForValue(i0)+(i0+1<ch.data.labels.length?(x.getPixelForValue(i0+1)-x.getPixelForValue(i0))*f:0);
-  const ctx=ch.ctx;ctx.save();ctx.strokeStyle='#dc2626';ctx.setLineDash([5,4]);ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(px,ch.chartArea.top);ctx.lineTo(px,ch.chartArea.bottom);ctx.stroke();
-  ctx.setLineDash([]);ctx.fillStyle='#dc2626';ctx.font='600 11px Inter,sans-serif';ctx.fillText('Data Date',Math.min(px+4,ch.chartArea.right-60),ch.chartArea.top+12);ctx.restore();}};
+const ddLinePlugin={id:'ddline',afterDatasetsDraw(ch){const x=ch.scales.x;if(!x)return;const fs=ch.$fs||11;
+  (ch.$marks||[]).forEach((m,n)=>{if(m.i==null)return;const i0=Math.floor(m.i),f=m.i-i0;const px=x.getPixelForValue(i0)+(i0+1<ch.data.labels.length?(x.getPixelForValue(i0+1)-x.getPixelForValue(i0))*f:0);
+    const ctx=ch.ctx;ctx.save();ctx.strokeStyle=m.color;ctx.setLineDash(m.dash);ctx.lineWidth=m.w||1.5;ctx.beginPath();ctx.moveTo(px,ch.chartArea.top);ctx.lineTo(px,ch.chartArea.bottom);ctx.stroke();
+    ctx.setLineDash([]);ctx.fillStyle=m.color;ctx.font='600 '+fs+'px Inter,sans-serif';const tw=ctx.measureText(m.label).width;
+    ctx.fillText(m.label,px+4+tw>ch.chartArea.right?px-tw-4:px+4,ch.chartArea.top+fs+2+n*(fs+6));ctx.restore();});}};
 function scurveConfig(cd,opts={}){
   const ds=[];
   if(cd.base.some(v=>v!=null))ds.push({label:'Baseline',data:cd.base,borderColor:'#94a3b8',borderDash:[6,4],borderWidth:2,pointRadius:0,tension:.25,fill:false});
@@ -1211,11 +1215,13 @@ function scurveConfig(cd,opts={}){
     options:{responsive:!opts.static,maintainAspectRatio:false,animation:opts.static?false:{duration:250},interaction:{mode:'index',intersect:false},
       plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:11}}},tooltip:{callbacks:{label:it=>it.raw==null?null:`${it.dataset.label}: ${(+it.raw).toFixed(2)}%`}}},scales}};
 }
-function ddIndex(cd){const d=C.dd;const p=cd.pts;if(d<p[0]||d>p[p.length-1])return null;for(let k=0;k<p.length-1;k++){if(d>=p[k]&&d<=p[k+1])return k+(p[k+1]>p[k]?(d-p[k])/(p[k+1]-p[k]):0);}return p.length-1;}
+function idxAt(cd,d){const p=cd.pts;if(!isFinite(d)||d<p[0]||d>p[p.length-1])return null;for(let k=0;k<p.length-1;k++){if(d>=p[k]&&d<=p[k+1])return k+(p[k+1]>p[k]?(d-p[k])/(p[k+1]-p[k]):0);}return p.length-1;}
+function setMarks(ch,cd,fs){ch.$fs=fs||11;ch.$marks=[{i:idxAt(cd,C.dd),color:'#dc2626',label:'Data Date',dash:[5,4]}];
+  const dl=parseLocal(P.deadline);if(isFinite(dl))ch.$marks.push({i:idxAt(cd,dl),color:'#7c3aed',label:'Deadline '+fmtWhen(dl),dash:[],w:2});}
 function drawSCurve(canvasId,opts={}){
   killChart(canvasId);const cv=document.getElementById(canvasId);if(!cv||typeof Chart==='undefined')return;
   const cd=curveData(opts.gran);if(!cd){cv.parentElement.innerHTML='<div class="empty">Isi tanggal task untuk melihat kurva</div>';return;}
-  const ch=new Chart(cv.getContext('2d'),scurveConfig(cd,opts));ch.$dd=ddIndex(cd);ch.update('none');CH[canvasId]=ch;return cd;
+  const ch=new Chart(cv.getContext('2d'),scurveConfig(cd,opts));setMarks(ch,cd);ch.update('none');CH[canvasId]=ch;return cd;
 }
 let SC={gran:'',periodic:false,table:false};
 function renderSCurve(){
@@ -1468,8 +1474,10 @@ function renderSettings(){
     <div class="field"><label>Lokasi / Unit</label><input class="inp" value="${esc(P.location)}" onchange="setP('location',this.value)"></div>
     <div class="field"><label>Owner / Kontraktor</label><input class="inp" value="${esc(P.client)}" onchange="setP('client',this.value)"></div>
     <div class="field"><label>Project Manager</label><input class="inp" value="${esc(P.manager)}" onchange="setP('manager',this.value)"></div>
-    <div class="field"><label>Tanggal mulai proyek</label><input class="inp" type="datetime-local" value="${esc(P.startDate)}" onchange="setP('startDate',this.value)"></div>
-    <div class="field"><label>Deadline (finish no later than)</label><input class="inp" type="datetime-local" value="${esc(P.deadline)}" onchange="setP('deadline',this.value)"></div>
+    <div class="field"><label>Tanggal mulai proyek</label>${P.precision==='hour'?`<input class="inp" type="datetime-local" value="${esc(P.startDate)}" onchange="setP('startDate',this.value)">`:`<input class="inp" type="date" value="${esc((P.startDate||'').slice(0,10))}" onchange="setP('startDate',this.value?this.value+'T'+dayStartStr():'')">`}
+      <div class="hint">Tanggal awal default untuk task baru. Kurva S dimulai dari task paling awal.</div></div>
+    <div class="field"><label>Deadline (finish no later than)</label>${P.precision==='hour'?`<input class="inp" type="datetime-local" value="${esc(P.deadline)}" onchange="setP('deadline',this.value)">`:`<input class="inp" type="date" value="${esc((P.deadline||'').slice(0,10))}" onchange="setP('deadline',this.value?this.value+'T'+dayEndStr():'')">`}
+      <div class="hint">Target selesai: garis ungu di S-Curve &amp; Gantt. Task yang lewat deadline ditandai ⚠ dan muncul di Dashboard. Kosongkan bila tidak ada.</div></div>
     <div class="field" style="grid-column:1/-1"><label>Deskripsi / scope</label><textarea class="inp" onchange="setP('description',this.value)">${esc(P.description)}</textarea></div></div></div>
   <div class="card"><h3>Kalender Kerja <span class="sub">progress rencana hanya berjalan di jam kerja</span></h3><div class="fgrid">
     <div class="field" style="grid-column:1/-1"><label>Hari kerja</label><div style="display:flex;gap:10px;flex-wrap:wrap">${[1,2,3,4,5,6,0].map(d=>`<label style="display:flex;gap:4px;align-items:center"><input type="checkbox" ${c.workDays.includes(d)?'checked':''} onchange="toggleWD(${d},this.checked)">${DOWS[d]}</label>`).join('')}</div></div>
@@ -1722,7 +1730,7 @@ async function generatePDF(){
   const cd=curveData();
   if(cd&&typeof Chart!=='undefined'){const cv=document.createElement('canvas');cv.width=1600;cv.height=720;cv.style.cssText='position:fixed;left:-9999px;top:0;width:1600px;height:720px';document.body.appendChild(cv);
     const cfg=scurveConfig(cd,{static:true});cfg.options.devicePixelRatio=1;cfg.plugins.push({id:'wbg',beforeDraw:ch=>{const x=ch.ctx;x.save();x.fillStyle='#fff';x.fillRect(0,0,ch.width,ch.height);x.restore();}});cfg.options.plugins.legend.labels.font={size:20};cfg.options.scales.x.ticks.font={size:16};cfg.options.scales.y.ticks.font={size:16};
-    const ch=new Chart(cv.getContext('2d'),cfg);ch.$dd=ddIndex(cd);ch.update('none');const img=ch.toBase64Image('image/jpeg',0.9);ch.destroy();cv.remove();
+    const ch=new Chart(cv.getContext('2d'),cfg);setMarks(ch,cd,20);ch.update('none');const img=ch.toBase64Image('image/jpeg',0.9);ch.destroy();cv.remove();
     const ih=CW*720/1600;checkY(ih+2);pdf.addImage(img,'JPEG',M,y,CW,ih);y+=ih+3;}
   // task table
   sec('DAFTAR TASK & PROGRESS');

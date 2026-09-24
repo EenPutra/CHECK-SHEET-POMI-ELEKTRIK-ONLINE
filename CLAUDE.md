@@ -3503,6 +3503,16 @@ approvals — its data model is a whole project, not a submission.
   `cloudSave()` so the list shows progress without loading every project. Buttons call
   `openProject(id, tab)` (`'progress'` / `'tasks'` only offered when editable), which reuses
   the local copy unless the cloud rev is newer. Same cards are the empty-state dashboard.
+- **Deadline is a target, the S-curve is the task dates — so it must be made visible.** User
+  report: "deadline in Settings isn't in sync with the S-curve". The real cause was one task
+  typed as 30 Nov (neighbours 30 Sep) — `P.deadline` only fed CPM float and was drawn nowhere
+  on the S-curve, so the stretched curve looked unrelated to it. Now: the chart plugin draws
+  `ch.$marks` (Data Date + Deadline, set by `setMarks()` for the screen and the PDF chart), the
+  curve range always includes the deadline, `compute()` exposes `pastDl` (leaf tasks finishing
+  after it) → red Dashboard note naming each task with a link, red "Rencana Selesai" KPI, and a
+  ⚠ on the row. `startDate`/`deadline` inputs are date-only in daily precision (stored at the
+  workday start/end), which is why the user's deadline had read 14:41. `startDate` is only
+  the default for new tasks; the curve starts at the earliest task.
 - **Long task names wrap everywhere.** The task-table name cell is a `<textarea class="ci
   nm-ta" rows=1>` auto-sized by `autoH()` (after every render, on input, and on window resize)
   — an `<input>` cannot wrap. A name is still ONE logical line: `oneLine()` strips newlines on
