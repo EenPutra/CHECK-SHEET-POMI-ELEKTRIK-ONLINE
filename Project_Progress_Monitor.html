@@ -938,6 +938,7 @@ function renderTasks(){
     <button class="ed btn btn-sm" onclick="dupSel()" title="Duplikat">⧉</button>
     <button class="ed btn btn-sm btn-ng" onclick="delSel()" title="Hapus">🗑</button>
     <span class="sep ed"></span>
+    <button class="ed btn btn-sm" onclick="openAutoPred()">🔗 Predecessor otomatis</button>
     <button class="ed btn btn-sm" onclick="autoSchedule()" ${c.cnt.conflicts?'':'disabled'} title="Geser task yang melanggar logika predecessor (yang belum mulai)">⚙ Jadwalkan Ulang Otomatis${c.cnt.conflicts?' ('+c.cnt.conflicts+')':''}</button>
     <button class="ed btn btn-sm" onclick="autoSchedule('asap')" ${c.cnt.gaps?'':'disabled'} title="Tarik task yang belum mulai ke tanggal paling awal yang diizinkan predecessor (mis. pekerjaan sebelumnya selesai lebih cepat)">⇤ Rapatkan ASAP${c.cnt.gaps?' ('+c.cnt.gaps+')':''}</button>
     ${wm==='wbs'?`<button class="ed btn btn-sm btn-pri" onclick="freezeWeights()">⚖ Bobot otomatis AKTIF · ubah ke manual</button>`:`<button class="ed btn btn-sm" onclick="autoWeights()">⚖ Bobot otomatis per WBS</button>`}
@@ -1113,6 +1114,52 @@ function freezeWeights(){
 }
 function normalizeWeights(){const lv=C.X.filter(x=>x.leaf);const tot=sum(lv.map(x=>+P.tasks[x.i].weight||0));if(tot<=0){toast('Bobot masih kosong');return;}
   mutate(()=>{lv.forEach(x=>{const t=P.tasks[x.i];t.weight=Math.round((+t.weight||0)/tot*100*10000)/10000;});logChange('weight','Bobot input dinormalisasi ke total 100');});}
+// ---- Auto predecessors from the dates (Finish-to-Start) ----
+// For each leaf: its predecessors are the task(s) that finish LAST before it starts. Candidates
+// are searched level by level up the WBS — the other members of its own group first (by date,
+// not row order), then its parent's sibling groups, … — so each phase chains internally instead of linking to every task
+// that happens to end the same day elsewhere. Overlapping tasks are parallel and never linked.
+function autoPredPlan(scope,mode){
+  const c=C,T=c.T,E=0.001;const L=c.X.filter(x=>x.leaf&&x.valid);
+  const leavesOf=j=>c.X[j].leaf?[j]:(c.X[j].leaves||[]);
+  const pools=x=>{if(scope==='project')return [L.map(y=>y.i)];const out=[];let node=x.i;
+    while(node!==-1&&node!=null){const par=c.X[node].parent;const pool=[];
+      for(let j=0;j<c.n;j++){if(j!==node&&c.X[j].parent===par)pool.push(...leavesOf(j));}
+      if(pool.length)out.push(pool);node=par;}
+    out.push(L.map(y=>y.i));return out;};
+  const plan=[];
+  L.forEach(x=>{const t=T[x.i];if(mode==='empty'&&(t.preds||[]).length)return;
+    const ok=y=>y&&y!==x&&y.leaf&&y.valid&&y.f<=x.s+E&&(y.s<x.s-E||(Math.abs(y.s-x.s)<=E&&y.i<x.i));
+    for(const pool of pools(x)){const cand=pool.map(j=>c.X[j]).filter(ok);if(!cand.length)continue;
+      const fmax=Math.max(...cand.map(y=>y.f));const pr=cand.filter(y=>y.f>=fmax-E).map(y=>y.i).sort((a,b)=>a-b);
+      const old=(t.preds||[]).map(p=>c.idx.get(p.id)).filter(v=>v!=null).sort((a,b)=>a-b);
+      if(pr.join()!==old.join())plan.push({i:x.i,preds:pr,old});break;}});
+  return plan;
+}
+let AP={scope:'wbs',mode:'empty'};
+function openAutoPred(){
+  if(!guard())return;const plan=autoPredPlan(AP.scope,AP.mode);const c=C;const nm=i=>`${i+1}. ${esc(c.T[i].name||'(tanpa nama)')}`;
+  const links=plan.reduce((a,p)=>a+p.preds.length,0);
+  openModal(`<div class="mh"><b>🔗 Predecessor otomatis dari jadwal</b><button class="x" onclick="closeModal()">×</button></div>
+  <div class="mb"><div class="note">Setiap task dihubungkan <b>Finish-to-Start</b> ke task yang <b>selesai paling akhir sebelum task itu mulai</b>. Beberapa task yang selesai bersamaan (paralel) semuanya dijadikan predecessor. Task yang jadwalnya bertumpuk tidak dihubungkan. Tanggal task tidak diubah.</div>
+    <div class="fgrid" style="margin:10px 0">
+      <div class="field"><label>Cakupan pencarian</label><select class="inp" onchange="AP.scope=this.value;openAutoPred()"><option value="wbs"${AP.scope==='wbs'?' selected':''}>Ikuti struktur WBS (disarankan)</option><option value="project"${AP.scope==='project'?' selected':''}>Seluruh proyek (murni kronologis)</option></select>
+        <div class="hint">${AP.scope==='wbs'?'Dicari dulu di grup yang sama; task pertama di grup dihubungkan ke grup sebelumnya.':'Dicari di semua task — bisa membuat banyak link silang antar grup.'}</div></div>
+      <div class="field"><label>Task yang diisi</label><select class="inp" onchange="AP.mode=this.value;openAutoPred()"><option value="empty"${AP.mode==='empty'?' selected':''}>Hanya yang predecessor-nya masih kosong</option><option value="all"${AP.mode==='all'?' selected':''}>Semua task (timpa predecessor yang ada)</option></select></div>
+    </div>
+    ${plan.length?`<div class="hint" style="margin-bottom:6px"><b>${plan.length}</b> task akan diisi · <b>${links}</b> link</div>
+    <div class="tbl-wrap" style="max-height:48vh"><table class="t"><thead><tr><th>Task</th><th>Mulai</th><th>Predecessor baru</th>${AP.mode==='all'?'<th>Sebelumnya</th>':''}</tr></thead><tbody>
+    ${plan.map(p=>`<tr><td>${nm(p.i)}</td><td style="white-space:nowrap">${fmtWhen(c.X[p.i].sm)}</td><td>${p.preds.map(j=>`${nm(j)} <span class="hint">(selesai ${fmtWhen(c.X[j].fm)})</span>`).join('<br>')}</td>${AP.mode==='all'?`<td class="hint">${p.old.length?p.old.map(j=>j+1).join(', '):'—'}</td>`:''}</tr>`).join('')}
+    </tbody></table></div>`:`<div class="empty" style="padding:22px"><b>Tidak ada yang perlu diisi</b>${AP.mode==='empty'?'Semua task yang bisa dihubungkan sudah punya predecessor. Pilih "Semua task" untuk menyusun ulang.':'Predecessor sudah sesuai dengan jadwal.'}</div>`}
+  </div>
+  <div class="mf"><button class="btn" onclick="closeModal()">Batal</button><button class="btn btn-pri" onclick="applyAutoPred()" ${plan.length?'':'disabled'}>Terapkan ${plan.length?'('+plan.length+' task)':''}</button></div>`);
+}
+function applyAutoPred(){
+  if(!guard())return;const plan=autoPredPlan(AP.scope,AP.mode);if(!plan.length){closeModal();return;}
+  mutate(()=>{plan.forEach(p=>{P.tasks[p.i].preds=p.preds.map(j=>({id:P.tasks[j].id,type:'FS',lag:0}));});
+    logChange('logic',`Predecessor otomatis dari jadwal: ${plan.length} task, ${plan.reduce((a,p)=>a+p.preds.length,0)} link (${AP.scope==='wbs'?'ikuti WBS':'seluruh proyek'}, ${AP.mode==='empty'?'hanya yang kosong':'timpa semua'})`);});
+  closeModal();toast(`🔗 Predecessor diisi untuk ${plan.length} task — critical path & float dihitung ulang`,4000);
+}
 function autoSchedule(mode){
   if(!guard())return;
   const asap=mode==='asap';const pick=x=>x.leaf&&x.state==='ns'&&(x.conflict>0||(asap&&x.gap>0));
@@ -1516,7 +1563,7 @@ function healthChecks(){
   const noPred=V.filter(x=>!(T[x.i].preds||[]).length),noSucc=V.filter(x=>!linked.has(x.id));
   const first=V.reduce((a,x)=>!a||x.sm<a.sm?x:a,null),last=V.reduce((a,x)=>!a||x.fm>a.fm?x:a,null);
   const missing=V.filter(x=>(noPred.includes(x)&&x!==first)||(noSucc.includes(x)&&x!==last));
-  add('1','Logic — task tanpa predecessor/successor',fp(missing.length/n*100,0),missing.length/n<=0.05,'≤ 5%','Task yang tidak terhubung logika tidak ikut terdorong saat pekerjaan sebelumnya molor. Isi kolom Predecessor.',missing.map(x=>x.id));
+  add('1','Logic — task tanpa predecessor/successor',fp(missing.length/n*100,0),missing.length/n<=0.05,'≤ 5%','Task yang tidak terhubung logika tidak ikut terdorong saat pekerjaan sebelumnya molor. Isi kolom Predecessor, atau pakai 🔗 Predecessor otomatis di tab Jadwal.',missing.map(x=>x.id));
   const rels=[];V.forEach(x=>(T[x.i].preds||[]).forEach(p=>rels.push({x,p})));const nr=rels.length||1;
   const leads=rels.filter(r=>r.p.lag<0);add('2','Leads (lag negatif)',String(leads.length),leads.length===0,'0','Lag negatif menyembunyikan tumpang tindih — pecah task bila perlu.',leads.map(r=>r.x.id));
   const lags=rels.filter(r=>r.p.lag>0);add('3','Lags',fp(lags.length/nr*100,0),lags.length/nr<=0.05,'≤ 5% relasi','Lag positif (waktu tunggu, mis. curing) sebaiknya dijadikan task tersendiri agar terlihat.',lags.map(r=>r.x.id));
@@ -1905,6 +1952,8 @@ const TIP_RULES=[
   [/moveSel\(1\)/,['Turun','Pindahkan baris terpilih (beserta sub-task-nya) ke bawah.']],
   [/dupSel/,['Duplikat','Salin baris terpilih beserta sub-task-nya (tanpa riwayat progress).']],
   [/delSel/,['Hapus task','Hapus baris terpilih beserta sub-task-nya. Bobot lain dinormalisasi ulang. Bisa di-undo (Ctrl+Z).']],
+  [/openAutoPred/,['Predecessor otomatis','Isi kolom Predecessor dari tanggal: tiap task dihubungkan ke task yang selesai paling akhir sebelum ia mulai (mengikuti struktur WBS). Ada pratinjau sebelum diterapkan.']],
+  [/applyAutoPred/,['Terapkan','Tulis predecessor hasil pratinjau ke task. Bisa di-undo (Ctrl+Z).']],
   [/autoSchedule\('asap'\)/,['Rapatkan ASAP','Tarik task yang belum mulai ke tanggal paling awal yang diizinkan predecessor-nya (mis. pekerjaan sebelumnya selesai lebih cepat).']],
   [/autoSchedule\(\)/,['Jadwalkan ulang otomatis','Geser task yang belum mulai agar tidak mendahului predecessor-nya. Semua turunan ikut bergeser; durasi tetap.']],
   [/autoWeights/,['Bobot otomatis per WBS','Bagi 100% rata ke semua main task, lalu bobot tiap main task dibagi rata ke sub-task-nya. Otomatis menyesuaikan saat task ditambah/dihapus/dipindah.']],
@@ -2050,6 +2099,7 @@ function renderHelp(){
       <tr><td><code>3FF</code></td><td>Selesai bersamaan dengan task 3 selesai (Finish-to-Finish)</td></tr>
       <tr><td><code>4FS+2</code></td><td>Mulai 2 ${P&&P.precision==='hour'?'jam':'hari'} kerja setelah task 4 selesai (mis. curing)</td></tr>
       <tr><td><code>5FF-1d</code></td><td>Selesai 1 hari sebelum task 5 selesai (akhiran <code>d</code> = hari, <code>j</code> = jam)</td></tr></table></div>
+    <p><b>🔗 Predecessor otomatis</b> mengisi kolom ini dari tanggal yang sudah ada: tiap task dihubungkan ke task yang selesai paling akhir sebelum ia mulai (dicari dulu di grup yang sama, lalu grup sebelumnya). Ada pratinjau sebelum diterapkan, pilihan hanya-yang-kosong atau timpa semua, dan bisa di-undo.</p>
     <p>Dengan predecessor, aplikasi menghitung <b>critical path</b> (tanda <span class="chip crit">CP</span>, bar merah) dan <b>float</b> (kelonggaran waktu). Bila sebuah task molor, <b>⚙ Jadwalkan Ulang Otomatis</b> menggeser semua turunannya; bila selesai lebih cepat, <b>⇤ Rapatkan ASAP</b> menarik turunannya maju. Keduanya hanya menggeser task yang belum mulai.</p></div>
 
   <div class="card" id="g-bobot"><h2>5. Bobot &amp; pekerjaan tambahan</h2>

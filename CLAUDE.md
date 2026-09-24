@@ -3503,6 +3503,16 @@ approvals — its data model is a whole project, not a submission.
   `cloudSave()` so the list shows progress without loading every project. Buttons call
   `openProject(id, tab)` (`'progress'` / `'tasks'` only offered when editable), which reuses
   the local copy unless the cloud rev is newer. Same cards are the empty-state dashboard.
+- **"🔗 Predecessor otomatis" (`autoPredPlan()` / `openAutoPred()` / `applyAutoPred()`).** Builds FS
+  links from the existing dates: a leaf's predecessors are the task(s) finishing LAST before it
+  starts (all of them when several finish at the same moment); overlapping tasks are parallel
+  and never linked; same-start zero-duration pairs use row order so no cycle can form. Default
+  scope "ikuti WBS": candidates are searched in the other members of the task's own group first
+  — **by date across the whole group, not only rows above it** (a first version looked only
+  upward and missed a sibling listed lower but finishing earlier) — then the parent's sibling
+  groups, up to the whole project. Preview table before applying; "only empty" or "overwrite
+  all"; one undo step. Never moves dates (every link satisfies pred.finish ≤ start, so no
+  conflicts). Verified on the user's workbook: all 14 links match a hand derivation.
 - **S-curve zoom / X-Y scale (tab S-Curve only).** User wanted to zoom the chart "without the
   font changing" — i.e. axis zoom, not browser zoom. State `SC.x0/x1` (visible time range, NaN =
   full), `SC.ymode` (`full` 0–100 / `auto` Chart.js `grace` / `manual` min–max), `SC.h`
