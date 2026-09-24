@@ -3503,6 +3503,20 @@ approvals — its data model is a whole project, not a submission.
   `cloudSave()` so the list shows progress without loading every project. Buttons call
   `openProject(id, tab)` (`'progress'` / `'tasks'` only offered when editable), which reuses
   the local copy unless the cloud rev is newer. Same cards are the empty-state dashboard.
+- **S-curve zoom / X-Y scale (tab S-Curve only).** User wanted to zoom the chart "without the
+  font changing" — i.e. axis zoom, not browser zoom. State `SC.x0/x1` (visible time range, NaN =
+  full), `SC.ymode` (`full` 0–100 / `auto` Chart.js `grace` / `manual` min–max), `SC.h`
+  (height). `curveData(gran, range)` clips to the range and picks its auto granularity from the
+  VISIBLE span (≤21 days → checkpoints), so zooming in adds detail rather than stretching a few
+  daily points; duplicate same-day labels (zoom edges, the data-date point) get a time suffix.
+  Controls: buttons (`scZoom`/`scPan`/`scReset`), quick ranges around the data date, date
+  inputs, Y mode + min/max, height. Desktop: **Ctrl/⌘ + wheel (also what a trackpad pinch
+  sends) zooms the chart and `preventDefault`s the browser zoom**, Shift+wheel pans, drag
+  selects a range (`#sc-sel` overlay), double-click resets. Updates go through
+  `scUpdate()` (rAF-coalesced) → `scDraw()`, which redraws only the chart/inputs/table, not the
+  panel. The window mousemove/mouseup handlers are stored on `window.__scMM/__scMU` and
+  replaced on each render (they used to pile up). Controls sit in `.view-ok` so read-only
+  visitors can zoom too. Dashboard and PDF charts always use the full range.
 - **Deadline is a target, the S-curve is the task dates — so it must be made visible.** User
   report: "deadline in Settings isn't in sync with the S-curve". The real cause was one task
   typed as 30 Nov (neighbours 30 Sep) — `P.deadline` only fed CPM float and was drawn nowhere

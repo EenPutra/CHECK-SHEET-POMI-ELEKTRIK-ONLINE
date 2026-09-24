@@ -205,6 +205,14 @@ details.std summary{cursor:pointer;font-weight:700;color:var(--navy)}
 .pcard{border:1px solid var(--bdr);border-radius:12px;padding:12px 14px;background:#fff;cursor:pointer}
 .pcard:hover{border-color:var(--pri);box-shadow:var(--shadow)}
 .pcard b{display:block;color:var(--navy);font-size:14px}
+.sc-bar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;margin-bottom:6px}
+.sc-grp{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.sc-lbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.3px;color:var(--txt-2);margin-right:2px}
+.sc-in{padding:4px 7px;font-size:12.5px;width:auto}.sc-num{width:70px}
+.sc-meta{display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between;font-size:12px;color:var(--txt-2);margin-bottom:6px}
+#sc-wrap{height:clamp(380px,calc(100vh - 420px),1400px);cursor:crosshair}
+#sc-sel{position:absolute;display:none;background:rgba(37,99,235,.12);border:1px solid rgba(37,99,235,.55);pointer-events:none}
+@media(hover:none){.sc-hint{display:none}}
 .pk-tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .pk-tools .inp{flex:1;min-width:180px}
 .seg{display:inline-flex;border:1px solid var(--bdr-2);border-radius:8px;overflow:hidden}
@@ -734,15 +742,17 @@ function compute(){
 // ---------------------------------------------------------------------
 //  Curve sampling (S-Curve)
 // ---------------------------------------------------------------------
-function curveData(granOverride){
+function curveData(granOverride,range){
   const c=C;if(!c.cnt.total)return null;
   let t0=Math.min(c.projS,isFinite(c.blS)?c.blS:Infinity);
   const dlc=parseLocal(P.deadline);
   let t1=Math.max(isFinite(dlc)?dlc:-Infinity,c.projF,isFinite(c.blF)?c.blF:-Infinity,c.dd<c.projF*2?Math.min(c.dd,c.projF+(c.projF-c.projS)*6):-Infinity,isFinite(c.fcMs)?c.fcMs:-Infinity);
   if(!isFinite(t0)||!isFinite(t1)||t1<=t0)return null;
+  const full=[t0,t1];
+  if(range){t0=Math.max(t0,range.a);t1=Math.min(t1,range.b);if(!(t1>t0))return null;}
   let gran=granOverride||P.curveGran||'auto';
   const spanD=(t1-t0)/DAY;
-  if(gran==='auto')gran=spanD<=14?'cp':spanD<=150?'day':'week';
+  if(gran==='auto')gran=spanD<=21?'cp':spanD<=150?'day':'week';
   const W=CAL.W;const out=[t0];const cp=Math.max(1,+P.calendar.cpHours||3)*60;
   const i0=Math.max(0,dayIdx(t0)),i1=dayIdx(t1);
   for(let i=i0;i<=i1&&i<CAL.days.length;i++){const d=CAL.days[i];if(!d.wd)continue;
@@ -753,7 +763,7 @@ function curveData(granOverride){
   out.push(t1);
   if(c.dd>t0&&c.dd<t1)out.push(c.dd);
   let pts=[...new Set(out.filter(v=>v>=t0&&v<=t1))].sort((a,b)=>a-b);
-  if(pts.length>1600){return curveData(gran==='cp'?'day':'week');}
+  if(pts.length>1600){return curveData(gran==='cp'?'day':'week',range);}
   const plan=[],base=[],act=[],fc=[];
   const wdd=c.wdd;
   pts.forEach(m=>{const w=toW(m);
@@ -763,7 +773,10 @@ function curveData(granOverride){
     if(isFinite(c.fcW)&&!c.doneAll&&m>=c.dd){const pw=c.W0+c.ES+(w-wdd)*(c.SPIt||0);fc.push(m>=c.fcMs?100:Math.max(c.EV,c.PVw(Math.min(pw,c.WF))));}
     else fc.push(m===c.dd&&isFinite(c.fcW)&&!c.doneAll?c.EV:null);});
   const labels=pts.map(m=>gran==='cp'?fmtDT(m):fmtD(m));
-  return {pts,labels,plan,base,act,fc,gran};
+  // Zoom edges / the data date can add a second point on the same day: show the time on those.
+  labels.forEach((l,k)=>{if((k>0&&labels[k-1]===l)||(k+1<labels.length&&labels[k+1]===l))labels[k]=fmtDT(pts[k]);});
+  labels.forEach((l,k)=>{if(k>0&&fmtDT(pts[k-1])===labels[k-1]&&labels[k-1]===l)labels[k]=fmtDT(pts[k]);});
+  return {pts,labels,plan,base,act,fc,gran,full};
 }
 
 // ---------------------------------------------------------------------
@@ -1233,10 +1246,10 @@ function scurveConfig(cd,opts={}){
     ds.push({type:'bar',label:'Rencana periodik',data:pp,backgroundColor:'rgba(37,99,235,.25)',yAxisID:'y2',order:10});
     ds.push({type:'bar',label:'Aktual periodik',data:pa,backgroundColor:'rgba(22,163,74,.35)',yAxisID:'y2',order:11});}
   const scales={x:{ticks:{maxRotation:0,autoSkip:true,maxTicksLimit:opts.compact?8:14,font:{size:10}},grid:{display:false}},
-    y:{min:0,max:100,ticks:{callback:v=>v+'%'},title:{display:!opts.compact,text:'Kumulatif (%)'}}};
+    y:Object.assign({ticks:{callback:v=>(+v.toFixed(2))+'%'},title:{display:!opts.compact,text:'Kumulatif (%)'}},opts.y==='auto'?{grace:'6%'}:opts.y?{min:opts.y.min,max:opts.y.max}:{min:0,max:100})};
   if(opts.periodic)scales.y2={position:'right',beginAtZero:true,grid:{display:false},ticks:{callback:v=>v+'%'},title:{display:true,text:'Periodik (%)'}};
   return {type:'line',data:{labels:cd.labels,datasets:ds},plugins:[ddLinePlugin],
-    options:{responsive:!opts.static,maintainAspectRatio:false,animation:opts.static?false:{duration:250},interaction:{mode:'index',intersect:false},
+    options:{responsive:!opts.static,maintainAspectRatio:false,animation:(opts.static||opts.noAnim)?false:{duration:250},interaction:{mode:'index',intersect:false},
       plugins:{legend:{position:'bottom',labels:{boxWidth:14,font:{size:11}}},tooltip:{callbacks:{label:it=>it.raw==null?null:`${it.dataset.label}: ${(+it.raw).toFixed(2)}%`}}},scales}};
 }
 function idxAt(cd,d){const p=cd.pts;if(!isFinite(d)||d<p[0]||d>p[p.length-1])return null;for(let k=0;k<p.length-1;k++){if(d>=p[k]&&d<=p[k+1])return k+(p[k+1]>p[k]?(d-p[k])/(p[k+1]-p[k]):0);}return p.length-1;}
@@ -1244,28 +1257,88 @@ function setMarks(ch,cd,fs){ch.$fs=fs||11;ch.$marks=[{i:idxAt(cd,C.dd),color:'#d
   const dl=parseLocal(P.deadline);if(isFinite(dl))ch.$marks.push({i:idxAt(cd,dl),color:'#7c3aed',label:'Deadline '+fmtWhen(dl),dash:[],w:2});}
 function drawSCurve(canvasId,opts={}){
   killChart(canvasId);const cv=document.getElementById(canvasId);if(!cv||typeof Chart==='undefined')return;
-  const cd=curveData(opts.gran);if(!cd){cv.parentElement.innerHTML='<div class="empty">Isi tanggal task untuk melihat kurva</div>';return;}
-  const ch=new Chart(cv.getContext('2d'),scurveConfig(cd,opts));setMarks(ch,cd);ch.update('none');CH[canvasId]=ch;return cd;
+  const cd=curveData(opts.gran,opts.range);if(!cd){if(!opts.range)cv.parentElement.innerHTML='<div class="empty">Isi tanggal task untuk melihat kurva</div>';return;}
+  const ch=new Chart(cv.getContext('2d'),scurveConfig(cd,opts));ch.$cd=cd;setMarks(ch,cd);ch.update('none');CH[canvasId]=ch;return cd;
 }
-let SC={gran:'',periodic:false,table:false};
+let SC={gran:'',periodic:false,table:false,x0:NaN,x1:NaN,ymode:'full',ymin:0,ymax:100,h:0};
+const SC_MIN_SPAN=3*HOUR;
+function scFull(){const cd=curveData(SC.gran||undefined);return cd?cd.full:null;}
+function scRange(){const f=scFull();if(!f)return null;const a=isFinite(SC.x0)?Math.max(f[0],SC.x0):f[0],b=isFinite(SC.x1)?Math.min(f[1],SC.x1):f[1];return {a,b,f,zoomed:isFinite(SC.x0)};}
+function scSetX(a,b){const f=scFull();if(!f)return;let w=Math.max(SC_MIN_SPAN,b-a);if(w>=f[1]-f[0]){SC.x0=SC.x1=NaN;return scUpdate();}
+  if(b-a<SC_MIN_SPAN){const c=(a+b)/2;a=c-w/2;b=c+w/2;}if(a<f[0]){b+=f[0]-a;a=f[0];}if(b>f[1]){a-=b-f[1];b=f[1];}SC.x0=Math.max(a,f[0]);SC.x1=b;scUpdate();}
+function scZoom(fac,center){const r=scRange();if(!r)return;const c=isFinite(center)?center:(r.a+r.b)/2;scSetX(c-(c-r.a)*fac,c+(r.b-c)*fac);}
+function scPan(dir){const r=scRange();if(!r||!r.zoomed)return;const w=r.b-r.a;scSetX(r.a+dir*w*0.3,r.b+dir*w*0.3);}
+function scReset(){SC.x0=SC.x1=NaN;SC.ymode='full';scUpdate();}
+function scPreset(v){if(!v)return;if(v==='all'){SC.x0=SC.x1=NaN;return scUpdate();}const d=C.dd;const r=scFull();
+  if(v==='todd')return scSetX(r[0],Math.max(d,r[0]+SC_MIN_SPAN));if(v==='fromdd')return scSetX(Math.min(d,r[1]-SC_MIN_SPAN),r[1]);const n=+v;scSetX(d-n*DAY,d+n*DAY);}
+function scDate(which,val){const r=scRange();if(!r)return;if(!val)return;const m=parseLocal(val);if(!isFinite(m))return;
+  if(which==='a')scSetX(P.precision==='hour'?m:m,r.b);else scSetX(r.a,P.precision==='hour'?m:m+DAY-60000);}
+function scYMode(v){SC.ymode=v;scUpdate();}
+function scYVal(){const a=parseFloat($('#sc-ymin').value),b=parseFloat($('#sc-ymax').value);if(!isFinite(a)||!isFinite(b)||b<=a){toast('Isi Y min lebih kecil dari Y max');return;}SC.ymode='manual';SC.ymin=a;SC.ymax=b;scUpdate();}
+function scHeight(v){SC.h=+v||0;const w=$('#sc-wrap');if(w)w.style.height=SC.h?SC.h+'px':'';if(CH['ch-sc'])CH['ch-sc'].resize();}
+let _scRaf=0;function scUpdate(){if(_scRaf)return;_scRaf=requestAnimationFrame(()=>{_scRaf=0;scDraw();});}
+function scDraw(){
+  const r=scRange();if(!r)return;
+  const cd=drawSCurve('ch-sc',{gran:SC.gran||undefined,periodic:SC.periodic,range:r.zoomed?{a:r.a,b:r.b}:null,y:SC.ymode==='auto'?'auto':SC.ymode==='manual'?{min:SC.ymin,max:SC.ymax}:null,noAnim:true});
+  const ch=CH['ch-sc'];const dIn=m=>P.precision==='hour'?toLocal(m):dayKey(m);
+  const x0=$('#sc-x0'),x1=$('#sc-x1');if(x0&&document.activeElement!==x0)x0.value=dIn(r.a);if(x1&&document.activeElement!==x1)x1.value=dIn(r.b);
+  if(ch&&ch.scales.y){const ya=$('#sc-ymin'),yb=$('#sc-ymax');if(ya&&document.activeElement!==ya)ya.value=+ch.scales.y.min.toFixed(2);if(yb&&document.activeElement!==yb)yb.value=+ch.scales.y.max.toFixed(2);}
+  const ym=$('#sc-ymode');if(ym)ym.value=SC.ymode;
+  const info=$('#sc-info');if(info&&cd)info.textContent=`${fmtWhen(r.a)} → ${fmtWhen(r.b)} · ${r.zoomed?Math.max(1,Math.round((r.b-r.a)/(r.f[1]-r.f[0])*100))+'% dari rentang penuh':'rentang penuh'} · ${cd.pts.length} titik (${{cp:'checkpoint',day:'harian',week:'mingguan'}[cd.gran]})`;
+  const pb=$('#sc-pan-l'),pn=$('#sc-pan-r');if(pb){pb.disabled=!r.zoomed||r.a<=r.f[0];pn.disabled=!r.zoomed||r.b>=r.f[1];}
+  const tb=$('#sc-table');if(tb)tb.innerHTML=SC.table&&cd?`<div class="tbl-wrap" style="max-height:max(320px,55vh);margin-top:8px"><table class="t"><thead><tr><th>#</th><th>Waktu</th><th class="num">Baseline %</th><th class="num">Rencana %</th><th class="num">Aktual %</th><th class="num">Deviasi</th><th class="num">Forecast %</th></tr></thead><tbody>
+    ${cd.pts.map((m,k)=>{const dv=cd.act[k]!=null?cd.act[k]-cd.plan[k]:null;return `<tr><td class="mono">${k+1}</td><td>${fmtDT(m)}</td><td class="num mono">${cd.base[k]!=null?cd.base[k].toFixed(2):''}</td><td class="num mono">${cd.plan[k].toFixed(2)}</td><td class="num mono">${cd.act[k]!=null?cd.act[k].toFixed(2):''}</td><td class="num mono ${dv<0?'dev-neg':dv>0?'dev-pos':''}">${dv!=null?(dv>0?'+':'')+dv.toFixed(2):''}</td><td class="num mono">${cd.fc[k]!=null?cd.fc[k].toFixed(2):''}</td></tr>`;}).join('')}</tbody></table></div>`:'';
+}
+function scBind(){
+  const wrap=$('#sc-wrap'),cv=$('#ch-sc'),sel=$('#sc-sel');if(!wrap||!cv)return;
+  const area=()=>{const ch=CH['ch-sc'];return ch&&ch.chartArea;};
+  const toMs=px=>{const ch=CH['ch-sc'];if(!ch||!ch.$cd)return NaN;const p=ch.$cd.pts,n=p.length,xs=ch.scales.x;if(n<2)return p[0];
+    const f=clamp((px-xs.left)/(xs.right-xs.left),0,1)*(n-1),i=Math.min(n-2,Math.floor(f));return p[i]+(p[i+1]-p[i])*(f-i);};
+  wrap.addEventListener('wheel',e=>{if(!(e.ctrlKey||e.metaKey||e.shiftKey))return;e.preventDefault();const r=cv.getBoundingClientRect();
+    if(e.shiftKey&&!e.ctrlKey&&!e.metaKey){scPan(Math.sign(e.deltaY||e.deltaX)*0.5);return;}
+    scZoom(e.deltaY<0?0.8:1.25,toMs(e.clientX-r.left));},{passive:false});
+  let x0=null;
+  cv.addEventListener('mousedown',e=>{const a=area();if(!a||e.button!==0)return;const r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;
+    if(x<a.left||x>a.right||y<a.top||y>a.bottom)return;x0=x;sel.style.cssText=`display:block;left:${x}px;width:0;top:${a.top}px;height:${a.bottom-a.top}px`;e.preventDefault();});
+  if(window.__scMM){window.removeEventListener('mousemove',window.__scMM);window.removeEventListener('mouseup',window.__scMU);}
+  window.__scMM=e=>{if(x0==null)return;const a=area(),r=cv.getBoundingClientRect();const x=clamp(e.clientX-r.left,a.left,a.right);sel.style.left=Math.min(x0,x)+'px';sel.style.width=Math.abs(x-x0)+'px';};
+  window.__scMU=e=>{if(x0==null)return;const r=cv.getBoundingClientRect(),a=area();const x=clamp(e.clientX-r.left,a.left,a.right);sel.style.display='none';const lo=Math.min(x0,x),hi=Math.max(x0,x);x0=null;
+    if(hi-lo>=8)scSetX(toMs(lo),toMs(hi));};
+  window.addEventListener('mousemove',window.__scMM);window.addEventListener('mouseup',window.__scMU);
+  cv.addEventListener('dblclick',()=>scReset());
+}
 function renderSCurve(){
   const c=C,el=$('#p-scurve');
   if(!c.cnt.total){el.innerHTML='<div class="card empty"><b>Belum ada task</b></div>';return;}
+  const dIn=P.precision==='hour'?'datetime-local':'date';
   el.innerHTML=`<div class="card"><h3>S-Curve — Kumulatif Rencana vs Aktual
     <span class="right view-ok">
-      <select class="inp" style="width:auto" onchange="SC.gran=this.value;renderSCurve()"><option value="">Interval: otomatis</option><option value="cp"${SC.gran==='cp'?' selected':''}>Checkpoint (${P.calendar.cpHours} jam kerja)</option><option value="day"${SC.gran==='day'?' selected':''}>Harian</option><option value="week"${SC.gran==='week'?' selected':''}>Mingguan</option></select>
-      <label style="display:flex;gap:5px;align-items:center;font-size:12px;font-weight:600"><input type="checkbox" ${SC.periodic?'checked':''} onchange="SC.periodic=this.checked;renderSCurve()"> Batang periodik</label>
+      <select class="inp" style="width:auto" data-tip="Kerapatan titik kurva. Otomatis menyesuaikan rentang yang sedang ditampilkan (makin di-zoom makin rapat)." onchange="SC.gran=this.value;scUpdate()"><option value="">Interval: otomatis</option><option value="cp"${SC.gran==='cp'?' selected':''}>Checkpoint (${P.calendar.cpHours} jam kerja)</option><option value="day"${SC.gran==='day'?' selected':''}>Harian</option><option value="week"${SC.gran==='week'?' selected':''}>Mingguan</option></select>
+      <label style="display:flex;gap:5px;align-items:center;font-size:12px;font-weight:600" data-tip="Tampilkan batang progress per periode (sumbu kanan) di bawah kurva kumulatif."><input type="checkbox" ${SC.periodic?'checked':''} onchange="SC.periodic=this.checked;scUpdate()"> Batang periodik</label>
     </span></h3>
-    <div style="height:clamp(380px,calc(100vh - 380px),1400px)"><canvas id="ch-sc"></canvas></div>
+    <div class="sc-bar view-ok">
+      <div class="sc-grp"><span class="sc-lbl">Zoom</span>
+        <button class="btn btn-sm" onclick="scZoom(0.6)">🔍+</button><button class="btn btn-sm" onclick="scZoom(1.6)">🔍−</button>
+        <button class="btn btn-sm" id="sc-pan-l" onclick="scPan(-1)">◀</button><button class="btn btn-sm" id="sc-pan-r" onclick="scPan(1)">▶</button>
+        <select class="inp sc-in" style="width:auto" data-tip="Lompat cepat ke rentang waktu tertentu di sekitar Data Date." onchange="scPreset(this.value);this.value=''"><option value="">Rentang cepat…</option><option value="all">Semua</option><option value="3">±3 hari dari Data Date</option><option value="7">±7 hari dari Data Date</option><option value="14">±14 hari dari Data Date</option><option value="30">±30 hari dari Data Date</option><option value="todd">Awal → Data Date</option><option value="fromdd">Data Date → akhir</option></select>
+        <button class="btn btn-sm" onclick="scReset()">⟲ Reset</button></div>
+      <div class="sc-grp"><span class="sc-lbl">Skala X</span>
+        <input class="inp sc-in" type="${dIn}" id="sc-x0" data-tip="Tanggal awal yang ditampilkan di sumbu X." onchange="scDate('a',this.value)"><span>→</span><input class="inp sc-in" type="${dIn}" id="sc-x1" data-tip="Tanggal akhir yang ditampilkan di sumbu X." onchange="scDate('b',this.value)"></div>
+      <div class="sc-grp"><span class="sc-lbl">Skala Y</span>
+        <select class="inp sc-in" id="sc-ymode" style="width:auto" data-tip="0–100%: skala penuh. Otomatis: mengikuti nilai yang sedang terlihat (berguna saat zoom). Manual: isi min–max sendiri." onchange="scYMode(this.value)"><option value="full">0–100%</option><option value="auto">Otomatis</option><option value="manual">Manual</option></select>
+        <input class="inp sc-in sc-num" type="number" step="any" id="sc-ymin" data-tip="Batas bawah sumbu Y (%)." onchange="scYVal()"><span>–</span><input class="inp sc-in sc-num" type="number" step="any" id="sc-ymax" data-tip="Batas atas sumbu Y (%)." onchange="scYVal()"><span>%</span></div>
+      <div class="sc-grp"><span class="sc-lbl">Tinggi</span>
+        <select class="inp sc-in" style="width:auto" data-tip="Tinggi area grafik. Ukuran huruf tidak berubah." onchange="scHeight(this.value)">${[[0,'Otomatis'],[300,'300 px'],[450,'450 px'],[600,'600 px'],[800,'800 px'],[1000,'1000 px'],[1400,'1400 px']].map(([v,l])=>`<option value="${v}"${SC.h===v?' selected':''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <div class="sc-meta"><span id="sc-info"></span><span class="hint sc-hint">Ctrl + scroll / pinch = zoom · seret di grafik = pilih area · Shift + scroll = geser · klik dua kali = reset</span></div>
+    <div id="sc-wrap" style="position:relative;${SC.h?'height:'+SC.h+'px':''}"><canvas id="ch-sc"></canvas><div id="sc-sel"></div></div>
     <div class="fgrid" style="margin-top:12px">
       <div class="note">📘 <b>Rencana</b> = distribusi linier bobot tiap task selama jam kerja antara Mulai–Selesai (jadwal saat ini, termasuk pekerjaan tambahan). <b>Baseline</b> = rencana awal yang dibekukan. <b>Aktual</b> = Σ bobot × % kumulatif (carry-forward). <b>Forecast</b> = proyeksi Earned Schedule: sisa pekerjaan mengikuti bentuk rencana dengan laju SPI(t) = ${fn(c.SPIt)}.</div>
       <div class="note">PV ${fp(c.PV)} · EV ${fp(c.EV)} · SV ${c.SV>=0?'+':''}${fp(c.SV)} · SPI ${fn(c.SPI)}<br>ES ${isFinite(c.ES)?durLabel(c.ES):'—'} dari AT ${isFinite(c.AT)?durLabel(Math.max(0,c.AT)):'—'} → SPI(t) ${fn(c.SPIt)} · SV(t) ${isFinite(c.svtDays)?c.svtDays.toFixed(1)+' hari kerja':'—'}<br>Forecast selesai: <b>${fmtWhen(c.fcMs)}</b> vs rencana ${fmtWhen(c.projF)}</div>
     </div>
-    <button class="btn btn-sm" style="margin-top:10px" onclick="SC.table=!SC.table;renderSCurve()">${SC.table?'Sembunyikan':'Tampilkan'} tabel data</button>
+    <button class="btn btn-sm view-ok" style="margin-top:10px" onclick="SC.table=!SC.table;this.textContent=(SC.table?'Sembunyikan':'Tampilkan')+' tabel data';scUpdate()">${SC.table?'Sembunyikan':'Tampilkan'} tabel data</button>
     <div id="sc-table"></div></div>`;
-  const cd=drawSCurve('ch-sc',{gran:SC.gran||undefined,periodic:SC.periodic});
-  if(SC.table&&cd){$('#sc-table').innerHTML=`<div class="tbl-wrap" style="max-height:max(320px,55vh);margin-top:8px"><table class="t"><thead><tr><th>#</th><th>Waktu</th><th class="num">Baseline %</th><th class="num">Rencana %</th><th class="num">Aktual %</th><th class="num">Deviasi</th><th class="num">Forecast %</th></tr></thead><tbody>
-    ${cd.pts.map((m,k)=>{const dv=cd.act[k]!=null?cd.act[k]-cd.plan[k]:null;return `<tr><td class="mono">${k+1}</td><td>${fmtDT(m)}</td><td class="num mono">${cd.base[k]!=null?cd.base[k].toFixed(2):''}</td><td class="num mono">${cd.plan[k].toFixed(2)}</td><td class="num mono">${cd.act[k]!=null?cd.act[k].toFixed(2):''}</td><td class="num mono ${dv<0?'dev-neg':dv>0?'dev-pos':''}">${dv!=null?(dv>0?'+':'')+dv.toFixed(2):''}</td><td class="num mono">${cd.fc[k]!=null?cd.fc[k].toFixed(2):''}</td></tr>`;}).join('')}</tbody></table></div>`;}
+  scDraw();scBind();
 }
 
 // ---------------------------------------------------------------------
@@ -1877,6 +1950,11 @@ const TIP_RULES=[
   [/claimProject/,['Klaim proyek','Jadikan Anda pemilik proyek lama yang belum punya pemilik.']],
   [/trimChangeLog/,['Pangkas change log','Simpan hanya 100 entri change log terbaru untuk mengecilkan ukuran data.']],
   [/toggleCollapse/,['Lipat / buka grup','Sembunyikan atau tampilkan sub-task di dalam grup ini.']],
+  [/scZoom\(0\.6\)/,['Zoom in','Perbesar rentang waktu di tengah grafik. Ukuran huruf tetap; titik data makin rapat.']],
+  [/scZoom\(1\.6\)/,['Zoom out','Perkecil (tampilkan rentang waktu lebih panjang).']],
+  [/scPan\(-1\)/,['Geser kiri','Geser rentang yang ditampilkan ke waktu lebih awal.']],
+  [/scPan\(1\)/,['Geser kanan','Geser rentang yang ditampilkan ke waktu lebih akhir.']],
+  [/scReset/,['Reset tampilan','Kembali ke rentang penuh dan skala Y 0–100% (juga: klik dua kali di grafik).']],
   [/SC\.table/,['Tabel data','Tampilkan / sembunyikan angka kurva S per titik waktu.']],
   [/addTask\('added'\),50/,null],
   [/switchTab\('tasks'\);setTimeout/,['Pekerjaan tambahan','Buka tab Jadwal dan tambahkan pekerjaan tambahan.']],
@@ -1996,7 +2074,8 @@ function renderHelp(){
       <tr><td><b>Forecast selesai</b></td><td>Perkiraan tanggal selesai bila laju SPI(t) berlanjut</td><td>merah = lewat rencana</td></tr>
       <tr><td><b>Float</b></td><td>Berapa lama task boleh molor tanpa memundurkan proyek</td><td>0 = kritis</td></tr></table></div>
     <p>Status proyek: <b>ON TRACK</b> (SPI(t) ≥ 1), <b>PERLU PERHATIAN</b> (≥ ${P?P.thresholds.warn:0.95}), <b>TERLAMBAT</b> (≥ ${P?P.thresholds.crit:0.9}), <b>KRITIS / DELAY</b> (di bawahnya). Ambang bisa diubah di Pengaturan.</p>
-    <p><b>Kurva S</b>: garis biru = rencana, abu putus-putus = baseline, hijau = aktual, oranye putus-putus = forecast, garis merah vertikal = Data Date. Interval bisa checkpoint (per N jam kerja), harian, atau mingguan; centang <i>Batang periodik</i> untuk melihat progress per periode.</p></div>
+    <p><b>Kurva S</b>: garis biru = rencana, abu putus-putus = baseline, hijau = aktual, oranye putus-putus = forecast, garis merah vertikal = Data Date. Interval bisa checkpoint (per N jam kerja), harian, atau mingguan; centang <i>Batang periodik</i> untuk melihat progress per periode.</p>
+    <p><b>Zoom &amp; skala</b> (tab S-Curve): tombol 🔍+ / 🔍− / ◀ ▶, pilihan <i>Rentang cepat</i> (mis. ±7 hari dari Data Date), <b>Skala X</b> (tanggal dari–sampai), <b>Skala Y</b> (0–100%, Otomatis mengikuti data yang terlihat, atau Manual min–max), dan <b>Tinggi</b> grafik. Di desktop: Ctrl + scroll atau pinch trackpad untuk zoom, seret di grafik untuk memilih area, Shift + scroll untuk menggeser, klik dua kali untuk reset. Ukuran huruf tidak ikut berubah, dan titik data otomatis makin rapat saat di-zoom.</p></div>
 
   <div class="card" id="g-alat"><h2>8. Gantt, look-ahead, health check</h2>
     <ul><li><b>Gantt</b> — bar biru (rencana), hijau (aktual), merah (critical path), oranye (pekerjaan tambahan), abu tipis (baseline), garis putus (float), panah (relasi). Zoom otomatis atau pilih jam/hari/minggu/bulan.</li>
