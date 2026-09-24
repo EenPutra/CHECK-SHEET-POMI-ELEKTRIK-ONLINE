@@ -3460,6 +3460,83 @@ re-encoded copy without mutating the original entry; `mapLimit` preserves input 
 correctness under concurrency. See `approval-helper.js`'s entry below for the companion universal
 upload-concurrency fix (every check sheet's photo UPLOAD, not just this file's photo download).
 
+## `Project_Progress_Monitor.html` — project schedule / S-curve tracker
+
+Not a check sheet — a standalone project-control app (portal card `project-progress`, category
+`report`), built from the user's Excel workbook `FIle checksheet mentah/PM_System_Step_Estimasi_
+SCurve_Progress.xlsx` (Step Kerja / Pekerjaan Tambahan / Progress Update / S-Curve sheets) and
+extended with international scheduling practice. It does NOT use `DB.save()` / `checksheets` /
+approvals — its data model is a whole project, not a submission.
+
+- **Storage**: `localStorage['ppm_store_v1']` always (`{projects:{id:project}, activeId}`), plus
+  optional Firestore sync to collection **`project_schedules`** (one doc per project). Sync is
+  optimistic-concurrency: `cloudSave()` runs a transaction that refuses to write when the cloud
+  `rev` is newer than the local `_baseRev` (→ conflict modal: use cloud / overwrite / backup
+  first). `firestore.rules` requires `rev` to strictly increase on update. Keys starting with `_`
+  (`_baseRev`, `_dirty`) are local-only and stripped by `forCloud()`. **The rules block was added
+  to `firestore.rules` but must be deployed** (`firebase deploy --only firestore:rules`) before
+  cloud sync works; until then the pill shows "Cloud ditolak" and everything still works locally.
+- **Access model (explicit user decision).** Anyone with the link reads (no login needed):
+  `?project=<id>` deep-links, `cloudBootstrap()` adopts that doc from the cloud on a fresh
+  device, and with no param and no local project it shows a picker of every cloud project.
+  **Editing requires login** with the shared `dashboard_users` account (same `hashPass` +
+  `AuthSession` session as `Review_Approval_Dashboard.html` — one login works across both, and
+  register / forgot-password / Team & Area setup stay in that dashboard). `canEdit()`: admin →
+  all; creator (`owner.user`) → own project; any account with `team === project.team` and
+  `project.area ∈ its areas` (TechOp2 multi-area via `TeamRouting.toAreaList`). `canManage()`
+  (delete, change team/area) = creator or admin. Creating/importing a project requires login and
+  stamps `owner{user,name,role}` + `team` + `area` (`setOwner()`; non-admin/supervisor can only
+  pick their own team/areas). Every mutation path goes through `guard()` (`mutate()`,
+  `commit()`, `editTask()`, `addTask()`, `undo()`, the modals' save…); read-only mode adds
+  `body.ro` (hides `.ed` elements) and `lockPanel()` disables every input except inside
+  `.view-ok` (filters, zoom, S-curve interval). A viewer's Data Date change goes into `VIEW`
+  (never saved). Ownerless projects (made before this) can be claimed in Settings.
+  **This is app-level enforcement, same trust model as the rest of the repo** — Firestore rules
+  cannot see the logged-in user until Level 2 (Firebase Auth); they only require
+  owner/team/area on create, freeze `owner.user` + `createdAt`, and require `rev` to increase.
+- **Other cloud behaviour**: `refreshFromCloud()` pulls a newer rev on tab-focus and every 2 min
+  when nothing local is unsaved; `cloudSave()` refuses to write above 950 KB (Firestore's 1 MB
+  doc limit — warns from 700 KB, offers to trim the change log).
+- **Time axis = working hours.** `buildCal()` builds a per-day table (work days, `startTime`/
+  `endTime`, optional break, holidays) with cumulative work hours; `toW(ms)` / `fromW(w,mode)`
+  convert between wall-clock and work-hour offsets (`mode:'finish'` resolves an exact day
+  boundary to the previous day's end, `'start'` to the next morning). Planned progress of a task
+  is linear in work hours between its start and finish — nights/weekends/holidays earn nothing,
+  the same rule as the source workbook. (The workbook itself counted the 16:00→07:00 overnight
+  gap as a 3-hour interval; the app uses real work hours, so Rencana differs slightly at a few
+  checkpoints while Aktual matches the workbook exactly.)
+- **Weights**: only leaf tasks carry weight (WBS summaries roll up). `weightMode` manual /
+  duration / cost; effective weight = raw ÷ Σraw, so adding a "Pekerjaan Tambahan"
+  (`scope:'added'`) renormalizes everything to 100% — mirrors the workbook's "Bobot
+  Tersesuaikan". Progress entries are cumulative `{t, pct}` with carry-forward; rules of credit
+  per task (`pct`, `0/100`, `50/50`, `20/80`).
+- **CPM**: PDM relations FS/SS/FF/SF + lag (stored in work hours; typed as `4FS+2`, `3SS`,
+  `5FF-1d`). Tasks WITH predecessors are logic-driven (ASAP); only unlinked tasks honour their
+  typed start as start-no-earlier-than. `conflict` = typed start earlier than logic (fixed by
+  "⚙ Jadwalkan Ulang Otomatis"), `gap` = typed start later than logic (pulled in by
+  "⇤ Rapatkan ASAP"); both only move not-started tasks. Critical = TF within 0.01h of the
+  minimum TF (longest path); a deadline makes negative float possible.
+- **EVM / Earned Schedule**: PV/EV/SV/SPI at the data date (`dataDateMode` now | fixed), ES by
+  binary search on the planned curve, SPI(t), IEAC(t) forecast finish and a forecast curve
+  (remaining work follows the plan shape at SPI(t) speed). Baselines are frozen snapshots
+  (`{id,start,finish,eff}` per leaf) — the S-curve shows Baseline vs current Rencana vs Aktual.
+- **Other tabs**: Update Progress (bulk field update at one timestamp), Gantt (SVG, auto zoom,
+  dependency arrows, baseline ghost bars, float tails), Look-ahead by PIC, Baseline variance +
+  variation register, Issue log + change log, Schedule Health (DCMA 14-point adapted).
+- **Import**: the POMI workbook (detected by a `Step Kerja` sheet — reads cached values, uses
+  the workbook's own Selesai dates, maps Progress Update rows incl. the Tambahan block after the
+  "PEKERJAAN TAMBAHAN" divider, auto-creates a baseline from the base scope); the app's own
+  Excel export (sheet `Tasks` + `Progress Log` — round-trips losslessly incl. predecessors);
+  a generic header-sniffing import; JSON backup. **Export**: 7-sheet Excel, JSON backup, and a
+  portrait A4 PDF on the shared `WAR_BG_URI` letterhead (KPIs, S-curve rendered to JPEG on a
+  white background — a PNG chart embedded uncompressed made the PDF 4.7MB — task table, Gantt,
+  look-ahead, variation register, issues).
+- Verified via headless Chrome (Firestore blocked with `Network.setBlockedURLs`): importing the
+  user's workbook reproduces its Aktual curve exactly at every checkpoint; a 4-task synthetic
+  network gives the textbook critical path (A→C→D, B float 2 days); adding an 8% variation
+  scales EV 32.5→30.09; Excel export→import round-trips identically; 390px mobile has no page
+  overflow.
+
 ## Per-file conventions worth matching
 
 - Toggle OK/NG widgets: a page-level `const ST = {}` state object, a `mkTog(id)` helper that

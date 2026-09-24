@@ -131,6 +131,34 @@ service cloud.firestore {
       }
     }
 
+    // ---------------------------------------------------------
+    //  project_schedules — Project_Progress_Monitor.html, one doc per
+    //  project (tasks, baselines, progress log, issues, change log).
+    //  Access model (enforced IN THE APP, from the shared dashboard_users
+    //  login): anyone with the link reads; only the creator (`owner.user`),
+    //  accounts whose team+area match the project's `team`/`area`, and
+    //  admins edit; only creator/admin delete. Rules cannot see who is
+    //  logged in until Level 2 (Firebase Auth), so what they CAN enforce:
+    //   - a project must be created with an owner + team + area
+    //   - ownership and createdAt can never be rewritten by an update
+    //   - optimistic concurrency: `rev` must strictly increase, so a stale
+    //     client can never silently roll a newer version back
+    // ---------------------------------------------------------
+    function validProject(d) {
+      return isString(d.name) && d.rev is int && d.tasks is list
+        && d.owner is map && isString(d.owner.user) && d.owner.user.size() > 0
+        && isString(d.team) && isString(d.area);
+    }
+    match /project_schedules/{doc} {
+      allow read: if true;
+      allow create: if validProject(request.resource.data);
+      allow update: if validProject(request.resource.data)
+                    && request.resource.data.rev > resource.data.rev
+                    && request.resource.data.owner.user == resource.data.owner.user
+                    && request.resource.data.createdAt == resource.data.createdAt;
+      allow delete: if true;   // TODO(level-2): owner/admin only (app-gated today)
+    }
+
     // No catch-all: any collection not matched above is DENIED. Add a
     // new match block here (and to SECURITY.md's inventory) when a new
     // collection is introduced.
