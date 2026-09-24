@@ -1417,6 +1417,19 @@ the current design — **do not "simplify" these away**:
 
 ### Firestore setup this system needs (Console-side, not in this repo)
 
+- **Before ANY `firebase deploy --only firestore:rules`, diff the file against the ruleset that
+  is live right now** — never assume the repo file is what production runs. The first deploy of
+  this file (2026-09-24, to add `project_schedules`) replaced a Console-only ruleset that had
+  been live since 2026-09-01 and differed from the repo: it also allowed `motor_master`, which
+  the repo file lacked, so Motor Witness Test's motor list broke ("Gagal memuat daftar motor…")
+  and, as a side effect, the never-deployed Level 1 hardening went live for every collection.
+  Read the live source (read-only) via the Rules API with the Firebase CLI's token:
+  `firebase projects:list` (refreshes the token), then GET
+  `https://firebaserules.googleapis.com/v1/projects/pomi-checksheet-e7/rulesets?pageSize=5`
+  and `…/rulesets/<id>` (the newest ruleset is the live one) with
+  `Authorization: Bearer <tokens.access_token from ~/.config/configstore/firebase-tools.json>`.
+  Also grep the code for every collection name (`collection('x')` AND variable/constant forms
+  like `MM_COLL`, `CLOUD_COL`, `this.COLLECTION`) and make sure each has a `match` block.
 - **Security rules must explicitly allow each collection.** The rules are
   collection-allowlisted — a brand-new collection with no matching `match` block is
   **denied by default**, not allowed by default. As of the Level 1 hardening (2026-09) the

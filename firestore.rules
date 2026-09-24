@@ -132,6 +132,18 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------
+    //  motor_master — Motor_Witness_Test_Vendor.html's registered-motor
+    //  list (load / register / edit / delete a motor). Was allowed by the
+    //  Console-only ruleset that ran before this file was first deployed
+    //  (2026-09-24) but was never added here, so that deploy silently cut
+    //  it off ("Gagal memuat daftar motor"). Same permissive rule as the
+    //  old Console ruleset; tighten at Level 2 with the rest.
+    // ---------------------------------------------------------
+    match /motor_master/{doc} {
+      allow read, write: if true;
+    }
+
+    // ---------------------------------------------------------
     //  project_schedules — Project_Progress_Monitor.html, one doc per
     //  project (tasks, baselines, progress log, issues, change log).
     //  Access model (enforced IN THE APP, from the shared dashboard_users
