@@ -3494,6 +3494,17 @@ approvals — its data model is a whole project, not a submission.
   **This is app-level enforcement, same trust model as the rest of the repo** — Firestore rules
   cannot see the logged-in user until Level 2 (Firebase Auth); they only require
   owner/team/area on create, freeze `owner.user` + `createdAt`, and require `rev` to increase.
+- **Hover tooltips (desktop only) + "📖 Panduan" tab.** One delegated `mouseover` handler
+  (`initTips()`, gated on `matchMedia('(hover: hover) and (pointer: fine)')`, so touch devices
+  never see them) resolves each button's text at hover time via `tipFor(el)`: `data-tip` →
+  `TAB_TIPS` for tabs → special ids (project select, cloud pill, Data Date) → **`TIP_RULES`,
+  a regex list matched against the element's `onclick` source** (order matters — more specific
+  patterns first, e.g. `autoSchedule('asap')` before `autoSchedule()`, `cloudSave(true` before
+  `cloudSave`) → the element's own `title` (moved to `data-ntitle` so the native tooltip doesn't
+  double up). **When adding a button, add a `TIP_RULES` entry (or a `data-tip`)** — verified by
+  an audit that walks every tab + every modal and asserts `tipFor()` resolves for all 350
+  buttons. The guide (`renderHelp()`) renders even with no project open (`switchTab` renders
+  `help` without `P`) and shows the viewer's own access status.
 - **Other cloud behaviour**: `refreshFromCloud()` pulls a newer rev on tab-focus and every 2 min
   when nothing local is unsaved; `cloudSave()` refuses to write above 950 KB (Firestore's 1 MB
   doc limit — warns from 700 KB, offers to trim the change log).

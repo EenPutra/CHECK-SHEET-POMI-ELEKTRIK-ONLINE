@@ -170,6 +170,24 @@ details.std summary{cursor:pointer;font-weight:700;color:var(--navy)}
 @media(max-width:640px){.topbar{position:static}.tabs{top:0}.fgrid{grid-template-columns:1fr}.fgrid>.field{grid-column:auto!important}.modal-bg{padding:2vh 8px}.modal .mb{padding:12px}.topbar .ttl small{display:none}main{padding:12px 10px 60px}.topbar{padding:8px 10px}.pstrip{padding:8px 10px}.kpi .v{font-size:20px}}
 @media print{.topbar,.tabs,.toolbar{display:none}}
 .ro .ed{display:none!important}
+#tip{position:fixed;z-index:300;max-width:300px;background:#0f172a;color:#f8fafc;font-size:12px;line-height:1.45;padding:8px 11px;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.28);pointer-events:none;opacity:0;transform:translateY(3px);transition:opacity .12s,transform .12s;display:none}
+#tip.show{opacity:1;transform:none}
+#tip b{color:#93c5fd;font-weight:700;display:block;margin-bottom:2px}
+#tip::after{content:'';position:absolute;left:var(--ax,20px);width:9px;height:9px;background:#0f172a;transform:rotate(45deg)}
+#tip.below::after{top:-4px}#tip.above::after{bottom:-4px}
+.guide{display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;align-items:start}
+.guide nav{position:sticky;top:110px;background:#fff;border:1px solid var(--bdr);border-radius:12px;padding:10px;font-size:13px}
+.guide nav a{display:block;padding:5px 8px;border-radius:6px;color:var(--txt-2);text-decoration:none}
+.guide nav a:hover{background:var(--pri-soft);color:var(--pri)}
+.guide article h2{font-size:17px;color:var(--navy);margin:0 0 8px;scroll-margin-top:120px}
+.guide article h4{margin:14px 0 6px;color:var(--navy-2);font-size:13.5px}
+.guide article p,.guide article li{font-size:13.5px;line-height:1.6;color:#1e293b}
+.guide article ol,.guide article ul{padding-left:20px;margin:6px 0}
+.guide article code,.guide .kbd{font-family:'JetBrains Mono',monospace;font-size:12px;background:#f1f5f9;border:1px solid var(--bdr);border-radius:5px;padding:1px 5px}
+.guide .steps{counter-reset:st;list-style:none;padding:0}
+.guide .steps li{counter-increment:st;position:relative;padding:8px 10px 8px 42px;border:1px solid var(--bdr);border-radius:10px;margin-bottom:8px;background:#fff}
+.guide .steps li::before{content:counter(st);position:absolute;left:10px;top:8px;width:22px;height:22px;border-radius:50%;background:var(--pri);color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center}
+@media(max-width:900px){.guide{grid-template-columns:minmax(0,1fr)}.guide nav{position:static}}
 .auth-chip{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:3px 4px 3px 10px;font-size:12px;white-space:nowrap}
 .auth-chip b{font-weight:700}.auth-chip .scope{color:#bfdbfe}
 .auth-chip button{background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:999px;padding:3px 9px;cursor:pointer;font-size:11px}
@@ -213,6 +231,7 @@ details.std summary{cursor:pointer;font-weight:700;color:var(--navy)}
   <button class="tab" data-tab="log">Kendala &amp; Log</button>
   <button class="tab" data-tab="health">Schedule Health<span class="cnt" id="hc-cnt" style="display:none"></span></button>
   <button class="tab" data-tab="settings">Pengaturan</button>
+  <button class="tab" data-tab="help">📖 Panduan</button>
 </nav>
 
 <main>
@@ -226,10 +245,12 @@ details.std summary{cursor:pointer;font-weight:700;color:var(--navy)}
   <section class="panel" id="p-log"></section>
   <section class="panel" id="p-health"></section>
   <section class="panel" id="p-settings"></section>
+  <section class="panel" id="p-help"></section>
 </main>
 
 <div class="modal-bg" id="modal-bg" onclick="if(event.target===this)closeModal()"><div class="modal" id="modal"></div></div>
 <div class="toast" id="toast"></div>
+<div id="tip" role="tooltip"></div>
 
 <script>
 'use strict';
@@ -504,6 +525,7 @@ function dayWindows(){
   if(c.breakOn){const bs=mins(c.breakStart),be=mins(c.breakEnd);if(bs>s&&be<e&&be>bs)return [[s,bs],[be,e]];}
   return [[s,e]];
 }
+function hpd(){return dayWindows().reduce((a,[x,y])=>a+(y-x),0)/60;}
 function buildCal(minMs,maxMs){
   const c=P.calendar,hol=new Set(c.holidays||[]),W=dayWindows(),H=W.reduce((a,[x,y])=>a+(y-x),0)/60;
   const d0=new Date(minMs);let d=new Date(d0.getFullYear(),d0.getMonth(),d0.getDate());
@@ -739,18 +761,18 @@ function setDD(v){if(!canEdit()){VIEW.ddMode='fixed';VIEW.dd=v;renderAll();retur
 
 function renderAll(){
   renderAuth();document.body.classList.toggle('ro',!P||!canEdit());
-  if(!P){renderProjSelect();$('#pstrip').innerHTML='';$$('.panel').forEach(p=>p.innerHTML='');if(TAB!=='dash')switchTab('dash');
+  if(!P){renderProjSelect();$('#pstrip').innerHTML='';$$('.panel').forEach(p=>{if(p.id!=='p-help')p.innerHTML='';});if(TAB==='help'){renderHelp();}else if(TAB!=='dash')switchTab('dash');
     const cl=Object.entries(CLOUD.remote).sort((a,b)=>String(b[1].updatedAt||'').localeCompare(String(a[1].updatedAt||'')));
     $('#p-dash').innerHTML=`<div class="card empty"><b>${cl.length?'Pilih proyek':'Belum ada proyek'}</b>${sess()?'Buat proyek baru atau import dari Excel template.':'Login untuk membuat proyek. Proyek yang sudah ada bisa dilihat tanpa login.'}<br><br>
       <button class="btn btn-pri" onclick="openNewProject()">➕ Buat Proyek</button> <button class="btn" onclick="$('#file-import').click()">📥 Import Excel / JSON</button>${sess()?'':' <button class="btn" onclick="openLogin()">🔑 Login</button>'}
       ${cl.length?`<div class="plist">${cl.map(([id,r])=>`<div class="pcard" onclick="adoptCloud('${esc(id)}')"><b>${esc(r.name||id)}</b><div class="hint">${esc([r.team,r.area].filter(Boolean).join(' · ')||'—')}${r.location?' · '+esc(r.location):''}</div><div class="hint">Pemilik ${esc(r.owner?r.owner.name||r.owner.user:'—')} · ${r.nTasks} task · diperbarui ${r.updatedAt?fmtDT(Date.parse(r.updatedAt)):'—'}</div></div>`).join('')}</div>`:(CLOUD.state==='busy'||CLOUD.state==='off'&&cloudReady()?'<p class="hint">Memuat daftar proyek dari cloud…</p>':'')}</div>`;return;}
   compute();renderProjSelect();renderStrip();renderCloudPill();renderTab();updateHealthBadge();
 }
-function switchTab(t){TAB=t;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));$$('.panel').forEach(p=>p.classList.toggle('active',p.id==='p-'+t));try{localStorage.setItem('ppm_tab',t);}catch(e){}if(P)renderTab();}
+function switchTab(t){TAB=t;$$('.tab').forEach(b=>b.classList.toggle('active',b.dataset.tab===t));$$('.panel').forEach(p=>p.classList.toggle('active',p.id==='p-'+t));try{localStorage.setItem('ppm_tab',t);}catch(e){}if((P&&C)||t==='help')renderTab();}
 function renderTab(){
-  const f={dash:renderDash,tasks:renderTasks,progress:renderProgress,scurve:renderSCurve,gantt:renderGantt,look:renderLook,base:renderBase,log:renderLog,health:renderHealth,settings:renderSettings}[TAB];
+  const f={dash:renderDash,tasks:renderTasks,progress:renderProgress,scurve:renderSCurve,gantt:renderGantt,look:renderLook,base:renderBase,log:renderLog,health:renderHealth,settings:renderSettings,help:renderHelp}[TAB];
   if(f)f();
-  if(P&&!canEdit())lockPanel($('#p-'+TAB));
+  if(P&&!canEdit()&&TAB!=='help')lockPanel($('#p-'+TAB));
 }
 // Read-only: disable data inputs (view controls keep working — they're marked .view-ok).
 function lockPanel(root){if(!root)return;$$('input,select,textarea',root).forEach(e=>{if(!e.closest('.view-ok'))e.disabled=true;});}
@@ -1395,7 +1417,7 @@ function renderSettings(){
   <div class="card"><h3>Data &amp; Sinkronisasi</h3>
     <div class="fgrid"><div class="field"><label><input type="checkbox" ${P.cloudSync!==false?'checked':''} onchange="setP('cloudSync',this.checked)"> Sinkron otomatis ke cloud</label><div class="hint">Status: ${esc(CLOUD.state)} ${esc(CLOUD.msg||'')}</div></div></div>
     <div class="toolbar" style="margin-top:10px"><button class="ed btn" onclick="cloudSave(false,true)">☁ Simpan ke cloud</button><button class="btn view-ok" onclick="adoptCloud()">⬇ Muat ulang dari cloud</button><button class="btn" onclick="backupJSON()">💾 Backup JSON</button><button class="btn" onclick="dupProject()">⧉ Duplikat proyek</button>${canManage()?'<button class="btn btn-ng" onclick="deleteProject()">🗑 Hapus proyek</button>':''}</div>
-    <details class="std" style="margin-top:12px"><summary>📚 Standar yang diterapkan</summary><ul style="font-size:12.5px;line-height:1.6">
+    <p class="hint" style="margin-top:12px">Panduan lengkap: tab <a href="#" onclick="switchTab('help');return false">📖 Panduan</a>.</p><details class="std" style="margin-top:8px"><summary>📚 Standar yang diterapkan</summary><ul style="font-size:12.5px;line-height:1.6">
       <li><b>PMI PMBOK® Guide &amp; Practice Standard for Scheduling</b> — WBS berjenjang, milestone, Precedence Diagramming Method (FS/SS/FF/SF + lag), Critical Path Method (ES/EF/LS/LF, total float), schedule baseline, data date, look-ahead.</li>
       <li><b>ANSI/EIA-748 &amp; PMI Practice Standard for EVM</b> — PV, EV, SV, SPI; bobot manual / durasi / biaya (cost-loaded).</li>
       <li><b>Earned Schedule (Lipke, diakui PMI)</b> — ES, SPI(t), SV(t), forecast tanggal selesai IEAC(t) &amp; kurva forecast.</li>
@@ -1676,6 +1698,229 @@ function pdfGantt(pdf,o){
     if(i===rows[rows.length-1]||o.getY()+RH>BOT){const xd=X(c.dd);pdf.setDrawColor(220,38,38);pdf.setLineDashPattern([1,1],0);pdf.line(xd,pageTop-1,xd,o.getY());pdf.setLineDashPattern([],0);}
   });
   pdf.setFontSize(6.2);pdf.setTextColor(100,116,139);o.setY(o.getY()+1);o.checkY(5);pdf.text('Biru = rencana, hijau = aktual, merah = critical path, oranye = pekerjaan tambahan, abu tipis = baseline, garis merah putus = data date.',M,o.getY()+2.5);o.setY(o.getY()+6);
+}
+
+// ---------------------------------------------------------------------
+//  Desktop hover tooltips — one delegated handler, text resolved from the
+//  button's click action, so dynamically rendered buttons are covered too.
+// ---------------------------------------------------------------------
+const TAB_TIPS={dash:'Ringkasan kesehatan proyek: progress aktual vs rencana, SPI, forecast tanggal selesai, task tertinggal, progress per PIC.',
+  tasks:'Susun jadwal (WBS): task, PIC, tanggal mulai–selesai, durasi, predecessor, bobot, dan % aktual. Edit langsung di tabel.',
+  progress:'Catat progress lapangan banyak task sekaligus pada satu waktu update (mis. tiap akhir shift/checkpoint).',
+  scurve:'Kurva S kumulatif: Baseline vs Rencana vs Aktual vs Forecast, dengan garis Data Date. Bisa tampilkan tabel data.',
+  gantt:'Bagan Gantt: bar rencana, progress aktual, critical path (merah), baseline, float, dan relasi antar-task.',
+  look:'Pekerjaan yang harus dikerjakan / disiapkan N hari ke depan per PIC, kinerja per PIC, dan daftar milestone.',
+  base:'Kelola baseline (rencana awal yang dibekukan), lihat varian jadwal & bobot, dan register pekerjaan tambahan.',
+  log:'Catat kendala lapangan (cuaca, permit, material…) dan lihat jejak semua perubahan (change log).',
+  health:'Pemeriksaan kualitas jadwal ala DCMA 14-Point: logika, lag, float, durasi, task tanpa PIC, dll.',
+  settings:'Info proyek, kepemilikan & akses, kalender kerja, metode bobot, ambang status, dan sinkronisasi cloud.',
+  help:'Panduan lengkap cara memakai aplikasi ini.'};
+const TIP_RULES=[
+  [/addTask\('task'\)/,['Tambah task','Menyisipkan task baru di bawah baris terpilih (atau di akhir). Tanggal mulai otomatis = selesai task sebelumnya.']],
+  [/addTask\('sub'\)/,['Tambah sub-task','Menyisipkan task satu tingkat di bawah baris terpilih — baris terpilih otomatis menjadi grup (WBS).']],
+  [/addTask\('milestone'\)/,['Tambah milestone','Titik kejadian berdurasi 0 (mis. "Permit terbit", "Commissioning selesai"). Progress 0/100.']],
+  [/addTask\('added'\)/,['Pekerjaan tambahan','Scope baru di luar rencana awal (variation / temuan lapangan). Isi justifikasinya; semua bobot otomatis dinormalisasi ulang.']],
+  [/indent\(-1\)/,['Outdent','Naikkan baris terpilih satu tingkat WBS (keluar dari grup).']],
+  [/indent\(1\)/,['Indent','Jadikan baris terpilih sub-task dari baris di atasnya.']],
+  [/moveSel\(-1\)/,['Naik','Pindahkan baris terpilih (beserta sub-task-nya) ke atas.']],
+  [/moveSel\(1\)/,['Turun','Pindahkan baris terpilih (beserta sub-task-nya) ke bawah.']],
+  [/dupSel/,['Duplikat','Salin baris terpilih beserta sub-task-nya (tanpa riwayat progress).']],
+  [/delSel/,['Hapus task','Hapus baris terpilih beserta sub-task-nya. Bobot lain dinormalisasi ulang. Bisa di-undo (Ctrl+Z).']],
+  [/autoSchedule\('asap'\)/,['Rapatkan ASAP','Tarik task yang belum mulai ke tanggal paling awal yang diizinkan predecessor-nya (mis. pekerjaan sebelumnya selesai lebih cepat).']],
+  [/autoSchedule\(\)/,['Jadwalkan ulang otomatis','Geser task yang belum mulai agar tidak mendahului predecessor-nya. Semua turunan ikut bergeser; durasi tetap.']],
+  [/normalizeWeights/,['Normalisasi bobot','Skalakan bobot input semua task agar totalnya tepat 100 (proporsi tidak berubah).']],
+  [/COLLAPSED\.clear/,['Buka semua','Tampilkan semua sub-task yang sedang dilipat.']],
+  [/openNewProject/,['Proyek baru','Buat proyek baru (wajib login). Anda menjadi pemilik; tim/area yang dipilih ikut bisa mengedit.']],
+  [/file-import/,['Import','Muat proyek dari Excel template "PM System S-Curve", file Excel hasil export aplikasi ini, Excel lain berkolom task/tanggal/bobot, atau backup JSON.']],
+  [/exportExcel/,['Export Excel','Unduh laporan Excel 7 sheet: ringkasan, task, S-curve, progress log, kendala, change log, health check. Bisa di-import ulang.']],
+  [/generatePDF/,['Download PDF','Laporan progress A4 berkop POMI: KPI, S-curve, daftar task, Gantt, look-ahead, pekerjaan tambahan, kendala.']],
+  [/backupJSON/,['Backup JSON','Unduh salinan lengkap proyek (semua data & riwayat) sebagai file JSON — bisa dipulihkan lewat Import.']],
+  [/undo\(\)/,['Undo','Batalkan perubahan terakhir (juga Ctrl+Z). Menyimpan hingga 40 langkah selama halaman terbuka.']],
+  [/shareLink/,['Bagikan','Salin link langsung ke proyek ini. Siapa pun dengan link bisa melihat; mengedit tetap butuh login pemilik/tim.']],
+  [/cloudSave\(true/,['Timpa cloud','Tulis versi di perangkat ini ke cloud, menggantikan versi yang diubah orang lain. Backup dulu bila ragu.']],
+  [/cloudSave/,['Simpan ke cloud','Simpan proyek ke database online sekarang (normalnya otomatis beberapa detik setelah perubahan).']],
+  [/adoptCloud\('/,['Buka proyek','Buka proyek ini dari cloud (mode baca, atau edit bila Anda pemilik/tim).']],
+  [/adoptCloud\(\)/,['Muat dari cloud','Ambil versi terbaru dari database online dan ganti salinan di perangkat ini.']],
+  [/openLogin/,['Login','Masuk dengan akun Review & Approval Dashboard untuk membuat atau mengedit proyek.']],
+  [/doLogout/,['Logout','Keluar dari akun (juga berlaku untuk dashboard lain di browser ini). Proyek tetap bisa dilihat.']],
+  [/doLogin/,['Masuk','Verifikasi username & password ke database akun.']],
+  [/openIssue\('/,['Detail kendala','Lihat / ubah / tutup kendala ini.']],
+  [/openIssue\(\)/,['Catat kendala','Catat hambatan lapangan (cuaca, permit, material, dll) beserta dampak jam kerja dan tindakannya.']],
+  [/openTaskEditor/,['Detail task','Buka detail: tipe, metode progress, biaya, kategori scope & justifikasi, catatan, dan riwayat progress.']],
+  [/setBaseline/,['Tetapkan baseline','Bekukan jadwal & bobot saat ini sebagai acuan. Re-baseline wajib diberi alasan (jejak audit).']],
+  [/delBaseline/,['Hapus baseline','Hapus snapshot baseline ini.']],
+  [/saveProgressSession/,['Simpan update','Simpan semua % yang diisi pada waktu update yang dipilih. Kolom kosong = tidak berubah.']],
+  [/snapCheckpoint/,['Checkpoint terdekat','Bulatkan waktu update ke checkpoint jam kerja terdekat (sesuai interval di Pengaturan).']],
+  [/qset\(this,(\d+)\)/,null],
+  [/saveTaskEditor/,['Simpan','Simpan detail task dan riwayat progress.']],
+  [/addProgRow/,['Entri progress','Tambah baris riwayat progress (waktu + % kumulatif), mis. untuk mengisi data yang terlewat.']],
+  [/closest\('tr'\)\.remove/,['Hapus entri','Hapus baris ini (baru tersimpan setelah klik Simpan).']],
+  [/saveIssue/,['Simpan kendala','Simpan data kendala.']],
+  [/delIssue/,['Hapus kendala','Hapus kendala ini.']],
+  [/createProject/,['Buat','Buat proyek dengan data di atas.']],
+  [/dupProject/,['Duplikat proyek','Salin seluruh proyek menjadi proyek baru milik Anda (mis. template untuk pekerjaan serupa).']],
+  [/deleteProject/,['Hapus proyek','Hapus proyek ini permanen (hanya pemilik/Admin). Backup JSON dulu.']],
+  [/saveScope/,['Simpan Team/Area','Ubah tim & area yang boleh mengedit proyek ini.']],
+  [/claimProject/,['Klaim proyek','Jadikan Anda pemilik proyek lama yang belum punya pemilik.']],
+  [/trimChangeLog/,['Pangkas change log','Simpan hanya 100 entri change log terbaru untuk mengecilkan ukuran data.']],
+  [/toggleCollapse/,['Lipat / buka grup','Sembunyikan atau tampilkan sub-task di dalam grup ini.']],
+  [/SC\.table/,['Tabel data','Tampilkan / sembunyikan angka kurva S per titik waktu.']],
+  [/addTask\('added'\),50/,null],
+  [/switchTab\('tasks'\);setTimeout/,['Pekerjaan tambahan','Buka tab Jadwal dan tambahkan pekerjaan tambahan.']],
+  [/switchTab\('settings'\)/,['Klaim proyek','Buka Pengaturan untuk mengklaim kepemilikan proyek ini.']],
+  [/switchTab\('tasks'\)/,['Ke Jadwal','Buka tab Jadwal & Task.']],
+  [/closeModal/,['Tutup','Tutup jendela ini tanpa menyimpan perubahan.']],
+];
+function tipFor(el){
+  if(el.dataset.tip)return ['',el.dataset.tip];
+  if(el.classList.contains('tab'))return [el.textContent.trim(),TAB_TIPS[el.dataset.tab]||''];
+  if(el.id==='proj-sel')return ['Pilih proyek','Ganti proyek yang dibuka. Tanda ☁ = ada di cloud tapi belum pernah dibuka di perangkat ini.'];
+  if(el.id==='cloud-pill')return ['Status cloud',(CLOUD.msg?CLOUD.msg+'. ':'')+'Klik untuk menyimpan ke database online sekarang.'];
+  if(el.closest('.dd-chip'))return ['Data Date','Titik waktu acuan perhitungan. "Sekarang" = waktu saat ini; "Tetap" = pilih tanggal (mis. untuk laporan per cut-off). Pengunjung baca-saja bisa mengubahnya tanpa tersimpan.'];
+  const oc=el.getAttribute('onclick')||'';
+  const q=oc.match(/qset\(this,(\d+)\)/);if(q)return ['Isi cepat','Isi '+q[1]+'% pada kolom progress baris ini.'];
+  for(const [re,t] of TIP_RULES){if(t&&re.test(oc))return t;}
+  const nt=el.dataset.ntitle||el.getAttribute('title');return nt?['',nt]:null;
+}
+(function initTips(){
+  let mq;try{mq=window.matchMedia('(hover: hover) and (pointer: fine)');}catch(e){return;}
+  const tip=document.getElementById('tip');let timer=null,cur=null;
+  const SEL='button, .tab, #proj-sel, #cloud-pill, .dd-chip select, [data-tip]';
+  const hide=()=>{clearTimeout(timer);cur=null;tip.classList.remove('show');tip.style.display='none';};
+  const show=el=>{const t=tipFor(el);if(!t||!t[1])return;
+    tip.innerHTML=(t[0]?`<b>${esc(t[0])}</b>`:'')+esc(t[1]);tip.style.display='block';tip.className='';
+    const r=el.getBoundingClientRect(),w=tip.offsetWidth,h=tip.offsetHeight,vw=window.innerWidth,vh=window.innerHeight;
+    let left=clamp(r.left+r.width/2-w/2,8,vw-w-8),top=r.bottom+9,below=true;if(top+h>vh-8){top=r.top-h-9;below=false;}
+    tip.style.left=left+'px';tip.style.top=top+'px';tip.style.setProperty('--ax',clamp(r.left+r.width/2-left-4,10,w-18)+'px');
+    tip.classList.add(below?'below':'above');requestAnimationFrame(()=>tip.classList.add('show'));};
+  document.addEventListener('mouseover',e=>{if(!mq.matches)return;const el=e.target.closest(SEL);if(el===cur)return;hide();if(!el)return;
+    if(el.hasAttribute('title')){el.dataset.ntitle=el.getAttribute('title');el.removeAttribute('title');}
+    cur=el;timer=setTimeout(()=>{if(cur===el)show(el);},380);});
+  document.addEventListener('mouseout',e=>{if(cur&&!cur.contains(e.relatedTarget))hide();});
+  ['mousedown','scroll','keydown'].forEach(ev=>window.addEventListener(ev,hide,true));
+})();
+
+// ---------------------------------------------------------------------
+//  Panduan (user guide)
+// ---------------------------------------------------------------------
+function renderHelp(){
+  const s=sess();
+  const sec=[['mulai','Mulai cepat'],['akses','Login & hak akses'],['proyek','Membuat / import proyek'],['jadwal','Menyusun jadwal'],['bobot','Bobot & pekerjaan tambahan'],
+    ['progress','Update progress lapangan'],['baca','Membaca dashboard & S-curve'],['alat','Gantt, look-ahead, health check'],['baseline','Baseline & change control'],
+    ['simpan','Penyimpanan, berbagi & sinkron'],['laporan','Laporan PDF & Excel'],['faq','Masalah umum (FAQ)'],['standar','Standar yang dipakai']];
+  $('#p-help').innerHTML=`<div class="guide"><nav>${sec.map(([id,t],i)=>`<a href="#g-${id}" onclick="document.getElementById('g-${id}').scrollIntoView({behavior:'smooth'});return false">${i+1}. ${t}</a>`).join('')}</nav>
+  <article>
+  <div class="card" id="g-mulai"><h2>1. Mulai cepat</h2>
+    <p>Aplikasi ini memantau progress proyek: daftar pekerjaan (task), penanggung jawab (PIC), target mulai–selesai, bobot tiap task, dan % penyelesaian — lalu menghitung <b>progress keseluruhan</b>, <b>kurva S rencana vs aktual</b>, keterlambatan, dan perkiraan tanggal selesai.</p>
+    <ol class="steps">
+      <li><b>Login</b> (tombol 🔑 kanan atas) dengan akun Review &amp; Approval Dashboard.</li>
+      <li><b>➕ Proyek</b> untuk membuat proyek baru, atau <b>📥 Import</b> Excel template "PM System S-Curve" yang sudah ada.</li>
+      <li>Di tab <b>Jadwal &amp; Task</b>: isi task, PIC, tanggal mulai–selesai, dan bobot. Hubungkan urutan kerja lewat kolom <b>Predecessor</b>.</li>
+      <li>Setelah jadwal disetujui: tab <b>Baseline &amp; Scope</b> → <b>📌 Tetapkan Baseline</b>.</li>
+      <li>Selama pekerjaan: tab <b>Update Progress</b> → isi % kumulatif tiap task → <b>💾 Simpan Update</b>.</li>
+      <li>Pantau di <b>Dashboard</b> / <b>S-Curve</b>; bagikan dengan <b>🔗 Bagikan</b>; cetak dengan <b>⬇️ PDF</b>.</li>
+    </ol>
+    <p class="hint">Di desktop, arahkan kursor ke tombol mana pun untuk melihat keterangan fungsinya.</p></div>
+
+  <div class="card" id="g-akses"><h2>2. Login &amp; hak akses</h2>
+    <p>Login memakai akun yang sama dengan <a href="Review_Approval_Dashboard.html" target="_blank" rel="noopener">Review &amp; Approval Dashboard</a>. Daftar akun baru, lupa password, dan pengaturan Team/Area dilakukan di sana. Sesi login berlaku di semua halaman aplikasi di browser yang sama dan berakhir setelah 1 jam tidak aktif.</p>
+    <div class="tbl-wrap"><table class="t"><tr><th>Siapa</th><th>Melihat</th><th>Mengedit</th><th>Hapus proyek / ubah Team-Area</th></tr>
+      <tr><td>Siapa pun yang punya link (tanpa login)</td><td>✅</td><td>—</td><td>—</td></tr>
+      <tr><td>Pembuat proyek</td><td>✅</td><td>✅</td><td>✅</td></tr>
+      <tr><td>Akun dengan Team <b>dan</b> Area sama dengan proyek (mis. E7 · Powerblock)</td><td>✅</td><td>✅</td><td>—</td></tr>
+      <tr><td>Akun tim/area lain, Supervisor bukan pembuat</td><td>✅</td><td>—</td><td>—</td></tr>
+      <tr><td>Admin</td><td>✅</td><td>✅</td><td>✅</td></tr></table></div>
+    <p>Status Anda sekarang: ${s?`<b>${esc(s.name)}</b> (${esc(ROLE_LBL[s.role]||s.role)}${s.team?' · '+esc(s.team+' '+s.areas.join('/')):''})${P?' — '+(canEdit()?'<b>bisa mengedit</b> proyek yang terbuka':'<b>baca saja</b> untuk proyek yang terbuka'):''}`:'belum login (baca saja)'}.</p>
+    <p>Jika tidak bisa mengedit, banner oranye di bawah nama proyek menjelaskan alasannya. Akun TechOp2 dengan beberapa area bisa mengedit proyek di semua area tersebut.</p></div>
+
+  <div class="card" id="g-proyek"><h2>3. Membuat / import proyek</h2>
+    <h4>Proyek baru</h4><p>Isi nama, tanggal mulai, <b>presisi</b> (Harian untuk proyek berhari-hari/berminggu; Per jam untuk pekerjaan singkat seperti shutdown), lokasi, serta Team &amp; Area yang boleh ikut mengedit.</p>
+    <h4>Import</h4><ul>
+      <li><b>Excel template "PM System Step Estimasi S-Curve Progress"</b> — sheet <code>Step Kerja</code>, <code>Pekerjaan Tambahan</code>, dan <code>Progress Update</code> dibaca apa adanya; baseline dibuat otomatis dari rencana awal.</li>
+      <li><b>Excel hasil export aplikasi ini</b> — kembali utuh, termasuk predecessor dan riwayat progress.</li>
+      <li><b>Excel lain</b> — baris header dicari otomatis dari kata kunci: <i>task/step/pekerjaan</i>, <i>PIC</i>, <i>mulai/start</i>, <i>selesai/finish</i>, <i>bobot/weight</i>, <i>durasi</i>, <i>progress/%</i>.</li>
+      <li><b>Backup JSON</b> — memulihkan proyek lengkap.</li></ul>
+    <p>Import selalu membuat proyek baru atas nama Anda (tidak menimpa proyek orang lain).</p></div>
+
+  <div class="card" id="g-jadwal"><h2>4. Menyusun jadwal (tab Jadwal &amp; Task)</h2>
+    <p>Klik sebuah baris untuk memilihnya, lalu gunakan toolbar: ➕ Task, ↳ Sub-task, ◆ Milestone, ➕ Pekerjaan Tambahan, ⇤/⇥ (outdent/indent), ▲▼ (pindah), ⧉ (duplikat), 🗑 (hapus). Semua isian bisa diketik langsung; tombol panah keyboard dan Enter berpindah antar sel.</p>
+    <ul>
+      <li><b>Mulai</b> — mengubahnya menggeser task dengan durasi tetap.</li>
+      <li><b>Selesai / Durasi</b> — mengubah panjang task. Durasi dihitung dalam <b>hari kerja</b> atau <b>jam kerja</b> (malam, akhir pekan, dan hari libur tidak dihitung — atur di Pengaturan → Kalender Kerja).</li>
+      <li><b>Grup (WBS)</b> — task yang punya sub-task menjadi grup: tanggal, bobot, dan progress-nya dihitung otomatis dari sub-task. Nomor WBS (1, 1.1, 1.2…) otomatis.</li>
+      <li><b>Milestone</b> — durasi 0, untuk titik penting (permit terbit, energize, serah terima).</li></ul>
+    <h4>Predecessor (urutan kerja)</h4>
+    <p>Tulis nomor baris task pendahulu, dipisah koma. Tipe relasi dan lag opsional:</p>
+    <div class="tbl-wrap"><table class="t"><tr><th>Tulis</th><th>Arti</th></tr>
+      <tr><td><code>3</code></td><td>Mulai setelah task 3 selesai (Finish-to-Start)</td></tr>
+      <tr><td><code>3SS</code></td><td>Mulai bersamaan dengan task 3 mulai (Start-to-Start)</td></tr>
+      <tr><td><code>3FF</code></td><td>Selesai bersamaan dengan task 3 selesai (Finish-to-Finish)</td></tr>
+      <tr><td><code>4FS+2</code></td><td>Mulai 2 ${P&&P.precision==='hour'?'jam':'hari'} kerja setelah task 4 selesai (mis. curing)</td></tr>
+      <tr><td><code>5FF-1d</code></td><td>Selesai 1 hari sebelum task 5 selesai (akhiran <code>d</code> = hari, <code>j</code> = jam)</td></tr></table></div>
+    <p>Dengan predecessor, aplikasi menghitung <b>critical path</b> (tanda <span class="chip crit">CP</span>, bar merah) dan <b>float</b> (kelonggaran waktu). Bila sebuah task molor, <b>⚙ Jadwalkan Ulang Otomatis</b> menggeser semua turunannya; bila selesai lebih cepat, <b>⇤ Rapatkan ASAP</b> menarik turunannya maju. Keduanya hanya menggeser task yang belum mulai.</p></div>
+
+  <div class="card" id="g-bobot"><h2>5. Bobot &amp; pekerjaan tambahan</h2>
+    <p><b>Bobot</b> menentukan seberapa besar sumbangan tiap task ke progress keseluruhan. Isi angka bebas di kolom <b>Bobot input</b> (mis. persen); kolom <b>Bobot efektif</b> selalu dinormalisasi sehingga totalnya 100%. Tombol <b>Σ Normalisasi</b> merapikan input menjadi total 100. Mode lain (Pengaturan): bobot otomatis dari <b>durasi</b> atau dari <b>biaya</b>.</p>
+    <p><b>Pekerjaan tambahan</b> (temuan lapangan / variation order): gunakan <b>➕ Pekerjaan Tambahan</b> atau ubah kategori scope di detail task (⋯), isi tanggal ditemukan dan justifikasinya. Bobotnya menambah total scope, lalu <b>semua bobot dinormalisasi ulang</b> — sama seperti kolom "Bobot Tersesuaikan" di Excel. Karena itu progress keseluruhan bisa turun saat scope bertambah (contoh: aktual 32,5% + tambahan 8% → 32,5 ÷ 1,08 = 30,1%). Pertumbuhan scope terlihat di Dashboard dan tab Baseline &amp; Scope.</p></div>
+
+  <div class="card" id="g-progress"><h2>6. Update progress lapangan</h2>
+    <ul><li><b>Tab Update Progress</b> (disarankan): pilih <b>waktu update</b>, isi % kumulatif baru (tombol cepat 25/50/75/100), catatan opsional, lalu <b>💾 Simpan Update</b>. Kolom kosong = tidak berubah. Filter "Perlu update" menampilkan task yang sedang/akan berjalan.</li>
+      <li><b>Kolom Aktual %</b> di tab Jadwal — dicatat pada Data Date saat ini.</li>
+      <li><b>Detail task (⋯)</b> — lihat/perbaiki riwayat progress, termasuk mengisi data yang terlewat dengan tanggal mundur.</li></ul>
+    <p>Progress selalu <b>kumulatif</b> (0–100%) dan dibawa ke waktu berikutnya sampai ada update baru. Nilai lebih kecil dari sebelumnya (rework) boleh, ditandai oranye.</p>
+    <h4>Metode pengukuran (detail task)</h4><ul><li><b>% Complete</b> — sesuai isian fisik.</li><li><b>0/100</b> — baru dihitung saat selesai (cocok untuk pekerjaan singkat/inspeksi).</li><li><b>50/50</b>, <b>20/80</b> — dapat 50% / 20% saat mulai, 100% saat selesai.</li></ul>
+    <h4>Data Date</h4><p>Titik waktu acuan semua perhitungan. <b>Sekarang</b> = waktu saat ini (untuk pemantauan harian). <b>Tetap</b> = tanggal tertentu (untuk laporan cut-off, mis. laporan mingguan per Jumat 16:00).</p></div>
+
+  <div class="card" id="g-baca"><h2>7. Membaca dashboard &amp; S-curve</h2>
+    <div class="tbl-wrap"><table class="t"><tr><th>Istilah</th><th>Arti</th><th>Cara membaca</th></tr>
+      <tr><td><b>Rencana (PV)</b></td><td>% yang seharusnya selesai pada Data Date menurut jadwal saat ini</td><td>—</td></tr>
+      <tr><td><b>Aktual (EV)</b></td><td>% yang benar-benar selesai (Σ bobot × % task)</td><td>—</td></tr>
+      <tr><td><b>Deviasi (SV)</b></td><td>Aktual − Rencana</td><td>negatif = tertinggal</td></tr>
+      <tr><td><b>SPI</b></td><td>Aktual ÷ Rencana</td><td>1,00 = sesuai; 0,90 = hanya 90% dari target</td></tr>
+      <tr><td><b>SPI(t)</b>, <b>SV(t)</b></td><td>Earned Schedule — kinerja jadwal dalam satuan waktu</td><td>SV(t) −1,5 hari = progress setara jadwal 1,5 hari kerja lalu</td></tr>
+      <tr><td><b>Forecast selesai</b></td><td>Perkiraan tanggal selesai bila laju SPI(t) berlanjut</td><td>merah = lewat rencana</td></tr>
+      <tr><td><b>Float</b></td><td>Berapa lama task boleh molor tanpa memundurkan proyek</td><td>0 = kritis</td></tr></table></div>
+    <p>Status proyek: <b>ON TRACK</b> (SPI(t) ≥ 1), <b>PERLU PERHATIAN</b> (≥ ${P?P.thresholds.warn:0.95}), <b>TERLAMBAT</b> (≥ ${P?P.thresholds.crit:0.9}), <b>KRITIS / DELAY</b> (di bawahnya). Ambang bisa diubah di Pengaturan.</p>
+    <p><b>Kurva S</b>: garis biru = rencana, abu putus-putus = baseline, hijau = aktual, oranye putus-putus = forecast, garis merah vertikal = Data Date. Interval bisa checkpoint (per N jam kerja), harian, atau mingguan; centang <i>Batang periodik</i> untuk melihat progress per periode.</p></div>
+
+  <div class="card" id="g-alat"><h2>8. Gantt, look-ahead, health check</h2>
+    <ul><li><b>Gantt</b> — bar biru (rencana), hijau (aktual), merah (critical path), oranye (pekerjaan tambahan), abu tipis (baseline), garis putus (float), panah (relasi). Zoom otomatis atau pilih jam/hari/minggu/bulan.</li>
+      <li><b>Look-ahead</b> — pekerjaan 3–42 hari ke depan per PIC, untuk menyiapkan material, permit, dan manpower. Juga kinerja per PIC dan daftar milestone.</li>
+      <li><b>Schedule Health</b> — 16 pemeriksaan kualitas jadwal (adaptasi DCMA 14-Point). Angka merah di tab = jumlah yang belum lolos; klik nomor task untuk memperbaikinya.</li>
+      <li><b>Kendala &amp; Log</b> — catat hambatan (cuaca, permit, material…) dengan dampak jam kerja sebagai bukti justifikasi keterlambatan; change log mencatat siapa mengubah apa dan kapan.</li></ul></div>
+
+  <div class="card" id="g-baseline"><h2>9. Baseline &amp; change control</h2>
+    <p>Baseline adalah jadwal &amp; bobot yang dibekukan sebagai acuan. Tetapkan sekali setelah rencana disetujui. Setelah itu tab Baseline menampilkan varian tiap task (Δ mulai/selesai dalam hari kerja, perubahan bobot, task baru/terhapus). Bila rencana berubah resmi, lakukan <b>Re-baseline</b> dengan alasan — baseline lama tetap tersimpan dan bisa dipilih untuk dibandingkan.</p></div>
+
+  <div class="card" id="g-simpan"><h2>10. Penyimpanan, berbagi &amp; sinkron</h2>
+    <p>Setiap perubahan tersimpan <b>di perangkat</b> seketika dan <b>ke database online (Firebase Firestore)</b> otomatis beberapa detik kemudian — lihat status ☁ di kanan atas (<i>Tersinkron</i> / <i>Belum tersimpan</i> / <i>Gagal</i>). Tetap bisa bekerja saat sinyal hilang; data dikirim saat online kembali (atau klik ☁).</p>
+    <ul><li><b>🔗 Bagikan</b> — salin link langsung ke proyek. Pembuka link tanpa login melihat mode baca; data diperbarui otomatis saat tab dibuka kembali.</li>
+      <li><b>Dua orang mengedit bersamaan</b> — aplikasi mencegah versi lama menimpa versi baru. Bila terjadi, muncul pilihan: pakai versi cloud, timpa dengan versi Anda, atau backup dulu.</li>
+      <li><b>Batas ukuran</b> — satu proyek maksimal ±1 MB di database (cukup untuk ratusan task dengan riwayat panjang). Aplikasi memperingatkan sejak 700 KB.</li>
+      <li><b>💾 Backup JSON</b> — simpan salinan lengkap di komputer Anda secara berkala untuk proyek penting.</li></ul></div>
+
+  <div class="card" id="g-laporan"><h2>11. Laporan PDF &amp; Excel</h2>
+    <p><b>⬇️ PDF</b> — laporan A4 berkop POMI berisi KPI, kurva S, daftar task, Gantt, look-ahead 14 hari, pekerjaan tambahan, dan kendala; ada pratinjau sebelum diunduh. Atur Data Date "Tetap" dulu untuk laporan per tanggal cut-off. <b>📊 Excel</b> — 7 sheet (ringkasan, task, S-curve, progress log, kendala, change log, health check).</p></div>
+
+  <div class="card" id="g-faq"><h2>12. Masalah umum</h2>
+    <div class="tbl-wrap"><table class="t"><tr><th>Masalah</th><th>Solusi</th></tr>
+      <tr><td>Semua kolom abu-abu / tidak bisa diketik</td><td>Mode baca saja — login, atau akun Anda bukan pemilik/tim proyek ini (lihat banner oranye).</td></tr>
+      <tr><td>Tombol ➕ Proyek meminta login</td><td>Membuat &amp; import proyek wajib login.</td></tr>
+      <tr><td>"Akun belum punya Team/Area"</td><td>Atur di Review &amp; Approval Dashboard → ⚙ Pengaturan → Team &amp; Area, lalu login ulang.</td></tr>
+      <tr><td>☁ Konflik versi</td><td>Orang lain menyimpan lebih dulu. Pilih "Pakai versi cloud" bila perubahan Anda sedikit, atau backup dulu lalu timpa.</td></tr>
+      <tr><td>☁ Gagal / Belum tersimpan</td><td>Periksa internet lalu klik ☁. Data aman di perangkat.</td></tr>
+      <tr><td>Tanda ⚠ di samping nama task</td><td>Arahkan kursor untuk melihat masalahnya (mulai sebelum predecessor, tanggal belum lengkap, dll).</td></tr>
+      <tr><td>Progress turun setelah menambah pekerjaan</td><td>Normal — scope bertambah sehingga bobot dinormalisasi ulang (lihat bagian 5).</td></tr>
+      <tr><td>Lupa password</td><td>Reset di Review &amp; Approval Dashboard ("Lupa password?").</td></tr></table></div></div>
+
+  <div class="card" id="g-standar"><h2>13. Standar yang dipakai</h2><ul>
+    <li><b>PMI PMBOK® Guide &amp; Practice Standard for Scheduling</b> — WBS, milestone, Precedence Diagramming Method, Critical Path Method, baseline, data date, look-ahead.</li>
+    <li><b>ANSI/EIA-748 &amp; PMI Practice Standard for Earned Value Management</b> — PV, EV, SV, SPI.</li>
+    <li><b>Earned Schedule</b> — SPI(t), SV(t), forecast tanggal selesai IEAC(t).</li>
+    <li><b>AACE International Recommended Practices</b> — aturan kredit progress (% complete, 0/100, 50/50, 20/80).</li>
+    <li><b>DCMA 14-Point Schedule Assessment</b> — pemeriksaan kesehatan jadwal.</li>
+    <li><b>ISO 21502</b> — change control, issue log, re-baseline beralasan.</li></ul></div>
+  </article></div>`;
 }
 
 // ---------------------------------------------------------------------
