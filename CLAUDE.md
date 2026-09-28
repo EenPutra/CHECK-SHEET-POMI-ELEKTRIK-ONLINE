@@ -3497,10 +3497,17 @@ freq `PROJECT`; one submission can be built up over days via CloudDraft / Load &
   (IEEE 43-2013, 40 °C correction `0.5^((40−t)/10)`), cable & breaker 1000 VDC ≥ 100 MΩ
   (NETA ATS 100.1), dry isolation transformer ≥ 500 MΩ (NETA 100.5), WR unbalance ≤ 2%, PT100
   ±3 °C, vibration ISO 10816-3 zones, control wiring ≥ 1 MΩ @ 500 V (IEC 60204-1).
-- **Full-width fluid layout, not a centred card column** (user request: zooming out should just
-  shrink everything and show more, like `Project_Progress_Monitor.html`): `.wrap` has no
-  `max-width`, panels are flat (no radius/shadow), the tab bar is a full-bleed white strip with an
-  underlined active tab. Don't reintroduce a `max-width` on `.wrap`.
+- **The page is an A4 sheet and browser Print to PDF must match it** (user request, replacing a
+  short-lived full-width layout): `.wrap` is `width:210mm` with `10mm` padding (190mm content) and
+  the hero lives inside it; `@page{size:A4;margin:10mm}` gives print the same 190mm, so the layout
+  wraps identically. Every table must fit 190mm without horizontal scroll (small `.ct` fonts,
+  `min-width:0` inputs — verify by checking each `.tbl-wrap` scrollWidth at A4 width). `@media
+  print` shows ALL panes (`.pane+.pane` page break), hides screen chrome (topbar, tabbar, toolbars,
+  photo-drop, `.np` delete column, `.no-print`, injected badges), hides empty photo sections
+  (`.photo-sec[data-n="0"]`). `preparePrint()` (🖨️ button + `beforeprint`) re-evaluates, redraws
+  charts, grows textareas to full text and marks empty fields `.pv-empty` so placeholders don't
+  print. Width media queries are `screen and (...)` — a plain `max-width` query also fires in print
+  (190mm) and made print differ from screen (charts went 1-column).
 - PDF skips empty measurement tables ("belum diisi"); "🖨️ PDF Form Lengkap"
   (`generatePDF({full:true})`) prints every table incl. padded blank log rows for field use.
 - Verified headless (Firestore blocked): calcs, draft round-trip, `prepareDyn` from a doc,

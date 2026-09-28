@@ -32,7 +32,7 @@
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
-body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:100vh}
+body{font-family:var(--sans);background:#dfe6ef;color:var(--txt);min-height:100vh}
 .topbar{position:sticky;top:0;z-index:100;background:var(--navy2);height:52px;display:flex;align-items:center;padding:0 20px;gap:12px;border-bottom:2px solid var(--blue)}
 .tb-logo{font-family:var(--raj);font-size:20px;font-weight:700;letter-spacing:3px;color:#fff;white-space:nowrap}
 .tb-logo em{color:var(--sky);font-style:normal}
@@ -48,22 +48,23 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .btn-pdf:hover{background:#1d4ed8}
 .btn-sm{padding:4px 10px;font-size:12px}
 .btn-back{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;border-radius:5px;font-size:11px;font-weight:700;letter-spacing:1px;text-decoration:none;background:rgba(255,255,255,0.1);color:rgba(255,255,255,0.85);border:1px solid rgba(255,255,255,0.18);white-space:nowrap;flex-shrink:0}
-.hero{background:var(--navy);padding:14px 18px 12px;color:#fff}
+.hero{background:var(--navy);padding:22px 20px 18px;color:#fff}
 .hero-eyebrow{font-family:var(--mono);font-size:10px;color:var(--sky);letter-spacing:3px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:8px}
 .hero-eyebrow::before{content:'';width:20px;height:1px;background:var(--sky)}
-.hero-title{font-family:var(--raj);font-size:clamp(22px,3vw,34px);font-weight:700;line-height:1;letter-spacing:1px}
+.hero-title{font-family:var(--raj);font-size:clamp(26px,5.5vw,44px);font-weight:700;line-height:1;letter-spacing:1px}
 .hero-title em{color:var(--sky);font-style:normal}
 .hero-sub{font-size:13px;color:rgba(255,255,255,0.65);margin-top:8px;font-weight:300}
 .hero-sub a{color:var(--sky)}
-.hero-stats{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
-.hstat{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:6px 14px;text-align:center;min-width:72px}
+.hero-stats{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+.hstat{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:8px;padding:10px 16px;text-align:center;min-width:72px}
 .hstat-n{font-family:var(--raj);font-size:26px;font-weight:700;color:#fff;line-height:1;display:block}
 .hstat-n.ok{color:#4ade80}.hstat-n.ng{color:#f87171}.hstat-n.pend{color:var(--sky)}
 .hstat-l{font-family:var(--mono);font-size:9px;color:rgba(255,255,255,0.45);letter-spacing:1.5px;text-transform:uppercase;margin-top:3px;display:block}
-/* Full-width fluid layout (like Project_Progress_Monitor.html): zooming out shows more
-   content per screen instead of a fixed-width column with empty margins. */
-.wrap{width:100%;margin:0;padding:12px 18px 60px}
-.panel{background:var(--surf);border:1px solid var(--bdr);border-radius:0;margin-bottom:12px;overflow:hidden}
+/* The page is an A4 sheet: 210mm wide with 10mm side padding = 190mm of content, the same
+   width the browser's print (@page A4, 10mm margins) lays out, so Print to PDF matches. */
+.wrap{width:210mm;max-width:100%;margin:16px auto 24px;padding:10mm;background:#fff;box-shadow:0 2px 14px rgba(15,23,42,0.12)}
+.hero{border-radius:10px;margin-bottom:16px}
+.panel{background:var(--surf);border:1px solid var(--bdr);border-radius:10px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 6px rgba(30,58,95,0.06)}
 .wo-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;padding:16px}
 .mf{display:flex;flex-direction:column;gap:4px}
 .mf label{font-size:10px;color:var(--txt4);font-weight:500;letter-spacing:1px;text-transform:uppercase}
@@ -78,19 +79,18 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .sec-hdr-arrow{color:rgba(255,255,255,0.4);font-size:14px;transition:transform .2s;margin-left:6px}
 .sec-hdr.open .sec-hdr-arrow{transform:rotate(180deg)}
 /* tabs */
-.tabbar{position:sticky;top:52px;z-index:90;background:#fff;margin:0 -18px 12px;padding:0 14px;display:flex;gap:2px;overflow-x:auto;-webkit-overflow-scrolling:touch;border-bottom:1px solid var(--bdr)}
+.tabbar{position:sticky;top:52px;z-index:90;background:var(--bg);padding:8px 0 6px;margin-bottom:12px;display:flex;gap:6px;overflow-x:auto;-webkit-overflow-scrolling:touch;border-bottom:1px solid var(--bdr)}
 .tabbar::-webkit-scrollbar{height:4px}.tabbar::-webkit-scrollbar-thumb{background:var(--sky2)}
-.tab{flex-shrink:0;border:none;border-bottom:3px solid transparent;background:none;color:var(--txt4);border-radius:0;padding:10px 11px 8px;font-family:var(--raj);font-weight:700;font-size:13px;letter-spacing:.5px;cursor:pointer;display:flex;align-items:center;gap:6px}
-.tab:hover{color:var(--navy)}
-.tab.on{color:var(--blue);border-bottom-color:var(--blue)}
+.tab{flex-shrink:0;border:1px solid var(--bdr);background:#fff;color:var(--navy);border-radius:7px;padding:6px 11px;font-family:var(--raj);font-weight:700;font-size:13px;letter-spacing:.5px;cursor:pointer;display:flex;align-items:center;gap:6px}
+.tab.on{background:var(--navy);color:#fff;border-color:var(--navy)}
 .tab .tb-cnt:empty{display:none}
 .tab .tb-cnt{font-family:var(--mono);font-size:10px;font-weight:400;padding:1px 6px;border-radius:9px;background:var(--bg2);color:var(--txt4)}
-.tab.on .tb-cnt{background:#dbeafe;color:var(--blue)}
+.tab.on .tb-cnt{background:rgba(255,255,255,0.15);color:var(--sky2)}
 .tab .tb-cnt.done{background:var(--ok-bg);color:#15803d}
 .tab .tb-cnt.ng{background:var(--ng-bg);color:#b91c1c}
 .pane{display:none}.pane.on{display:block}
-.pane-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:2px 0 8px}
-.pane-head h2{font-family:var(--raj);font-size:19px;color:var(--navy);letter-spacing:1px;text-transform:uppercase}
+.pane-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:4px 0 12px}
+.pane-head h2{font-family:var(--raj);font-size:22px;color:var(--navy);letter-spacing:1px;text-transform:uppercase}
 .pane-head .pic{font-family:var(--mono);font-size:11px;color:var(--txt4)}
 .pane-nav{display:flex;gap:8px;justify-content:space-between;margin:8px 0 18px}
 /* sub blocks */
@@ -105,20 +105,21 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:0 16px}
 .tbl-wrap::-webkit-scrollbar{height:5px}.tbl-wrap::-webkit-scrollbar-thumb{background:var(--sky2);border-radius:2px}
 .ct{width:100%;border-collapse:collapse;font-size:12px}
-.ct th{background:var(--navy);color:var(--sky2);padding:6px 7px;text-align:center;font-family:var(--mono);font-size:9px;letter-spacing:.5px;text-transform:uppercase;border-right:1px solid rgba(255,255,255,0.08)}
-.ct td{padding:4px 6px;border-bottom:1px solid var(--bdr2);background:var(--surf);vertical-align:middle;text-align:center;border-right:1px solid var(--bdr2)}
+.ct th{background:var(--navy);color:var(--sky2);padding:5px 4px;text-align:center;font-family:var(--mono);font-size:8.5px;letter-spacing:.3px;text-transform:uppercase;border-right:1px solid rgba(255,255,255,0.08)}
+.ct td{padding:3px 4px;border-bottom:1px solid var(--bdr2);background:var(--surf);vertical-align:middle;text-align:center;border-right:1px solid var(--bdr2)}
 .ct td:last-child{border-right:none}
-.ct td.lbl{text-align:left;font-family:var(--mono);font-size:10.5px;color:var(--navy);font-weight:700;background:rgba(37,99,235,0.05);white-space:nowrap}
-.ct td.task{text-align:left;font-weight:600;color:var(--navy);min-width:170px}
+.ct td.lbl{text-align:left;font-family:var(--mono);font-size:10px;color:var(--navy);font-weight:700;background:rgba(37,99,235,0.05);min-width:78px}
+.ct td.task{text-align:left;font-weight:600;color:var(--navy);min-width:112px;font-size:11.5px}
 .ct td.task small{display:block;font-weight:400;color:var(--txt4);font-family:var(--mono);font-size:9.5px}
-.ct td.cr{text-align:left;font-size:11px;color:#334155;min-width:240px;line-height:1.45}
+.ct td.cr{text-align:left;font-size:10.5px;color:#334155;line-height:1.4}
 .ct td.no{font-family:var(--mono);color:var(--txt4);font-size:10.5px}
-.ct td.calc{font-family:var(--mono);font-size:11px;color:#334155;background:#f8fafc;white-space:nowrap}
-.ct .mi{width:100%;min-width:58px;font-size:11px;padding:3px 4px;border-radius:3px;font-family:var(--mono);text-align:center;border:1.5px solid var(--bdr);background:var(--bg2);color:var(--txt)}
+.ct td.calc{font-family:var(--mono);font-size:10px;color:#334155;background:#f8fafc;white-space:nowrap}
+.ct .mi{width:100%;min-width:0;font-size:10.5px;padding:3px 3px;border-radius:3px;font-family:var(--mono);text-align:center;border:1.5px solid var(--bdr);background:var(--bg2);color:var(--txt)}
 .ct .mi:focus{outline:none;border-color:var(--blue);background:#fff}
-.ct .mi.txt{text-align:left;font-family:var(--sans);min-width:110px}
-.ct textarea.mi{min-width:150px;resize:vertical;min-height:30px;text-align:left;font-family:var(--sans)}
-.ct select.mi{min-width:64px}
+.ct .mi.txt{text-align:left;font-family:var(--sans);min-width:64px}
+.ct textarea.mi{min-width:96px;resize:vertical;min-height:26px;text-align:left;font-family:var(--sans);overflow:hidden}
+.ct input[type=date].mi,.ct input[type=time].mi{min-width:74px;font-size:10px}
+.ct select.mi{min-width:44px}
 .rs.v-ok{background:var(--ok-bg);border-color:#86efac;color:#15803d;font-weight:700}
 .rs.v-ng{background:var(--ng-bg);border-color:#fca5a5;color:#b91c1c;font-weight:700}
 .rs.v-na{background:var(--na-bg);color:var(--txt4)}
@@ -131,7 +132,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .toolbar{display:flex;justify-content:flex-end;gap:8px;padding:8px 16px 6px}
 .btn2{background:var(--bg2);color:var(--navy);border:1px solid var(--bdr);border-radius:5px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
 .btn2:hover{background:var(--sky2)}
-.chart-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:14px;padding:12px 16px}
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:12px 16px}
 .chart-box{border:1px solid var(--bdr);border-radius:8px;padding:10px;background:#fff}
 .chart-box h4{font-family:var(--raj);font-size:11px;letter-spacing:1px;color:var(--navy);text-transform:uppercase;margin-bottom:6px}
 .chart-box canvas{width:100%;height:190px}
@@ -158,10 +159,30 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .photo-cap{width:100%;border:none;border-top:1px solid var(--bdr2);padding:6px 8px;font-size:12px;font-family:inherit;background:transparent}
 .photo-empty{color:var(--txt4);font-size:12px;text-align:center;padding:10px}
 .sum-tbl td{text-align:center}.sum-tbl td:first-child{text-align:left;font-weight:600;color:var(--navy)}
-@media(max-width:820px){.chart-grid,.findings-grid{grid-template-columns:1fr}}
-@media(max-width:640px){.tb-sub,.tb-sep,.tb-time{display:none}.tb-logo{font-size:16px;letter-spacing:1px}.tb-right{gap:6px}.tb-right .btn-sm,.btn-back{padding:4px 7px;font-size:11px;letter-spacing:0}.hstat{min-width:60px;padding:8px 10px}.hstat-n{font-size:20px}.btn-draft.btn-sm{display:none}.topbar{padding:0 12px;gap:8px}}
-@media(max-width:640px){.wrap{padding:10px 10px 60px}.tabbar{margin:0 -10px 10px;padding:0 6px}.hero{padding:12px}}
-@media(max-width:460px){.chart-grid{grid-template-columns:1fr}}
+@media screen and (max-width:600px){.chart-grid,.findings-grid{grid-template-columns:1fr}}
+@media screen and (max-width:230mm){.wrap{margin:0 auto;padding:12px 10px 60px;box-shadow:none}}
+/* ── PRINT: every tab, in order, at the same 190mm width as the screen sheet ── */
+@page{size:A4 portrait;margin:10mm}
+@media print{
+  html,body{background:#fff!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .topbar,.tabbar,.pane-nav,.toolbar,.photo-drop,.photo-ctrl,.no-print,.np,.notice,.footer,.photo-empty,
+  #sg-datasaver-badge,#ta-widget,#lmm-revision-banner,.sec-hdr-arrow{display:none!important}
+  .wrap{width:auto;max-width:none;margin:0;padding:0;box-shadow:none}
+  .pane{display:block!important}
+  .pane+.pane{break-before:page}
+  .sec-body{display:block!important}
+  .photo-sec[data-n="0"]{display:none!important}
+  .tbl-wrap{overflow:visible}
+  tr,.crit,.warnbox,.prm,.msum,.chart-box,.photo-item,.mf,.hstat{break-inside:avoid}
+  .blk-title,.pane-head,.crit,.prm{break-after:avoid}
+  ::placeholder{color:transparent!important}
+  .pv-empty{color:transparent!important}
+  input::-webkit-calendar-picker-indicator{display:none!important}
+  select{-webkit-appearance:none;appearance:none}
+  textarea{resize:none!important;overflow:hidden!important}
+}
+@media screen and (max-width:640px){.tb-sub,.tb-sep,.tb-time{display:none}.tb-logo{font-size:16px;letter-spacing:1px}.tb-right{gap:6px}.tb-right .btn-sm,.btn-back{padding:4px 7px;font-size:11px;letter-spacing:0}.hstat{min-width:60px;padding:8px 10px}.hstat-n{font-size:20px}.btn-draft.btn-sm{display:none}.topbar{padding:0 12px;gap:8px}}
+@media(max-width:400px){.wrap{padding:12px 10px 60px}}
 </style>
 </head>
 <body>
@@ -175,10 +196,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
     <a class="btn-back" href="index.html" title="Back to Portal">&#8592; Portal</a>
     <span class="tb-time" id="clock">--:--:--</span>
     <button class="btn btn-draft btn-sm" onclick="CloudDraft.save()">💾 Draft</button>
+    <button class="btn btn-draft btn-sm" onclick="printSheet()" title="Cetak / Print to PDF — hasil sama dengan tampilan halaman A4 ini, semua tab">🖨️ Print</button>
     <button class="btn btn-pdf btn-sm" onclick="generatePDF()">📄 PDF</button>
     <button class="btn btn-sm" style="background:#16a34a;color:#fff" onclick="submitToDb()">🗄️ Submit DB</button>
   </div>
 </div>
+
+<div class="wrap">
 
 <div class="hero">
   <div class="hero-eyebrow">Project Check Sheet · Commissioning Record</div>
@@ -193,7 +217,6 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
   </div>
 </div>
 
-<div class="wrap">
 
 <!-- WORK ORDER (always visible) -->
 <div class="panel">
@@ -215,7 +238,7 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
         <select id="shift"><option>Normal Hours</option><option>Shift 1 (07:00–15:00)</option><option>Shift 2 (15:00–23:00)</option><option>Shift 3 (23:00–07:00)</option></select>
       </div>
     </div>
-    <div style="padding:0 16px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <div class="no-print" style="padding:0 16px 14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="openLoadMerge()">&#128229; Muat / Lanjutkan dari Database</button>
       <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="pullLast()">📥 Tarik Submission Terakhir</button>
       <span style="font-size:11px;color:var(--txt4)">Pekerjaan berjalan beberapa hari — simpan draft ke database lalu lanjutkan besok dari perangkat mana pun.</span>
@@ -227,10 +250,11 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 <div id="panes"></div>
 <input type="hidden" id="dyn-structure">
 
-<div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
+<div class="no-print" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;padding:4px 0 8px">
   <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="resetForm()">🔄 Reset</button>
   <button class="btn" style="background:var(--navy);color:#fff" onclick="CloudDraft.save()">💾 Save Draft</button>
   <button class="btn" style="background:#f1f5f9;color:var(--navy);border:1px solid var(--bdr)" onclick="generatePDF({full:true})" title="Semua tabel dicetak walau kosong — untuk diisi manual di lapangan">🖨️ PDF Form Lengkap</button>
+  <button class="btn" style="background:var(--navy);color:#fff" onclick="printSheet()" title="Print to PDF dari browser — layout sama persis dengan halaman ini, semua tab tercetak">🖨️ Print / Save as PDF</button>
   <button class="btn btn-pdf" onclick="generatePDF()">📄 Download PDF</button>
   <button class="btn" style="background:#16a34a;color:#fff;font-size:15px;padding:10px 24px" onclick="submitToDb()">&#128202; Submit to Database</button>
 </div>
@@ -727,7 +751,7 @@ function dynHtml(id){
   const D=DYN[id];
   return `<div class="blk-title">${D.title}</div>${paramsHtml('d-'+id+'-p-',D.params)}
     <div class="toolbar"><button class="btn2" onclick="addDynRow('${id}')">+ Tambah Baris</button></div>
-    <div class="tbl-wrap"><table class="ct" id="t-${id}"><thead><tr><th>#</th>${D.cols.map(c=>`<th>${c.label}</th>`).join('')}<th></th></tr></thead><tbody id="db-${id}"></tbody></table></div>
+    <div class="tbl-wrap"><table class="ct" id="t-${id}"><thead><tr><th>#</th>${D.cols.map(c=>`<th>${c.label}</th>`).join('')}<th class="np"></th></tr></thead><tbody id="db-${id}"></tbody></table></div>
     <div class="msum" id="s-${id}"></div>
     ${D.charts?`<div class="chart-grid">${D.charts.map((ch,i)=>`<div class="chart-box"><h4>${ch.title}</h4><canvas id="ch-${id}-${i}" width="520" height="220"></canvas></div>`).join('')}</div>`:''}`;
 }
@@ -754,9 +778,9 @@ function buildUI(){
     <div class="pane-head"><h2>${t.no!=='0'?t.no+' · ':''}${esc(t.title)}</h2><span class="pic">${t.pic?'PIC: '+t.pic:''}</span></div>
     <div class="panel">${t.blocks.map(b=>b.type==='checks'?checksHtml(t,b):b.type==='fields'?fieldsHtml(b):b.type==='meas'?measHtml(b.id):b.type==='dyn'?dynHtml(b.id)
       :b.type==='warn'?`<div class="warnbox">${b.html}</div>`:b.type==='summary'?summaryHtml():b.type==='final'?finalHtml():'').join('')}
-      <div class="blk-title">Foto Dokumentasi — ${esc(t.title)}</div>
+      <div class="photo-sec" id="ps-${t.key}" data-n="0"><div class="blk-title">Foto Dokumentasi — ${esc(t.title)}</div>
       <div class="photo-drop" onclick="pickPhotos(this,'${t.key}')"><div class="photo-drop-ico">📷</div><div class="photo-drop-txt"><strong>Klik untuk menambah foto</strong> (before / during / after, layar alat ukur)</div></div>
-      <div class="photo-grid" id="grid-${t.key}"></div>
+      <div class="photo-grid" id="grid-${t.key}"></div></div>
     </div>
     <div class="pane-nav">${ti>0?`<button class="btn2" onclick="showTab('${TABS[ti-1].key}')">← ${esc(TABS[ti-1].title)}</button>`:'<span></span>'}
       ${ti<TABS.length-1?`<button class="btn2" onclick="showTab('${TABS[ti+1].key}')">${esc(TABS[ti+1].title)} →</button>`:''}</div>
@@ -768,6 +792,7 @@ function showTab(k){
   document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.id==='pane-'+k));
   try{ localStorage.setItem(TAB_KEY,k); }catch(e){}
   if(k==='sr'||k==='rt') drawCharts();
+  document.querySelectorAll('#pane-'+k+' textarea').forEach(autoGrow);
   const tb=document.querySelector('.tab.on'); if(tb) tb.scrollIntoView({block:'nearest',inline:'center'});
 }
 
@@ -783,7 +808,7 @@ function addDynRow(id,vals,idx){
     if(c.t==='sel') return `<td>${selHtml(cid,c.opts)}</td>`;
     if(c.t==='num') return `<td><input class="mi" id="${cid}" inputmode="decimal" value="${esc(val)}"></td>`;
     if(c.t==='time'||c.t==='date') return `<td><input class="mi" type="${c.t}" id="${cid}" value="${esc(val)}"></td>`;
-    return `<td><input class="mi txt" id="${cid}" value="${esc(val)}"></td>`; }).join('')+`<td><button class="rowdel" onclick="delDynRow(this)" aria-label="Hapus baris">✕</button></td>`;
+    return `<td><input class="mi txt" id="${cid}" value="${esc(val)}"></td>`; }).join('')+`<td class="np"><button class="rowdel" onclick="delDynRow(this)" aria-label="Hapus baris">✕</button></td>`;
   if(vals) D.cols.forEach(c=>{ if(c.t==='sel'&&vals[c.k]!=null){ const s=tr.querySelector('#'+CSS.escape(`d-${id}-${i}-${c.k}`)); if(s) s.value=vals[c.k]; } });
   body.appendChild(tr); renumber(id); syncDynStructure();
   return i;
@@ -887,14 +912,14 @@ const PAL=['#1e3a5f','#c07a1e','#16a34a','#dc2626','#7c3aed','#0891b2'];
 function drawChart(canvas, labels, series){
   const ctx=canvas.getContext('2d'); const W=canvas.width, H=canvas.height;
   ctx.fillStyle='#fff'; ctx.fillRect(0,0,W,H);
-  const padL=34,padR=8,padT=20,padB=22, plotW=W-padL-padR, plotH=H-padT-padB;
+  const padL=36,padR=18,padT=20,padB=22, plotW=W-padL-padR, plotH=H-padT-padB;
   const all=series.flatMap(s=>s.data).filter(x=>x!=null&&isFinite(x));
   const maxV=all.length?Math.max(...all):1, minV=all.length?Math.min(...all):0;
   const yMax=maxV>minV?maxV+(maxV-minV)*0.15:(maxV||1)+1, yMin=Math.max(0,minV-(maxV-minV)*0.15-(maxV===minV?1:0));
   ctx.strokeStyle='#94a3b8'; ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(padL,padT); ctx.lineTo(padL,padT+plotH); ctx.lineTo(padL+plotW,padT+plotH); ctx.stroke();
   ctx.font='9px Arial'; ctx.textBaseline='middle'; ctx.textAlign='right';
   for(let g=0;g<=4;g++){ const yy=padT+plotH-(plotH*g/4), val=yMin+(yMax-yMin)*g/4;
-    ctx.strokeStyle='#e2e8f0'; ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(padL+plotW,yy); ctx.stroke(); ctx.fillStyle='#64748b'; ctx.fillText(val.toFixed(0),padL-4,yy); }
+    ctx.strokeStyle='#e2e8f0'; ctx.beginPath(); ctx.moveTo(padL,yy); ctx.lineTo(padL+plotW,yy); ctx.stroke(); ctx.fillStyle='#64748b'; ctx.fillText(val.toFixed(yMax-yMin<8?1:0),padL-4,yy); }
   const n=labels.length, stepX=n>1?plotW/(n-1):0; ctx.textAlign='center'; ctx.textBaseline='top';
   labels.forEach((lb,i)=>{ if(n>8&&i%Math.ceil(n/8)!==0&&i!==n-1) return; ctx.fillStyle='#64748b'; ctx.fillText(String(lb||'').slice(0,5),padL+stepX*(n>1?i:0.5),padT+plotH+4); });
   const yOf=val=>padT+plotH-((val-yMin)/(yMax-yMin))*plotH;
@@ -909,7 +934,31 @@ function chartData(id,ch){
     series:ch.series.map(s=>({label:s.label,data:rows.map(tr=>num(dynVal(id,tr.dataset.i,s.k)))})) };
 }
 let _chT=null;
-function drawCharts(){ clearTimeout(_chT); _chT=setTimeout(()=>{ Object.entries(DYN).forEach(([id,D])=>(D.charts||[]).forEach((ch,i)=>{ const cv=document.getElementById(`ch-${id}-${i}`); if(!cv) return; const d=chartData(id,ch); drawChart(cv,d.labels,d.series); })); },150); }
+function drawChartsNow(){ Object.entries(DYN).forEach(([id,D])=>(D.charts||[]).forEach((ch,i)=>{ const cv=document.getElementById(`ch-${id}-${i}`); if(!cv) return; const d=chartData(id,ch); drawChart(cv,d.labels,d.series); })); }
+function drawCharts(){ clearTimeout(_chT); _chT=setTimeout(drawChartsNow,150); }
+
+// ═══════════════════════════════════════════════════════════════
+//  PRINT / SAVE AS PDF — the browser prints this same A4 page (all tabs, @media print)
+// ═══════════════════════════════════════════════════════════════
+function autoGrow(el){ if(!el||el.tagName!=='TEXTAREA') return; el.style.height='auto'; el.style.height=(el.scrollHeight+2)+'px'; }
+function preparePrint(){
+  document.body.classList.add('printing');
+  evalAll(); drawChartsNow();
+  // every tab is laid out for print; size remarks to their full text and hide
+  // empty-field placeholders (dd/mm/yyyy etc.) so only real values print
+  document.querySelectorAll('.pane').forEach(p=>p.dataset.wasOn=p.classList.contains('on')?'1':'');
+  document.querySelectorAll('.pane').forEach(p=>p.classList.add('on'));
+  document.querySelectorAll('textarea').forEach(autoGrow);
+  document.querySelectorAll('input,select,textarea').forEach(el=>el.classList.toggle('pv-empty',!el.value));
+}
+function afterPrint(){
+  document.body.classList.remove('printing');
+  document.querySelectorAll('.pane').forEach(p=>{ if(p.dataset.wasOn!==undefined){ p.classList.toggle('on',p.dataset.wasOn==='1'); delete p.dataset.wasOn; } });
+  document.querySelectorAll('.pv-empty').forEach(el=>el.classList.remove('pv-empty'));
+}
+function printSheet(){ preparePrint(); setTimeout(()=>window.print(),60); }
+window.addEventListener('beforeprint',()=>{ if(!document.body.classList.contains('printing')) preparePrint(); });
+window.addEventListener('afterprint',afterPrint);
 
 // ═══════════════════════════════════════════════════════════════
 //  DRAFT (local) — CloudDraft handles the database copy
@@ -945,7 +994,7 @@ function resetForm(){
   colorAll(); evalAll(); showNote('🔄 Form direset.','ok');
 }
 function showNote(msg,t){ const n=document.getElementById('notice'); n.textContent=msg; n.className='notice '+t; setTimeout(()=>n.className='notice',4500); }
-document.addEventListener('input',e=>{ if(e.target.matches('input,select,textarea')){ scheduleEval(); scheduleAutoSave(); } });
+document.addEventListener('input',e=>{ if(e.target.matches('textarea')) autoGrow(e.target); if(e.target.matches('input,select,textarea')){ scheduleEval(); scheduleAutoSave(); } });
 document.addEventListener('change',e=>{ if(e.target.matches('select.rs')) colorSel(e.target); if(e.target.matches('input,select,textarea')){ scheduleEval(); scheduleAutoSave(); } });
 
 // ── LOAD / MERGE ──
@@ -1205,6 +1254,7 @@ function removePhotoAt(group,i){ if(!confirm('Hapus foto ini?')) return; PHOTOS[
 function renderPhotos(group){
   const grid=document.getElementById('grid-'+group); if(!grid) return;
   const list=PHOTOS[group]||[];
+  const sec=document.getElementById('ps-'+group); if(sec) sec.dataset.n=list.length;
   grid.innerHTML=!list.length?'<div class="photo-empty">Belum ada foto.</div>':list.map((p,i)=>`
     <div class="photo-item"><div class="photo-img-wrap"><img src="${p.src}" alt="Foto ${i+1}"></div>
       <div class="photo-ctrl"><button class="p-btn" onclick="recropPhotoAt('${group}',${i})">✂ Crop</button>
