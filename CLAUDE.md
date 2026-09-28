@@ -3473,6 +3473,35 @@ re-encoded copy without mutating the original entry; `mapLimit` preserves input 
 correctness under concurrency. See `approval-helper.js`'s entry below for the companion universal
 upload-concurrency fix (every check sheet's photo UPLOAD, not just this file's photo download).
 
+## `Restoration_CCH_FDR_B1_Checksheet.html` — project check sheet for one schedule
+
+Built from the WBS of Project Progress Monitor project `prj_muf56y4fumd71k` ("Restoration
+CCH-FDR-B1", Jetty; read from Firestore `project_schedules` via the public REST GET). One tab
+per level-0 WBS group (Visual → Cleaning → 3.1 Main Breaker / 3.2 Cable / 3.3 Motor /
+3.4 Recondition / 3.5 Inverter → Control Box → Protection → PLC (C7) → Solo Run → Running test
+→ Completion → Summary); every check row is one project task with its name **verbatim**, so
+results can be matched back to the schedule. Fixed `assetTag` `CCH-FDR-B1`, formId `cchfdrb1`,
+freq `PROJECT`; one submission can be built up over days via CloudDraft / Load & Merge.
+
+- Everything is data-driven: `TABS` (blocks `checks` / `fields` / `meas` / `dyn` / `warn` /
+  `summary` / `final`), `MEAS` (fixed measurement grids, ids `m-<tbl>-<row>-<col>`, params
+  `m-<tbl>-p-<k>`, computed cells `c-…`, each with a `calc()` returning `{col, res}` and an
+  acceptance-criteria text), `DYN` (row tables, ids `d-<tbl>-<i>-<col>`, row shape in
+  `#dyn-structure`, rebuilt by `prepareDyn()` = the LoadMergeModal `beforeApply`). Add a
+  measurement by adding a `MEAS` entry + a `{type:'meas',id}` block — the UI, `base.sheets`
+  (`buildAllSheets()`), PDF and summary counts all follow.
+- Task results are `<select class="rs" id="res-…">` (OK/NG/N/A), not `.rb` toggles, so they
+  restore through the plain `inputValues` sweep; `submitToDb()` fills `base.items`/counts
+  itself because `collectCheckSheetData()` only scrapes `.rb` toggles.
+- Criteria are editable per table (params), defaults: IR motor 500 VDC / R40 ≥ 100 MΩ / PI ≥ 2
+  (IEEE 43-2013, 40 °C correction `0.5^((40−t)/10)`), cable & breaker 1000 VDC ≥ 100 MΩ
+  (NETA ATS 100.1), dry isolation transformer ≥ 500 MΩ (NETA 100.5), WR unbalance ≤ 2%, PT100
+  ±3 °C, vibration ISO 10816-3 zones, control wiring ≥ 1 MΩ @ 500 V (IEC 60204-1).
+- PDF skips empty measurement tables ("belum diisi"); "🖨️ PDF Form Lengkap"
+  (`generatePDF({full:true})`) prints every table incl. padded blank log rows for field use.
+- Verified headless (Firestore blocked): calcs, draft round-trip, `prepareDyn` from a doc,
+  15-page filled PDF / 20-page blank form, no overflow at 390 px; portal card `cch-fdr-b1-restoration`.
+
 ## `Project_Progress_Monitor.html` — project schedule / S-curve tracker
 
 Not a check sheet — a standalone project-control app (portal card `project-progress`, category
