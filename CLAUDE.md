@@ -3497,6 +3497,10 @@ freq `PROJECT`; one submission can be built up over days via CloudDraft / Load &
   (IEEE 43-2013, 40 °C correction `0.5^((40−t)/10)`), cable & breaker 1000 VDC ≥ 100 MΩ
   (NETA ATS 100.1), dry isolation transformer ≥ 500 MΩ (NETA 100.5), WR unbalance ≤ 2%, PT100
   ±3 °C, vibration ISO 10816-3 zones, control wiring ≥ 1 MΩ @ 500 V (IEC 60204-1).
+- **Full-width fluid layout, not a centred card column** (user request: zooming out should just
+  shrink everything and show more, like `Project_Progress_Monitor.html`): `.wrap` has no
+  `max-width`, panels are flat (no radius/shadow), the tab bar is a full-bleed white strip with an
+  underlined active tab. Don't reintroduce a `max-width` on `.wrap`.
 - PDF skips empty measurement tables ("belum diisi"); "🖨️ PDF Form Lengkap"
   (`generatePDF({full:true})`) prints every table incl. padded blank log rows for field use.
 - Verified headless (Firestore blocked): calcs, draft round-trip, `prepareDyn` from a doc,
