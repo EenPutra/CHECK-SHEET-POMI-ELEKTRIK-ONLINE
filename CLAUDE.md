@@ -3497,17 +3497,17 @@ freq `PROJECT`; one submission can be built up over days via CloudDraft / Load &
   (IEEE 43-2013, 40 °C correction `0.5^((40−t)/10)`), cable & breaker 1000 VDC ≥ 100 MΩ
   (NETA ATS 100.1), dry isolation transformer ≥ 500 MΩ (NETA 100.5), WR unbalance ≤ 2%, PT100
   ±3 °C, vibration ISO 10816-3 zones, control wiring ≥ 1 MΩ @ 500 V (IEC 60204-1).
-- **The page is an A4 sheet and browser Print to PDF must match it** (user request, replacing a
-  short-lived full-width layout): `.wrap` is `width:210mm` with `10mm` padding (190mm content) and
-  the hero lives inside it; `@page{size:A4;margin:10mm}` gives print the same 190mm, so the layout
-  wraps identically. Every table must fit 190mm without horizontal scroll (small `.ct` fonts,
-  `min-width:0` inputs — verify by checking each `.tbl-wrap` scrollWidth at A4 width). `@media
-  print` shows ALL panes (`.pane+.pane` page break), hides screen chrome (topbar, tabbar, toolbars,
-  photo-drop, `.np` delete column, `.no-print`, injected badges), hides empty photo sections
-  (`.photo-sec[data-n="0"]`). `preparePrint()` (🖨️ button + `beforeprint`) re-evaluates, redraws
-  charts, grows textareas to full text and marks empty fields `.pv-empty` so placeholders don't
-  print. Width media queries are `screen and (...)` — a plain `max-width` query also fires in print
-  (190mm) and made print differ from screen (charts went 1-column).
+- **Screen layout = the original card layout; no browser print feature.** A full-width layout and
+  an A4 "Print to PDF" mode were both tried and rejected by the user ("hasilnya jelek") — don't
+  bring either back. Instead **`generatePDF()` draws the HTML look in jsPDF** (on the shared
+  letterhead): navy hero with stat boxes, one card per tab (navy header bar with WBS no. square,
+  PIC and done-count pill; card outlines are collected per page in `CARDS` and stroked at the end
+  so they never cover content), block titles, criteria/warn boxes that keep `<b>` emphasis
+  (`runsOf`/`wrapRuns`), parameter chips, navy-headed tables whose input cells are tinted like the
+  form inputs and whose OK/NG/N/A/PASS/FAIL values are drawn as pills (`kinds` per column:
+  `no/lbl/task/crit/in/txt/calc/pill/sel`), field grids, 2-up chart boxes (charts rendered at 2×
+  via a scaled context passed to `drawChart`) and 2-up photo cards. Helvetica keeps °/µ/±/×/²/·;
+  `Sx2()` only replaces what WinAnsi lacks (Ω, ≤, ≥, arrows, Greek, emoji).
 - PDF skips empty measurement tables ("belum diisi"); "🖨️ PDF Form Lengkap"
   (`generatePDF({full:true})`) prints every table incl. padded blank log rows for field use.
 - Verified headless (Firestore blocked): calcs, draft round-trip, `prepareDyn` from a doc,
