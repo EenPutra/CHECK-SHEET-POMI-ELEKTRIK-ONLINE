@@ -171,6 +171,12 @@ table.t input.ci.num{text-align:right}
 .pic-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:5px}
 .legend-dot{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .upd-row.changed td{background:#f0fdf4}
+#upd-table tr.upd-grp td{background:#f8fafc;font-weight:700}
+#upd-table tr.upd-grp.l0 td{background:#eef2f7}
+#upd-table .ucell{display:flex;align-items:flex-start;gap:4px}
+#upd-table .utg{width:16px;flex-shrink:0;text-align:center;color:var(--txt-3);cursor:pointer;user-select:none}
+#upd-table tr.upd-row .utg{cursor:default}
+#upd-table .grp-new{font-size:10.5px;color:var(--pri);font-weight:600}
 .upd-row.down td{background:#fff7ed}
 .qbtn{border:1px solid var(--bdr-2);background:#fff;border-radius:6px;padding:2px 6px;font-size:11px;cursor:pointer}
 .qbtn:hover{background:var(--pri-soft)}
@@ -1229,15 +1235,22 @@ function saveTaskEditor(id){
 // ---------------------------------------------------------------------
 //  Update Progress (field update session)
 // ---------------------------------------------------------------------
-let UPD={filter:'need',pic:'',time:''};
+let UPD={filter:'need',pic:'',time:'',fold:new Set()};
 function renderProgress(){
   const c=C,el=$('#p-progress');
   if(!c.cnt.total){el.innerHTML='<div class="card empty"><b>Belum ada task</b></div>';return;}
   const tms=UPD.time?parseLocal(UPD.time):c.dd;const wt=toW(tms);
   const pics=[...new Set(c.T.map(t=>t.pic).filter(Boolean))].sort();
-  const rows=c.X.filter(x=>x.leaf).filter(x=>{const t=c.T[x.i];if(UPD.pic&&t.pic!==UPD.pic)return false;const cur=rawAt(x,tms);
+  const leafRows=c.X.filter(x=>x.leaf).filter(x=>{const t=c.T[x.i];if(UPD.pic&&t.pic!==UPD.pic)return false;const cur=rawAt(x,tms);
     if(UPD.filter==='all')return true;if(UPD.filter==='need')return cur<100&&(planFracW(x,wt)>0||cur>0||(isFinite(x.sm)&&x.sm-tms<2*DAY));
     if(UPD.filter==='prog')return cur>0&&cur<100;if(UPD.filter==='late')return cur<100&&cur<planFracW(x,wt)*100-0.5;return true;});
+  // Show the WBS tree (task → sub-task → sub-sub-task) like the Jadwal & Task tab: every
+  // group that contains a listed leaf is shown as a header row with its rolled-up %.
+  const keep=new Set(leafRows.map(x=>x.i));leafRows.forEach(x=>{let p=x.parent;while(p!=null&&p>=0){keep.add(p);p=c.X[p].parent;}});
+  const rows=c.X.filter(x=>keep.has(x.i));
+  const ancOf=x=>{const a=[];let p=x.parent;while(p!=null&&p>=0){a.push(c.T[p].id);p=c.X[p].parent;}return a.join(' ');};
+  const grpPct=x=>{const L=x.leaves.map(j=>c.X[j]);const tot=sum(L.map(y=>y.eff));const w=L.map(y=>tot>0?y.eff/tot:1/Math.max(1,L.length));
+    return {pl:sum(L.map((y,k)=>w[k]*planFracW(y,wt)*100)),cur:sum(L.map((y,k)=>w[k]*rawAt(y,tms)))};};
   el.innerHTML=`<div class="card"><h3>Update Progress Lapangan <span class="sub">catat % kumulatif per task pada satu waktu update</span></h3>
   <div class="toolbar">
     <div class="field view-ok"><label>Waktu update</label><input class="inp" type="datetime-local" id="upd-time" value="${esc(UPD.time||toLocal(c.dd))}" onchange="UPD.time=this.value;renderProgress()"></div>
@@ -1248,17 +1261,39 @@ function renderProgress(){
     <label class="ed" style="display:flex;align-items:center;gap:6px;margin-left:auto;font-size:12px"><input type="checkbox" id="upd-setdd"${P.dataDateMode==='fixed'?' checked':''}> Jadikan Data Date</label>
     <button class="ed btn btn-ok" onclick="saveProgressSession()">💾 Simpan Update</button>
   </div>
-  ${rows.length?`<div class="tbl-wrap fill-h"><table class="t"><thead><tr><th>No</th><th>Task</th><th>PIC</th><th>Jadwal</th><th class="num">Renc. %</th><th class="num">Terakhir %</th><th style="min-width:230px">% Kumulatif baru</th><th>Catatan</th></tr></thead><tbody>
-  ${rows.map(x=>{const t=c.T[x.i];const cur=rawAt(x,tms);const pl=planFracW(x,wt)*100;return `<tr class="upd-row" data-id="${t.id}">
-    <td class="c mono">${x.i+1}</td><td>${esc(t.name)}${t.scope==='added'?' <span class="chip add">+VO</span>':''}${x.crit?' <span class="chip crit">CP</span>':''}${t.method!=='pct'?` <span class="chip" title="Metode progress">${t.method}</span>`:''}</td><td>${esc(t.pic)}</td>
+  ${leafRows.length?`<div class="toolbar view-ok" style="margin:-4px 0 6px"><button class="btn btn-sm" data-tip="Tampilkan semua sub-task" onclick="updFoldAll(false)">▾ Buka semua</button><button class="btn btn-sm" data-tip="Lipat semua grup, hanya tampilkan task utama" onclick="updFoldAll(true)">▸ Lipat semua</button>
+    <span class="hint">${leafRows.length} task · klik ▾/▸ pada grup untuk lipat/buka · tombol di baris grup mengisi semua sub-task di bawahnya</span></div>
+  <div class="tbl-wrap fill-h"><table class="t" id="upd-table"><thead><tr><th>No</th><th>WBS</th><th style="min-width:260px">Task / Pekerjaan</th><th>PIC</th><th>Jadwal</th><th class="num">Renc. %</th><th class="num">Terakhir %</th><th style="min-width:230px">% Kumulatif baru</th><th>Catatan</th></tr></thead><tbody>
+  ${rows.map(x=>{const t=c.T[x.i];const pad=`padding-left:${c.lvl[x.i]*18}px`;const anc=ancOf(x);
+    if(!x.leaf){const g=grpPct(x);const folded=UPD.fold.has(t.id);return `<tr class="upd-grp l${c.lvl[x.i]}" data-id="${t.id}" data-anc="${anc}">
+    <td class="c mono">${x.i+1}</td><td class="mono" style="color:var(--txt-3)">${c.wbs[x.i]}</td>
+    <td><div class="ucell" style="${pad}"><span class="utg" onclick="updFold('${t.id}')">${folded?'▸':'▾'}</span><span>${esc(t.name)}${t.scope==='added'?' <span class="chip add">+VO</span>':''}</span></div></td><td>${esc(t.pic)}</td>
+    <td style="font-size:11.5px;white-space:nowrap">${fmtWhen(x.sm)} → ${fmtWhen(x.fm)}</td><td class="num mono">${fp(g.pl,0)}</td><td class="num mono">${fp(g.cur,0)}</td>
+    <td><div style="display:flex;gap:4px;align-items:center"><span class="grp-new" data-grp="${t.id}"></span><span class="ed" style="display:flex;gap:4px">${[50,100].map(v=>`<button class="qbtn" onclick="qsetGrp('${t.id}',${v})" title="Isi semua sub-task di bawah grup ini dengan ${v}%">semua ${v}</button>`).join('')}</span></div></td><td></td></tr>`;}
+    const cur=rawAt(x,tms);const pl=planFracW(x,wt)*100;return `<tr class="upd-row" data-id="${t.id}" data-anc="${anc}">
+    <td class="c mono">${x.i+1}</td><td class="mono" style="color:var(--txt-3)">${c.wbs[x.i]}</td>
+    <td><div class="ucell" style="${pad}"><span class="utg">${t.type==='milestone'?'◆':'·'}</span><span>${esc(t.name)}${t.scope==='added'?' <span class="chip add">+VO</span>':''}${x.crit?' <span class="chip crit">CP</span>':''}${t.method!=='pct'?` <span class="chip" title="Metode progress">${t.method}</span>`:''}</span></div></td><td>${esc(t.pic)}</td>
     <td style="font-size:11.5px;white-space:nowrap">${fmtWhen(x.sm)} → ${fmtWhen(x.fm)}</td><td class="num mono">${fp(pl,0)}</td><td class="num mono">${fp(cur,0)}</td>
-    <td><div style="display:flex;gap:4px;align-items:center"><input class="ci num upd-v" type="number" min="0" max="100" step="any" placeholder="${Math.round(cur)}" data-cur="${cur}" style="width:66px;border-color:var(--bdr-2)" oninput="markUpd(this)">
+    <td><div style="display:flex;gap:4px;align-items:center"><input class="ci num upd-v" type="number" min="0" max="100" step="any" placeholder="${Math.round(cur)}" data-cur="${cur}" data-eff="${x.eff}" style="width:66px;border-color:var(--bdr-2)" oninput="markUpd(this)">
       ${[25,50,75,100].map(v=>`<button class="qbtn" onclick="qset(this,${v})">${v}</button>`).join('')}</div></td>
     <td><input class="ci upd-n" placeholder="opsional" style="min-width:140px;border-color:var(--bdr)"></td></tr>`;}).join('')}
   </tbody></table></div>`:`<div class="empty"><b>Tidak ada task untuk filter ini</b>Ubah filter atau waktu update.</div>`}
-  <p class="hint">Kosongkan kolom jika tidak ada perubahan. Nilai lebih kecil dari sebelumnya (mis. rework) tetap diizinkan dan ditandai oranye.</p></div>`;
+  <p class="hint">Kosongkan kolom jika tidak ada perubahan. Nilai lebih kecil dari sebelumnya (mis. rework) tetap diizinkan dan ditandai oranye. Baris grup (tebal) tidak diisi — % grup dihitung otomatis dari sub-task sesuai bobot.</p></div>`;
+  updApplyFold();
 }
-function markUpd(inp){const tr=inp.closest('tr');const v=parseFloat(inp.value);const cur=+inp.dataset.cur;tr.classList.toggle('changed',inp.value!==''&&v>=cur);tr.classList.toggle('down',inp.value!==''&&v<cur);}
+// Fold/unfold in the Progress tab only hides rows (no re-render), so values typed but not
+// yet saved are never lost.
+function updFold(id){UPD.fold.has(id)?UPD.fold.delete(id):UPD.fold.add(id);updApplyFold();}
+function updFoldAll(on){UPD.fold.clear();if(on)$$('#upd-table tr.upd-grp').forEach(tr=>UPD.fold.add(tr.dataset.id));updApplyFold();}
+function updApplyFold(){$$('#upd-table tbody tr').forEach(tr=>{const anc=(tr.dataset.anc||'').split(' ').filter(Boolean);tr.style.display=anc.some(a=>UPD.fold.has(a))?'none':'';
+  if(tr.classList.contains('upd-grp')){const g=tr.querySelector('.utg');if(g)g.textContent=UPD.fold.has(tr.dataset.id)?'▸':'▾';}});}
+function qsetGrp(id,v){$$('#upd-table tr.upd-row').forEach(tr=>{if(!(tr.dataset.anc||'').split(' ').includes(id))return;const inp=tr.querySelector('.upd-v');inp.value=v;markUpd(inp);});}
+// Live preview of each group's new rolled-up % while leaf values are being typed.
+function updGroupPreview(){$$('#upd-table tr.upd-grp').forEach(g=>{const id=g.dataset.id;let tot=0,acc=0,chg=false;
+  $$('#upd-table tr.upd-row').forEach(tr=>{if(!(tr.dataset.anc||'').split(' ').includes(id))return;const inp=tr.querySelector('.upd-v');const e=+inp.dataset.eff||0;
+    const val=inp.value!==''&&isFinite(parseFloat(inp.value))?(chg=true,clamp(parseFloat(inp.value),0,100)):+inp.dataset.cur;tot+=e;acc+=e*val;});
+  const el=g.querySelector('.grp-new');if(el)el.textContent=chg&&tot>0?'→ '+fp(acc/tot,0):'';});}
+function markUpd(inp){const tr=inp.closest('tr');const v=parseFloat(inp.value);const cur=+inp.dataset.cur;tr.classList.toggle('changed',inp.value!==''&&v>=cur);tr.classList.toggle('down',inp.value!==''&&v<cur);updGroupPreview();}
 function qset(b,v){const inp=b.closest('td').querySelector('.upd-v');inp.value=v;markUpd(inp);}
 function snapCheckpoint(){const cp=(+P.calendar.cpHours||3)*60;const tms=parseLocal($('#upd-time').value)||Date.now();const d=new Date(tms);const i=dayIdx(tms);
   const day=CAL.days[i];let best=tms;if(day&&day.wd){const m=(tms-day.ms)/60000;const s=CAL.W[0][0],e=CAL.W[CAL.W.length-1][1];let k=Math.round((clamp(m,s,e)-s)/cp);let mm=Math.min(e,s+k*cp);best=day.ms+mm*60000;}else{best=fromW(toW(tms),'finish');}

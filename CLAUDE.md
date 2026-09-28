@@ -3638,6 +3638,14 @@ approvals — its data model is a whole project, not a submission.
   binary search on the planned curve, SPI(t), IEAC(t) forecast finish and a forecast curve
   (remaining work follows the plan shape at SPI(t) speed). Baselines are frozen snapshots
   (`{id,start,finish,eff}` per leaf) — the S-curve shows Baseline vs current Rencana vs Aktual.
+- **Update Progress shows the WBS tree** (user request: "task, subtask, subsubtask" like the
+  Jadwal & Task tab). The filter still selects LEAF tasks; every ancestor group of a listed leaf
+  is added as a bold header row (`tr.upd-grp.l<level>`, indent 18px/level, WBS column) showing
+  the group's rolled-up Renc./Terakhir % at the update time (eff-weighted, `grpPct`). Groups have
+  no input — "semua 50/100" (`qsetGrp`) fills every descendant leaf, and `updGroupPreview()`
+  shows the group's new % live while typing. Fold/unfold (`UPD.fold`, `updFold`/`updFoldAll`)
+  only toggles `display` via each row's `data-anc` ancestor-id list — **never re-render the
+  tab for this**, a re-render drops values typed but not yet saved.
 - **Other tabs**: Update Progress (bulk field update at one timestamp), Gantt (SVG, auto zoom,
   dependency arrows, baseline ghost bars, float tails), Look-ahead by PIC, Baseline variance +
   variation register, Issue log + change log, Schedule Health (DCMA 14-point adapted).
