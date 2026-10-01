@@ -169,6 +169,7 @@ being reused from other origins; combined with App Check it's meaningful.
 | `weekly_dashboard` + `/workOrders` | Weekly Report Dashboard EIC7 | separate mini-app, own client-side password; permissive until Level 2 |
 | `motor_master` | `Motor_Witness_Test_Vendor.html` (registered motor list) | permissive read/write, same as the old Console rule; was missing from this file and got cut off by the first deploy of it (2026-09-24) — restored 2026-09-25 |
 | `project_schedules` | `Project_Progress_Monitor.html` | one doc per project; public read (share link); edit = creator / same team+area / supervisor / admin, delete = creator / admin — **app-gated only**; rules require `owner.user`+`team`+`area` on create, freeze `owner.user`/`createdAt`, and require `rev` to strictly increase (optimistic lock); client deletes allowed until Level 2 |
+| `feedback_reports` | `feedback-widget.js` (every check sheet + dashboard) / `Feedback_Reports.html` | bug & feedback reports; public create (status `baru`, title/type/size validated), update can only change status/priority/devNote/history — `createdAt`, reporter, title, description frozen; triage + delete app-gated (admin/supervisor, delete admin) until Level 2 |
 
 ## Deferred to Level 2 (Firebase Authentication)
 

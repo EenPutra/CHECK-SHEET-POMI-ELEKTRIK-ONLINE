@@ -2561,7 +2561,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20261001a`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20261001b`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a
@@ -2638,6 +2638,40 @@ every other shared lib. A brand-new check sheet just needs the one `<script>` ta
 - Works on dynamically-rendered tables (delegated listener, no per-table wiring) — verified
   headless across the SWGR megger grid, `Motor_Witness_Test_Vendor.html`,
   `Transformer_AT_NoDGA_Weekly.html`, and `4000_Hours_Mill_PM.html` with zero console errors.
+
+## `feedback-widget.js` + `Feedback_Reports.html` — bug / feedback reporting
+
+A small round 💬 button, bottom-right of **every page that loads `auth-session.js`** (all portal
+check sheets, the 3 generator `.tpl`s + their output, both dashboards — 63 files), included
+right after `auth-session.js` (`../` prefix in subfolders). Self-installing like
+`table-nav.js`, no `init()`. A new page just needs the `<script>` tag. Opens a compact panel:
+type (bug / kekurangan / saran / tampilan / lainnya), priority, title + description (required),
+reproduce steps (bug only), up to 3 screenshots (file picker or **Ctrl+V paste**, canvas-shrunk
+to 1280px JPEG, all together kept under ~600KB so the doc stays below Firestore's 1MB cap),
+reporter (prefilled from `AuthSession`, editable — no login required), optional contact.
+- **Auto context** (opt-out checkbox, "lihat" shows the JSON): page title/file/url, UA, viewport,
+  screen, online, theme, app `?v=`, session user/role/team/area, and the **last 20 errors on the
+  page** — captured from script load via `error` (incl. failed resource loads),
+  `unhandledrejection`, and a `console.error` wrapper. Errors thrown before the script loaded
+  are not captured.
+- Writes `feedback_reports` (`status:'baru'`, `history[]`, ISO `createdAt`). On failure
+  (offline / rules) the doc goes to `localStorage['fb_queue']` (screenshots dropped if quota is
+  hit) and is retried 4s after every page load and whenever the panel opens; a red count dot on
+  the button shows pending items. Unsent text is kept in `localStorage['fb_draft']`.
+- **Sits above submit-guard's `#sg-datasaver-badge`** (same corner) — `reposition()` measures
+  the badge with `getBoundingClientRect()` on a body `MutationObserver`; `offsetParent` is always
+  `null` for a `position:fixed` element, so don't use it to test visibility (first version did
+  and the button covered the badge).
+- `Feedback_Reports.html` (portal card `feedback-reports`, category `report`): login with the
+  shared `dashboard_users` account (any role can view). Stat cards (clickable filters), search /
+  status (default "belum selesai") / type / priority / page / sort, detail dialog
+  (`?id=<docId>` deep link) with screenshots, page errors, env, history. **Admin + supervisor**
+  change status (`baru → ditinjau → dikerjakan → selesai / ditolak`), priority and a developer
+  note (appends a `history` entry); **admin only** deletes. "📋 Salin untuk Developer" copies the
+  filtered list (or one report) as Markdown — ready to paste into a dev session; "⬇️ CSV" exports.
+- Rules (`firestore.rules`, deployed 2026-10-01): public create only as `status:'baru'` with a
+  known `type` and size-capped title/description; update cannot change `createdAt`, `reporter`,
+  `title`, `description`; status must stay in the known set. Role gates are app-side (Level 1).
 
 ## Technician login on check sheets — auto-filling "Checked By" (`technician-auth.js`)
 

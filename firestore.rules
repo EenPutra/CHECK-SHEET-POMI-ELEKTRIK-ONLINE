@@ -171,6 +171,34 @@ service cloud.firestore {
       allow delete: if true;   // TODO(level-2): owner/admin only (app-gated today)
     }
 
+    // ---------------------------------------------------------
+    //  feedback_reports — "Laporkan Bug / Masukan" (feedback-widget.js,
+    //  loaded on every check sheet + dashboard). Anyone can file a report
+    //  (no login needed in the field); Feedback_Reports.html lists them and
+    //  lets admin/supervisor change status (app-gated until Level 2).
+    //   - a report must be created as status 'baru' with a title, a known
+    //     type, and a size-capped body
+    //   - an update can only move status inside the known set and can
+    //     never rewrite createdAt / the reporter / the original text
+    // ---------------------------------------------------------
+    function fbStatus(s) { return s in ['baru', 'ditinjau', 'dikerjakan', 'selesai', 'ditolak']; }
+    match /feedback_reports/{doc} {
+      allow read: if true;
+      allow create: if request.resource.data.status == 'baru'
+                    && isString(request.resource.data.title)
+                    && request.resource.data.title.size() > 0
+                    && request.resource.data.title.size() <= 200
+                    && isString(request.resource.data.description)
+                    && request.resource.data.description.size() <= 5000
+                    && request.resource.data.type in ['bug', 'kekurangan', 'saran', 'tampilan', 'lainnya'];
+      allow update: if fbStatus(request.resource.data.status)
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.reporter == resource.data.reporter
+                    && request.resource.data.title == resource.data.title
+                    && request.resource.data.description == resource.data.description;
+      allow delete: if true;   // TODO(level-2): admin only (app-gated today)
+    }
+
     // No catch-all: any collection not matched above is DENIED. Add a
     // new match block here (and to SECURITY.md's inventory) when a new
     // collection is introduced.
