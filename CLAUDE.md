@@ -2561,7 +2561,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20260923a`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20261001a`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a
@@ -2710,6 +2710,19 @@ elsewhere in this file — pick up the change without needing their own dedicate
 `TechnicianAuth.logout()`, which clears the shared session, clears the field back to empty, and
 restores it to editable — for a shared device where a different technician takes over the same
 tablet/computer for the next visit.
+
+**While logged in, the field is LOCKED to the logged-in name against script writes too
+(2026-10-01).** Bug report: pull data from the database (Load & Merge / Muat Draft / Mode Timpa /
+revision restore), then switch login → the submit still carried the PIC from the pulled doc.
+`readOnly` only blocks typing; every restore path (`applyMergedBundleToForm()`, a sheet's own
+`loadDraft()`/`loadLastFromDb()`) writes `.value = …` and silently replaced the name. Fix:
+`guardField()` installs a per-element `value` setter that forces any write to `_lockedName`
+while logged in (pass-through when logged out, so logout + manual typing still works). Plus a
+`storage` + `visibilitychange` listener (`syncFromSession()`, exposed as
+`TechnicianAuth.reapply()`) so a login switch in ANOTHER tab (e.g. the dashboard) updates an
+already-open check sheet. Exception: `?reviseOf=` opened by `techop2`/`supervisor`/`admin`
+(a reviewer correcting someone else's report) does NOT lock — the original PIC is restored and
+kept. A technician revising their own report stays locked to their own name.
 
 Widget DOM is injected as a sibling right after whichever wrapper (`.mf`, this codebase's common
 `<div class="mf"><label>...</label><input></div>` pattern) contains the Checked-By field, or

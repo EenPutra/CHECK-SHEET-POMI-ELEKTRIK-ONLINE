@@ -35,6 +35,35 @@
 const TechnicianAuth = (function () {
   let _config = null;
   let _domReady = false;
+  // Name the Checked-By field is locked to while logged in (null = not locked).
+  let _lockedName = null;
+
+  // Elevated roles opening ?reviseOf= are correcting SOMEONE ELSE's report —
+  // the original PIC must survive the restore, so no lock in that case.
+  function _isReviewerRevision(session) {
+    try {
+      if (!new URLSearchParams(location.search).get('reviseOf')) return false;
+    } catch (e) { return false; }
+    return ['techop2', 'supervisor', 'admin'].includes((session && session.role) || '');
+  }
+
+  // Every restore path (Load & Merge, Muat Draft, revision restore, a sheet's
+  // own loadDraft()/loadLastFromDb()) writes the field via `.value = …`, and
+  // readOnly does not block a script write — so the PIC from the pulled
+  // database doc used to replace the logged-in name. While logged in, this
+  // per-element setter forces every write back to the logged-in name.
+  function guardField(field) {
+    if (!field || field.__taGuard) return;
+    let proto = Object.getPrototypeOf(field), desc = null;
+    while (proto && !(desc = Object.getOwnPropertyDescriptor(proto, 'value'))) proto = Object.getPrototypeOf(proto);
+    if (!desc || !desc.set || !desc.get) return;
+    Object.defineProperty(field, 'value', {
+      configurable: true,
+      get() { return desc.get.call(this); },
+      set(v) { desc.set.call(this, _lockedName != null ? _lockedName : v); },
+    });
+    field.__taGuard = true;
+  }
 
   async function hashPass(str) {
     const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
@@ -138,7 +167,16 @@ const TechnicianAuth = (function () {
 
   function applySession(session) {
     const field = document.getElementById(_config.checkedByFieldId);
+    if (field && _isReviewerRevision(session)) {
+      // Reviewer fixing another technician's report: keep the field editable
+      // and let the revision restore bring back the original PIC.
+      _lockedName = null;
+      renderLoggedIn(session);
+      return;
+    }
     if (field) {
+      _lockedName = session.name;
+      guardField(field);
       field.value = session.name;
       field.readOnly = true;
       field.style.background = '#f0f7ff';
@@ -153,6 +191,7 @@ const TechnicianAuth = (function () {
   }
 
   function clearSession() {
+    _lockedName = null;
     const field = document.getElementById(_config.checkedByFieldId);
     if (field) {
       field.readOnly = false;
@@ -220,6 +259,7 @@ const TechnicianAuth = (function () {
       sessionStorage.removeItem('dashboard_role');
       sessionStorage.removeItem('dashboard_name');
     }
+    _lockedName = null;
     const field = document.getElementById(_config.checkedByFieldId);
     if (field) field.value = '';
     clearSession();
@@ -242,12 +282,37 @@ const TechnicianAuth = (function () {
     // technician can still type/submit — but keep whatever they already
     // typed, don't wipe an in-progress form.
     if (window.AuthSession) window.AuthSession.onExpire(() => {
+      _lockedName = null;
       const field = document.getElementById(_config.checkedByFieldId);
       if (field) { field.readOnly = false; field.style.background = ''; field.style.cursor = ''; }
       renderLoggedOut();
       if (typeof showNote === 'function') showNote('⏳ Sesi login berakhir (1 jam tanpa aktivitas). Login lagi bila perlu.', 'info');
     });
+    // Account switched in ANOTHER tab (e.g. logged in as a different user on
+    // the dashboard): follow it here too, or the old name would be submitted.
+    window.addEventListener('storage', e => {
+      if (e.key === 'dashboard_user' || e.key === 'dashboard_name' || e.key === null) syncFromSession();
+    });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) syncFromSession(); });
   }
 
-  return { init, openModal, logout, _submit: submit, _closeModal: closeModal };
+  // Re-read the shared session and make the field match it. Safe to call any
+  // time (also exposed as TechnicianAuth.reapply()).
+  function syncFromSession() {
+    if (!_config) return;
+    const field = document.getElementById(_config.checkedByFieldId);
+    if (!field) return;
+    const session = currentSession();
+    if (session) {
+      if (_lockedName !== session.name || field.value !== session.name) {
+        const changed = _lockedName != null && _lockedName !== session.name;
+        applySession(session);
+        if (changed && typeof showNote === 'function') showNote('🔄 Login berganti — Checked By sekarang: ' + session.name + '.', 'info');
+      }
+    } else if (_lockedName != null) {
+      clearSession();
+    }
+  }
+
+  return { init, openModal, logout, reapply: syncFromSession, _submit: submit, _closeModal: closeModal };
 })();
