@@ -226,6 +226,18 @@ details.std summary{cursor:pointer;font-weight:700;color:var(--navy)}
 .seg button{border:none;background:#fff;padding:6px 11px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--txt-2)}
 .seg button.on{background:var(--pri);color:#fff}
 .pk-list{display:flex;flex-direction:column;gap:8px;max-height:62vh;overflow:auto;padding:2px}
+.ed-box{margin-top:12px;border:1px solid var(--bdr);border-radius:10px;padding:10px 12px;background:#f8fafc}
+.ed-hd{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}.ed-hd .btn{margin-left:auto}
+.ed-chips{display:flex;flex-wrap:wrap;gap:6px}
+.ed-chip{display:inline-flex;align-items:center;gap:5px;background:#fff;border:1px solid var(--bdr);border-radius:999px;padding:3px 6px 3px 10px;font-size:12.5px}
+.ed-chip button{border:0;background:#e2e8f0;color:#334155;width:18px;height:18px;border-radius:50%;cursor:pointer;line-height:18px;padding:0;font-size:13px}
+.ed-chip button:hover{background:var(--ng);color:#fff}
+.ed-team{display:flex;gap:7px;align-items:flex-start;margin-top:10px;font-size:12.5px;cursor:pointer}
+.edp-list{max-height:min(52vh,440px);overflow:auto;border:1px solid var(--bdr);border-radius:8px}
+.edp-row{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;padding:7px 10px;border-bottom:1px solid var(--bdr);cursor:pointer;align-items:center}
+.edp-row:last-child{border-bottom:0}.edp-row:hover{background:#f1f5f9}
+.edp-row>.hint{grid-column:2;font-size:11.5px}.edp-row.dis{opacity:.6;cursor:default}
+.edp-row .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pk-card{display:grid;grid-template-columns:minmax(0,1fr) 190px auto;gap:12px;align-items:center;border:1px solid var(--bdr);border-radius:12px;padding:10px 12px;background:#fff}
 .pk-card.cur{border-color:var(--pri);box-shadow:0 0 0 2px var(--pri-soft)}
 .pk-card b.nm{color:var(--navy);font-size:14px}
@@ -334,18 +346,24 @@ function areaList(a){if(window.TeamRouting)return TeamRouting.toAreaList(a);if(A
 function sess(){try{const s=window.AuthSession&&AuthSession.get();if(!s||!s.user)return null;return {user:s.user,name:s.name||s.user,role:s.role||'',team:s.team||'',areas:areaList(s.area)};}catch(e){return null;}}
 function who(){const s=sess();return s?s.name:'';}
 const ROLE_LBL={technician:'Teknisi',techop2:'TechOp2',supervisor:'Supervisor',admin:'Admin'};
-// Edit rights: admin & supervisor -> every project; the creator -> own project; anyone logged in whose team
-// matches the project's team and whose area list contains the project's area. Everyone else,
+// Edit rights: admin & supervisor -> every project; the creator -> own project; the members the
+// creator picked (`editors`, usernames from dashboard_users); and — unless the creator switched
+// `teamAccess` off — anyone logged in whose team matches the project's team and whose area list
+// contains the project's area. Everyone else,
 // including anyone who only has the link, is read-only. NOTE: enforced in the app, not by
 // Firestore (no Firebase Auth yet) — see SECURITY.md "Level 2".
 const EDIT_ALL_ROLES=['admin','supervisor'];
 function canEdit(p){p=p||P;const s=sess();if(!s||!p)return false;if(EDIT_ALL_ROLES.includes(s.role))return true;
   if(!p.owner||!p.owner.user)return false;if(p.owner.user===s.user)return true;
-  return !!(p.team&&p.area&&s.team===p.team&&s.areas.includes(p.area));}
+  if(isEditorMember(p,s.user))return true;
+  return !!(p.teamAccess!==false&&p.team&&p.area&&s.team===p.team&&s.areas.includes(p.area));}
+function isEditorMember(p,user){user=String(user||'').toLowerCase();return !!user&&(p.editors||[]).some(e=>e.user===user);}
+function accessSummary(p){p=p||P;const n=(p.editors||[]).length;
+  return `pembuat (${p.owner?p.owner.name||p.owner.user:'—'})`+(n?`, ${n} anggota editor`:'')+(p.teamAccess!==false?`, tim ${p.team||'?'} · ${p.area||'?'}`:'')+', Supervisor, dan Admin';}
 function canManage(p){p=p||P;const s=sess();return !!(s&&p&&(s.role==='admin'||(p.owner&&p.owner.user===s.user)));}
 function denyReason(){const s=sess();if(!P)return '';if(!s)return 'Mode baca saja — login untuk mengedit.';
   if(!P.owner||!P.owner.user)return 'Proyek belum punya pemilik — klaim di tab Pengaturan.';
-  return `Mode baca saja — hanya pembuat (${P.owner.name||P.owner.user}), tim ${P.team||'?'} · ${P.area||'?'}, Supervisor, dan Admin yang bisa mengedit.`;}
+  return `Mode baca saja — hanya ${accessSummary()} yang bisa mengedit. Minta pembuat proyek menambahkan Anda sebagai anggota editor.`;}
 function guard(){if(P&&canEdit())return true;toast('🔒 '+denyReason(),4500);return false;}
 async function hashPass(str){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 function openLogin(msg){
@@ -386,7 +404,7 @@ function shareLink(){
   const inCloud=!!CLOUD.remote[P.id];
   const done=()=>openModal(`<div class="mh"><b>🔗 Bagikan proyek</b><button class="x" onclick="closeModal()">×</button></div><div class="mb">
     <div class="field"><label>Link</label><input class="inp mono" value="${esc(url)}" onclick="this.select()" readonly></div>
-    <div class="note" style="margin-top:10px">Siapa pun yang membuka link ini bisa <b>melihat</b> proyek (dashboard, S-curve, Gantt, export PDF/Excel) tanpa login. Yang bisa <b>mengedit</b> hanya pembuat proyek (${esc(P.owner?P.owner.name||P.owner.user:'—')}), akun tim <b>${esc(P.team||'—')} · ${esc(P.area||'—')}</b>, Supervisor, dan Admin yang login.</div>
+    <div class="note" style="margin-top:10px">Siapa pun yang membuka link ini bisa <b>melihat</b> proyek (dashboard, S-curve, Gantt, export PDF/Excel) tanpa login. Yang bisa <b>mengedit</b> hanya ${esc(accessSummary())} yang login.</div>
     ${inCloud?'':'<div class="note warn">Proyek ini belum tersimpan di cloud, jadi link belum bisa dibuka di perangkat lain. '+(canEdit()?'Klik ☁ untuk menyimpan.':'Minta pemilik proyek menyimpannya ke cloud.')+'</div>'}</div>
     <div class="mf"><button class="btn btn-pri" onclick="closeModal()">Selesai</button></div>`);
   try{navigator.clipboard.writeText(url).then(()=>{toast('Link disalin');done();},done);}catch(e){done();}
@@ -416,7 +434,7 @@ function defaultProject(name){
     startDate:toLocal(s.getTime()),deadline:'',
     calendar:{workDays:[1,2,3,4,5],startTime:'07:00',endTime:'16:00',breakOn:false,breakStart:'12:00',breakEnd:'13:00',holidays:[],cpHours:3},
     precision:'day',weightMode:'manual',dataDateMode:'now',dataDate:'',curveGran:'auto',
-    thresholds:{warn:0.95,crit:0.90},cloudSync:true,
+    thresholds:{warn:0.95,crit:0.90},cloudSync:true,editors:[],teamAccess:true,
     tasks:[],baselines:[],activeBaselineId:'',changes:[],issues:[],
     rev:0,createdAt:new Date().toISOString(),updatedAt:new Date().toISOString(),updatedBy:who()};
 }
@@ -427,8 +445,12 @@ function normalizeProject(p){
   p.calendar=Object.assign({},d.calendar,p.calendar||{});
   p.thresholds=Object.assign({},d.thresholds,p.thresholds||{});
   p.tasks=(p.tasks||[]).map(t=>newTask(t));
+  p.editors=normEditors(p.editors);
   return p;
 }
+// Members the project owner picked from dashboard_users: [{user, name}] (user = username, lowercase).
+function normEditors(a){const seen=new Set();return (Array.isArray(a)?a:[]).map(e=>typeof e==='string'?{user:e,name:e}:e)
+  .filter(e=>e&&e.user&&!seen.has(String(e.user).toLowerCase())&&seen.add(String(e.user).toLowerCase())).map(e=>({user:String(e.user).toLowerCase(),name:e.name||e.user}));}
 function loadStore(){
   try{const raw=localStorage.getItem(LS_KEY);if(raw){const s=JSON.parse(raw);if(s&&s.projects)STORE=s;}}catch(e){console.warn(e);}
   Object.values(STORE.projects).forEach(normalizeProject);
@@ -516,7 +538,7 @@ function showConflict(remote){
   <button class="btn btn-ng" onclick="closeModal();cloudSave(true,true)">&#11014;&#65039; Timpa cloud dengan versi saya</button></div>`);
 }
 function stampSummary(){if(!C||!P||!C.cnt)return;P.summary={ev:+C.EV.toFixed(2),pv:+C.PV.toFixed(2),spi:isFinite(C.SPI)?+C.SPI.toFixed(3):null,status:C.status.t,statusK:C.status.k,done:C.cnt.done,total:C.cnt.total,at:new Date().toISOString()};}
-function remoteMeta(d){return {summary:d.summary||null,rev:d.rev||0,name:d.name,updatedAt:d.updatedAt,updatedBy:d.updatedBy,team:d.team||'',area:d.area||'',owner:d.owner||null,location:d.location||'',nTasks:(d.tasks||[]).length};}
+function remoteMeta(d){return {summary:d.summary||null,rev:d.rev||0,name:d.name,updatedAt:d.updatedAt,updatedBy:d.updatedBy,team:d.team||'',area:d.area||'',owner:d.owner||null,editors:normEditors(d.editors),teamAccess:d.teamAccess!==false,location:d.location||'',nTasks:(d.tasks||[]).length};}
 async function adoptCloud(id,quiet){
   id=id||(P&&P.id);if(!id||!cloudReady())return false;
   try{const snap=await db.collection(CLOUD_COL).doc(id).get();if(!snap.exists){if(!quiet)toast('Proyek tidak ditemukan di cloud (mungkin sudah dihapus).',4500);return false;}
@@ -793,7 +815,7 @@ let PK={q:'',f:'all'};
 function projectIndex(){
   const m={};
   Object.values(STORE.projects).forEach(p=>{m[p.id]={id:p.id,name:p.name,team:p.team||'',area:p.area||'',owner:p.owner||null,location:p.location||'',nTasks:(p.tasks||[]).length,
-    updatedAt:p.updatedAt,updatedBy:p.updatedBy,summary:p.summary||null,local:true,dirty:!!p._dirty,cloud:false};});
+    editors:p.editors||[],teamAccess:p.teamAccess!==false,updatedAt:p.updatedAt,updatedBy:p.updatedBy,summary:p.summary||null,local:true,dirty:!!p._dirty,cloud:false};});
   Object.entries(CLOUD.remote).forEach(([id,r])=>{const l=m[id];if(l&&l.dirty){l.cloud=true;return;}m[id]=Object.assign({},r,{id,local:!!l,dirty:false,cloud:true});});
   return Object.values(m).sort((a,b)=>String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')));
 }
@@ -1643,7 +1665,77 @@ function accessCard(){const s=sess();const o=P.owner;const mg=canManage();
   ${o&&o.user?`<div class="fgrid view-ok" style="margin-top:10px">${mg&&Object.keys(scopeOptions()).length?scopeSelects(P.team,P.area,'ac-team','ac-area')+`<div class="field"><label>&nbsp;</label><button class="btn btn-pri" onclick="saveScope()">Simpan Team/Area</button></div>`
      :`<div class="field"><label>Team · Area yang bisa mengedit</label><div><b>${esc(P.team||'—')} · ${esc(P.area||'—')}</b></div></div>`}</div>`
    :(s&&Object.keys(scopeOptions()).length?`<div class="note warn" style="margin-top:10px">Proyek ini dibuat sebelum ada kepemilikan. Klaim untuk menjadikan Anda pemilik; setelah itu hanya Anda dan tim Anda yang bisa mengedit.</div><div class="fgrid view-ok">${scopeSelects(s.team,s.areas[0],'ac-team','ac-area')}<div class="field"><label>&nbsp;</label><button class="btn btn-pri" onclick="claimProject()">Klaim proyek ini</button></div></div>`:'')}
-  <p class="hint" style="margin-top:10px">Aturan akses: siapa pun dengan link bisa melihat. Mengedit hanya pemilik, akun dengan Team &amp; Area yang sama, Supervisor, dan Admin. Menghapus proyek hanya pemilik atau Admin. Login memakai akun Review &amp; Approval Dashboard.</p></div>`;}
+  ${o&&o.user?editorsSection(mg):''}
+  <p class="hint" style="margin-top:10px">Aturan akses: siapa pun dengan link bisa melihat. Mengedit hanya pemilik, anggota editor yang dipilih pemilik${P.teamAccess!==false?', akun dengan Team &amp; Area yang sama':''}, Supervisor, dan Admin. Mengatur anggota editor, Team/Area, dan menghapus proyek hanya pemilik atau Admin. Login memakai akun Review &amp; Approval Dashboard.</p></div>`;}
+function editorsSection(mg){const ed=P.editors||[];
+  return `<div class="ed-box view-ok"><div class="ed-hd"><b>👥 Anggota editor</b><span class="hint">${ed.length} orang dipilih pemilik</span>
+      ${mg?`<button class="btn btn-sm btn-pri" data-tip="Pilih akun (username) yang boleh mengedit proyek ini, dari daftar akun yang terdaftar." onclick="openEditorPicker()">＋ Kelola anggota</button>`:''}</div>
+    <div class="ed-chips">${ed.length?ed.map(e=>`<span class="ed-chip">👤 <b>${esc(e.name)}</b> <span class="hint">@${esc(e.user)}</span>${mg?`<button data-tip="Hapus ${esc(e.name)} dari anggota editor." onclick="removeEditor('${esc(e.user)}')">×</button>`:''}</span>`).join('')
+      :`<span class="hint">${mg?'Belum ada. Klik "Kelola anggota" untuk memilih siapa saja yang boleh mengedit.':'Belum ada anggota editor yang dipilih.'}</span>`}</div>
+    <label class="ed-team"><input type="checkbox" ${P.teamAccess!==false?'checked':''} ${mg?'':'disabled'} onchange="setTeamAccess(this.checked)">
+      <span>Semua akun tim <b>${esc(P.team||'—')} · ${esc(P.area||'—')}</b> otomatis bisa mengedit <span class="hint">— matikan agar hanya pemilik &amp; anggota di atas (plus Supervisor/Admin) yang bisa mengedit</span></span></label></div>`;}
+function removeEditor(user){if(!canManage())return;const e=(P.editors||[]).find(x=>x.user===user);if(!e)return;
+  if(!confirm(`Hapus ${e.name} (@${e.user}) dari anggota editor?`))return;
+  pushUndo();P.editors=P.editors.filter(x=>x.user!==user);logChange('project',`Anggota editor dihapus: ${e.name} (@${e.user})`);commit(true);toast('Anggota dihapus');}
+function setTeamAccess(on){if(!canManage()){renderAll();return;}if((P.teamAccess!==false)===on)return;
+  if(!on&&!(P.editors||[]).length&&!confirm('Belum ada anggota editor. Kalau akses tim dimatikan, hanya Anda, Supervisor, dan Admin yang bisa mengedit. Lanjutkan?')){renderAll();return;}
+  pushUndo();P.teamAccess=on;logChange('project',on?`Akses edit tim ${P.team} · ${P.area} diaktifkan`:`Akses edit otomatis tim ${P.team} · ${P.area} dimatikan — hanya anggota editor terpilih`);commit(true);toast(on?'Tim Team/Area bisa mengedit':'Hanya anggota terpilih yang bisa mengedit');}
+
+// ── picker: choose editors from the registered accounts (dashboard_users) ──
+let USERS=null;
+async function loadUsers(force){
+  if(USERS&&!force)return USERS;
+  if(!cloudReady())throw new Error('Database tidak terjangkau (offline?).');
+  const snap=await db.collection('dashboard_users').get();
+  // only what the picker needs — never keep the password hash around
+  USERS=snap.docs.map(d=>{const u=d.data();return {user:String(u.username||'').toLowerCase(),name:u.name||u.username||'',role:u.role||'',team:u.team||'',areas:areaList(u.area)};})
+    .filter(u=>u.user).sort((a,b)=>a.name.localeCompare(b.name));
+  return USERS;
+}
+let EDP={sel:new Set()};
+async function openEditorPicker(){
+  if(!canManage()){toast('Hanya pembuat proyek atau Admin yang bisa mengatur anggota editor.');return;}
+  openModal(`<div class="mh"><b>👥 Anggota editor</b><button class="x" onclick="closeModal()">×</button></div><div class="mb"><div class="hint">Memuat daftar akun…</div></div>`);
+  let users;try{users=await loadUsers(true);}catch(e){openModal(`<div class="mh"><b>👥 Anggota editor</b><button class="x" onclick="closeModal()">×</button></div><div class="mb"><div class="note warn">Gagal memuat daftar akun: ${esc(e.message||e)}</div></div><div class="mf"><button class="btn" onclick="closeModal()">Tutup</button></div>`);return;}
+  EDP.sel=new Set((P.editors||[]).map(e=>e.user));
+  const teams=[...new Set(users.map(u=>u.team).filter(Boolean))].sort();
+  const owner=P.owner&&P.owner.user;
+  const row=u=>{const always=u.user===owner||EDIT_ALL_ROLES.includes(u.role);
+    const why=u.user===owner?'Pemilik':EDIT_ALL_ROLES.includes(u.role)?'Sudah bisa edit semua proyek':'';
+    return `<label class="edp-row${always?' dis':''}" data-q="${esc((u.name+' '+u.user+' '+u.team+' '+u.areas.join(' ')+' '+(ROLE_LBL[u.role]||u.role)).toLowerCase())}" data-team="${esc(u.team)}">
+      <input type="checkbox" value="${esc(u.user)}" ${always?'disabled':''} ${EDP.sel.has(u.user)||always?'checked':''} onchange="edpToggle(this)">
+      <span class="nm"><b>${esc(u.name)}</b> <span class="hint">@${esc(u.user)}</span></span>
+      <span class="hint">${esc(ROLE_LBL[u.role]||u.role||'—')}${u.team?' · '+esc(u.team+' '+u.areas.join('/')):''}${why?' · <i>'+why+'</i>':''}</span></label>`;};
+  openModal(`<div class="mh"><b>👥 Anggota editor — ${esc(P.name)}</b><button class="x" onclick="closeModal()">×</button></div>
+  <div class="mb"><p class="hint" style="margin-top:0">Centang akun yang boleh mengedit proyek ini (jadwal, progress, issue, dll). Pengaturan proyek &amp; anggota tetap hanya pemilik dan Admin.</p>
+    <div class="toolbar" style="margin-bottom:8px"><input class="inp" id="edp-q" placeholder="Cari nama / username / team / area…" oninput="edpFilter()" style="flex:1;min-width:160px">
+      <select class="inp" id="edp-team" style="width:auto" onchange="edpFilter()"><option value="">Semua team</option>${teams.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
+      <label style="display:flex;gap:5px;align-items:center;font-size:12px;font-weight:600"><input type="checkbox" id="edp-only" onchange="edpFilter()"> Hanya yang dipilih</label></div>
+    <div class="edp-list" id="edp-list">${users.map(row).join('')}</div>
+    <div class="toolbar" style="margin-top:8px"><button class="btn btn-sm" data-tip="Centang semua akun yang sedang tampil di daftar (hasil pencarian/filter)." onclick="edpAll(true)">Pilih semua yang tampil</button><button class="btn btn-sm" data-tip="Hapus centang semua akun yang sedang tampil di daftar." onclick="edpAll(false)">Kosongkan yang tampil</button><span class="hint" id="edp-count"></span></div></div>
+  <div class="mf"><button class="btn" onclick="closeModal()">Batal</button><button class="btn btn-pri" onclick="saveEditors()">Simpan anggota</button></div>`);
+  edpCount();setTimeout(()=>{const e=$('#edp-q');if(e)e.focus();},50);
+}
+function edpToggle(cb){cb.checked?EDP.sel.add(cb.value):EDP.sel.delete(cb.value);edpCount();if($('#edp-only').checked)edpFilter();}
+function edpFilter(){const q=$('#edp-q').value.trim().toLowerCase(),t=$('#edp-team').value,only=$('#edp-only').checked;
+  document.querySelectorAll('#edp-list .edp-row').forEach(r=>{const cb=r.querySelector('input');
+    const show=(!q||r.dataset.q.includes(q))&&(!t||r.dataset.team===t)&&(!only||(!cb.disabled&&EDP.sel.has(cb.value)));r.style.display=show?'':'none';});}
+function edpAll(on){document.querySelectorAll('#edp-list .edp-row').forEach(r=>{if(r.style.display==='none')return;const cb=r.querySelector('input');if(cb.disabled)return;cb.checked=on;on?EDP.sel.add(cb.value):EDP.sel.delete(cb.value);});edpCount();}
+function edpCount(){const el=$('#edp-count');if(el)el.textContent=EDP.sel.size+' anggota dipilih';}
+function saveEditors(){
+  if(!canManage())return;
+  const owner=P.owner&&P.owner.user;
+  const next=(USERS||[]).filter(u=>EDP.sel.has(u.user)&&u.user!==owner).map(u=>({user:u.user,name:u.name}));
+  // keep a selected member whose account no longer exists (not in USERS) rather than silently dropping them
+  (P.editors||[]).forEach(e=>{if(EDP.sel.has(e.user)&&!(USERS||[]).some(u=>u.user===e.user))next.push(e);});
+  const before=new Set((P.editors||[]).map(e=>e.user)),after=new Set(next.map(e=>e.user));
+  const added=next.filter(e=>!before.has(e.user)),removed=(P.editors||[]).filter(e=>!after.has(e.user));
+  closeModal();
+  if(!added.length&&!removed.length){toast('Tidak ada perubahan');return;}
+  pushUndo();P.editors=next;
+  logChange('project','Anggota editor'+(added.length?' + '+added.map(e=>e.name).join(', '):'')+(removed.length?(added.length?';':'')+' − '+removed.map(e=>e.name).join(', '):''));
+  commit(true);toast(`Anggota editor disimpan (${next.length} orang)`);
+}
 function saveScope(){if(!canManage())return;const t=$('#ac-team').value,a=$('#ac-area').value;if(t===P.team&&a===P.area)return;pushUndo();logChange('project',`Team/Area proyek ${P.team||'—'} · ${P.area||'—'} → ${t} · ${a}`);P.team=t;P.area=a;commit(true);toast('Team/Area disimpan');}
 function claimProject(){const s=sess();if(!s||(P.owner&&P.owner.user))return;pushUndo();setOwner(P,$('#ac-team').value,$('#ac-area').value);logChange('project',`Proyek diklaim oleh ${s.name} (${P.team} · ${P.area})`);commit(true);toast('Proyek sekarang milik Anda');}
 function renderSettings(){
@@ -1710,7 +1802,7 @@ function openNewProject(){
   <div class="field"><label>Presisi jadwal</label><select class="inp" id="np-prec"><option value="day">Harian</option><option value="hour">Per jam (shutdown / pekerjaan singkat)</option></select></div>
   <div class="field"><label>Lokasi / Unit</label><input class="inp" id="np-loc"></div>
   ${scopeSelects(s.team,s.areas[0],'np-team','np-area')}</div>
-  <div class="note" style="margin-top:10px">Pemilik: <b>${esc(s.name)}</b>. Yang bisa mengedit: Anda, semua akun tim yang dipilih, Supervisor, dan Admin. Pihak lain dengan link hanya bisa melihat.</div>
+  <div class="note" style="margin-top:10px">Pemilik: <b>${esc(s.name)}</b>. Yang bisa mengedit: Anda, semua akun tim yang dipilih, Supervisor, dan Admin. Setelah proyek dibuat, Anda bisa menambah anggota editor dari akun yang terdaftar di tab ⚙ Pengaturan. Pihak lain dengan link hanya bisa melihat.</div>
   <p class="hint">Atau gunakan <b>📥 Import</b> untuk memuat dari Excel template "PM System Step Estimasi S-Curve Progress" / file Excel hasil export aplikasi ini / backup JSON.</p></div>
   <div class="mf"><button class="btn" onclick="closeModal()">Batal</button><button class="btn btn-pri" onclick="createProject()">Buat</button></div>`);
   setTimeout(()=>{const e=$('#np-name');if(e)e.focus();},50);
@@ -2001,6 +2093,11 @@ const TIP_RULES=[
   [/openProject/,['Buka proyek','Tampilkan dashboard proyek ini.']],
   [/PK\.f=/,null],
   [/COLLAPSED\.clear/,['Buka semua','Tampilkan semua sub-task yang sedang dilipat.']],
+  [/openEditorPicker/,['Kelola anggota editor','Pilih akun (username terdaftar) yang boleh mengedit proyek ini. Hanya pembuat proyek dan Admin.']],
+  [/saveEditors/,['Simpan anggota','Simpan daftar anggota editor. Perubahan tercatat di change log.']],
+  [/removeEditor/,['Hapus anggota','Cabut hak edit akun ini dari proyek.']],
+  [/edpAll\(true/,['Pilih semua','Centang semua akun yang sedang tampil di daftar.']],
+  [/edpAll\(false/,['Kosongkan','Hapus centang semua akun yang sedang tampil di daftar.']],
   [/openNewProject/,['Proyek baru','Buat proyek baru (wajib login). Anda menjadi pemilik; tim/area yang dipilih ikut bisa mengedit.']],
   [/file-import/,['Import','Muat proyek dari Excel template "PM System S-Curve", file Excel hasil export aplikasi ini, Excel lain berkolom task/tanggal/bobot, atau backup JSON.']],
   [/exportExcel/,['Export Excel','Unduh laporan Excel 7 sheet: ringkasan, task, S-curve, progress log, kendala, change log, health check. Bisa di-import ulang.']],
@@ -2101,10 +2198,11 @@ function renderHelp(){
 
   <div class="card" id="g-akses"><h2>2. Login &amp; hak akses</h2>
     <p>Login memakai akun yang sama dengan <a href="Review_Approval_Dashboard.html" target="_blank" rel="noopener">Review &amp; Approval Dashboard</a>. Daftar akun baru, lupa password, dan pengaturan Team/Area dilakukan di sana. Sesi login berlaku di semua halaman aplikasi di browser yang sama dan berakhir setelah 1 jam tidak aktif.</p>
-    <div class="tbl-wrap"><table class="t"><tr><th>Siapa</th><th>Melihat</th><th>Mengedit</th><th>Hapus proyek / ubah Team-Area</th></tr>
+    <div class="tbl-wrap"><table class="t"><tr><th>Siapa</th><th>Melihat</th><th>Mengedit</th><th>Hapus proyek / ubah Team-Area / atur anggota</th></tr>
       <tr><td>Siapa pun yang punya link (tanpa login)</td><td>✅</td><td>—</td><td>—</td></tr>
       <tr><td>Pembuat proyek</td><td>✅</td><td>✅</td><td>✅</td></tr>
-      <tr><td>Akun dengan Team <b>dan</b> Area sama dengan proyek (mis. E7 · Powerblock)</td><td>✅</td><td>✅</td><td>—</td></tr>
+      <tr><td>Anggota editor yang dipilih pembuat (tab Pengaturan → 👥 Anggota editor)</td><td>✅</td><td>✅</td><td>—</td></tr>
+      <tr><td>Akun dengan Team <b>dan</b> Area sama dengan proyek (mis. E7 · Powerblock) — bisa dimatikan oleh pembuat</td><td>✅</td><td>✅</td><td>—</td></tr>
       <tr><td>Akun tim/area lain (Teknisi, TechOp2)</td><td>✅</td><td>—</td><td>—</td></tr>
       <tr><td>Supervisor</td><td>✅</td><td>✅ semua proyek</td><td>—</td></tr>
       <tr><td>Admin</td><td>✅</td><td>✅ semua proyek</td><td>✅</td></tr></table></div>

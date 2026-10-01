@@ -3596,7 +3596,19 @@ approvals — its data model is a whole project, not a submission.
   `AuthSession` session as `Review_Approval_Dashboard.html` — one login works across both, and
   register / forgot-password / Team & Area setup stay in that dashboard). `canEdit()`: admin and
   supervisor (`EDIT_ALL_ROLES`) → all; creator (`owner.user`) → own project; any account with `team === project.team` and
-  `project.area ∈ its areas` (TechOp2 multi-area via `TeamRouting.toAreaList`). `canManage()`
+  `project.area ∈ its areas` (TechOp2 multi-area via `TeamRouting.toAreaList`).
+  **Anggota editor (2026-10-01):** the creator/admin (`canManage()`) can also pick individual
+  accounts — `P.editors = [{user, name}]` (lowercase username + display name), chosen in
+  Pengaturan → "👥 Anggota editor" → "Kelola anggota" (`openEditorPicker()`: reads the whole
+  `dashboard_users` collection via `loadUsers()` and keeps ONLY username/name/role/team/area —
+  never the password hash; search + team filter + "hanya yang dipilih"; owner and
+  admin/supervisor rows are shown disabled since they can already edit). A member can edit
+  (`isEditorMember()` in `canEdit()`) but not manage. `P.teamAccess` (default `true`) is a
+  checkbox in the same box: switched off, the automatic team+area rule no longer applies and
+  only owner + picked members + supervisor/admin edit. Both fields ride in `remoteMeta()` so the
+  project picker's edit/view badge is right, are normalised by `normEditors()` /
+  `defaultProject()` for older projects, and every change is written to the change log.
+  App-gated like the rest of this model (Firestore rules unchanged). `canManage()`
   (delete, change team/area) = creator or admin. Creating/importing a project requires login and
   stamps `owner{user,name,role}` + `team` + `area` (`setOwner()`; non-admin/supervisor can only
   pick their own team/areas). Every mutation path goes through `guard()` (`mutate()`,
