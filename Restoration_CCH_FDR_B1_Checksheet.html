@@ -159,6 +159,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 @media(max-width:820px){.chart-grid,.findings-grid{grid-template-columns:1fr}}
 @media(max-width:640px){.tb-sub,.tb-sep,.tb-time{display:none}.tb-logo{font-size:16px;letter-spacing:1px}.tb-right{gap:6px}.tb-right .btn-sm,.btn-back{padding:4px 7px;font-size:11px;letter-spacing:0}.hstat{min-width:60px;padding:8px 10px}.hstat-n{font-size:20px}.btn-draft.btn-sm{display:none}.topbar{padding:0 12px;gap:8px}}
 @media(max-width:400px){.wrap{padding:12px 10px 60px}}
+
+/* mobile-topbar-fix: on a phone the topbar buttons scroll inside the bar
+   instead of widening the whole page (which made every page side-scroll) */
+@media(max-width:640px){
+  .tb-right{min-width:0;flex-shrink:1;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tb-right::-webkit-scrollbar{display:none}
+  .tb-right>*{flex-shrink:0}
+}
 </style>
 </head>
 <body>

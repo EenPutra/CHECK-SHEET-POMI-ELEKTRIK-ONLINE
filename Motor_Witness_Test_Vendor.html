@@ -339,6 +339,14 @@ canvas.sigc{border:1.5px solid var(--pb);border-radius:8px;background:#ffffff;wi
 .pd-help b{color:var(--pd-b)}
 @media(max-width:720px){.sw2{grid-template-columns:1fr}.ph h1{font-size:24px}.stats{margin-left:0;width:100%}}
 @media print{.topbar,.tr,.action-row,#pdf-modal-overlay,.autosave-ind{display:none!important}body{background:#fff;color:#000}.sec-body{display:block!important}}
+
+/* mobile-topbar-fix: on a phone the topbar buttons scroll inside the bar
+   instead of widening the whole page (which made every page side-scroll) */
+@media(max-width:640px){
+  .tr{min-width:0;flex-shrink:1;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tr::-webkit-scrollbar{display:none}
+  .tr>*{flex-shrink:0}
+}
 </style>
 </head>
 <body>

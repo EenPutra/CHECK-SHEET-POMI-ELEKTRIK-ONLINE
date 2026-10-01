@@ -299,6 +299,10 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
 .edit-cs-box a{flex-shrink:0;text-decoration:none}
 
 @media(max-width:640px){
+  /* tab row scrolls sideways instead of widening the page */
+  .tabs{overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tab-btn{flex-shrink:0;white-space:nowrap}
   .detail-hdr{flex-direction:column}
   .action-row{justify-content:stretch}
   .action-row button{flex:1}
@@ -309,6 +313,14 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
   .tb-right{order:2;margin-left:auto;flex-wrap:wrap;justify-content:flex-end;gap:6px}
   .tb-nav{order:3;flex:1 0 100%;gap:4px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:2px}
   .tb-nav a{padding:7px 10px;font-size:12px;white-space:nowrap;flex-shrink:0}
+}
+
+/* mobile-topbar-fix: on a phone the topbar buttons scroll inside the bar
+   instead of widening the whole page (which made every page side-scroll) */
+@media(max-width:640px){
+  .tb-right{min-width:0;flex-shrink:1;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tb-right::-webkit-scrollbar{display:none}
+  .tb-right>*{flex-shrink:0}
 }
 </style>
 <script>

@@ -2592,6 +2592,19 @@ visible and hit-testable. `Motor_Witness_Test_Vendor.html` (its own `saveSession
 no `btn-draft` class) and files that never had the rule (e.g. `4000_Hours_Mill_PM.html`) were
 already fine.
 
+## Mobile — the topbar must not widen the page (`mobile-topbar-fix`)
+
+A 390px scan (2026-10-01) found ~48 check sheets whose topbar action row (`.tb-right` / `.tr` /
+`.topbar-right`, a non-wrapping flex row of buttons) was wider than the phone, which widened the
+whole layout viewport (innerWidth 402–705px) so every page could be side-scrolled. Fixed with a
+`/* mobile-topbar-fix */` `@media(max-width:640px)` block at the end of each page's first
+`<style>` (and the 3 generator `.tpl`s): that row gets `min-width:0; overflow-x:auto` (hidden
+scrollbar) and its children `flex-shrink:0`, so the buttons scroll sideways inside the bar.
+Desktop is untouched. Same session: `Review_Approval_Dashboard.html`'s `.tabs` row scrolls on
+phones, and `Transformer_GIS_SF6.html`'s `.giswrap` goes to one column with each table in its own
+`overflow-x:auto` cell. A new page with a topbar button row needs the same block. Check with a
+`mobile:true` 390px CDP viewport: `innerWidth` must stay 390.
+
 ## `pdf-preview.js` — the shared "preview before it goes anywhere" modal
 
 Self-injecting like `submit-guard.js`. Monkey-patches `window.jspdf.jsPDF.API.save` so every

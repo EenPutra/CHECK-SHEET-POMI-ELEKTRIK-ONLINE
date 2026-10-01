@@ -136,6 +136,14 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .photo-cap:focus{outline:none;background:var(--bg2)}
 .photo-empty{color:var(--txt4);font-size:12px;text-align:center;padding:10px}
 @media(max-width:640px){.tb-sub,.tb-sep{display:none}.btn-draft.btn-sm{display:none}}
+
+/* mobile-topbar-fix: on a phone the topbar buttons scroll inside the bar
+   instead of widening the whole page (which made every page side-scroll) */
+@media(max-width:640px){
+  .tb-right{min-width:0;flex-shrink:1;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tb-right::-webkit-scrollbar{display:none}
+  .tb-right>*{flex-shrink:0}
+}
 </style>
 </head>
 <body>

@@ -785,6 +785,14 @@ table.dtbl tr:last-child td{border-bottom:none}
   .tb-nav a{padding:7px 10px;font-size:12px;white-space:nowrap;flex-shrink:0}
   .stat-grid{grid-template-columns:1fr 1fr}
 }
+
+/* mobile-topbar-fix: on a phone the topbar buttons scroll inside the bar
+   instead of widening the whole page (which made every page side-scroll) */
+@media(max-width:640px){
+  .tb-right{min-width:0;flex-shrink:1;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .tb-right::-webkit-scrollbar{display:none}
+  .tb-right>*{flex-shrink:0}
+}
 </style>
 </head>
 <body>
