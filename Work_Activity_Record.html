@@ -136,6 +136,13 @@ body{font-family:var(--sans);background:var(--bg);color:var(--txt);min-height:10
 .drop-zone{border:2px dashed var(--bdr);border-radius:8px;padding:28px 20px;text-align:center;
   cursor:pointer;background:var(--bg2);transition:all .2s;position:relative;overflow:hidden}
 .drop-zone:hover{border-color:var(--blue);background:#eef4ff}
+/* drag & drop / paste target */
+.bc-image.img-drop-over{outline:3px dashed var(--blue);outline-offset:-3px;background:#eef4ff}
+.bc-image.img-active{box-shadow:0 0 0 2px #bfdbfe}
+.img-dnd-hint{font-size:10.5px;color:var(--txt4);font-family:var(--mono);margin-top:6px;text-align:center}
+#page-drop-ov{position:fixed;inset:0;z-index:9000;background:rgba(37,99,235,.10);border:4px dashed var(--blue);display:none;
+  align-items:center;justify-content:center;pointer-events:none;font:700 18px var(--sans,system-ui);color:#1e40af}
+#page-drop-ov.show{display:flex}
 .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
 .drop-ico{font-size:34px;margin-bottom:6px}
 .drop-hint{font-size:11px;color:var(--txt4);font-family:var(--mono)}
@@ -741,7 +748,7 @@ function renderImgBlock(b,i){
     return `<div class="drop-zone">
       <input type="file" accept="image/*" multiple onchange="onAddPhotos(${i},this)">
       <div class="drop-ico">🖼️</div>
-      <div class="drop-hint">Click to add photos<br><small style="font-size:10px">JPG · PNG · WEBP · Multiple OK</small></div>
+      <div class="drop-hint">Klik, tarik &amp; lepas foto ke sini, atau tempel (Ctrl+V / ⌘V)<br><small style="font-size:10px">JPG · PNG · WEBP · Multiple OK</small></div>
     </div>`;
   }
 
@@ -779,6 +786,7 @@ function renderImgBlock(b,i){
   }).join('');
 
   return `<div class="photo-grid screen-only">${screenItems}${addBtn}</div>
+    <div class="img-dnd-hint screen-only">Tambah foto: tarik &amp; lepas ke blok ini, atau klik blok lalu tempel (Ctrl+V / ⌘V)</div>
     <div class="photo-grid print-only">${printItems}</div>`;
 }
 
@@ -963,6 +971,78 @@ function setPhotoSpan(blockIdx,photoIdx,full){
   BLOCKS[blockIdx].photos[photoIdx].full=full;
   renderBlocks();
 }
+
+// ── PASTE & DRAG-AND-DROP ───────────────────────
+// Images pasted (Ctrl+V / ⌘V) or dropped go through the same PhotoKit crop
+// modal as "Add Photo", one after another. Target block: the image block it
+// was dropped on / last clicked; otherwise the last image block; otherwise a
+// new image block is appended.
+let ACTIVE_IMG_ID=null;
+function imageFilesOf(list){return Array.from(list||[]).filter(f=>f&&f.type&&f.type.startsWith('image/'));}
+function targetImageBlock(preferId){
+  let i=BLOCKS.findIndex(b=>b.type==='image'&&b.id===(preferId||ACTIVE_IMG_ID));
+  if(i<0){for(let k=BLOCKS.length-1;k>=0;k--){if(BLOCKS[k].type==='image'){i=k;break;}}}
+  if(i<0){addBlock('image');i=BLOCKS.length-1;}
+  return i;
+}
+function addPhotoFiles(files,preferId){
+  files=imageFilesOf(files);
+  if(!files.length)return false;
+  const bi=targetImageBlock(preferId);
+  const id=BLOCKS[bi].id;ACTIVE_IMG_ID=id;
+  showNote('🖼️ '+files.length+' foto ditambahkan ke blok foto '+(BLOCKS.filter(b=>b.type==='image').findIndex(b=>b.id===id)+1)+' — atur crop untuk tiap foto.','info');
+  const queue=files.slice();
+  (function next(){
+    const f=queue.shift();if(!f)return;
+    PhotoKit.fromFile(f,{},entry=>{
+      const idx=BLOCKS.findIndex(b=>b.id===id);   // the block may have moved meanwhile
+      if(entry&&idx>=0){
+        BLOCKS[idx].photos.push({src:entry.src,w:entry.w,h:entry.h,widthCm:entry.widthCm,heightCm:entry.heightCm,
+          filename:f.name&&f.name!=='image.png'?f.name:(entry.filename||'pasted.jpg'),caption:'',size:'m',full:false});
+        renderBlocks();
+        const card=document.getElementById(id);if(card)card.classList.add('img-active');
+      }
+      next();
+    });
+  })();
+  return true;
+}
+(function initPhotoDnd(){
+  const list=document.getElementById('blocks-list');
+  const ov=document.createElement('div');ov.id='page-drop-ov';ov.textContent='Lepas foto di sini — masuk ke blok foto';document.body.appendChild(ov);
+  const hasFiles=e=>e.dataTransfer&&Array.from(e.dataTransfer.types||[]).includes('Files');
+  const cardOf=el=>el&&el.closest?el.closest('.bc-image'):null;
+  const clearOver=()=>document.querySelectorAll('.bc-image.img-drop-over').forEach(c=>c.classList.remove('img-drop-over'));
+  // remember the image block the user last clicked into (paste target)
+  document.addEventListener('mousedown',e=>{const c=cardOf(e.target);if(c){ACTIVE_IMG_ID=c.id;
+    document.querySelectorAll('.bc-image.img-active').forEach(x=>{if(x!==c)x.classList.remove('img-active');});c.classList.add('img-active');}},true);
+  let depth=0;
+  window.addEventListener('dragenter',e=>{if(!hasFiles(e))return;depth++;ov.classList.add('show');});
+  window.addEventListener('dragleave',e=>{if(!hasFiles(e))return;if(--depth<=0){depth=0;ov.classList.remove('show');clearOver();}});
+  // A File block keeps its own native drop (attachment), so it is left alone.
+  const inFileBlock=e=>!!(e.target.closest&&e.target.closest('.bc-file'));
+  window.addEventListener('dragover',e=>{if(!hasFiles(e))return;clearOver();if(inFileBlock(e))return;e.preventDefault();
+    e.dataTransfer.dropEffect='copy';const c=cardOf(e.target);if(c)c.classList.add('img-drop-over');});
+  window.addEventListener('drop',e=>{depth=0;ov.classList.remove('show');clearOver();
+    if(!hasFiles(e)||inFileBlock(e))return;
+    const imgs=imageFilesOf(e.dataTransfer.files);
+    e.preventDefault();
+    if(!imgs.length){showNote('⚠️ Hanya file gambar (JPG/PNG/WEBP) yang bisa ditambahkan sebagai foto.','err');return;}
+    const c=cardOf(e.target);
+    addPhotoFiles(imgs,c?c.id:null);
+  });
+  document.addEventListener('paste',e=>{
+    const cd=e.clipboardData;if(!cd)return;
+    let files=imageFilesOf(cd.files);
+    if(!files.length)files=imageFilesOf(Array.from(cd.items||[]).filter(it=>it.kind==='file').map(it=>it.getAsFile()));
+    if(!files.length)return;                        // plain text paste: leave it alone
+    if(document.querySelector('.pk-crop.show,#pkCrop.show'))return;   // crop modal open
+    e.preventDefault();
+    const c=cardOf(document.activeElement);
+    addPhotoFiles(files,c?c.id:null);
+  });
+  if(list)list.addEventListener('focusin',e=>{const c=cardOf(e.target);if(c)ACTIVE_IMG_ID=c.id;});
+})();
 
 // ═══════════════════════════════════════════════════
 //  IMAGE EDITOR
