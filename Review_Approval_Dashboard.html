@@ -12,15 +12,15 @@
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=20261001b"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script><script src="firebase-config.js?v=20261005a"></script>
 <!-- ?v bumped on every change to a shared lib so GitHub Pages' 10-min asset
      cache doesn't serve a stale copy (symptom: "Approvals.xxx is not a function"). -->
-<script src="db-helper.js?v=20261001b"></script>
-<script src="storage-helper.js?v=20261001b"></script>
-<script src="approval-helper.js?v=20261001b"></script>
-<script src="auth-session.js?v=20261001b"></script>
-<script src="feedback-widget.js?v=20261001b"></script>
-<script src="team-routing.js?v=20261001b"></script>
+<script src="db-helper.js?v=20261005a"></script>
+<script src="storage-helper.js?v=20261005a"></script>
+<script src="approval-helper.js?v=20261005a"></script>
+<script src="auth-session.js?v=20261005a"></script>
+<script src="feedback-widget.js?v=20261005a"></script>
+<script src="team-routing.js?v=20261005a"></script>
 <style>
 :root{
   --bg:#f4f7fb; --bg-2:#eaf0f7; --surf:#ffffff; --surf-2:#f8fafc;
@@ -523,8 +523,8 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
 <div class="login-overlay" id="manual-overlay" style="display:none">
   <div class="login-box">
     <button class="settings-x" onclick="closeManualUpload()" title="Tutup">&times;</button>
-    <div class="login-logo" style="font-size:18px">UPLOAD <span>MANUAL</span></div>
-    <div class="login-sub" style="margin-bottom:14px">Masukkan laporan yang tidak lewat check sheet ke alur Review &amp; Approval. Isi data, lampirkan PDF, dan gambar (opsional).</div>
+    <div class="login-logo" style="font-size:18px" id="mu-title">UPLOAD <span>MANUAL</span></div>
+    <div class="login-sub" style="margin-bottom:14px" id="mu-sub">Masukkan laporan yang tidak lewat check sheet ke alur Review &amp; Approval. Isi data, lampirkan PDF, dan gambar (opsional).</div>
 
     <div class="login-field-lbl">Judul / Nama Laporan *</div>
     <input type="text" class="login-field" id="mu-name" placeholder="cth. Kalibrasi Flow Meter FGD">
@@ -548,11 +548,12 @@ canvas.sig-canvas{border:1.5px dashed var(--bdr-2);border-radius:10px;background
     <textarea class="dinput" id="mu-notes" placeholder="Ringkasan pekerjaan / temuan (opsional)"></textarea>
 
     <div class="settings-sec" style="margin-top:14px">
-      <h4>File PDF Laporan *</h4>
+      <h4 id="mu-pdf-lbl">File PDF Laporan *</h4>
       <input type="file" id="mu-pdf" accept="application/pdf,.pdf" class="login-field" style="padding:9px">
-      <h4 style="margin-top:14px">Gambar / Foto (opsional, bisa banyak)</h4>
+      <h4 style="margin-top:14px" id="mu-img-lbl">Gambar / Foto (opsional, bisa banyak)</h4>
       <input type="file" id="mu-images" accept="image/*" multiple class="login-field" style="padding:9px">
       <div class="login-hint" id="mu-img-count" style="margin-top:4px"></div>
+      <div class="login-hint" id="mu-keep-hint" style="margin-top:8px;display:none"></div>
     </div>
 
     <button class="login-btn" id="mu-btn" onclick="submitManualUpload()">&#128228; Submit ke Review &amp; Approval</button>
@@ -1222,6 +1223,53 @@ function openManualUpload(){
   document.getElementById('mu-img-count').textContent = '';
   document.getElementById('mu-err').textContent = '';
   _muInFlightId = null; // a fresh form is a fresh report — abandon any earlier failed-attempt doc id
+  _muRevise = null;
+  _muSetMode();
+}
+// Revise mode: edit an existing manual upload in place (same checksheet +
+// approval docs). A 'returned_to_technician' entry becomes 'revised' on
+// resubmit (Approvals.submitWithFiles existingApprovalId path). The PDF and
+// photos are optional — left empty, the ones already on Drive are kept.
+let _muRevise = null;
+function _isManualUpload(a, cs){ return !!a && (a._src === 'Upload manual' || a.src === 'Upload manual' || !!(cs && cs.manualUpload)); }
+function _muSetMode(){
+  const r = _muRevise;
+  document.getElementById('mu-title').innerHTML = r ? 'REVISI <span>UPLOAD MANUAL</span>' : 'UPLOAD <span>MANUAL</span>';
+  document.getElementById('mu-sub').textContent = r
+    ? 'Perbaiki data laporan manual ini lalu kirim ulang. Laporan yang sama diperbarui (tidak membuat laporan baru) dan kembali ke antrean review.'
+    : 'Masukkan laporan yang tidak lewat check sheet ke alur Review & Approval. Isi data, lampirkan PDF, dan gambar (opsional).';
+  document.getElementById('mu-pdf-lbl').textContent = r ? 'Ganti File PDF (opsional)' : 'File PDF Laporan *';
+  document.getElementById('mu-img-lbl').textContent = r ? 'Ganti Gambar / Foto (opsional)' : 'Gambar / Foto (opsional, bisa banyak)';
+  const kh = document.getElementById('mu-keep-hint');
+  if(r){
+    const nImg = r.cs && r.cs.photoUrls ? Object.values(r.cs.photoUrls).reduce((n,l)=>n+((l||[]).length),0) : 0;
+    kh.style.display = '';
+    kh.textContent = 'Kosongkan bila tidak diganti — PDF' + (nImg ? ' dan ' + nImg + ' gambar' : '') + ' yang sudah ada tetap dipakai. Memilih gambar baru menggantikan semua gambar lama.';
+  } else kh.style.display = 'none';
+  document.getElementById('mu-btn').innerHTML = r ? '&#128260; Simpan Revisi &amp; Kirim Ulang' : '&#128228; Submit ke Review &amp; Approval';
+}
+async function openManualRevision(id){
+  const a = _allApprovals.find(x => x.id === id) || _curApproval;
+  if(!a){ alert('Data tidak ditemukan.'); return; }
+  let cs = _checksheetCache[a.checksheetId];
+  if(cs === undefined){ try{ cs = await getChecksheet(a.checksheetId); }catch(e){ cs = null; } }
+  if(!cs){ alert('Data laporan manual tidak ditemukan di database — hubungi admin.'); return; }
+  if(loggedInRole !== 'admin' && !_isMyOwnReport(a, cs)){ alert('Anda hanya bisa merevisi laporan milik akun Anda sendiri.'); return; }
+  if(a.status === 'approved'){ alert('Laporan sudah disetujui (final) — tidak bisa direvisi. Hubungi admin.'); return; }
+  if(typeof closeDetail === 'function') try{ closeDetail(); }catch(e){}
+  openManualUpload();
+  _muRevise = { approvalId: a.id, checksheetId: a.checksheetId, cs };
+  _muInFlightId = a.checksheetId;
+  document.getElementById('mu-name').value = cs.assetName || a.assetName || '';
+  document.getElementById('mu-wo').value = cs.woNumber || '';
+  document.getElementById('mu-tag').value = (cs.assetTag && cs.assetTag !== 'MANUAL-UPLOAD') ? cs.assetTag : '';
+  document.getElementById('mu-date').value = (cs.executionDate || '').slice(0,10);
+  document.getElementById('mu-pic').value = cs.checkedBy || a.submittedBy || '';
+  document.getElementById('mu-notes').value = cs.findings || '';
+  const team = TEAM_AREAS[a.team] ? a.team : (TEAM_AREAS[a._team] ? a._team : '');
+  document.getElementById('mu-team').value = team;
+  renderAreaChecks('mu-area-checks', team, [a.area || a._area].filter(Boolean));
+  _muSetMode();
 }
 function closeManualUpload(){
   const ov = document.getElementById('manual-overlay');
@@ -1275,8 +1323,9 @@ async function submitManualUpload(){
   if(!pic){ errEl.textContent = 'Isi PIC / pelaksana.'; return; }
   if(!TEAM_AREAS[team]){ errEl.textContent = 'Pilih Team.'; return; }
   if(areas.length !== 1){ errEl.textContent = 'Pilih tepat satu Area.'; return; }
-  if(!pdfFile){ errEl.textContent = 'Lampirkan file PDF laporan.'; return; }
-  if(pdfFile.type && pdfFile.type.indexOf('pdf') === -1){ errEl.textContent = 'File utama harus PDF.'; return; }
+  const rev = _muRevise;
+  if(!pdfFile && !(rev && rev.cs && rev.cs.pdfUrl)){ errEl.textContent = 'Lampirkan file PDF laporan.'; return; }
+  if(pdfFile && pdfFile.type && pdfFile.type.indexOf('pdf') === -1){ errEl.textContent = 'File utama harus PDF.'; return; }
 
   btn.disabled = true; btn.textContent = 'Mengunggah...';
   showFileProgress('Menyiapkan laporan manual…');
@@ -1292,15 +1341,17 @@ async function submitManualUpload(){
       // who put this into the system (may differ from the PIC) — dashboard.html
       // scopes a technician's view to their own submissions, and matches this
       // too so the uploader can track its status there.
-      uploadedBy: loggedInName || loggedInUser || '',
-      uploadedByUsername: loggedInUser || '',
+      // a revision keeps the ORIGINAL uploader — ownership must not move to
+      // whoever happens to fix it (e.g. an admin)
+      uploadedBy: (rev && rev.cs && rev.cs.uploadedBy) || loggedInName || loggedInUser || '',
+      uploadedByUsername: (rev && rev.cs && rev.cs.uploadedByUsername) || loggedInUser || '',
       sheets: { info: { title: 'Laporan Manual (Upload)', columns: ['Value'], rows: [
         { no: '1', desc: 'Judul', values: { Value: assetName } },
         { no: '2', desc: 'No. WO', values: { Value: woNumber || '—' } },
         { no: '3', desc: 'Tanggal', values: { Value: executionDate } },
         { no: '4', desc: 'PIC / Pelaksana', values: { Value: pic } },
         { no: '5', desc: 'Team / Area', values: { Value: team + ' / ' + area } },
-        { no: '6', desc: 'Diinput oleh', values: { Value: loggedInName || loggedInUser } },
+        { no: '6', desc: 'Diinput oleh', values: { Value: (rev && rev.cs && rev.cs.uploadedBy) || loggedInName || loggedInUser } },
         { no: '7', desc: 'Catatan', values: { Value: notes || '—' } },
       ] } },
     };
@@ -1309,6 +1360,12 @@ async function submitManualUpload(){
     // DB.save() a second, duplicate checksheet doc with no approval record
     // ever pointing at it (an orphan nothing in this app cleans up
     // automatically, unlike an orphaned APPROVAL — see CLAUDE.md).
+    // DB.update() is a full replace — carry the files already on Drive over
+    // unless this revision replaces them (submitWithFiles re-attaches new ones).
+    if(rev && rev.cs){
+      if(!pdfFile && rev.cs.pdfUrl) base.pdfUrl = rev.cs.pdfUrl;
+      if(!imgFiles.length && rev.cs.photoUrls) base.photoUrls = rev.cs.photoUrls;
+    }
     let id = _muInFlightId;
     if(id){
       setFileProgressPct(6, 'Melanjutkan laporan yang tersimpan…');
@@ -1331,18 +1388,22 @@ async function submitManualUpload(){
       photos: photoEntries.length ? { manual: photoEntries } : null,
       // No jsPDF here — hand submitWithFiles the uploaded file directly; it
       // only ever calls pdf.output('blob') on this.
-      pdfBuilder: () => ({ output: () => pdfFile }),
+      pdfBuilder: pdfFile ? () => ({ output: () => pdfFile }) : null,
       assetTag: assetTag || 'MANUAL-UPLOAD', assetName,
       checksheetFile: '', submittedBy: pic,
       team, area, src: 'Upload manual',
+      existingApprovalId: rev ? rev.approvalId : undefined,
       onProgress: (pct, label) => setFileProgressPct(10 + Math.round(pct * 0.85), label),
     });
     if(!ok) throw new Error('Sebagian file gagal diupload — cek koneksi lalu tekan Submit lagi (data laporan sudah tersimpan, tidak akan dobel).');
 
     finishFileProgress();
     _muInFlightId = null; // fully succeeded — a later Manual Upload starts a fresh doc
+    _muRevise = null;
+    if(rev) delete _checksheetCache[rev.checksheetId];
     closeManualUpload();
-    alert('✅ Laporan manual masuk ke Review & Approval (team ' + team + ' · ' + area + ').');
+    alert(rev ? '✅ Revisi laporan manual tersimpan dan dikirim ulang ke antrean review.'
+              : '✅ Laporan manual masuk ke Review & Approval (team ' + team + ' · ' + area + ').');
     await loadAll();
   }catch(err){
     hideFileProgress();
@@ -1350,7 +1411,7 @@ async function submitManualUpload(){
     errEl.textContent = 'Gagal: ' + (err.message || err) +
       (_muInFlightId ? ' Data laporan sudah tersimpan — tekan Submit lagi untuk melanjutkan (tidak akan dobel).' : '');
   }
-  btn.disabled = false; btn.textContent = '📤 Submit ke Review & Approval';
+  btn.disabled = false; _muSetMode();
 }
 
 function doLogout(){
@@ -1790,7 +1851,7 @@ function _isMyOwnReport(a, cs){
 // A submitter may EDIT their own report while it's still in the review pipeline
 // (opening ?reviseOf= resets it appropriately on resubmit) but never once
 // APPROVED — that's final, contact admin.
-function _canOwnerEdit(a){ return a && a.status !== 'approved' && !!a.checksheetFile && !a._src; }
+function _canOwnerEdit(a){ return a && a.status !== 'approved' && ((!!a.checksheetFile && !a._src) || _isManualUpload(a)); }
 // A submitter may DELETE their own report at ANY status if there was a
 // mistake — the gate is ownership (_isMyOwnReport), not workflow stage. The
 // confirm dialog in doDeleteMyReport() escalates by status: a plain confirm
@@ -1798,7 +1859,7 @@ function _canOwnerEdit(a){ return a && a.status !== 'approved' && !!a.checksheet
 // approved (that also discards the reviewer's / supervisor's signed work).
 // External-feed submissions (_src) still can't be deleted here — they live in
 // another app.
-function _canOwnerDelete(a){ return !!a && !a._src; }
+function _canOwnerDelete(a){ return !!a && (!a._src || _isManualUpload(a)); }
 function _msIReviewed(a){ return a.review && _msMatches(a.review.reviewedBy); }
 function _msIApproved(a){ return a.approval && _msMatches(a.approval.approvedBy); }
 function _msInMyArea(a){
@@ -2001,12 +2062,15 @@ function _msCard(a){
       + detail;
   }
   const acts = [`<button class="btn btn-sm btn-pri" onclick="openDetail('${a.id}')">Detail lengkap</button>`];
+  if(a.status==='returned_to_technician' && _isManualUpload(a, cs) && _msISubmitted(a)){
+    acts.push(`<button class="btn btn-sm" onclick="openManualRevision('${a.id}')">Perbaiki &amp; kirim ulang</button>`);
+  }
   if(a.status==='returned_to_technician' && a.checksheetFile && !a._src && _msISubmitted(a)){
     acts.push(`<a class="btn btn-sm" target="_blank" rel="noopener" href="${escHtml(a.checksheetFile.replace(/ /g,'%20'))}?reviseOf=${encodeURIComponent(a.id)}">Perbaiki &amp; kirim ulang</a>`);
   }
   // Own-report self-service (strict ownership) — never for another account's report
-  if(loggedInRole !== 'admin' && !a._src && _isMyOwnReport(a, cs)){
-    if(a.status!=='returned_to_technician' && _canOwnerEdit(a)){
+  if(loggedInRole !== 'admin' && (!a._src || _isManualUpload(a, cs)) && _isMyOwnReport(a, cs)){
+    if((a.status!=='returned_to_technician' || _isManualUpload(a, cs)) && _canOwnerEdit(a) && !(a.status==='returned_to_technician' && _msISubmitted(a))){
       acts.push(`<button class="btn btn-sm" onclick="openOwnRevision('${a.id}')">&#9999;&#65039; Perbaiki / Edit</button>`);
     }
     if(_canOwnerDelete(a)){
@@ -2432,6 +2496,7 @@ function _afterApprovalRemoved(id){
 // report belonging to another account. Admin keeps its own fuller toolset.
 function openOwnRevision(id){
   const a = _allApprovals.find(x => x.id === id) || _curApproval;
+  if(_isManualUpload(a, a && _checksheetCache[a.checksheetId])){ openManualRevision(id); return; }
   if(!a || !a.checksheetFile){ alert('Check sheet asal tidak diketahui — hubungi admin.'); return; }
   window.open(a.checksheetFile.replace(/ /g,'%20') + '?reviseOf=' + encodeURIComponent(id), '_blank', 'noopener');
 }
@@ -2673,7 +2738,7 @@ function renderDetail(a, cs){
   // Submitter self-service: fix or retract YOUR OWN report if there's a
   // mistake. Strict ownership (_isMyOwnReport) — never shown for a report
   // belonging to another account. Admin has its own fuller toolset below.
-  if(loggedInRole !== 'admin' && !a._src && _isMyOwnReport(a, cs)){
+  if(loggedInRole !== 'admin' && (!a._src || _isManualUpload(a, cs)) && _isMyOwnReport(a, cs)){
     const canEdit = _canOwnerEdit(a);
     const canDel  = _canOwnerDelete(a);
     html += `<div class="dsec danger-zone" style="border-color:rgba(37,99,235,.22);background:var(--pri-soft)">
@@ -2681,7 +2746,7 @@ function renderDetail(a, cs){
       <div class="readonly-hint" style="margin-bottom:10px">Laporan ini Anda yang submit. Perbaiki isian bila ada kesalahan, atau hapus laporannya bila memang salah.</div>`;
     if(canEdit){
       html += `<button class="btn btn-sm btn-pri" onclick="openOwnRevision('${a.id}')">&#9999;&#65039; Perbaiki / Edit Laporan Ini</button>
-        <div class="readonly-hint" style="margin:6px 0 0">Membuka check sheet dalam mode revisi. Setelah disimpan ulang, laporan kembali ke antrean review.</div>`;
+        <div class="readonly-hint" style="margin:6px 0 0">${_isManualUpload(a, cs) ? 'Membuka form upload manual berisi data laporan ini. PDF/gambar boleh diganti atau dibiarkan.' : 'Membuka check sheet dalam mode revisi.'} Setelah disimpan ulang, laporan kembali ke antrean review.</div>`;
     }else{
       html += `<div class="readonly-hint" style="color:var(--ng)">Laporan sudah <b>disetujui (final)</b> — tidak bisa diedit sendiri. Hubungi admin bila hanya perlu perbaikan isian (bukan hapus).</div>`;
     }
@@ -2948,14 +3013,28 @@ function pdfDownloadName(a, cs, suffix){
   cs = cs || _curChecksheet || {};
   const rawDate = ((cs.executionDate || a._date || '').trim()) || String(a.createdAt || '').slice(0, 10);
   const digits = rawDate.replace(/[^0-9]/g, '').slice(0, 8);
-  const ymd = digits.length === 8 ? `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}` : 'TanpaTanggal';
+  // Missing parts are simply left out (no "TanpaTanggal"/"TanpaWO" placeholders).
+  const ymd = digits.length === 8 ? `${digits.slice(0,4)}-${digits.slice(4,6)}-${digits.slice(6,8)}` : '';
   const clean = s => String(s || '').replace(/[\\/:*?"<>|\r\n\t]+/g, '-').replace(/\s+/g, ' ').trim();
-  const wo   = clean(cs.woNumber || a._wo) || 'TanpaWO';
-  const tag  = clean(cs.assetTag || a.assetTag) || 'TanpaTag';
-  let name   = clean(cs.assetName || a.assetName);
-  if(!name || name.toLowerCase() === tag.toLowerCase()) name = '';   // don't repeat the tag
-  const parts = [ymd, wo, tag, name, suffix].filter(Boolean);
-  return parts.join(' ') + '.pdf';
+  const wo   = clean(cs.woNumber || a._wo);
+  let tag    = clean(cs.assetTag || a.assetTag);
+  if(/^(MANUAL-UPLOAD|WORK-ACTIVITY-RECORD|MAINTENANCE-CORRECTIVE-ACTION)$/i.test(tag)) tag = '';
+  const name = clean(cs.assetName || a.assetName);
+  // Drop every word that an earlier part already used, so a report whose
+  // name repeats its WO / tag ("2511043908,2511043851 FEGT & Leak Detection")
+  // doesn't print it twice. Comma lists count per item.
+  const seen = new Set(), parts = [];
+  [ymd, wo, tag, name, suffix].forEach(p => {
+    if(!p) return;
+    const kept = p.split(' ').filter(w => {
+      const items = w.toLowerCase().split(',').filter(Boolean);
+      return !items.length || !items.every(x => seen.has(x));
+    });
+    p.toLowerCase().split(/[ ,]+/).filter(Boolean).forEach(x => seen.add(x));
+    const out = kept.join(' ').replace(/^[\s&,+\-–—]+|[\s&,+\-–—]+$/g, '').trim();
+    if(out) parts.push(out);
+  });
+  return (parts.join(' ') || 'laporan') + '.pdf';
 }
 // Fetch a drive-proxy PDF and save it with a real filename (not open in a tab).
 function downloadRemoteFile(url, filename){
@@ -3262,18 +3341,26 @@ async function buildFinalPdf(approval, cs, onProgress){
   });
   y = pdf.lastAutoTable.finalY + 8;
 
+  // Content stays above FOOT_Y; anything that would cross it moves to a new
+  // page (a long approval note used to push the signature onto the footer
+  // line or off the page). The footer is stamped on every page at the end.
+  const FOOT_Y = 280, TOP_Y = 20;
+  const ensure = h => { if(y + h > FOOT_Y){ pdf.addPage(); y = TOP_Y; } };
   function section(title, rows, sigDataUrl, signerLabel){
+    ensure(30);   // title + at least the first table rows
     pdf.setFont('helvetica','bold'); pdf.setFontSize(12); pdf.setTextColor(30,58,95);
     pdf.text(title, M, y); y += 6;
     pdf.setTextColor(0,0,0);
     pdf.autoTable({
       startY:y, theme:'grid', styles:{fontSize:9.5, cellPadding:3},
+      margin:{top:TOP_Y, bottom:297-FOOT_Y+2, left:M, right:M},
       columnStyles:{0:{cellWidth:42, fontStyle:'bold', fillColor:[240,247,255]}},
       body: rows,
     });
     y = pdf.lastAutoTable.finalY + 4;
     if(sigDataUrl){
-      pdf.setFontSize(9);
+      ensure(36);   // label + 25mm signature image, kept together
+      pdf.setFont('helvetica','bold'); pdf.setFontSize(9);
       pdf.text(signerLabel, M, y + 4);
       pdf.addImage(sigDataUrl, 'PNG', M, y + 6, 55, 25); // canvas is drawn at a matching 2.2:1 ratio — no stretch
       y += 36;
@@ -3297,8 +3384,13 @@ async function buildFinalPdf(approval, cs, onProgress){
     ], approval.approval.signature, 'Tanda tangan: '+(approval.approval.approvedBy||'-'));
   }
 
-  pdf.setFontSize(8.5); pdf.setTextColor(140);
-  pdf.text('Dokumen dibuat otomatis oleh sistem Review & Approval — ELECTRIC 7 POMI.', M, 289);
+  const nPages = pdf.internal.getNumberOfPages();
+  for(let pg = 1; pg <= nPages; pg++){
+    pdf.setPage(pg);
+    pdf.setFont('helvetica','normal'); pdf.setFontSize(8.5); pdf.setTextColor(140);
+    pdf.text('Dokumen dibuat otomatis oleh sistem Review & Approval — ELECTRIC 7 POMI.', M, 289);
+    if(nPages > 1) pdf.text('Hal. ' + pg + '/' + nPages, 210 - M, 289, {align:'right'});
+  }
 
   const addendumBytes = pdf.output('arraybuffer');
 

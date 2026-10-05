@@ -1478,6 +1478,14 @@ the current design — **do not "simplify" these away**:
   `cs.assetTag`/`a.assetTag`; name from `assetName`, dropped when it equals the tag; empty parts
   omitted; filesystem-unsafe chars → `-`; `'FINAL'` suffix for the approved PDF).
   The detail view shows the computed name above the buttons.
+  **No placeholders, no repeats (2026-10-05, FB-5IGCYC):** a missing date / WO / tag is simply
+  left out (no `TanpaTanggal`), synthetic tags (`MANUAL-UPLOAD`, …) are dropped, and any word an
+  earlier part already used is skipped — a report named "2511043908,2511043851 FEGT & Leak
+  Detection" with that same WO no longer prints the WO twice (comma lists are compared per item).
+  **`buildFinalPdf()` keeps content above the footer:** `ensure(h)` starts a new page when a
+  section title, a table (autoTable `margin.bottom`) or a signature (label + 25 mm image, kept
+  together) would cross y=280; the footer and "Hal. n/N" are stamped on every page at the end.
+  A long approval note used to push the signature onto the footer line or off the page.
   `deleteByUrl(url)` is best-effort, dev/test cleanup only. **`DRIVE_PROXY_URL`**
   at the top of this file is the one deployment-specific value — must match whatever Web App
   URL `drive-proxy.gs` is actually deployed at (ends in `/exec`); if it still contains the
@@ -2031,6 +2039,16 @@ This was an explicit user request; the design decisions were confirmed up front:
   instead of `DB.save()`-ing a new one; cleared only on full success (or when the modal is
   reopened fresh). The error message now tells the user this explicitly ("tekan Submit lagi...
   tidak akan dobel") instead of leaving them to guess whether retrying is safe.
+- **The owner can revise or delete their own manual upload (2026-10-05, report FB-TEDIQX).**
+  `src:'Upload manual'` used to fall under the same `!a._src` gate as real external feeds, so a
+  returned manual upload could be neither fixed nor deleted. `_isManualUpload(a, cs)` now exempts
+  it in `_canOwnerEdit()` / `_canOwnerDelete()` and the owner sections. Edit =
+  `openManualRevision(id)`: the same `#manual-overlay` in revise mode (`_muRevise`,
+  `_muSetMode()`), prefilled from the checksheet doc; PDF and images are optional — left empty,
+  the existing `pdfUrl` / `photoUrls` are carried into the `DB.update()` (a full replace) so
+  nothing is lost; new images replace all old ones. Resubmit goes through
+  `submitWithFiles({existingApprovalId})`, so `returned_to_technician` → `revised` like a check
+  sheet revision. The original `uploadedBy` is kept so ownership never moves to whoever fixed it.
 - **External feeds** (`EXTERNAL_SUBMITTER_SCOPE`): other POMI mini-apps post into the same
   `checksheets`/`approvals` collections via `Approvals.submitWithFiles()` but can't hold
   `dashboard_users` accounts, so they send a **fixed synthetic `submittedBy` per plant area**
@@ -2561,7 +2579,7 @@ lib (`approval-helper.js`, `team-routing.js`, `db-helper.js`, `auth-session.js`,
 without revalidating — the symptom is a fresh page HTML calling a method the cached lib
 doesn't have yet (`"Approvals.cancelReturn is not a function"`). As of the `revised`-status
 rollout (2026-08-30) **every** `.html` page in the repo loads the shared libs with a single
-shared `?v=YYYYMMDDx` query string (currently `?v=20261001b`) — a Python one-liner rewrites
+shared `?v=YYYYMMDDx` query string (currently `?v=20261005a`) — a Python one-liner rewrites
 all `<script src="[../]<lib>.js?v=…">` includes at once. **On any shared-lib change, bump the
 suffix repo-wide** (same script) so no browser serves a stale copy of a lib whose API the
 new page HTML depends on. The revision-overwrite flow in particular is triggered from a
@@ -2685,6 +2703,17 @@ reporter (prefilled from `AuthSession`, editable — no login required), optiona
 - Rules (`firestore.rules`, deployed 2026-10-01): public create only as `status:'baru'` with a
   known `type` and size-capped title/description; update cannot change `createdAt`, `reporter`,
   `title`, `description`; status must stay in the known set. Role gates are app-side (Level 1).
+- **Drag & drop (2026-10-05, report FB-5IGCYC):** images dropped on the open panel or on the 💬
+  button (which opens the panel) are attached like a paste; both listeners `stopPropagation()` so
+  a page's own drop handler (Work Activity Record) doesn't also take them, and drops anywhere else
+  stay with the page.
+- **Working the reports from the command line:** `tools/feedback.py` (stdlib only, Firestore
+  REST, same open rules) — `list` prints every open report in full and saves its screenshots as
+  JPGs, `set <FB-XXXXXX> <status> --note ...` appends a `history` entry like the page does. The
+  project skill **`/perbaiki-aduan`** (`.claude/skills/perbaiki-aduan/SKILL.md`) is the one-command
+  flow: list → triage → mark `dikerjakan` → fix per CLAUDE.md → verify headless with fail-loud
+  mocks → commit + push → mark `selesai` (with the commit hash) or `ditinjau`/`ditolak` with the
+  reason.
 
 ## Technician login on check sheets — auto-filling "Checked By" (`technician-auth.js`)
 

@@ -179,6 +179,10 @@
 .fbw-ok code{background:#eff6ff;color:#1e3a5f;padding:2px 7px;border-radius:5px;font-weight:700}
 .fbw-foot{border-top:1px solid #e2e8f0;padding:7px 12px;font-size:11.5px;display:flex;justify-content:space-between;gap:8px;color:#64748b}
 .fbw-foot a{color:#2563eb;text-decoration:none;font-weight:600}
+#fbw-panel.fbw-over{outline:3px dashed #2563eb;outline-offset:-3px}
+#fbw-panel.fbw-over .fbw-shots{background:#eff6ff}
+#fbw-btn.fbw-over{transform:scale(1.15);background:#2563eb}
+.fbw-shots{border-radius:7px;transition:background .15s}
 @media(max-width:480px){#fbw-panel{right:8px;left:8px;width:auto;max-width:none;bottom:60px}}
 @media print{#fbw-btn,#fbw-panel,#fbw-tip{display:none!important}}
 `;
@@ -222,6 +226,23 @@
       if (files.length) { e.preventDefault(); addFiles(files); }
     });
     document.addEventListener('keydown', e => { if (e.key === 'Escape' && isOpen()) close(); });
+
+    // Drag & drop images onto the open panel, or onto the 💬 button (opens the
+    // panel). Only these two targets — drops elsewhere stay with the page.
+    const hasFiles = e => e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+    const imgsOf = e => Array.from((e.dataTransfer && e.dataTransfer.files) || []).filter(f => f.type && f.type.startsWith('image/'));
+    [panel, btn].forEach(el => {
+      el.addEventListener('dragover', e => { if (!hasFiles(e)) return; e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; el.classList.add('fbw-over'); });
+      el.addEventListener('dragleave', e => { if (!el.contains(e.relatedTarget)) el.classList.remove('fbw-over'); });
+      el.addEventListener('drop', e => {
+        if (!hasFiles(e)) return;
+        e.preventDefault(); e.stopPropagation(); el.classList.remove('fbw-over');
+        const files = imgsOf(e);
+        if (!isOpen()) open();
+        if (files.length) addFiles(files);
+        else { const err = document.getElementById('fbw-err'); if (err) err.textContent = 'Hanya file gambar yang bisa dilampirkan.'; }
+      });
+    });
 
     reposition();
     // Sit above submit-guard.js's "Mode Hemat Data" badge (same corner).
@@ -289,7 +310,7 @@
         </div>
         <span class="fbw-lbl">Screenshot <span style="text-transform:none;font-weight:500;color:#64748b">(maks ${MAX_SHOTS})</span></span>
         <div class="fbw-shots" id="fbw-shots"></div>
-        <div class="fbw-hint">Pilih gambar, atau tempel langsung dengan Ctrl+V / ⌘V.</div>
+        <div class="fbw-hint">Klik ＋, <b>tarik &amp; lepas</b> gambar ke panel ini, atau <b>tempel</b> (Ctrl+V / ⌘V) — tidak perlu simpan file dulu.</div>
         <input type="file" id="fbw-file" accept="image/*" multiple style="display:none">
         <div class="fbw-row">
           <div><label class="fbw-lbl" for="fbw-name">Nama pelapor</label>
